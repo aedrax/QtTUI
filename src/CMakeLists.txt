@@ -1,9 +1,11 @@
 set(QTTUI_SOURCES
     placeholder.cpp
+    ScreenBuffer.cpp
 )
 
 set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QtTUIGlobal.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/ScreenBuffer.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})

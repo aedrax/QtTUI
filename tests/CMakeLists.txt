@@ -27,3 +27,6 @@ endfunction()
 
 # Placeholder test to verify the test build works
 qttui_add_test(test_placeholder test_placeholder.cpp)
+
+# ScreenBuffer property tests (Properties 5, 8)
+qttui_add_test(test_screen_buffer test_screen_buffer.cpp)
