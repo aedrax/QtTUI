@@ -233,6 +233,7 @@ private slots:
                             parseIdx = j + 1;
                             int currentX = cupPos.x();
                             int currentY = cupPos.y();
+                            bool firstCharAfterCup = true;
 
                             // Walk through SGR+char pairs until next CUP or end
                             while (parseIdx < output.size()) {
@@ -251,10 +252,15 @@ private slots:
                                         // Next should be the character
                                         if (parseIdx < output.size()
                                             && output[parseIdx] != '\x1b') {
-                                            // This is a batched cell at (currentX+1, currentY)
-                                            currentX++;
-                                            QPoint batchedPos(currentX, currentY);
-                                            renderedPositions.insert(batchedPos);
+                                            if (firstCharAfterCup) {
+                                                // First SGR+char belongs to the CUP position itself
+                                                firstCharAfterCup = false;
+                                            } else {
+                                                // Subsequent chars are batched adjacent cells
+                                                currentX++;
+                                                QPoint batchedPos(currentX, currentY);
+                                                renderedPositions.insert(batchedPos);
+                                            }
                                             parseIdx++;
                                         }
                                     } else if (k < output.size() && output[k] == 'H') {
