@@ -48,6 +48,7 @@ public:
     int height() const;
 
     Cell &backCell(int x, int y);
+    const Cell &backCell(int x, int y) const;
     const Cell &frontCell(int x, int y) const;
 
     QVector<QPoint> diff() const;

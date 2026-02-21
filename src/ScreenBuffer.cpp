@@ -59,6 +59,17 @@ Cell &ScreenBuffer::backCell(int x, int y)
     return m_back[index(x, y)];
 }
 
+const Cell &ScreenBuffer::backCell(int x, int y) const
+{
+    if (!inBounds(x, y)) {
+        qWarning() << "ScreenBuffer::backCell: out of bounds access at"
+                    << x << "," << y
+                    << "(buffer size" << m_width << "x" << m_height << ")";
+        return s_defaultCell;
+    }
+    return m_back[index(x, y)];
+}
+
 const Cell &ScreenBuffer::frontCell(int x, int y) const
 {
     if (!inBounds(x, y)) {

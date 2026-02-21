@@ -1,11 +1,13 @@
 set(QTTUI_SOURCES
     placeholder.cpp
     ScreenBuffer.cpp
+    AnsiRenderer.cpp
 )
 
 set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QtTUIGlobal.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/ScreenBuffer.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/AnsiRenderer.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})
