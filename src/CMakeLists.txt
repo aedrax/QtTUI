@@ -2,12 +2,21 @@ set(QTTUI_SOURCES
     placeholder.cpp
     ScreenBuffer.cpp
     AnsiRenderer.cpp
+    TerminalBackend.cpp
 )
+
+# Platform-specific backend sources
+if(WIN32)
+    list(APPEND QTTUI_SOURCES WindowsBackend.cpp)
+else()
+    list(APPEND QTTUI_SOURCES PosixBackend.cpp)
+endif()
 
 set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QtTUIGlobal.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/ScreenBuffer.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/AnsiRenderer.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/TerminalBackend.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})

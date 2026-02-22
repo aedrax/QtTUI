@@ -33,3 +33,19 @@ qttui_add_test(test_screen_buffer test_screen_buffer.cpp)
 
 # AnsiRenderer unit tests (differential rendering, batching)
 qttui_add_test(test_ansi_renderer test_ansi_renderer.cpp)
+
+# MockTerminalBackend (shared test helper, compiled as object library)
+add_library(mock_terminal_backend OBJECT MockTerminalBackend.cpp MockTerminalBackend.h)
+target_link_libraries(mock_terminal_backend PUBLIC QtTUI::QtTUI Qt6::Core Qt6::Test)
+target_include_directories(mock_terminal_backend PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+# TerminalBackend property tests (Property 35)
+add_executable(test_terminal_backend test_terminal_backend.cpp)
+target_link_libraries(test_terminal_backend PRIVATE
+    QtTUI::QtTUI
+    Qt6::Core
+    Qt6::Test
+    rapidcheck
+    mock_terminal_backend
+)
+add_test(NAME test_terminal_backend COMMAND test_terminal_backend)
