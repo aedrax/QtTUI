@@ -39,6 +39,9 @@ add_library(mock_terminal_backend OBJECT MockTerminalBackend.cpp MockTerminalBac
 target_link_libraries(mock_terminal_backend PUBLIC QtTUI::QtTUI Qt6::Core Qt6::Test)
 target_include_directories(mock_terminal_backend PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
+# InputParser property tests (Properties 1-4)
+qttui_add_test(test_input_parser test_input_parser.cpp)
+
 # TerminalBackend property tests (Property 35)
 add_executable(test_terminal_backend test_terminal_backend.cpp)
 target_link_libraries(test_terminal_backend PRIVATE

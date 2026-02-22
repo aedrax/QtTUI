@@ -3,6 +3,8 @@ set(QTTUI_SOURCES
     ScreenBuffer.cpp
     AnsiRenderer.cpp
     TerminalBackend.cpp
+    TuiEvents.cpp
+    InputParser.cpp
 )
 
 # Platform-specific backend sources
@@ -17,6 +19,8 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/ScreenBuffer.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/AnsiRenderer.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/TerminalBackend.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/TuiEvents.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/InputParser.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})
