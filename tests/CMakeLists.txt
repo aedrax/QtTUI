@@ -52,3 +52,6 @@ target_link_libraries(test_terminal_backend PRIVATE
     mock_terminal_backend
 )
 add_test(NAME test_terminal_backend COMMAND test_terminal_backend)
+
+# QTuiWidget property tests (Properties 10-13)
+qttui_add_test(test_qtui_widget test_qtui_widget.cpp)

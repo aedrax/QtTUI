@@ -5,6 +5,7 @@ set(QTTUI_SOURCES
     TerminalBackend.cpp
     TuiEvents.cpp
     InputParser.cpp
+    QTuiWidget.cpp
 )
 
 # Platform-specific backend sources
@@ -21,6 +22,7 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/TerminalBackend.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/TuiEvents.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/InputParser.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiWidget.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})
