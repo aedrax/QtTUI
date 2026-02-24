@@ -1,0 +1,141 @@
+#include <QtTUI/QTuiMainWindow.h>
+#include <QtTUI/ScreenBuffer.h>
+#include <QtTUI/TuiEvents.h>
+#include <QCoreApplication>
+#include <QDebug>
+
+namespace QtTUI {
+
+QTuiMainWindow::QTuiMainWindow(QTuiWidget *parent)
+    : QTuiWidget(parent)
+{
+}
+
+void QTuiMainWindow::setCentralWidget(QTuiWidget *widget)
+{
+    if (m_centralWidget == widget)
+        return;
+
+    // Detach previous central widget (reparent away, don't delete)
+    if (m_centralWidget) {
+        m_centralWidget->setParent(nullptr);
+    }
+
+    m_centralWidget = widget;
+
+    if (m_centralWidget) {
+        m_centralWidget->setParent(this);
+        // Fill available area
+        m_centralWidget->setGeometry(geometry());
+    }
+
+    rebuildFocusChain();
+}
+
+QTuiWidget *QTuiMainWindow::centralWidget() const
+{
+    return m_centralWidget;
+}
+
+void QTuiMainWindow::show()
+{
+    setVisible(true);
+    // Trigger initial layout and paint
+    relayoutChildren();
+}
+
+void QTuiMainWindow::paintEvent(ScreenBuffer &buffer)
+{
+    // Delegate painting to all visible children
+    for (auto *child : childWidgets()) {
+        if (child->isVisible()) {
+            child->paintEvent(buffer);
+        }
+    }
+}
+
+void QTuiMainWindow::resizeEvent(TuiResizeEvent *event)
+{
+    setGeometry(QRect(0, 0, event->size().width(), event->size().height()));
+    relayoutChildren();
+}
+
+void QTuiMainWindow::keyPressEvent(TuiKeyEvent *event)
+{
+    if (event->key() == Qt::Key_Tab) {
+        if (event->modifiers() & Qt::ShiftModifier) {
+            advanceFocus(false);
+        } else {
+            advanceFocus(true);
+        }
+        return;
+    }
+
+    // Forward to focused child if any
+    for (auto *child : childWidgets()) {
+        if (child->hasFocus()) {
+            QCoreApplication::sendEvent(child, event);
+            return;
+        }
+    }
+}
+
+void QTuiMainWindow::relayoutChildren()
+{
+    if (m_centralWidget) {
+        m_centralWidget->setGeometry(geometry());
+    }
+
+    // Also relayout any other children to fit within bounds
+    for (auto *child : childWidgets()) {
+        if (child != m_centralWidget && child->isVisible()) {
+            QRect childGeo = child->geometry();
+            QRect bounds = geometry();
+            // Clamp child geometry to within main window bounds
+            if (childGeo.right() > bounds.right() || childGeo.bottom() > bounds.bottom()) {
+                childGeo = childGeo.intersected(bounds);
+                child->setGeometry(childGeo);
+            }
+        }
+    }
+}
+
+void QTuiMainWindow::advanceFocus(bool forward)
+{
+    rebuildFocusChain();
+
+    if (m_focusChain.isEmpty())
+        return;
+
+    const int n = m_focusChain.size();
+    int currentIdx = -1;
+
+    for (int i = 0; i < n; ++i) {
+        if (m_focusChain[i]->hasFocus()) {
+            currentIdx = i;
+            break;
+        }
+    }
+
+    int nextIdx;
+    if (currentIdx < 0) {
+        // No widget has focus, start at first (forward) or last (backward)
+        nextIdx = forward ? 0 : n - 1;
+    } else {
+        nextIdx = forward ? (currentIdx + 1) % n : (currentIdx - 1 + n) % n;
+    }
+
+    m_focusChain[nextIdx]->setFocus();
+}
+
+void QTuiMainWindow::rebuildFocusChain()
+{
+    m_focusChain.clear();
+    for (auto *child : childWidgets()) {
+        if (child->isVisible()) {
+            m_focusChain.append(child);
+        }
+    }
+}
+
+} // namespace QtTUI
