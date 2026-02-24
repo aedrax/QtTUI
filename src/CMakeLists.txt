@@ -7,6 +7,7 @@ set(QTTUI_SOURCES
     InputParser.cpp
     QTuiWidget.cpp
     QTuiMainWindow.cpp
+    QTuiLineEdit.cpp
 )
 
 # Platform-specific backend sources
@@ -25,6 +26,7 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/InputParser.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiWidget.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiMainWindow.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiLineEdit.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})
