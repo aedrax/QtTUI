@@ -64,3 +64,6 @@ qttui_add_test(test_qtui_lineedit test_qtui_lineedit.cpp)
 
 # QTuiTableView property tests (Properties 17-21)
 qttui_add_test(test_qtui_tableview test_qtui_tableview.cpp)
+
+# QTuiListView property tests (Properties 22-25)
+qttui_add_test(test_qtui_listview test_qtui_listview.cpp)

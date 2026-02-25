@@ -9,6 +9,7 @@ set(QTTUI_SOURCES
     QTuiMainWindow.cpp
     QTuiLineEdit.cpp
     QTuiTableView.cpp
+    QTuiListView.cpp
 )
 
 # Platform-specific backend sources
@@ -29,6 +30,7 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiMainWindow.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiLineEdit.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTableView.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiListView.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})
