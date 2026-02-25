@@ -61,3 +61,6 @@ qttui_add_test(test_qtui_mainwindow test_qtui_mainwindow.cpp)
 
 # QTuiLineEdit property tests (Properties 26-30)
 qttui_add_test(test_qtui_lineedit test_qtui_lineedit.cpp)
+
+# QTuiTableView property tests (Properties 17-21)
+qttui_add_test(test_qtui_tableview test_qtui_tableview.cpp)
