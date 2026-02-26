@@ -11,6 +11,7 @@ set(QTTUI_SOURCES
     QTuiTableView.cpp
     QTuiListView.cpp
     QTuiBoxLayout.cpp
+    QTuiApplication.cpp
 )
 
 # Platform-specific backend sources
@@ -33,6 +34,7 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTableView.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiListView.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiBoxLayout.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiApplication.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})
