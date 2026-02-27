@@ -6,6 +6,8 @@
 
 namespace QtTUI {
 
+class QTuiBoxLayout;
+
 class QTuiMainWindow : public QTuiWidget {
     Q_OBJECT
 public:
@@ -13,6 +15,9 @@ public:
 
     void setCentralWidget(QTuiWidget *widget);
     QTuiWidget *centralWidget() const;
+
+    void setLayout(QTuiBoxLayout *layout);
+    QTuiBoxLayout *layout() const;
 
     void show();
 
@@ -28,6 +33,7 @@ private:
     void rebuildFocusChain();
 
     QTuiWidget *m_centralWidget = nullptr;
+    QTuiBoxLayout *m_layout = nullptr;
     QList<QTuiWidget *> m_focusChain;
 };
 

@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiMainWindow.h>
+#include <QtTUI/QTuiBoxLayout.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
 #include <QCoreApplication>
@@ -35,6 +36,24 @@ void QTuiMainWindow::setCentralWidget(QTuiWidget *widget)
 QTuiWidget *QTuiMainWindow::centralWidget() const
 {
     return m_centralWidget;
+}
+
+void QTuiMainWindow::setLayout(QTuiBoxLayout *layout)
+{
+    if (m_layout == layout)
+        return;
+
+    // Take ownership of the new layout
+    if (layout && layout->parent() != this)
+        layout->setParent(this);
+
+    m_layout = layout;
+    relayoutChildren();
+}
+
+QTuiBoxLayout *QTuiMainWindow::layout() const
+{
+    return m_layout;
 }
 
 void QTuiMainWindow::show()
@@ -82,16 +101,21 @@ void QTuiMainWindow::keyPressEvent(TuiKeyEvent *event)
 
 void QTuiMainWindow::relayoutChildren()
 {
-    if (m_centralWidget) {
+    if (m_layout) {
+        // Delegate to the layout manager
+        m_layout->apply(geometry());
+    } else if (m_centralWidget) {
+        // No layout, central widget fills the entire area
         m_centralWidget->setGeometry(geometry());
     }
 
-    // Also relayout any other children to fit within bounds
+    // Clamp any non-layout-managed children to within bounds
     for (auto *child : childWidgets()) {
+        if (m_layout)
+            break; // Layout handles all managed widgets
         if (child != m_centralWidget && child->isVisible()) {
             QRect childGeo = child->geometry();
             QRect bounds = geometry();
-            // Clamp child geometry to within main window bounds
             if (childGeo.right() > bounds.right() || childGeo.bottom() > bounds.bottom()) {
                 childGeo = childGeo.intersected(bounds);
                 child->setGeometry(childGeo);

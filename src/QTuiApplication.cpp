@@ -1,6 +1,8 @@
 #include <QtTUI/QTuiApplication.h>
+#include <QtTUI/QTuiMainWindow.h>
 
 #include <QSocketNotifier>
+#include <QTimer>
 
 #include <cstdlib>
 
@@ -74,8 +76,26 @@ ScreenBuffer *QTuiApplication::screenBuffer() const
     return m_screenBuffer.get();
 }
 
+void QTuiApplication::setMainWindow(QTuiMainWindow *window)
+{
+    m_mainWindow = window;
+}
+
+QTuiMainWindow *QTuiApplication::mainWindow() const
+{
+    return m_mainWindow;
+}
+
 void QTuiApplication::triggerRender()
 {
+    m_renderScheduled = false;
+
+    // Paint the widget tree into the back buffer
+    if (m_mainWindow && m_mainWindow->isVisible()) {
+        m_mainWindow->paintEvent(*m_screenBuffer);
+    }
+
+    // Diff and write only changed cells to the terminal
     QByteArray output = m_renderer->render(*m_screenBuffer);
     if (!output.isEmpty()) {
         m_backend->write(output);
@@ -83,11 +103,22 @@ void QTuiApplication::triggerRender()
     m_screenBuffer->swapBuffers();
 }
 
+void QTuiApplication::scheduleRender()
+{
+    if (m_renderScheduled)
+        return;
+    m_renderScheduled = true;
+    // Fire after all pending events are processed
+    QTimer::singleShot(0, this, &QTuiApplication::triggerRender);
+}
+
 void QTuiApplication::onInputReady()
 {
     QByteArray data = m_backend->read();
     if (!data.isEmpty()) {
         m_inputParser->processInput(data);
+        // Schedule a render after the event batch is dispatched
+        scheduleRender();
     }
 }
 
@@ -96,6 +127,8 @@ void QTuiApplication::onTerminalResized(QSize newSize)
     m_screenBuffer->resize(newSize.width(), newSize.height());
     m_inputParser->setTerminalSize(newSize);
     m_inputParser->processResize(newSize);
+    // Resize triggers relayout in widgets, schedule a full repaint
+    scheduleRender();
 }
 
 void QTuiApplication::restoreTerminal()

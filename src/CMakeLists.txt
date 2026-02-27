@@ -22,6 +22,7 @@ else()
 endif()
 
 set(QTTUI_HEADERS
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QtTUI
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QtTUIGlobal.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/ScreenBuffer.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/AnsiRenderer.h
@@ -56,10 +57,15 @@ install(TARGETS QtTUI
     RUNTIME DESTINATION bin
 )
 
-# Install public headers
+# Install public headers (*.h files)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/QtTUI
     DESTINATION include
     FILES_MATCHING PATTERN "*.h"
+)
+
+# Install umbrella header (no extension, not matched by *.h glob)
+install(FILES ${CMAKE_SOURCE_DIR}/include/QtTUI/QtTUI
+    DESTINATION include/QtTUI
 )
 
 # Install CMake config files for find_package(QtTUI REQUIRED)

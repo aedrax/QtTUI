@@ -16,6 +16,8 @@ class QSocketNotifier;
 
 namespace QtTUI {
 
+class QTuiMainWindow;
+
 class QTuiApplication : public QCoreApplication {
     Q_OBJECT
 public:
@@ -27,7 +29,11 @@ public:
     TerminalBackend *backend() const;
     ScreenBuffer *screenBuffer() const;
 
+    void setMainWindow(QTuiMainWindow *window);
+    QTuiMainWindow *mainWindow() const;
+
     void triggerRender();
+    void scheduleRender();
 
 private slots:
     void onInputReady();
@@ -41,6 +47,8 @@ private:
     std::unique_ptr<ScreenBuffer> m_screenBuffer;
     std::unique_ptr<AnsiRenderer> m_renderer;
     QSocketNotifier *m_inputNotifier = nullptr;
+    QTuiMainWindow *m_mainWindow = nullptr;
+    bool m_renderScheduled = false;
 
     static QTuiApplication *s_instance;
 };

@@ -1,0 +1,21 @@
+// QtTUI umbrella header
+// Include this single header to get all QtTUI public classes.
+
+#ifndef QTTUI_QTTUI_H
+#define QTTUI_QTTUI_H
+
+#include <QtTUI/QtTUIGlobal.h>
+#include <QtTUI/ScreenBuffer.h>
+#include <QtTUI/AnsiRenderer.h>
+#include <QtTUI/TerminalBackend.h>
+#include <QtTUI/TuiEvents.h>
+#include <QtTUI/InputParser.h>
+#include <QtTUI/QTuiWidget.h>
+#include <QtTUI/QTuiMainWindow.h>
+#include <QtTUI/QTuiLineEdit.h>
+#include <QtTUI/QTuiTableView.h>
+#include <QtTUI/QTuiListView.h>
+#include <QtTUI/QTuiBoxLayout.h>
+#include <QtTUI/QTuiApplication.h>
+
+#endif // QTTUI_QTTUI_H
