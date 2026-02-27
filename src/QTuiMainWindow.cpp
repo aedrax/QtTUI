@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiMainWindow.h>
+#include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiBoxLayout.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
@@ -48,7 +49,9 @@ void QTuiMainWindow::setLayout(QTuiBoxLayout *layout)
         layout->setParent(this);
 
     m_layout = layout;
-    relayoutChildren();
+    // Only relayout if we already have a valid geometry (e.g. after show())
+    if (!geometry().isEmpty())
+        relayoutChildren();
 }
 
 QTuiBoxLayout *QTuiMainWindow::layout() const
@@ -59,6 +62,14 @@ QTuiBoxLayout *QTuiMainWindow::layout() const
 void QTuiMainWindow::show()
 {
     setVisible(true);
+    // Initialize geometry from terminal size if not yet set
+    if (geometry().isEmpty()) {
+        auto *app = QTuiApplication::instance();
+        if (app && app->backend()) {
+            QSize sz = app->backend()->terminalSize();
+            setGeometry(QRect(0, 0, sz.width(), sz.height()));
+        }
+    }
     // Trigger initial layout and paint
     relayoutChildren();
 }

@@ -9,6 +9,11 @@ QTuiLineEdit::QTuiLineEdit(QTuiWidget *parent)
 {
 }
 
+QSize QTuiLineEdit::minimumSize() const
+{
+    return QSize(1, 1);
+}
+
 QString QTuiLineEdit::text() const
 {
     return m_text;

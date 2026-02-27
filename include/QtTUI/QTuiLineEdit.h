@@ -20,6 +20,8 @@ public:
 
     void paintEvent(ScreenBuffer &buffer) override;
 
+    QSize minimumSize() const override;
+
 signals:
     void textChanged(const QString &text);
     void returnPressed();
