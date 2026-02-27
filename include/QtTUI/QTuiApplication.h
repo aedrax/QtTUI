@@ -35,6 +35,9 @@ public:
     void triggerRender();
     void scheduleRender();
 
+protected:
+    bool event(QEvent *event) override;
+
 private slots:
     void onInputReady();
     void onTerminalResized(QSize newSize);

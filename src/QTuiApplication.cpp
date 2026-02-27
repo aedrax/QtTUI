@@ -1,6 +1,8 @@
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiMainWindow.h>
 
+#include <QtTUI/TuiEvents.h>
+
 #include <QSocketNotifier>
 #include <QTimer>
 
@@ -101,6 +103,19 @@ void QTuiApplication::triggerRender()
         m_backend->write(output);
     }
     m_screenBuffer->swapBuffers();
+}
+
+bool QTuiApplication::event(QEvent *event)
+{
+    // Forward TUI events to the main window
+    if (m_mainWindow) {
+        if (event->type() == TuiEventTypes::keyEventType()
+            || event->type() == TuiEventTypes::mouseEventType()
+            || event->type() == TuiEventTypes::resizeEventType()) {
+            return QCoreApplication::sendEvent(m_mainWindow, event);
+        }
+    }
+    return QCoreApplication::event(event);
 }
 
 void QTuiApplication::scheduleRender()
