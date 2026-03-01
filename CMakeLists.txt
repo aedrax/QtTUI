@@ -14,3 +14,8 @@ if(QTTUI_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
+
+option(QTTUI_BUILD_DEMOS "Build QtTUI demos" ON)
+if(QTTUI_BUILD_DEMOS)
+    add_subdirectory(demos)
+endif()
