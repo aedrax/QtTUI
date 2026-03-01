@@ -1,6 +1,6 @@
 #include <QtTUI/QTuiMainWindow.h>
 #include <QtTUI/QTuiApplication.h>
-#include <QtTUI/QTuiBoxLayout.h>
+#include <QtTUI/QTuiLayout.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
 #include <QCoreApplication>
@@ -39,7 +39,7 @@ QTuiWidget *QTuiMainWindow::centralWidget() const
     return m_centralWidget;
 }
 
-void QTuiMainWindow::setLayout(QTuiBoxLayout *layout)
+void QTuiMainWindow::setLayout(QTuiLayout *layout)
 {
     if (m_layout == layout)
         return;
@@ -54,7 +54,7 @@ void QTuiMainWindow::setLayout(QTuiBoxLayout *layout)
         relayoutChildren();
 }
 
-QTuiBoxLayout *QTuiMainWindow::layout() const
+QTuiLayout *QTuiMainWindow::layout() const
 {
     return m_layout;
 }

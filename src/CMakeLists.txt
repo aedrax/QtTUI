@@ -12,6 +12,9 @@ set(QTTUI_SOURCES
     QTuiListView.cpp
     QTuiBoxLayout.cpp
     QTuiApplication.cpp
+    QTuiSizePolicy.cpp
+    QTuiLayoutItem.cpp
+    QTuiLayout.cpp
 )
 
 # Platform-specific backend sources
@@ -36,6 +39,9 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiListView.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiBoxLayout.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiApplication.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiSizePolicy.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiLayoutItem.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiLayout.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})

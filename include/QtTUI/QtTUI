@@ -17,5 +17,8 @@
 #include <QtTUI/QTuiListView.h>
 #include <QtTUI/QTuiBoxLayout.h>
 #include <QtTUI/QTuiApplication.h>
+#include <QtTUI/QTuiSizePolicy.h>
+#include <QtTUI/QTuiLayoutItem.h>
+#include <QtTUI/QTuiLayout.h>
 
 #endif // QTTUI_QTTUI_H
