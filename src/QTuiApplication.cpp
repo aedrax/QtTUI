@@ -40,6 +40,9 @@ QTuiApplication::QTuiApplication(int &argc, char **argv)
     m_backend->enterAlternateScreen();
     m_backend->enterRawMode();
 
+    // Force a full redraw on the first render cycle
+    m_screenBuffer->invalidateAll();
+
     // Register atexit safety net for terminal restoration
     std::atexit(atexitHandler);
 
