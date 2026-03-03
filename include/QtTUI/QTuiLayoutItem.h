@@ -9,6 +9,7 @@
 namespace QtTUI {
 
 class QTuiWidget;
+class QTuiLayout;
 
 class QTuiLayoutItem {
 public:
@@ -67,6 +68,26 @@ public:
 private:
     int m_width;
     int m_height;
+    QRect m_geometry;
+};
+
+class QTuiLayoutItemWrapper : public QTuiLayoutItem {
+public:
+    explicit QTuiLayoutItemWrapper(QTuiLayout *layout);
+
+    QSize sizeHint() const override;
+    QSize minimumSize() const override;
+    QSize maximumSize() const override;
+
+    void setGeometry(const QRect &rect) override;
+    QRect geometry() const override;
+
+    bool isEmpty() const override;
+
+    QTuiLayout *layout() const;
+
+private:
+    QTuiLayout *m_layout;
     QRect m_geometry;
 };
 

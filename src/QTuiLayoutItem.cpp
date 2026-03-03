@@ -1,5 +1,6 @@
 #include <QtTUI/QTuiLayoutItem.h>
 #include <QtTUI/QTuiWidget.h>
+#include <QtTUI/QTuiLayout.h>
 
 namespace QtTUI {
 
@@ -124,6 +125,50 @@ QRect QTuiSpacerItem::geometry() const
 bool QTuiSpacerItem::isEmpty() const
 {
     return false;
+}
+
+// --- QTuiLayoutItemWrapper ---
+
+QTuiLayoutItemWrapper::QTuiLayoutItemWrapper(QTuiLayout *layout)
+    : m_layout(layout)
+{
+}
+
+QSize QTuiLayoutItemWrapper::sizeHint() const
+{
+    return QSize(0, 0);
+}
+
+QSize QTuiLayoutItemWrapper::minimumSize() const
+{
+    return QSize(0, 0);
+}
+
+QSize QTuiLayoutItemWrapper::maximumSize() const
+{
+    return QSize(16777215, 16777215);
+}
+
+void QTuiLayoutItemWrapper::setGeometry(const QRect &rect)
+{
+    m_geometry = rect;
+    if (m_layout)
+        m_layout->apply(rect);
+}
+
+QRect QTuiLayoutItemWrapper::geometry() const
+{
+    return m_geometry;
+}
+
+bool QTuiLayoutItemWrapper::isEmpty() const
+{
+    return !m_layout || m_layout->count() == 0;
+}
+
+QTuiLayout *QTuiLayoutItemWrapper::layout() const
+{
+    return m_layout;
 }
 
 } // namespace QtTUI

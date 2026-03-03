@@ -73,3 +73,12 @@ qttui_add_test(test_qtui_boxlayout test_qtui_boxlayout.cpp)
 
 # Layout base classes unit tests
 qttui_add_test(test_qtui_layout_base test_qtui_layout_base.cpp)
+
+# QTuiFormLayout unit tests
+qttui_add_test(test_qtui_form_layout test_qtui_form_layout.cpp)
+
+# QTuiGridLayout unit tests
+qttui_add_test(test_qtui_grid_layout test_qtui_grid_layout.cpp)
+
+# QTuiStackedLayout unit tests
+qttui_add_test(test_qtui_stacked_layout test_qtui_stacked_layout.cpp)
