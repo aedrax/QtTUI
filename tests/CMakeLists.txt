@@ -70,3 +70,6 @@ qttui_add_test(test_qtui_listview test_qtui_listview.cpp)
 
 # QTuiBoxLayout property tests (Properties 31-32)
 qttui_add_test(test_qtui_boxlayout test_qtui_boxlayout.cpp)
+
+# Layout base classes unit tests
+qttui_add_test(test_qtui_layout_base test_qtui_layout_base.cpp)
