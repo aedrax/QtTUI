@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiListView.h>
+#include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
 #include <QDebug>
@@ -55,6 +56,7 @@ void QTuiListView::paintEvent(ScreenBuffer &buffer)
     if (geo.width() <= 0 || geo.height() <= 0 || !m_model)
         return;
 
+    const auto theme = themeProperties();
     const int rows = m_model->rowCount();
     const int viewWidth = geo.width();
     const int viewHeight = geo.height();
@@ -69,11 +71,19 @@ void QTuiListView::paintEvent(ScreenBuffer &buffer)
             itemText = m_model->data(idx, Qt::DisplayRole).toString();
         }
 
+        bool isCurrent = (modelRow == m_currentRow && modelRow < rows);
         for (int x = 0; x < viewWidth; ++x) {
             Cell &cell = buffer.backCell(geo.x() + x, screenY);
             cell.character = (x < itemText.length()) ? itemText.at(x) : QLatin1Char(' ');
             cell.bold = false;
-            cell.inverse = (modelRow == m_currentRow && modelRow < rows);
+            if (isCurrent) {
+                cell.foreground = theme.focusForeground;
+                cell.background = theme.focusBackground;
+            } else {
+                cell.foreground = theme.foreground;
+                cell.background = theme.background;
+            }
+            cell.inverse = isCurrent;
         }
     }
 }

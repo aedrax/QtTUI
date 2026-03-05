@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiWidget.h>
+#include <QtTUI/Theme_Engine.h>
 #include <QtTUI/TuiEvents.h>
 #include <QDebug>
 
@@ -107,6 +108,11 @@ QList<QTuiWidget *> QTuiWidget::childWidgets() const
 QSize QTuiWidget::minimumSize() const
 {
     return QSize(0, 0);
+}
+
+ThemeProperties QTuiWidget::themeProperties() const
+{
+    return Theme_Engine::instance()->effectiveProperties(this);
 }
 
 bool QTuiWidget::event(QEvent *event)

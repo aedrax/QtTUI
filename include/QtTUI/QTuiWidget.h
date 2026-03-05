@@ -9,6 +9,7 @@
 
 namespace QtTUI {
 
+struct ThemeProperties;
 class ScreenBuffer;
 class TuiKeyEvent;
 class TuiMouseEvent;
@@ -36,6 +37,9 @@ public:
 
     virtual QSize minimumSize() const;
     virtual void paintEvent(ScreenBuffer &buffer) = 0;
+
+    // Theme integration: returns effective theme properties for this widget
+    ThemeProperties themeProperties() const;
 
 signals:
     void geometryChanged(const QRect &rect);

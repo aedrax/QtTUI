@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiLineEdit.h>
+#include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
 
@@ -104,6 +105,7 @@ void QTuiLineEdit::paintEvent(ScreenBuffer &buffer)
     if (geo.width() <= 0 || geo.height() <= 0)
         return;
 
+    const auto theme = themeProperties();
     int visibleWidth = geo.width();
     int y = geo.y();
     int xStart = geo.x();
@@ -116,10 +118,17 @@ void QTuiLineEdit::paintEvent(ScreenBuffer &buffer)
         } else {
             cell.character = QLatin1Char(' ');
         }
+        cell.bold = theme.bold;
+        cell.italic = theme.italic;
+        cell.underline = theme.underline;
         // Highlight cursor position
         if (hasFocus() && textIdx == m_cursorPos) {
+            cell.foreground = theme.focusForeground;
+            cell.background = theme.focusBackground;
             cell.inverse = true;
         } else {
+            cell.foreground = theme.foreground;
+            cell.background = theme.background;
             cell.inverse = false;
         }
     }

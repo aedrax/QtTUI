@@ -82,3 +82,6 @@ qttui_add_test(test_qtui_grid_layout test_qtui_grid_layout.cpp)
 
 # QTuiStackedLayout unit tests
 qttui_add_test(test_qtui_stacked_layout test_qtui_stacked_layout.cpp)
+
+# Theme_Engine unit tests
+qttui_add_test(test_theme_engine test_theme_engine.cpp)

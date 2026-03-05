@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiTableView.h>
+#include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
 #include <QDebug>
@@ -57,6 +58,7 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
     if (geo.width() <= 0 || geo.height() <= 0 || !m_model)
         return;
 
+    const auto theme = themeProperties();
     const int cols = m_model->columnCount();
     const int rows = m_model->rowCount();
     const int viewWidth = geo.width();
@@ -79,6 +81,8 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
             for (int i = 0; i < colWidths[c] && xOff + i < geo.x() + viewWidth; ++i) {
                 Cell &cell = buffer.backCell(xOff + i, geo.y());
                 cell.character = (i < header.length()) ? header.at(i) : QLatin1Char(' ');
+                cell.foreground = theme.foreground;
+                cell.background = theme.background;
                 cell.bold = true;
                 cell.inverse = false;
             }
@@ -105,7 +109,15 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
                 cell.character = (i < cellText.length()) ? cellText.at(i) : QLatin1Char(' ');
                 cell.bold = false;
                 // Highlight current cell
-                cell.inverse = (modelRow == m_currentRow && c == m_currentCol && modelRow < rows);
+                bool isCurrent = (modelRow == m_currentRow && c == m_currentCol && modelRow < rows);
+                if (isCurrent) {
+                    cell.foreground = theme.focusForeground;
+                    cell.background = theme.focusBackground;
+                } else {
+                    cell.foreground = theme.foreground;
+                    cell.background = theme.background;
+                }
+                cell.inverse = isCurrent;
             }
             xOff += colWidths[c];
         }

@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiLabel.h>
+#include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 
 namespace QtTUI {
@@ -33,6 +34,7 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
     if (!isVisible() || geo.isEmpty())
         return;
 
+    const auto theme = themeProperties();
     const int startX = geo.x();
     const int y = geo.y();
     const int maxWidth = geo.width();
@@ -41,6 +43,11 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
         if (startX + i < buffer.width() && y < buffer.height()) {
             Cell &cell = buffer.backCell(startX + i, y);
             cell.character = m_text.at(i);
+            cell.foreground = theme.foreground;
+            cell.background = theme.background;
+            cell.bold = theme.bold;
+            cell.italic = theme.italic;
+            cell.underline = theme.underline;
         }
     }
 }
