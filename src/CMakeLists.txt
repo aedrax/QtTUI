@@ -20,6 +20,7 @@ set(QTTUI_SOURCES
     QTuiGridLayout.cpp
     QTuiStackedLayout.cpp
     Theme_Engine.cpp
+    UI_Loader.cpp
 )
 
 # Platform-specific backend sources
@@ -52,6 +53,7 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiGridLayout.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiStackedLayout.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/Theme_Engine.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/UI_Loader.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})

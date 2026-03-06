@@ -85,3 +85,6 @@ qttui_add_test(test_qtui_stacked_layout test_qtui_stacked_layout.cpp)
 
 # Theme_Engine unit tests
 qttui_add_test(test_theme_engine test_theme_engine.cpp)
+
+# UI_Loader unit tests
+qttui_add_test(test_ui_loader test_ui_loader.cpp)

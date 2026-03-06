@@ -20,5 +20,7 @@
 #include <QtTUI/QTuiSizePolicy.h>
 #include <QtTUI/QTuiLayoutItem.h>
 #include <QtTUI/QTuiLayout.h>
+#include <QtTUI/Theme_Engine.h>
+#include <QtTUI/UI_Loader.h>
 
 #endif // QTTUI_QTTUI_H
