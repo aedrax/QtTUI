@@ -88,3 +88,6 @@ qttui_add_test(test_theme_engine test_theme_engine.cpp)
 
 # UI_Loader unit tests
 qttui_add_test(test_ui_loader test_ui_loader.cpp)
+
+# QTuiLabel unit tests
+qttui_add_test(test_qtui_label test_qtui_label.cpp)
