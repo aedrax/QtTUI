@@ -21,6 +21,11 @@ set(QTTUI_SOURCES
     QTuiStackedLayout.cpp
     Theme_Engine.cpp
     UI_Loader.cpp
+    QTuiPushButton.cpp
+    QTuiToolButton.cpp
+    QTuiCheckBox.cpp
+    QTuiRadioButton.cpp
+    QTuiButtonGroup.cpp
 )
 
 # Platform-specific backend sources
@@ -54,6 +59,11 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiStackedLayout.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/Theme_Engine.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/UI_Loader.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiPushButton.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiToolButton.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiCheckBox.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiRadioButton.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiButtonGroup.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})
