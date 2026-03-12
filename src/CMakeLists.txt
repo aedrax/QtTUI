@@ -26,6 +26,10 @@ set(QTTUI_SOURCES
     QTuiCheckBox.cpp
     QTuiRadioButton.cpp
     QTuiButtonGroup.cpp
+    QTuiSpinBox.cpp
+    QTuiDoubleSpinBox.cpp
+    QTuiSlider.cpp
+    QTuiDial.cpp
 )
 
 # Platform-specific backend sources
@@ -64,6 +68,10 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiCheckBox.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiRadioButton.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiButtonGroup.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiSpinBox.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiDoubleSpinBox.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiSlider.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiDial.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})
