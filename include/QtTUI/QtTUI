@@ -22,5 +22,7 @@
 #include <QtTUI/QTuiLayout.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/UI_Loader.h>
+#include <QtTUI/QTuiComboBox.h>
+#include <QtTUI/QTuiProgressBar.h>
 
 #endif // QTTUI_QTTUI_H

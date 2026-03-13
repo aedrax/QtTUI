@@ -30,6 +30,8 @@ set(QTTUI_SOURCES
     QTuiDoubleSpinBox.cpp
     QTuiSlider.cpp
     QTuiDial.cpp
+    QTuiComboBox.cpp
+    QTuiProgressBar.cpp
 )
 
 # Platform-specific backend sources
@@ -72,6 +74,8 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiDoubleSpinBox.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiSlider.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiDial.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiComboBox.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiProgressBar.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})
