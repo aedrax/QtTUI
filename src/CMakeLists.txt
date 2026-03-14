@@ -32,6 +32,7 @@ set(QTTUI_SOURCES
     QTuiDial.cpp
     QTuiComboBox.cpp
     QTuiProgressBar.cpp
+    QTuiTextEdit.cpp
 )
 
 # Platform-specific backend sources
@@ -76,6 +77,7 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiDial.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiComboBox.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiProgressBar.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTextEdit.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})

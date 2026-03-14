@@ -1,0 +1,781 @@
+#include <QtTest/QtTest>
+#include <rapidcheck.h>
+#include <QSignalSpy>
+#include <QCoreApplication>
+#include <QtTUI/QTuiTextEdit.h>
+#include <QtTUI/ScreenBuffer.h>
+#include <QtTUI/TuiEvents.h>
+
+using namespace QtTUI;
+
+static void sendKey(QTuiTextEdit &w, int key, Qt::KeyboardModifiers mods = Qt::NoModifier,
+                    const QString &text = QString())
+{
+    TuiKeyEvent ev(key, mods, text);
+    QCoreApplication::sendEvent(&w, &ev);
+}
+
+class TestQTuiTextEdit : public QObject {
+    Q_OBJECT
+private slots:
+
+    void inheritsQTuiWidget()
+    {
+        QTuiTextEdit te;
+        QVERIFY(qobject_cast<QTuiWidget *>(&te) != nullptr);
+    }
+
+    void defaultConstruction()
+    {
+        QTuiTextEdit te;
+        QCOMPARE(te.toPlainText(), QString());
+        QCOMPARE(te.cursorRow(), 0);
+        QCOMPARE(te.cursorColumn(), 0);
+        QCOMPARE(te.isReadOnly(), false);
+        QCOMPARE(te.hasSelection(), false);
+    }
+
+    void setPlainText_basic()
+    {
+        QTuiTextEdit te;
+        QSignalSpy spy(&te, &QTuiTextEdit::textChanged);
+
+        te.setPlainText("Hello\nWorld");
+        QCOMPARE(te.toPlainText(), QStringLiteral("Hello\nWorld"));
+        QCOMPARE(spy.count(), 1);
+        // Cursor resets to 0,0
+        QCOMPARE(te.cursorRow(), 0);
+        QCOMPARE(te.cursorColumn(), 0);
+    }
+
+    void setPlainText_empty()
+    {
+        QTuiTextEdit te;
+        te.setPlainText("Some text");
+        te.setPlainText("");
+        QCOMPARE(te.toPlainText(), QString());
+    }
+
+    void insertCharacter()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        QSignalSpy spy(&te, &QTuiTextEdit::textChanged);
+
+        sendKey(te, Qt::Key_A, Qt::NoModifier, "a");
+        sendKey(te, Qt::Key_B, Qt::NoModifier, "b");
+        sendKey(te, Qt::Key_C, Qt::NoModifier, "c");
+
+        QCOMPARE(te.toPlainText(), QStringLiteral("abc"));
+        QCOMPARE(te.cursorRow(), 0);
+        QCOMPARE(te.cursorColumn(), 3);
+        QCOMPARE(spy.count(), 3); // 3 chars inserted = 3 textChanged signals
+    }
+
+    void insertCharacter_midLine()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("ac");
+
+        // Move cursor to position 1 (between 'a' and 'c')
+        sendKey(te, Qt::Key_Right, Qt::NoModifier);
+
+        sendKey(te, Qt::Key_B, Qt::NoModifier, "b");
+        QCOMPARE(te.toPlainText(), QStringLiteral("abc"));
+        QCOMPARE(te.cursorColumn(), 2);
+    }
+
+    void deleteBackward_midLine()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("abc");
+
+        // Move to end
+        sendKey(te, Qt::Key_End, Qt::NoModifier);
+        QCOMPARE(te.cursorColumn(), 3);
+
+        QSignalSpy spy(&te, &QTuiTextEdit::textChanged);
+        sendKey(te, Qt::Key_Backspace, Qt::NoModifier);
+        QCOMPARE(te.toPlainText(), QStringLiteral("ab"));
+        QCOMPARE(te.cursorColumn(), 2);
+        QCOMPARE(spy.count(), 1);
+    }
+
+    void deleteBackward_atLineStart_mergesLines()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("Hello\nWorld");
+
+        // Move to start of second line
+        sendKey(te, Qt::Key_Down, Qt::NoModifier);
+        sendKey(te, Qt::Key_Home, Qt::NoModifier);
+        QCOMPARE(te.cursorRow(), 1);
+        QCOMPARE(te.cursorColumn(), 0);
+
+        sendKey(te, Qt::Key_Backspace, Qt::NoModifier);
+        QCOMPARE(te.toPlainText(), QStringLiteral("HelloWorld"));
+        QCOMPARE(te.cursorRow(), 0);
+        QCOMPARE(te.cursorColumn(), 5);
+    }
+
+    void deleteBackward_atDocStart_noop()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("abc");
+
+        QSignalSpy spy(&te, &QTuiTextEdit::textChanged);
+        sendKey(te, Qt::Key_Backspace, Qt::NoModifier);
+        QCOMPARE(te.toPlainText(), QStringLiteral("abc"));
+        QCOMPARE(spy.count(), 0);
+    }
+
+    void insertNewLine()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("HelloWorld");
+
+        // Move cursor to position 5
+        for (int i = 0; i < 5; ++i)
+            sendKey(te, Qt::Key_Right, Qt::NoModifier);
+        QCOMPARE(te.cursorColumn(), 5);
+
+        QSignalSpy spy(&te, &QTuiTextEdit::textChanged);
+        sendKey(te, Qt::Key_Return, Qt::NoModifier);
+        QCOMPARE(te.toPlainText(), QStringLiteral("Hello\nWorld"));
+        QCOMPARE(te.cursorRow(), 1);
+        QCOMPARE(te.cursorColumn(), 0);
+        QCOMPARE(spy.count(), 1);
+    }
+
+    void cursorMovement_arrows()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("Line1\nLine2\nLine3");
+
+        // Right arrow
+        sendKey(te, Qt::Key_Right, Qt::NoModifier);
+        QCOMPARE(te.cursorColumn(), 1);
+
+        // Down arrow
+        sendKey(te, Qt::Key_Down, Qt::NoModifier);
+        QCOMPARE(te.cursorRow(), 1);
+        QCOMPARE(te.cursorColumn(), 1);
+
+        // Left arrow
+        sendKey(te, Qt::Key_Left, Qt::NoModifier);
+        QCOMPARE(te.cursorColumn(), 0);
+
+        // Up arrow
+        sendKey(te, Qt::Key_Up, Qt::NoModifier);
+        QCOMPARE(te.cursorRow(), 0);
+    }
+
+    void cursorMovement_homeEnd()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("Hello\nWorld");
+
+        sendKey(te, Qt::Key_End, Qt::NoModifier);
+        QCOMPARE(te.cursorColumn(), 5);
+
+        sendKey(te, Qt::Key_Home, Qt::NoModifier);
+        QCOMPARE(te.cursorColumn(), 0);
+    }
+
+    void cursorMovement_pageUpDown()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 3)); // 3 visible rows
+        te.setFocus();
+        te.setPlainText("L0\nL1\nL2\nL3\nL4\nL5\nL6\nL7\nL8\nL9");
+
+        // PageDown should move by page size (3 rows)
+        sendKey(te, Qt::Key_PageDown, Qt::NoModifier);
+        QCOMPARE(te.cursorRow(), 3);
+
+        // PageUp should move back
+        sendKey(te, Qt::Key_PageUp, Qt::NoModifier);
+        QCOMPARE(te.cursorRow(), 0);
+    }
+
+    void cursorMovement_clampToLineLength()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("LongLine\nHi");
+
+        // Move to end of first line (col 8)
+        sendKey(te, Qt::Key_End, Qt::NoModifier);
+        QCOMPARE(te.cursorColumn(), 8);
+
+        // Move down to shorter line, column should clamp
+        sendKey(te, Qt::Key_Down, Qt::NoModifier);
+        QCOMPARE(te.cursorRow(), 1);
+        QCOMPARE(te.cursorColumn(), 2); // "Hi" has length 2
+    }
+
+    void scrolling_cursorBelowViewport()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 3)); // 3 visible rows
+        te.setFocus();
+        te.setPlainText("L0\nL1\nL2\nL3\nL4");
+
+        // Move down past visible area
+        for (int i = 0; i < 4; ++i)
+            sendKey(te, Qt::Key_Down, Qt::NoModifier);
+
+        QCOMPARE(te.cursorRow(), 4);
+        // After scrollToVisible, the cursor should be visible
+        // We can't directly check m_scrollRow, but we can verify via paint
+        // that the widget doesn't crash and cursor is at expected position
+    }
+
+    void textChanged_emittedOnEdit()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+
+        QSignalSpy spy(&te, &QTuiTextEdit::textChanged);
+
+        sendKey(te, Qt::Key_X, Qt::NoModifier, "x");
+        QCOMPARE(spy.count(), 1);
+
+        sendKey(te, Qt::Key_Return, Qt::NoModifier);
+        QCOMPARE(spy.count(), 2);
+
+        sendKey(te, Qt::Key_Backspace, Qt::NoModifier);
+        QCOMPARE(spy.count(), 3);
+    }
+
+    void textChanged_notEmittedOnMovement()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("Hello");
+
+        QSignalSpy spy(&te, &QTuiTextEdit::textChanged);
+
+        sendKey(te, Qt::Key_Right, Qt::NoModifier);
+        sendKey(te, Qt::Key_Left, Qt::NoModifier);
+        sendKey(te, Qt::Key_Home, Qt::NoModifier);
+        sendKey(te, Qt::Key_End, Qt::NoModifier);
+        sendKey(te, Qt::Key_Up, Qt::NoModifier);
+        sendKey(te, Qt::Key_Down, Qt::NoModifier);
+
+        QCOMPARE(spy.count(), 0);
+    }
+
+    void readOnly_blocksInsertion()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("Original");
+        te.setReadOnly(true);
+
+        QCOMPARE(te.isReadOnly(), true);
+
+        QSignalSpy spy(&te, &QTuiTextEdit::textChanged);
+
+        sendKey(te, Qt::Key_A, Qt::NoModifier, "a");
+        QCOMPARE(te.toPlainText(), QStringLiteral("Original"));
+        QCOMPARE(spy.count(), 0);
+    }
+
+    void readOnly_blocksBackspace()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("Original");
+        te.setReadOnly(true);
+
+        sendKey(te, Qt::Key_End, Qt::NoModifier);
+        QSignalSpy spy(&te, &QTuiTextEdit::textChanged);
+
+        sendKey(te, Qt::Key_Backspace, Qt::NoModifier);
+        QCOMPARE(te.toPlainText(), QStringLiteral("Original"));
+        QCOMPARE(spy.count(), 0);
+    }
+
+    void readOnly_blocksNewline()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("Original");
+        te.setReadOnly(true);
+
+        QSignalSpy spy(&te, &QTuiTextEdit::textChanged);
+
+        sendKey(te, Qt::Key_Return, Qt::NoModifier);
+        QCOMPARE(te.toPlainText(), QStringLiteral("Original"));
+        QCOMPARE(spy.count(), 0);
+    }
+
+    void readOnly_allowsNavigation()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("Hello\nWorld");
+        te.setReadOnly(true);
+
+        sendKey(te, Qt::Key_Right, Qt::NoModifier);
+        QCOMPARE(te.cursorColumn(), 1);
+
+        sendKey(te, Qt::Key_Down, Qt::NoModifier);
+        QCOMPARE(te.cursorRow(), 1);
+    }
+
+    void selection_shiftRight()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("Hello");
+
+        QCOMPARE(te.hasSelection(), false);
+
+        sendKey(te, Qt::Key_Right, Qt::ShiftModifier);
+        sendKey(te, Qt::Key_Right, Qt::ShiftModifier);
+        sendKey(te, Qt::Key_Right, Qt::ShiftModifier);
+
+        QCOMPARE(te.hasSelection(), true);
+        QCOMPARE(te.selectedText(), QStringLiteral("Hel"));
+    }
+
+    void selection_shiftDown()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("Line1\nLine2\nLine3");
+
+        sendKey(te, Qt::Key_Down, Qt::ShiftModifier);
+
+        QCOMPARE(te.hasSelection(), true);
+        // Selection from (0,0) to (1,0) = "Line1\n"
+        QCOMPARE(te.selectedText(), QStringLiteral("Line1\n"));
+    }
+
+    void selection_clearedOnNonShiftMove()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("Hello");
+
+        // Create selection
+        sendKey(te, Qt::Key_Right, Qt::ShiftModifier);
+        sendKey(te, Qt::Key_Right, Qt::ShiftModifier);
+        QCOMPARE(te.hasSelection(), true);
+
+        // Non-shift move clears selection
+        sendKey(te, Qt::Key_Right, Qt::NoModifier);
+        QCOMPARE(te.hasSelection(), false);
+    }
+
+    void selection_clearedOnEdit()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("Hello");
+
+        sendKey(te, Qt::Key_Right, Qt::ShiftModifier);
+        sendKey(te, Qt::Key_Right, Qt::ShiftModifier);
+        QCOMPARE(te.hasSelection(), true);
+
+        // Typing clears selection
+        sendKey(te, Qt::Key_X, Qt::NoModifier, "x");
+        QCOMPARE(te.hasSelection(), false);
+    }
+
+    void paintEvent_doesNotCrash()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 20, 5));
+        te.setFocus();
+        te.setPlainText("Line1\nLine2\nLine3\nLine4\nLine5\nLine6");
+
+        ScreenBuffer buf(20, 5);
+        te.paintEvent(buf);
+        // Just verify no crash; check first cell has content
+        QCOMPARE(buf.backCell(0, 0).character, QChar('L'));
+    }
+
+    // ===================================================================
+    // Property-based tests (rapidcheck)
+    // ===================================================================
+
+    // For any random printable char inserted at any valid cursor position,
+    // the resulting text contains that char at the correct position and
+    // cursor advances by 1.
+    void pbt_textInsertion()
+    {
+        rc::check("Inserting a printable char at any valid position places it correctly and advances cursor",
+            []() {
+                QTuiTextEdit te;
+                te.setGeometry(QRect(0, 0, 80, 20));
+                te.setFocus();
+
+                // Generate a short initial text (1-3 lines of printable chars)
+                const auto lineCount = *rc::gen::inRange(1, 4);
+                QStringList lines;
+                for (int i = 0; i < lineCount; ++i) {
+                    const auto lineChars = *rc::gen::container<std::vector<int>>(
+                        rc::gen::inRange(32, 127));
+                    QString line;
+                    for (int c : lineChars)
+                        line.append(QChar(c));
+                    lines.append(line);
+                }
+                const QString initial = lines.join(QLatin1Char('\n'));
+                te.setPlainText(initial);
+
+                // Pick a random valid row and column
+                const auto row = *rc::gen::inRange(0, lineCount);
+                const auto col = *rc::gen::inRange(0, static_cast<int>(lines.at(row).length()) + 1);
+
+                // Navigate to position: down to row, then End+Home to reset, then right to col
+                for (int r = 0; r < row; ++r) {
+                    TuiKeyEvent ev(Qt::Key_Down, Qt::NoModifier);
+                    QCoreApplication::sendEvent(&te, &ev);
+                }
+                {
+                    TuiKeyEvent ev(Qt::Key_Home, Qt::NoModifier);
+                    QCoreApplication::sendEvent(&te, &ev);
+                }
+                for (int c = 0; c < col; ++c) {
+                    TuiKeyEvent ev(Qt::Key_Right, Qt::NoModifier);
+                    QCoreApplication::sendEvent(&te, &ev);
+                }
+
+                RC_ASSERT(te.cursorRow() == row);
+                RC_ASSERT(te.cursorColumn() == col);
+
+                // Generate a printable char and insert it
+                const auto ch = *rc::gen::map(rc::gen::inRange(32, 127), [](int c) {
+                    return QChar(c);
+                });
+
+                TuiKeyEvent ev(ch.unicode(), Qt::NoModifier, QString(ch));
+                QCoreApplication::sendEvent(&te, &ev);
+
+                // Verify cursor advanced
+                RC_ASSERT(te.cursorRow() == row);
+                RC_ASSERT(te.cursorColumn() == col + 1);
+
+                // Verify the char is at the correct position in the line
+                QStringList resultLines = te.toPlainText().split(QLatin1Char('\n'));
+                RC_ASSERT(resultLines.at(row).at(col) == ch);
+
+                // Verify the line grew by exactly 1
+                RC_ASSERT(resultLines.at(row).length() == lines.at(row).length() + 1);
+            });
+    }
+
+    // Backspace at col > 0 removes the character before cursor;
+    // at col 0 of row > 0 merges with previous line.
+    void pbt_backspaceDeletion()
+    {
+        rc::check("Backspace removes char before cursor or merges lines at line start",
+            []() {
+                QTuiTextEdit te;
+                te.setGeometry(QRect(0, 0, 80, 20));
+                te.setFocus();
+
+                // Generate 1-4 lines of printable chars
+                const auto lineCount = *rc::gen::inRange(1, 5);
+                QStringList lines;
+                for (int i = 0; i < lineCount; ++i) {
+                    const auto lineChars = *rc::gen::container<std::vector<int>>(
+                        rc::gen::inRange(32, 127));
+                    QString line;
+                    for (int c : lineChars)
+                        line.append(QChar(c));
+                    lines.append(line);
+                }
+                const QString initial = lines.join(QLatin1Char('\n'));
+                te.setPlainText(initial);
+
+                // Pick a random valid position (not row=0, col=0 since that's a no-op)
+                const auto row = *rc::gen::inRange(0, lineCount);
+                const auto col = *rc::gen::inRange(0, static_cast<int>(lines.at(row).length()) + 1);
+                RC_PRE(row > 0 || col > 0); // Skip the no-op case
+
+                // Navigate to position
+                for (int r = 0; r < row; ++r) {
+                    TuiKeyEvent ev(Qt::Key_Down, Qt::NoModifier);
+                    QCoreApplication::sendEvent(&te, &ev);
+                }
+                {
+                    TuiKeyEvent ev(Qt::Key_Home, Qt::NoModifier);
+                    QCoreApplication::sendEvent(&te, &ev);
+                }
+                for (int c = 0; c < col; ++c) {
+                    TuiKeyEvent ev(Qt::Key_Right, Qt::NoModifier);
+                    QCoreApplication::sendEvent(&te, &ev);
+                }
+
+                const QString beforeText = te.toPlainText();
+
+                // Press backspace
+                TuiKeyEvent ev(Qt::Key_Backspace, Qt::NoModifier);
+                QCoreApplication::sendEvent(&te, &ev);
+
+                if (col > 0) {
+                    // Character before cursor removed, cursor moves back by 1
+                    RC_ASSERT(te.cursorRow() == row);
+                    RC_ASSERT(te.cursorColumn() == col - 1);
+                    QStringList resultLines = te.toPlainText().split(QLatin1Char('\n'));
+                    // Same number of lines
+                    RC_ASSERT(resultLines.size() == lineCount);
+                    // Line is shorter by 1
+                    RC_ASSERT(resultLines.at(row).length() == lines.at(row).length() - 1);
+                } else {
+                    // col == 0, row > 0: merge with previous line
+                    RC_ASSERT(te.cursorRow() == row - 1);
+                    RC_ASSERT(te.cursorColumn() == static_cast<int>(lines.at(row - 1).length()));
+                    QStringList resultLines = te.toPlainText().split(QLatin1Char('\n'));
+                    // One fewer line
+                    RC_ASSERT(resultLines.size() == lineCount - 1);
+                    // Merged line = previous + current
+                    RC_ASSERT(resultLines.at(row - 1) == lines.at(row - 1) + lines.at(row));
+                }
+            });
+    }
+
+    // Enter at any cursor position splits the current line correctly.
+    void pbt_newlineInsertion()
+    {
+        rc::check("Enter splits the current line at cursor position",
+            []() {
+                QTuiTextEdit te;
+                te.setGeometry(QRect(0, 0, 80, 20));
+                te.setFocus();
+
+                // Generate 1-3 lines
+                const auto lineCount = *rc::gen::inRange(1, 4);
+                QStringList lines;
+                for (int i = 0; i < lineCount; ++i) {
+                    const auto lineChars = *rc::gen::container<std::vector<int>>(
+                        rc::gen::inRange(32, 127));
+                    QString line;
+                    for (int c : lineChars)
+                        line.append(QChar(c));
+                    lines.append(line);
+                }
+                te.setPlainText(lines.join(QLatin1Char('\n')));
+
+                // Pick a random position
+                const auto row = *rc::gen::inRange(0, lineCount);
+                const auto col = *rc::gen::inRange(0, static_cast<int>(lines.at(row).length()) + 1);
+
+                // Navigate to position
+                for (int r = 0; r < row; ++r) {
+                    TuiKeyEvent ev(Qt::Key_Down, Qt::NoModifier);
+                    QCoreApplication::sendEvent(&te, &ev);
+                }
+                {
+                    TuiKeyEvent ev(Qt::Key_Home, Qt::NoModifier);
+                    QCoreApplication::sendEvent(&te, &ev);
+                }
+                for (int c = 0; c < col; ++c) {
+                    TuiKeyEvent ev(Qt::Key_Right, Qt::NoModifier);
+                    QCoreApplication::sendEvent(&te, &ev);
+                }
+
+                // Press Enter
+                TuiKeyEvent ev(Qt::Key_Return, Qt::NoModifier);
+                QCoreApplication::sendEvent(&te, &ev);
+
+                // Cursor should be at start of new line
+                RC_ASSERT(te.cursorRow() == row + 1);
+                RC_ASSERT(te.cursorColumn() == 0);
+
+                QStringList resultLines = te.toPlainText().split(QLatin1Char('\n'));
+                // One more line
+                RC_ASSERT(resultLines.size() == lineCount + 1);
+                // The original line was split: left part stays, right part goes to new line
+                RC_ASSERT(resultLines.at(row) == lines.at(row).left(col));
+                RC_ASSERT(resultLines.at(row + 1) == lines.at(row).mid(col));
+            });
+    }
+
+    // Arrow keys, Home, End move cursor within valid bounds.
+    void pbt_cursorMovement()
+    {
+        rc::check("Cursor movement keys keep cursor within valid bounds",
+            []() {
+                QTuiTextEdit te;
+                te.setGeometry(QRect(0, 0, 80, 20));
+                te.setFocus();
+
+                // Generate 1-5 lines
+                const auto lineCount = *rc::gen::inRange(1, 6);
+                QStringList lines;
+                for (int i = 0; i < lineCount; ++i) {
+                    const auto lineChars = *rc::gen::container<std::vector<int>>(
+                        rc::gen::inRange(32, 127));
+                    QString line;
+                    for (int c : lineChars)
+                        line.append(QChar(c));
+                    lines.append(line);
+                }
+                te.setPlainText(lines.join(QLatin1Char('\n')));
+
+                // Navigate to a random starting position
+                const auto startRow = *rc::gen::inRange(0, lineCount);
+                const auto startCol = *rc::gen::inRange(0, static_cast<int>(lines.at(startRow).length()) + 1);
+                for (int r = 0; r < startRow; ++r) {
+                    TuiKeyEvent ev(Qt::Key_Down, Qt::NoModifier);
+                    QCoreApplication::sendEvent(&te, &ev);
+                }
+                {
+                    TuiKeyEvent ev(Qt::Key_Home, Qt::NoModifier);
+                    QCoreApplication::sendEvent(&te, &ev);
+                }
+                for (int c = 0; c < startCol; ++c) {
+                    TuiKeyEvent ev(Qt::Key_Right, Qt::NoModifier);
+                    QCoreApplication::sendEvent(&te, &ev);
+                }
+
+                // Pick a random movement key
+                const auto dir = *rc::gen::inRange(0, 6);
+                int key = Qt::Key_Left;
+                if (dir == 0) key = Qt::Key_Left;
+                else if (dir == 1) key = Qt::Key_Right;
+                else if (dir == 2) key = Qt::Key_Up;
+                else if (dir == 3) key = Qt::Key_Down;
+                else if (dir == 4) key = Qt::Key_Home;
+                else key = Qt::Key_End;
+
+                TuiKeyEvent ev(key, Qt::NoModifier);
+                QCoreApplication::sendEvent(&te, &ev);
+
+                // Cursor must be within valid bounds
+                const int resultRow = te.cursorRow();
+                const int resultCol = te.cursorColumn();
+                RC_ASSERT(resultRow >= 0);
+                RC_ASSERT(resultRow < lineCount);
+                RC_ASSERT(resultCol >= 0);
+                RC_ASSERT(resultCol <= static_cast<int>(lines.at(resultRow).length()));
+
+                // Text must be unchanged (movement doesn't modify text)
+                RC_ASSERT(te.toPlainText() == lines.join(QLatin1Char('\n')));
+            });
+    }
+
+    // In read-only mode, no editing operation changes the text content.
+    void pbt_readOnlyMode()
+    {
+        rc::check("Read-only mode blocks all editing operations",
+            []() {
+                QTuiTextEdit te;
+                te.setGeometry(QRect(0, 0, 80, 20));
+                te.setFocus();
+
+                // Generate initial text
+                const auto lineCount = *rc::gen::inRange(1, 4);
+                QStringList lines;
+                for (int i = 0; i < lineCount; ++i) {
+                    const auto lineChars = *rc::gen::container<std::vector<int>>(
+                        rc::gen::inRange(32, 127));
+                    QString line;
+                    for (int c : lineChars)
+                        line.append(QChar(c));
+                    lines.append(line);
+                }
+                const QString initial = lines.join(QLatin1Char('\n'));
+                te.setPlainText(initial);
+                te.setReadOnly(true);
+
+                // Navigate to a random position
+                const auto row = *rc::gen::inRange(0, lineCount);
+                for (int r = 0; r < row; ++r) {
+                    TuiKeyEvent ev(Qt::Key_Down, Qt::NoModifier);
+                    QCoreApplication::sendEvent(&te, &ev);
+                }
+                const auto col = *rc::gen::inRange(0, static_cast<int>(lines.at(row).length()) + 1);
+                {
+                    TuiKeyEvent ev(Qt::Key_Home, Qt::NoModifier);
+                    QCoreApplication::sendEvent(&te, &ev);
+                }
+                for (int c = 0; c < col; ++c) {
+                    TuiKeyEvent ev(Qt::Key_Right, Qt::NoModifier);
+                    QCoreApplication::sendEvent(&te, &ev);
+                }
+
+                // Pick a random editing operation
+                const auto op = *rc::gen::inRange(0, 3);
+                if (op == 0) {
+                    // Try inserting a char
+                    const auto ch = *rc::gen::map(rc::gen::inRange(32, 127), [](int c) {
+                        return QChar(c);
+                    });
+                    TuiKeyEvent ev(ch.unicode(), Qt::NoModifier, QString(ch));
+                    QCoreApplication::sendEvent(&te, &ev);
+                } else if (op == 1) {
+                    // Try backspace
+                    TuiKeyEvent ev(Qt::Key_Backspace, Qt::NoModifier);
+                    QCoreApplication::sendEvent(&te, &ev);
+                } else {
+                    // Try enter
+                    TuiKeyEvent ev(Qt::Key_Return, Qt::NoModifier);
+                    QCoreApplication::sendEvent(&te, &ev);
+                }
+
+                // Text must be unchanged
+                RC_ASSERT(te.toPlainText() == initial);
+            });
+    }
+
+    // For any string, setPlainText then toPlainText returns the same string.
+    void pbt_setPlainTextRoundTrip()
+    {
+        rc::check("setPlainText(s) then toPlainText() returns s",
+            []() {
+                QTuiTextEdit te;
+
+                // Generate a string that may contain newlines
+                const auto lineCount = *rc::gen::inRange(1, 6);
+                QStringList lines;
+                for (int i = 0; i < lineCount; ++i) {
+                    const auto lineChars = *rc::gen::container<std::vector<int>>(
+                        rc::gen::inRange(32, 127));
+                    QString line;
+                    for (int c : lineChars)
+                        line.append(QChar(c));
+                    lines.append(line);
+                }
+                const QString text = lines.join(QLatin1Char('\n'));
+
+                te.setPlainText(text);
+                RC_ASSERT(te.toPlainText() == text);
+            });
+    }
+};
+
+QTEST_MAIN(TestQTuiTextEdit)
+#include "test_qtui_textedit.moc"

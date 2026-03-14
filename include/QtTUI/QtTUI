@@ -24,5 +24,6 @@
 #include <QtTUI/UI_Loader.h>
 #include <QtTUI/QTuiComboBox.h>
 #include <QtTUI/QTuiProgressBar.h>
+#include <QtTUI/QTuiTextEdit.h>
 
 #endif // QTTUI_QTTUI_H

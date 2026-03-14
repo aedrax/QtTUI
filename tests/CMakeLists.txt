@@ -100,3 +100,6 @@ qttui_add_test(test_qtui_numeric_widgets test_qtui_numeric_widgets.cpp)
 
 # ComboBox and ProgressBar widget tests
 qttui_add_test(test_qtui_combobox_progressbar test_qtui_combobox_progressbar.cpp)
+
+# QTuiTextEdit unit tests
+qttui_add_test(test_qtui_textedit test_qtui_textedit.cpp)

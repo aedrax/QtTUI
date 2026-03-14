@@ -15,6 +15,7 @@
 #include <QtTUI/QTuiDial.h>
 #include <QtTUI/QTuiComboBox.h>
 #include <QtTUI/QTuiProgressBar.h>
+#include <QtTUI/QTuiTextEdit.h>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -86,6 +87,10 @@ UI_Loader::UI_Loader(QObject *parent)
 
     registerWidget(QStringLiteral("QTuiProgressBar"), [](QTuiWidget *parent) -> QTuiWidget * {
         return new QTuiProgressBar(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiTextEdit"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiTextEdit(parent);
     });
 }
 
