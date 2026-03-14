@@ -5,6 +5,16 @@
 #include <QtTUI/QTuiLineEdit.h>
 #include <QtTUI/QTuiTableView.h>
 #include <QtTUI/QTuiListView.h>
+#include <QtTUI/QTuiPushButton.h>
+#include <QtTUI/QTuiToolButton.h>
+#include <QtTUI/QTuiCheckBox.h>
+#include <QtTUI/QTuiRadioButton.h>
+#include <QtTUI/QTuiSpinBox.h>
+#include <QtTUI/QTuiDoubleSpinBox.h>
+#include <QtTUI/QTuiSlider.h>
+#include <QtTUI/QTuiDial.h>
+#include <QtTUI/QTuiComboBox.h>
+#include <QtTUI/QTuiProgressBar.h>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -36,6 +46,46 @@ UI_Loader::UI_Loader(QObject *parent)
 
     registerWidget(QStringLiteral("QTuiListView"), [](QTuiWidget *parent) -> QTuiWidget * {
         return new QTuiListView(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiPushButton"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiPushButton(QString(), parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiToolButton"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiToolButton(QString(), parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiCheckBox"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiCheckBox(QString(), parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiRadioButton"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiRadioButton(QString(), parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiSpinBox"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiSpinBox(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiDoubleSpinBox"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiDoubleSpinBox(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiSlider"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiSlider(Qt::Horizontal, parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiDial"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiDial(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiComboBox"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiComboBox(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiProgressBar"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiProgressBar(parent);
     });
 }
 

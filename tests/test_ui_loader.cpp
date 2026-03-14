@@ -50,7 +50,17 @@ void TestUILoader::testAvailableWidgets()
     QVERIFY(widgets.contains(QStringLiteral("QTuiLineEdit")));
     QVERIFY(widgets.contains(QStringLiteral("QTuiTableView")));
     QVERIFY(widgets.contains(QStringLiteral("QTuiListView")));
-    QCOMPARE(widgets.size(), 5);
+    QVERIFY(widgets.contains(QStringLiteral("QTuiPushButton")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiToolButton")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiCheckBox")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiRadioButton")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiSpinBox")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiDoubleSpinBox")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiSlider")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiDial")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiComboBox")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiProgressBar")));
+    QCOMPARE(widgets.size(), 15);
 }
 
 // ---------------------------------------------------------------
