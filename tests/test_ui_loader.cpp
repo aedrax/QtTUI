@@ -64,7 +64,9 @@ void TestUILoader::testAvailableWidgets()
     QVERIFY(widgets.contains(QStringLiteral("QTuiDateEdit")));
     QVERIFY(widgets.contains(QStringLiteral("QTuiTimeEdit")));
     QVERIFY(widgets.contains(QStringLiteral("QTuiLCDNumber")));
-    QCOMPARE(widgets.size(), 20);
+    QVERIFY(widgets.contains(QStringLiteral("QTuiScrollBar")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiScrollArea")));
+    QCOMPARE(widgets.size(), 22);
 }
 
 // ---------------------------------------------------------------

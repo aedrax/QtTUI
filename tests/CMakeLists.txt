@@ -106,3 +106,6 @@ qttui_add_test(test_qtui_textedit test_qtui_textedit.cpp)
 
 # QTuiDateTimeEdit, QTuiDateEdit, QTuiTimeEdit, QTuiLCDNumber unit tests
 qttui_add_test(test_qtui_datetime_lcd test_qtui_datetime_lcd.cpp)
+
+# QTuiScrollBar and QTuiScrollArea unit tests
+qttui_add_test(test_qtui_scroll_widgets test_qtui_scroll_widgets.cpp)

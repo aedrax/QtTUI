@@ -35,6 +35,8 @@ set(QTTUI_SOURCES
     QTuiTextEdit.cpp
     QTuiDateTimeEdit.cpp
     QTuiLCDNumber.cpp
+    QTuiScrollBar.cpp
+    QTuiScrollArea.cpp
 )
 
 # Platform-specific backend sources
@@ -82,6 +84,8 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTextEdit.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiDateTimeEdit.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiLCDNumber.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiScrollBar.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiScrollArea.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})

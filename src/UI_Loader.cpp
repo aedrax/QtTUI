@@ -18,6 +18,8 @@
 #include <QtTUI/QTuiTextEdit.h>
 #include <QtTUI/QTuiDateTimeEdit.h>
 #include <QtTUI/QTuiLCDNumber.h>
+#include <QtTUI/QTuiScrollBar.h>
+#include <QtTUI/QTuiScrollArea.h>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -109,6 +111,14 @@ UI_Loader::UI_Loader(QObject *parent)
 
     registerWidget(QStringLiteral("QTuiLCDNumber"), [](QTuiWidget *parent) -> QTuiWidget * {
         return new QTuiLCDNumber(5, parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiScrollBar"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiScrollBar(Qt::Vertical, parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiScrollArea"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiScrollArea(parent);
     });
 }
 
