@@ -60,7 +60,11 @@ void TestUILoader::testAvailableWidgets()
     QVERIFY(widgets.contains(QStringLiteral("QTuiDial")));
     QVERIFY(widgets.contains(QStringLiteral("QTuiComboBox")));
     QVERIFY(widgets.contains(QStringLiteral("QTuiProgressBar")));
-    QCOMPARE(widgets.size(), 15);
+    QVERIFY(widgets.contains(QStringLiteral("QTuiDateTimeEdit")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiDateEdit")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiTimeEdit")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiLCDNumber")));
+    QCOMPARE(widgets.size(), 20);
 }
 
 // ---------------------------------------------------------------

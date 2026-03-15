@@ -25,5 +25,7 @@
 #include <QtTUI/QTuiComboBox.h>
 #include <QtTUI/QTuiProgressBar.h>
 #include <QtTUI/QTuiTextEdit.h>
+#include <QtTUI/QTuiDateTimeEdit.h>
+#include <QtTUI/QTuiLCDNumber.h>
 
 #endif // QTTUI_QTTUI_H

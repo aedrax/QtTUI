@@ -16,6 +16,8 @@
 #include <QtTUI/QTuiComboBox.h>
 #include <QtTUI/QTuiProgressBar.h>
 #include <QtTUI/QTuiTextEdit.h>
+#include <QtTUI/QTuiDateTimeEdit.h>
+#include <QtTUI/QTuiLCDNumber.h>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -91,6 +93,22 @@ UI_Loader::UI_Loader(QObject *parent)
 
     registerWidget(QStringLiteral("QTuiTextEdit"), [](QTuiWidget *parent) -> QTuiWidget * {
         return new QTuiTextEdit(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiDateTimeEdit"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiDateTimeEdit(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiDateEdit"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiDateEdit(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiTimeEdit"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiTimeEdit(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiLCDNumber"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiLCDNumber(5, parent);
     });
 }
 
