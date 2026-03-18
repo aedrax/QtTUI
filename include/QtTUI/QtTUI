@@ -29,5 +29,7 @@
 #include <QtTUI/QTuiLCDNumber.h>
 #include <QtTUI/QTuiScrollBar.h>
 #include <QtTUI/QTuiScrollArea.h>
+#include <QtTUI/QTuiGroupBox.h>
+#include <QtTUI/QTuiCollapsible.h>
 
 #endif // QTTUI_QTTUI_H
