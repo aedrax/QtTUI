@@ -44,6 +44,9 @@ set(QTTUI_SOURCES
     QTuiToolBox.cpp
     QTuiStackedWidget.cpp
     QTuiSplitter.cpp
+    QTuiFocusFrame.cpp
+    QTuiSizeGrip.cpp
+    QTuiCalendarWidget.cpp
 )
 
 # Platform-specific backend sources
@@ -100,6 +103,9 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiToolBox.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiStackedWidget.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiSplitter.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiFocusFrame.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiSizeGrip.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiCalendarWidget.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})

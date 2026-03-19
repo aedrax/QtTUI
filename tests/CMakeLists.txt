@@ -118,3 +118,6 @@ qttui_add_test(test_qtui_tab_widgets test_qtui_tab_widgets.cpp)
 
 # QTuiStackedWidget, QTuiSplitter, QTuiSplitterHandle unit tests
 qttui_add_test(test_qtui_stacked_splitter test_qtui_stacked_splitter.cpp)
+
+# QTuiFocusFrame, QTuiSizeGrip, QTuiCalendarWidget unit tests
+qttui_add_test(test_qtui_utility_widgets test_qtui_utility_widgets.cpp)
