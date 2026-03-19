@@ -20,6 +20,8 @@
 #include <QtTUI/QTuiLCDNumber.h>
 #include <QtTUI/QTuiScrollBar.h>
 #include <QtTUI/QTuiScrollArea.h>
+#include <QtTUI/QTuiStackedWidget.h>
+#include <QtTUI/QTuiSplitter.h>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -119,6 +121,14 @@ UI_Loader::UI_Loader(QObject *parent)
 
     registerWidget(QStringLiteral("QTuiScrollArea"), [](QTuiWidget *parent) -> QTuiWidget * {
         return new QTuiScrollArea(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiStackedWidget"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiStackedWidget(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiSplitter"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiSplitter(Qt::Horizontal, parent);
     });
 }
 

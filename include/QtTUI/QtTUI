@@ -31,5 +31,10 @@
 #include <QtTUI/QTuiScrollArea.h>
 #include <QtTUI/QTuiGroupBox.h>
 #include <QtTUI/QTuiCollapsible.h>
+#include <QtTUI/QTuiTabBar.h>
+#include <QtTUI/QTuiTabWidget.h>
+#include <QtTUI/QTuiToolBox.h>
+#include <QtTUI/QTuiStackedWidget.h>
+#include <QtTUI/QTuiSplitter.h>
 
 #endif // QTTUI_QTTUI_H

@@ -66,7 +66,9 @@ void TestUILoader::testAvailableWidgets()
     QVERIFY(widgets.contains(QStringLiteral("QTuiLCDNumber")));
     QVERIFY(widgets.contains(QStringLiteral("QTuiScrollBar")));
     QVERIFY(widgets.contains(QStringLiteral("QTuiScrollArea")));
-    QCOMPARE(widgets.size(), 22);
+    QVERIFY(widgets.contains(QStringLiteral("QTuiStackedWidget")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiSplitter")));
+    QCOMPARE(widgets.size(), 24);
 }
 
 // ---------------------------------------------------------------

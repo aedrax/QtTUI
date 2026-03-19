@@ -42,6 +42,8 @@ set(QTTUI_SOURCES
     QTuiTabBar.cpp
     QTuiTabWidget.cpp
     QTuiToolBox.cpp
+    QTuiStackedWidget.cpp
+    QTuiSplitter.cpp
 )
 
 # Platform-specific backend sources
@@ -96,6 +98,8 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTabBar.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTabWidget.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiToolBox.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiStackedWidget.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiSplitter.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})

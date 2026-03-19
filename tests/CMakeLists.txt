@@ -115,3 +115,6 @@ qttui_add_test(test_qtui_container_widgets test_qtui_container_widgets.cpp)
 
 # QTuiTabBar, QTuiTabWidget, QTuiToolBox unit tests
 qttui_add_test(test_qtui_tab_widgets test_qtui_tab_widgets.cpp)
+
+# QTuiStackedWidget, QTuiSplitter, QTuiSplitterHandle unit tests
+qttui_add_test(test_qtui_stacked_splitter test_qtui_stacked_splitter.cpp)
