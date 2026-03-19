@@ -1,0 +1,209 @@
+#include <QtTUI/QTuiTabWidget.h>
+#include <QtTUI/Theme_Engine.h>
+#include <QtTUI/ScreenBuffer.h>
+#include <QtTUI/TuiEvents.h>
+
+namespace QtTUI {
+
+QTuiTabWidget::QTuiTabWidget(QTuiWidget *parent)
+    : QTuiWidget(parent)
+    , m_tabBar(new QTuiTabBar(this))
+{
+    connect(m_tabBar, &QTuiTabBar::currentChanged, this, &QTuiTabWidget::onTabChanged);
+}
+
+int QTuiTabWidget::addTab(QTuiWidget *page, const QString &label)
+{
+    if (!page)
+        return -1;
+
+    m_pages.append(page);
+    page->setParent(this);
+    int idx = m_tabBar->addTab(label);
+
+    // Hide all non-current pages
+    if (m_pages.size() == 1) {
+        // First page added, it becomes current via tabBar's setCurrentIndex(0)
+        // onTabChanged will be called by the signal
+    } else {
+        page->setVisible(false);
+    }
+
+    updatePageGeometries();
+    return idx;
+}
+
+void QTuiTabWidget::removeTab(int index)
+{
+    if (index < 0 || index >= m_pages.size())
+        return;
+
+    QTuiWidget *page = m_pages.takeAt(index);
+    page->setVisible(false);
+    m_tabBar->removeTab(index);
+
+    // Update current index tracking
+    if (m_pages.isEmpty()) {
+        m_currentIndex = -1;
+    } else if (m_currentIndex >= m_pages.size()) {
+        m_currentIndex = m_pages.size() - 1;
+    }
+
+    updatePageGeometries();
+}
+
+int QTuiTabWidget::count() const
+{
+    return m_pages.size();
+}
+
+QTuiWidget *QTuiTabWidget::widget(int index) const
+{
+    if (index < 0 || index >= m_pages.size())
+        return nullptr;
+    return m_pages.at(index);
+}
+
+int QTuiTabWidget::indexOf(QTuiWidget *widget) const
+{
+    return m_pages.indexOf(widget);
+}
+
+int QTuiTabWidget::currentIndex() const
+{
+    return m_currentIndex;
+}
+
+void QTuiTabWidget::setCurrentIndex(int index)
+{
+    if (index < 0 || index >= m_pages.size())
+        return;
+    m_tabBar->setCurrentIndex(index);
+    // onTabChanged will handle the rest via signal
+}
+
+QTuiWidget *QTuiTabWidget::currentWidget() const
+{
+    if (m_currentIndex < 0 || m_currentIndex >= m_pages.size())
+        return nullptr;
+    return m_pages.at(m_currentIndex);
+}
+
+QTuiTabBar *QTuiTabWidget::tabBar() const
+{
+    return m_tabBar;
+}
+
+void QTuiTabWidget::onTabChanged(int index)
+{
+    if (index == m_currentIndex)
+        return;
+
+    // Hide old page
+    if (m_currentIndex >= 0 && m_currentIndex < m_pages.size())
+        m_pages.at(m_currentIndex)->setVisible(false);
+
+    m_currentIndex = index;
+
+    // Show new page
+    if (m_currentIndex >= 0 && m_currentIndex < m_pages.size())
+        m_pages.at(m_currentIndex)->setVisible(true);
+
+    emit currentChanged(m_currentIndex);
+}
+
+void QTuiTabWidget::updatePageGeometries()
+{
+    const QRect geo = geometry();
+    if (geo.isEmpty())
+        return;
+
+    const int x0 = geo.x();
+    const int y0 = geo.y();
+    const int w = geo.width();
+    const int h = geo.height();
+
+    // Tab bar occupies the first row (North position)
+    m_tabBar->setGeometry(QRect(x0, y0, w, 1));
+
+    // Content area is everything below the tab bar
+    QRect contentRect(x0, y0 + 1, w, qMax(0, h - 1));
+
+    for (auto *page : m_pages) {
+        page->setGeometry(contentRect);
+    }
+}
+
+void QTuiTabWidget::paintEvent(ScreenBuffer &buffer)
+{
+    const QRect geo = geometry();
+    if (!isVisible() || geo.isEmpty())
+        return;
+
+    const auto theme = themeProperties();
+    const auto border = Theme_Engine::borderChars(theme.borderStyle);
+    const Color fg = theme.foreground;
+    const Color bg = theme.background;
+
+    const int x0 = geo.x();
+    const int y0 = geo.y();
+    const int w = geo.width();
+    const int h = geo.height();
+
+    // Update geometries before painting
+    updatePageGeometries();
+
+    // Paint the tab bar
+    m_tabBar->paintEvent(buffer);
+
+    // Clear the content area below the tab bar
+    for (int row = 1; row < h; ++row) {
+        for (int col = 0; col < w; ++col) {
+            int px = x0 + col;
+            int py = y0 + row;
+            if (px < buffer.width() && py < buffer.height()) {
+                Cell &cell = buffer.backCell(px, py);
+                cell.character = QLatin1Char(' ');
+                cell.foreground = fg;
+                cell.background = bg;
+                cell.bold = false;
+            }
+        }
+    }
+
+    // Draw a separator line between tab bar and content
+    if (h > 1) {
+        int sepY = y0 + 1;
+        if (sepY < buffer.height()) {
+            for (int col = 0; col < w; ++col) {
+                int px = x0 + col;
+                if (px < buffer.width()) {
+                    Cell &cell = buffer.backCell(px, sepY);
+                    cell.character = border.horizontal;
+                    cell.foreground = fg;
+                    cell.background = bg;
+                    cell.bold = theme.bold;
+                }
+            }
+        }
+    }
+
+    // Paint the current page
+    if (m_currentIndex >= 0 && m_currentIndex < m_pages.size()) {
+        QTuiWidget *page = m_pages.at(m_currentIndex);
+        if (page->isVisible()) {
+            // Adjust page geometry to be below the separator
+            const QRect contentRect(x0, y0 + 2, w, qMax(0, h - 2));
+            page->setGeometry(contentRect);
+            page->paintEvent(buffer);
+        }
+    }
+}
+
+void QTuiTabWidget::resizeEvent(TuiResizeEvent *event)
+{
+    Q_UNUSED(event);
+    updatePageGeometries();
+}
+
+} // namespace QtTUI

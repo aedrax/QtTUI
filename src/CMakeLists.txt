@@ -39,6 +39,9 @@ set(QTTUI_SOURCES
     QTuiScrollArea.cpp
     QTuiGroupBox.cpp
     QTuiCollapsible.cpp
+    QTuiTabBar.cpp
+    QTuiTabWidget.cpp
+    QTuiToolBox.cpp
 )
 
 # Platform-specific backend sources
@@ -90,6 +93,9 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiScrollArea.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiGroupBox.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiCollapsible.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTabBar.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTabWidget.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiToolBox.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})

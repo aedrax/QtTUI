@@ -112,3 +112,6 @@ qttui_add_test(test_qtui_scroll_widgets test_qtui_scroll_widgets.cpp)
 
 # QTuiGroupBox and QTuiCollapsible unit tests
 qttui_add_test(test_qtui_container_widgets test_qtui_container_widgets.cpp)
+
+# QTuiTabBar, QTuiTabWidget, QTuiToolBox unit tests
+qttui_add_test(test_qtui_tab_widgets test_qtui_tab_widgets.cpp)
