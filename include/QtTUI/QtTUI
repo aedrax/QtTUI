@@ -36,5 +36,8 @@
 #include <QtTUI/QTuiToolBox.h>
 #include <QtTUI/QTuiStackedWidget.h>
 #include <QtTUI/QTuiSplitter.h>
+#include <QtTUI/QTuiItemDelegate.h>
+#include <QtTUI/QTuiStyledItemDelegate.h>
+#include <QtTUI/QTuiHeaderView.h>
 
 #endif // QTTUI_QTTUI_H
