@@ -68,7 +68,15 @@ void TestUILoader::testAvailableWidgets()
     QVERIFY(widgets.contains(QStringLiteral("QTuiScrollArea")));
     QVERIFY(widgets.contains(QStringLiteral("QTuiStackedWidget")));
     QVERIFY(widgets.contains(QStringLiteral("QTuiSplitter")));
-    QCOMPARE(widgets.size(), 24);
+    QVERIFY(widgets.contains(QStringLiteral("QTuiGroupBox")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiCollapsible")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiTabBar")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiTabWidget")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiToolBox")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiFocusFrame")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiSizeGrip")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiCalendarWidget")));
+    QCOMPARE(widgets.size(), 32);
 }
 
 // ---------------------------------------------------------------

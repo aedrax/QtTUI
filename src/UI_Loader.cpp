@@ -22,6 +22,14 @@
 #include <QtTUI/QTuiScrollArea.h>
 #include <QtTUI/QTuiStackedWidget.h>
 #include <QtTUI/QTuiSplitter.h>
+#include <QtTUI/QTuiGroupBox.h>
+#include <QtTUI/QTuiCollapsible.h>
+#include <QtTUI/QTuiTabBar.h>
+#include <QtTUI/QTuiTabWidget.h>
+#include <QtTUI/QTuiToolBox.h>
+#include <QtTUI/QTuiFocusFrame.h>
+#include <QtTUI/QTuiSizeGrip.h>
+#include <QtTUI/QTuiCalendarWidget.h>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -129,6 +137,38 @@ UI_Loader::UI_Loader(QObject *parent)
 
     registerWidget(QStringLiteral("QTuiSplitter"), [](QTuiWidget *parent) -> QTuiWidget * {
         return new QTuiSplitter(Qt::Horizontal, parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiGroupBox"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiGroupBox(QString(), parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiCollapsible"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiCollapsible(QString(), parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiTabBar"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiTabBar(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiTabWidget"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiTabWidget(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiToolBox"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiToolBox(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiFocusFrame"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiFocusFrame(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiSizeGrip"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiSizeGrip(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiCalendarWidget"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiCalendarWidget(parent);
     });
 }
 
