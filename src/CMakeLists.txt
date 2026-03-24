@@ -50,6 +50,10 @@ set(QTTUI_SOURCES
     QTuiItemDelegate.cpp
     QTuiStyledItemDelegate.cpp
     QTuiHeaderView.cpp
+    QTuiTreeView.cpp
+    QTuiColumnView.cpp
+    QTuiUndoStack.cpp
+    QTuiUndoView.cpp
 )
 
 # Platform-specific backend sources
@@ -112,6 +116,10 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiItemDelegate.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiStyledItemDelegate.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiHeaderView.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTreeView.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiColumnView.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiUndoStack.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiUndoView.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})

@@ -124,3 +124,6 @@ qttui_add_test(test_qtui_utility_widgets test_qtui_utility_widgets.cpp)
 
 # QTuiItemDelegate, QTuiStyledItemDelegate, QTuiHeaderView unit tests
 qttui_add_test(test_qtui_delegates_headerview test_qtui_delegates_headerview.cpp)
+
+# QTuiTreeView, QTuiColumnView, QTuiUndoView unit tests
+qttui_add_test(test_qtui_treeview_columnview_undoview test_qtui_treeview_columnview_undoview.cpp)
