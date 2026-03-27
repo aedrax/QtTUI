@@ -130,3 +130,6 @@ qttui_add_test(test_qtui_treeview_columnview_undoview test_qtui_treeview_columnv
 
 # QTuiDataWidgetMapper unit tests
 qttui_add_test(test_qtui_datawidgetmapper test_qtui_datawidgetmapper.cpp)
+
+# QTuiListWidget unit tests
+qttui_add_test(test_qtui_listwidget test_qtui_listwidget.cpp)

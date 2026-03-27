@@ -55,6 +55,8 @@ set(QTTUI_SOURCES
     QTuiUndoStack.cpp
     QTuiUndoView.cpp
     QTuiDataWidgetMapper.cpp
+    QTuiListWidgetItem.cpp
+    QTuiListWidget.cpp
 )
 
 # Platform-specific backend sources
@@ -122,6 +124,8 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiUndoStack.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiUndoView.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiDataWidgetMapper.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiListWidgetItem.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiListWidget.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})
