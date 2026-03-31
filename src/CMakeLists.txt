@@ -57,6 +57,8 @@ set(QTTUI_SOURCES
     QTuiDataWidgetMapper.cpp
     QTuiListWidgetItem.cpp
     QTuiListWidget.cpp
+    QTuiTableWidgetItem.cpp
+    QTuiTableWidget.cpp
 )
 
 # Platform-specific backend sources
@@ -126,6 +128,8 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiDataWidgetMapper.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiListWidgetItem.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiListWidget.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTableWidgetItem.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTableWidget.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})
