@@ -40,5 +40,8 @@
 #include <QtTUI/QTuiStyledItemDelegate.h>
 #include <QtTUI/QTuiHeaderView.h>
 #include <QtTUI/QTuiDataWidgetMapper.h>
+#include <QtTUI/QTuiTreeWidgetItem.h>
+#include <QtTUI/QTuiTreeWidgetItemIterator.h>
+#include <QtTUI/QTuiTreeWidget.h>
 
 #endif // QTTUI_QTTUI_H
