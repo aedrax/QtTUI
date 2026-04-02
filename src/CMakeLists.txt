@@ -62,6 +62,9 @@ set(QTTUI_SOURCES
     QTuiTreeWidgetItem.cpp
     QTuiTreeWidgetItemIterator.cpp
     QTuiTreeWidget.cpp
+    QTuiAction.cpp
+    QTuiMenu.cpp
+    QTuiMenuBar.cpp
 )
 
 # Platform-specific backend sources
@@ -136,6 +139,9 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTreeWidgetItem.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTreeWidgetItemIterator.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTreeWidget.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiAction.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiMenu.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiMenuBar.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})
