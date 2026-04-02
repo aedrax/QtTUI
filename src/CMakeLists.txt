@@ -65,6 +65,9 @@ set(QTTUI_SOURCES
     QTuiAction.cpp
     QTuiMenu.cpp
     QTuiMenuBar.cpp
+    QTuiToolBar.cpp
+    QTuiStatusBar.cpp
+    QTuiWidgetAction.cpp
 )
 
 # Platform-specific backend sources
@@ -142,6 +145,9 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiAction.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiMenu.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiMenuBar.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiToolBar.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiStatusBar.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiWidgetAction.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})

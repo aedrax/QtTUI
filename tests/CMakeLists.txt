@@ -142,3 +142,6 @@ qttui_add_test(test_qtui_treewidget test_qtui_treewidget.cpp)
 
 # QTuiMenu, QTuiMenuBar unit tests
 qttui_add_test(test_qtui_menu_widgets test_qtui_menu_widgets.cpp)
+
+# QTuiToolBar, QTuiStatusBar, QTuiWidgetAction unit tests
+qttui_add_test(test_qtui_toolbar_statusbar test_qtui_toolbar_statusbar.cpp)
