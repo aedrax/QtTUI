@@ -148,3 +148,6 @@ qttui_add_test(test_qtui_toolbar_statusbar test_qtui_toolbar_statusbar.cpp)
 
 # QTuiDockWidget unit tests
 qttui_add_test(test_qtui_dock_widget test_qtui_dock_widget.cpp)
+
+# QTuiMdiArea, QTuiMdiSubWindow unit tests
+qttui_add_test(test_qtui_mdi_widgets test_qtui_mdi_widgets.cpp)
