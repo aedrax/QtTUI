@@ -151,3 +151,6 @@ qttui_add_test(test_qtui_dock_widget test_qtui_dock_widget.cpp)
 
 # QTuiMdiArea, QTuiMdiSubWindow unit tests
 qttui_add_test(test_qtui_mdi_widgets test_qtui_mdi_widgets.cpp)
+
+# QTuiMainWindow integration tests (menu bar, toolbars, status bar, dock widgets)
+qttui_add_test(test_qtui_mainwindow_integration test_qtui_mainwindow_integration.cpp)
