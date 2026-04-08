@@ -4,31 +4,62 @@
 #ifndef QTTUI_QTTUI_H
 #define QTTUI_QTTUI_H
 
+// Global definitions
 #include <QtTUI/QtTUIGlobal.h>
+
+// Core infrastructure
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/AnsiRenderer.h>
 #include <QtTUI/TerminalBackend.h>
 #include <QtTUI/TuiEvents.h>
 #include <QtTUI/InputParser.h>
+#include <QtTUI/Theme_Engine.h>
+#include <QtTUI/UI_Loader.h>
+
+// Base widget and application
 #include <QtTUI/QTuiWidget.h>
-#include <QtTUI/QTuiMainWindow.h>
-#include <QtTUI/QTuiLineEdit.h>
-#include <QtTUI/QTuiTableView.h>
-#include <QtTUI/QTuiListView.h>
-#include <QtTUI/QTuiBoxLayout.h>
 #include <QtTUI/QTuiApplication.h>
+
+// Layout classes
 #include <QtTUI/QTuiSizePolicy.h>
 #include <QtTUI/QTuiLayoutItem.h>
 #include <QtTUI/QTuiLayout.h>
-#include <QtTUI/Theme_Engine.h>
-#include <QtTUI/UI_Loader.h>
+#include <QtTUI/QTuiBoxLayout.h>
+#include <QtTUI/QTuiFormLayout.h>
+#include <QtTUI/QTuiGridLayout.h>
+#include <QtTUI/QTuiStackedLayout.h>
+
+// Label
+#include <QtTUI/QTuiLabel.h>
+
+// Button and toggle widgets
+#include <QtTUI/QTuiPushButton.h>
+#include <QtTUI/QTuiToolButton.h>
+#include <QtTUI/QTuiCheckBox.h>
+#include <QtTUI/QTuiRadioButton.h>
+#include <QtTUI/QTuiButtonGroup.h>
+
+// Numeric input widgets
+#include <QtTUI/QTuiSpinBox.h>
+#include <QtTUI/QTuiDoubleSpinBox.h>
+#include <QtTUI/QTuiSlider.h>
+#include <QtTUI/QTuiDial.h>
+
+// Selection and display widgets
 #include <QtTUI/QTuiComboBox.h>
 #include <QtTUI/QTuiProgressBar.h>
+#include <QtTUI/QTuiLineEdit.h>
+
+// Text and specialized editing
 #include <QtTUI/QTuiTextEdit.h>
 #include <QtTUI/QTuiDateTimeEdit.h>
 #include <QtTUI/QTuiLCDNumber.h>
+
+// Scroll widgets
 #include <QtTUI/QTuiScrollBar.h>
 #include <QtTUI/QTuiScrollArea.h>
+
+// Container widgets
 #include <QtTUI/QTuiGroupBox.h>
 #include <QtTUI/QTuiCollapsible.h>
 #include <QtTUI/QTuiTabBar.h>
@@ -36,12 +67,43 @@
 #include <QtTUI/QTuiToolBox.h>
 #include <QtTUI/QTuiStackedWidget.h>
 #include <QtTUI/QTuiSplitter.h>
+
+// Utility widgets
+#include <QtTUI/QTuiFocusFrame.h>
+#include <QtTUI/QTuiSizeGrip.h>
+#include <QtTUI/QTuiCalendarWidget.h>
+
+// Model/View widgets
 #include <QtTUI/QTuiItemDelegate.h>
 #include <QtTUI/QTuiStyledItemDelegate.h>
 #include <QtTUI/QTuiHeaderView.h>
+#include <QtTUI/QTuiTableView.h>
+#include <QtTUI/QTuiListView.h>
+#include <QtTUI/QTuiTreeView.h>
+#include <QtTUI/QTuiColumnView.h>
+#include <QtTUI/QTuiUndoStack.h>
+#include <QtTUI/QTuiUndoView.h>
 #include <QtTUI/QTuiDataWidgetMapper.h>
+
+// Convenience item-based widgets
+#include <QtTUI/QTuiListWidgetItem.h>
+#include <QtTUI/QTuiListWidget.h>
+#include <QtTUI/QTuiTableWidgetItem.h>
+#include <QtTUI/QTuiTableWidget.h>
 #include <QtTUI/QTuiTreeWidgetItem.h>
 #include <QtTUI/QTuiTreeWidgetItemIterator.h>
 #include <QtTUI/QTuiTreeWidget.h>
+
+// Main window components
+#include <QtTUI/QTuiAction.h>
+#include <QtTUI/QTuiMenu.h>
+#include <QtTUI/QTuiMenuBar.h>
+#include <QtTUI/QTuiToolBar.h>
+#include <QtTUI/QTuiStatusBar.h>
+#include <QtTUI/QTuiWidgetAction.h>
+#include <QtTUI/QTuiDockWidget.h>
+#include <QtTUI/QTuiMdiSubWindow.h>
+#include <QtTUI/QTuiMdiArea.h>
+#include <QtTUI/QTuiMainWindow.h>
 
 #endif // QTTUI_QTTUI_H

@@ -30,6 +30,20 @@
 #include <QtTUI/QTuiFocusFrame.h>
 #include <QtTUI/QTuiSizeGrip.h>
 #include <QtTUI/QTuiCalendarWidget.h>
+#include <QtTUI/QTuiHeaderView.h>
+#include <QtTUI/QTuiTreeView.h>
+#include <QtTUI/QTuiColumnView.h>
+#include <QtTUI/QTuiUndoView.h>
+#include <QtTUI/QTuiListWidget.h>
+#include <QtTUI/QTuiTableWidget.h>
+#include <QtTUI/QTuiTreeWidget.h>
+#include <QtTUI/QTuiMenu.h>
+#include <QtTUI/QTuiMenuBar.h>
+#include <QtTUI/QTuiToolBar.h>
+#include <QtTUI/QTuiStatusBar.h>
+#include <QtTUI/QTuiDockWidget.h>
+#include <QtTUI/QTuiMdiArea.h>
+#include <QtTUI/QTuiMdiSubWindow.h>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -169,6 +183,65 @@ UI_Loader::UI_Loader(QObject *parent)
 
     registerWidget(QStringLiteral("QTuiCalendarWidget"), [](QTuiWidget *parent) -> QTuiWidget * {
         return new QTuiCalendarWidget(parent);
+    });
+
+    // Model/View widgets
+    registerWidget(QStringLiteral("QTuiHeaderView"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiHeaderView(Qt::Horizontal, parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiTreeView"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiTreeView(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiColumnView"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiColumnView(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiUndoView"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiUndoView(parent);
+    });
+
+    // Convenience item-based widgets
+    registerWidget(QStringLiteral("QTuiListWidget"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiListWidget(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiTableWidget"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiTableWidget(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiTreeWidget"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiTreeWidget(parent);
+    });
+
+    // Main window components
+    registerWidget(QStringLiteral("QTuiMenu"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiMenu(QString(), parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiMenuBar"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiMenuBar(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiToolBar"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiToolBar(QString(), parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiStatusBar"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiStatusBar(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiDockWidget"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiDockWidget(QString(), parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiMdiArea"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiMdiArea(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiMdiSubWindow"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiMdiSubWindow(parent);
     });
 }
 

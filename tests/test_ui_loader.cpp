@@ -76,7 +76,21 @@ void TestUILoader::testAvailableWidgets()
     QVERIFY(widgets.contains(QStringLiteral("QTuiFocusFrame")));
     QVERIFY(widgets.contains(QStringLiteral("QTuiSizeGrip")));
     QVERIFY(widgets.contains(QStringLiteral("QTuiCalendarWidget")));
-    QCOMPARE(widgets.size(), 32);
+    QVERIFY(widgets.contains(QStringLiteral("QTuiHeaderView")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiTreeView")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiColumnView")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiUndoView")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiListWidget")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiTableWidget")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiTreeWidget")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiMenu")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiMenuBar")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiToolBar")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiStatusBar")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiDockWidget")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiMdiArea")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiMdiSubWindow")));
+    QCOMPARE(widgets.size(), 46);
 }
 
 // ---------------------------------------------------------------
