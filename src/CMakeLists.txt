@@ -12,6 +12,7 @@ set(QTTUI_SOURCES
     QTuiListView.cpp
     QTuiBoxLayout.cpp
     QTuiApplication.cpp
+    RenderScheduler.cpp
     QTuiSizePolicy.cpp
     QTuiLayoutItem.cpp
     QTuiLayout.cpp
@@ -95,6 +96,7 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiListView.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiBoxLayout.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiApplication.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/RenderScheduler.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiSizePolicy.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiLayoutItem.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiLayout.h

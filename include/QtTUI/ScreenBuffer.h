@@ -55,11 +55,15 @@ public:
     void swapBuffers();
     void invalidateAll();
 
+    bool resizedDuringRender() const;
+    void setResizedDuringRender(bool value);
+
 private:
     int m_width;
     int m_height;
     QVector<Cell> m_front;
     QVector<Cell> m_back;
+    bool m_resizedDuringRender = false;
 
     static Cell s_defaultCell;
 

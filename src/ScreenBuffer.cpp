@@ -43,6 +43,17 @@ void ScreenBuffer::resize(int width, int height)
     m_back.fill(Cell(), size);
     // Invalidate front buffer so diff() returns all positions (full redraw)
     invalidateAll();
+    m_resizedDuringRender = true;
+}
+
+bool ScreenBuffer::resizedDuringRender() const
+{
+    return m_resizedDuringRender;
+}
+
+void ScreenBuffer::setResizedDuringRender(bool value)
+{
+    m_resizedDuringRender = value;
 }
 
 int ScreenBuffer::width() const { return m_width; }

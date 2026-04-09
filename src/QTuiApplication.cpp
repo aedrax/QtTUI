@@ -1,5 +1,6 @@
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiMainWindow.h>
+#include <QtTUI/RenderScheduler.h>
 
 #include <QtTUI/TuiEvents.h>
 
@@ -35,6 +36,7 @@ QTuiApplication::QTuiApplication(int &argc, char **argv)
     const QSize termSize = m_backend->terminalSize();
     m_screenBuffer = std::make_unique<ScreenBuffer>(termSize.width(), termSize.height());
     m_renderer = std::make_unique<AnsiRenderer>();
+    m_scheduler = std::make_unique<RenderScheduler>(this);
 
     // Enter alternate screen and raw mode
     m_backend->enterAlternateScreen();
@@ -81,6 +83,11 @@ ScreenBuffer *QTuiApplication::screenBuffer() const
     return m_screenBuffer.get();
 }
 
+RenderScheduler *QTuiApplication::scheduler() const
+{
+    return m_scheduler.get();
+}
+
 void QTuiApplication::setMainWindow(QTuiMainWindow *window)
 {
     m_mainWindow = window;
@@ -93,19 +100,7 @@ QTuiMainWindow *QTuiApplication::mainWindow() const
 
 void QTuiApplication::triggerRender()
 {
-    m_renderScheduled = false;
-
-    // Paint the widget tree into the back buffer
-    if (m_mainWindow && m_mainWindow->isVisible()) {
-        m_mainWindow->paintEvent(*m_screenBuffer);
-    }
-
-    // Diff and write only changed cells to the terminal
-    QByteArray output = m_renderer->render(*m_screenBuffer);
-    if (!output.isEmpty()) {
-        m_backend->write(output);
-    }
-    m_screenBuffer->swapBuffers();
+    m_scheduler->renderNow();
 }
 
 bool QTuiApplication::event(QEvent *event)
@@ -123,11 +118,8 @@ bool QTuiApplication::event(QEvent *event)
 
 void QTuiApplication::scheduleRender()
 {
-    if (m_renderScheduled)
-        return;
-    m_renderScheduled = true;
-    // Fire after all pending events are processed
-    QTimer::singleShot(0, this, &QTuiApplication::triggerRender);
+    m_scheduler->scheduleDirtyRegion(
+        QRect(0, 0, m_screenBuffer->width(), m_screenBuffer->height()));
 }
 
 void QTuiApplication::onInputReady()
