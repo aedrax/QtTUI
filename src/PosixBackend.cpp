@@ -54,6 +54,11 @@ bool PosixBackend::enterRawMode()
     }
 
     m_rawMode = true;
+
+    // Enable SGR mouse reporting (button events + SGR encoding)
+    const QByteArray enableMouse("\x1b[?1000h\x1b[?1006h");
+    ::write(STDOUT_FILENO, enableMouse.constData(), enableMouse.size());
+
     return true;
 }
 
@@ -61,6 +66,10 @@ bool PosixBackend::exitRawMode()
 {
     if (!m_rawMode)
         return true;
+
+    // Disable SGR mouse reporting
+    const QByteArray disableMouse("\x1b[?1006l\x1b[?1000l");
+    ::write(STDOUT_FILENO, disableMouse.constData(), disableMouse.size());
 
     if (::tcsetattr(STDIN_FILENO, TCSAFLUSH, &m_originalTermios) != 0) {
         qWarning("PosixBackend: failed to restore terminal attributes");

@@ -50,12 +50,16 @@ public:
 protected:
     void resizeEvent(TuiResizeEvent *event) override;
     void keyPressEvent(TuiKeyEvent *event) override;
+    void mousePressEvent(TuiMouseEvent *event) override;
 
 private:
     void relayoutChildren();
     void relayout();
     void advanceFocus(bool forward);
     void rebuildFocusChain();
+    void collectFocusableWidgets(QTuiWidget *widget, QList<QTuiWidget *> &chain);
+    static QTuiWidget *findFocusedWidget(QTuiWidget *root);
+    static QTuiWidget *findWidgetAt(QTuiWidget *root, const QPoint &pos);
 
     QTuiWidget *m_centralWidget = nullptr;
     QTuiLayout *m_layout = nullptr;

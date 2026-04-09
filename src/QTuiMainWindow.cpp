@@ -216,19 +216,32 @@ void QTuiMainWindow::resizeEvent(TuiResizeEvent *event)
 
 void QTuiMainWindow::keyPressEvent(TuiKeyEvent *event)
 {
-    if (event->key() == Qt::Key_Tab) {
-        if (event->modifiers() & Qt::ShiftModifier)
-            advanceFocus(false);
-        else
-            advanceFocus(true);
+    // Tab forward
+    if (event->key() == Qt::Key_Tab && !(event->modifiers() & Qt::ShiftModifier)) {
+        advanceFocus(true);
         return;
     }
 
-    for (auto *child : childWidgets()) {
-        if (child->hasFocus()) {
-            QCoreApplication::sendEvent(child, event);
-            return;
-        }
+    // Shift+Tab backward (terminals send Key_Backtab for Shift+Tab)
+    if (event->key() == Qt::Key_Backtab
+        || (event->key() == Qt::Key_Tab && (event->modifiers() & Qt::ShiftModifier))) {
+        advanceFocus(false);
+        return;
+    }
+
+    // Find the focused widget anywhere in the tree and dispatch to it
+    QTuiWidget *focused = findFocusedWidget(this);
+    if (focused && focused != this) {
+        QCoreApplication::sendEvent(focused, event);
+    }
+}
+
+void QTuiMainWindow::mousePressEvent(TuiMouseEvent *event)
+{
+    QTuiWidget *target = findWidgetAt(this, event->pos());
+    if (target && target != this) {
+        target->setFocus();
+        QCoreApplication::sendEvent(target, event);
     }
 }
 
@@ -389,11 +402,52 @@ void QTuiMainWindow::advanceFocus(bool forward)
 void QTuiMainWindow::rebuildFocusChain()
 {
     m_focusChain.clear();
-    for (auto *child : childWidgets()) {
+    collectFocusableWidgets(this, m_focusChain);
+}
+
+void QTuiMainWindow::collectFocusableWidgets(QTuiWidget *widget, QList<QTuiWidget *> &chain)
+{
+    auto children = widget->childWidgets();
+    bool hasVisibleChild = false;
+    for (auto *child : children) {
         if (child->isVisible()) {
-            m_focusChain.append(child);
+            hasVisibleChild = true;
+            collectFocusableWidgets(child, chain);
         }
     }
+    // Leaf visible widgets (no visible children) are focusable
+    if (!hasVisibleChild && widget != this && widget->isVisible()) {
+        chain.append(widget);
+    }
+}
+
+QTuiWidget *QTuiMainWindow::findFocusedWidget(QTuiWidget *root)
+{
+    if (root->hasFocus())
+        return root;
+    for (auto *child : root->childWidgets()) {
+        QTuiWidget *found = findFocusedWidget(child);
+        if (found)
+            return found;
+    }
+    return nullptr;
+}
+
+QTuiWidget *QTuiMainWindow::findWidgetAt(QTuiWidget *root, const QPoint &pos)
+{
+    // Depth-first: find the deepest visible child whose geometry contains pos
+    QTuiWidget *best = nullptr;
+    if (root->isVisible() && root->geometry().contains(pos))
+        best = root;
+
+    for (auto *child : root->childWidgets()) {
+        if (!child->isVisible())
+            continue;
+        QTuiWidget *found = findWidgetAt(child, pos);
+        if (found)
+            best = found;
+    }
+    return best;
 }
 
 } // namespace QtTUI
