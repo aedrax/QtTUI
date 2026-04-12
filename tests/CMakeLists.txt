@@ -154,3 +154,12 @@ qttui_add_test(test_qtui_mdi_widgets test_qtui_mdi_widgets.cpp)
 
 # QTuiMainWindow integration tests (menu bar, toolbars, status bar, dock widgets)
 qttui_add_test(test_qtui_mainwindow_integration test_qtui_mainwindow_integration.cpp)
+
+# Widget Gallery demo tests (structure, behavior, signal/slot wiring)
+qttui_add_test(test_gallery test_gallery.cpp)
+
+# ScreenBuffer bounds safety property tests (Property 35)
+qttui_add_test(test_screenbuffer_bounds test_screenbuffer_bounds.cpp)
+
+# RenderScheduler coalescing property tests (Property 4)
+qttui_add_test(test_render_scheduler test_render_scheduler.cpp)

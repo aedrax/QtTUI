@@ -1,6 +1,7 @@
 #include <QtTest/QtTest>
 #include <QSignalSpy>
 #include <QCoreApplication>
+#include <QElapsedTimer>
 #include <QtTUI/QTuiAction.h>
 #include <QtTUI/QTuiToolBar.h>
 #include <QtTUI/QTuiStatusBar.h>
@@ -230,8 +231,13 @@ private slots:
         QCOMPARE(bar.currentMessage(), QStringLiteral("Saved!"));
         QCOMPARE(spy.count(), 1);
 
-        // Wait for timeout to expire
-        QTRY_COMPARE_WITH_TIMEOUT(bar.currentMessage(), QString(), 500);
+        // Wait for timeout to expire (avoid QTRY macro due to ABI compat)
+        QElapsedTimer timer;
+        timer.start();
+        while (!timer.hasExpired(500) && !bar.currentMessage().isEmpty()) {
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+        }
+        QCOMPARE(bar.currentMessage(), QString());
         // messageChanged should have been emitted again on timeout
         QVERIFY(spy.count() >= 2);
     }
