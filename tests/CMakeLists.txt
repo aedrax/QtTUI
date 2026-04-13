@@ -163,3 +163,6 @@ qttui_add_test(test_screenbuffer_bounds test_screenbuffer_bounds.cpp)
 
 # RenderScheduler coalescing property tests (Property 4)
 qttui_add_test(test_render_scheduler test_render_scheduler.cpp)
+
+# Focus rendering property tests (Property 28)
+qttui_add_test(test_focus_rendering test_focus_rendering.cpp)

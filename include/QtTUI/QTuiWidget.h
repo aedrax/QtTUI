@@ -41,6 +41,10 @@ public:
     // Theme integration: returns effective theme properties for this widget
     ThemeProperties themeProperties() const;
 
+    // Dirty region API: marks regions for repaint and notifies the scheduler
+    void markDirty();
+    void markDirty(const QRect &region);
+
 signals:
     void geometryChanged(const QRect &rect);
     void visibilityChanged(bool visible);
@@ -66,11 +70,17 @@ private:
     QRect m_dirtyNew;
     bool m_hasDirtyRegions = false;
 
+    // Accumulated dirty region for scheduler integration
+    QRect m_dirtyRegion;
+    bool m_isDirty = false;
+
 public:
     // Dirty region accessors (for rendering integration)
     bool hasDirtyRegions() const;
+    bool isDirty() const;
     QRect dirtyOldRegion() const;
     QRect dirtyNewRegion() const;
+    QRect dirtyRegion() const;
     void clearDirtyRegions();
 };
 

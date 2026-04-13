@@ -1,4 +1,6 @@
 #include <QtTUI/QTuiWidget.h>
+#include <QtTUI/QTuiApplication.h>
+#include <QtTUI/RenderScheduler.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/TuiEvents.h>
 #include <QDebug>
@@ -46,6 +48,11 @@ void QTuiWidget::setGeometry(const QRect &rect)
     m_hasDirtyRegions = true;
 
     m_geometry = clamped;
+
+    // Notify the scheduler about both old and new geometry regions
+    markDirty(m_dirtyOld);
+    markDirty(m_dirtyNew);
+
     emit geometryChanged(m_geometry);
 }
 
@@ -58,6 +65,12 @@ void QTuiWidget::setVisible(bool visible)
 {
     if (m_visible == visible)
         return;
+
+    // When transitioning to hidden, mark current geometry dirty so the area is cleared
+    if (m_visible && !visible) {
+        markDirty();
+    }
+
     m_visible = visible;
     emit visibilityChanged(m_visible);
 }
@@ -82,10 +95,12 @@ void QTuiWidget::setFocusWidget(QTuiWidget *widget)
 
     if (prev) {
         prev->m_hasFocus = false;
+        prev->markDirty();
         emit prev->focusLost();
     }
     if (widget) {
         widget->m_hasFocus = true;
+        widget->markDirty();
         emit widget->focusGained();
     }
 }
@@ -113,6 +128,26 @@ QSize QTuiWidget::minimumSize() const
 ThemeProperties QTuiWidget::themeProperties() const
 {
     return Theme_Engine::instance()->effectiveProperties(this);
+}
+
+void QTuiWidget::markDirty()
+{
+    markDirty(m_geometry);
+}
+
+void QTuiWidget::markDirty(const QRect &region)
+{
+    if (m_dirtyRegion.isNull()) {
+        m_dirtyRegion = region;
+    } else {
+        m_dirtyRegion = m_dirtyRegion.united(region);
+    }
+    m_isDirty = true;
+
+    auto *app = QTuiApplication::instance();
+    if (app && app->scheduler()) {
+        app->scheduler()->scheduleDirtyRegion(region);
+    }
 }
 
 bool QTuiWidget::event(QEvent *event)
@@ -156,6 +191,18 @@ void QTuiWidget::clearDirtyRegions()
     m_hasDirtyRegions = false;
     m_dirtyOld = QRect();
     m_dirtyNew = QRect();
+    m_isDirty = false;
+    m_dirtyRegion = QRect();
+}
+
+bool QTuiWidget::isDirty() const
+{
+    return m_isDirty;
+}
+
+QRect QTuiWidget::dirtyRegion() const
+{
+    return m_dirtyRegion;
 }
 
 } // namespace QtTUI

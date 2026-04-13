@@ -3,6 +3,7 @@
 #include <QtTUI/RenderScheduler.h>
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiMainWindow.h>
+#include <QtTUI/QTuiLabel.h>
 #include <QtTUI/ScreenBuffer.h>
 
 using namespace QtTUI;
@@ -99,6 +100,127 @@ private slots:
 
                 // Scheduler should still have no pending render.
                 RC_ASSERT(!scheduler->hasPendingRender());
+            });
+    }
+
+    // -----------------------------------------------------------------------
+    // Feature: widget-rendering-overhaul, Property 1: Property Change Dirtying
+    // -----------------------------------------------------------------------
+    void propertyChangeDirtying()
+    {
+        rc::check("After any property change, widget is dirty and scheduler has pending render",
+            []() {
+                // **Validates: Requirements 1.1, 1.2, 1.3**
+                static int argc = 1;
+                static char arg0[] = "test";
+                static char *argv[] = { arg0, nullptr };
+                QTuiApplication app(argc, argv);
+
+                QTuiMainWindow mainWindow;
+                mainWindow.setGeometry(QRect(0, 0, 80, 24));
+                mainWindow.setVisible(true);
+                app.setMainWindow(&mainWindow);
+
+                // Drain initial events so we start from a clean state.
+                QCoreApplication::processEvents();
+                QCoreApplication::processEvents();
+
+                RenderScheduler *scheduler = app.scheduler();
+                RC_ASSERT(scheduler != nullptr);
+
+                // Choose which property change to apply: 0 = geometry, 1 = visibility (hide)
+                const int changeType = *rc::gen::inRange(0, 2);
+
+                if (changeType == 0) {
+                    // --- Geometry change ---
+                    // Generate a random new geometry different from the current one.
+                    const int x = *rc::gen::inRange(0, 200);
+                    const int y = *rc::gen::inRange(0, 200);
+                    const int w = *rc::gen::inRange(1, 100);
+                    const int h = *rc::gen::inRange(1, 100);
+                    QRect newGeo(x, y, w, h);
+                    RC_PRE(newGeo != mainWindow.geometry());
+
+                    // Clear dirty state before the property change.
+                    mainWindow.clearDirtyRegions();
+                    // Drain any pending render from prior operations.
+                    QCoreApplication::processEvents();
+                    QCoreApplication::processEvents();
+
+                    mainWindow.setGeometry(newGeo);
+
+                    RC_ASSERT(mainWindow.isDirty());
+                    RC_ASSERT(scheduler->hasPendingRender());
+                } else {
+                    // --- Visibility change (hide) ---
+                    // Ensure the widget is currently visible before hiding.
+                    RC_PRE(mainWindow.isVisible());
+
+                    mainWindow.clearDirtyRegions();
+                    QCoreApplication::processEvents();
+                    QCoreApplication::processEvents();
+
+                    mainWindow.setVisible(false);
+
+                    RC_ASSERT(mainWindow.isDirty());
+                    RC_ASSERT(scheduler->hasPendingRender());
+                }
+            });
+    }
+
+    // -----------------------------------------------------------------------
+    // Feature: widget-rendering-overhaul, Property 2: Geometry Change Marks Old and New Dirty
+    // -----------------------------------------------------------------------
+    void geometryChangeMarksOldAndNew()
+    {
+        rc::check("setGeometry() marks both old and new geometry in the dirty region",
+            []() {
+                // **Validates: Requirements 1.2**
+                static int argc = 1;
+                static char arg0[] = "test";
+                static char *argv[] = { arg0, nullptr };
+                QTuiApplication app(argc, argv);
+
+                QTuiMainWindow mainWindow;
+                mainWindow.setGeometry(QRect(0, 0, 80, 24));
+                mainWindow.setVisible(true);
+                app.setMainWindow(&mainWindow);
+
+                // Create a QTuiLabel as a child widget to test geometry changes on.
+                QTuiLabel label(QStringLiteral("test"), &mainWindow);
+
+                // Drain initial events.
+                QCoreApplication::processEvents();
+                QCoreApplication::processEvents();
+
+                // Generate a random initial geometry for the label.
+                const int oldX = *rc::gen::inRange(0, 60);
+                const int oldY = *rc::gen::inRange(0, 20);
+                const int oldW = *rc::gen::inRange(1, 20);
+                const int oldH = *rc::gen::inRange(1, 4);
+                QRect oldGeo(oldX, oldY, oldW, oldH);
+                label.setGeometry(oldGeo);
+
+                // Clear dirty state after setting initial geometry.
+                label.clearDirtyRegions();
+                QCoreApplication::processEvents();
+                QCoreApplication::processEvents();
+
+                // Generate a new geometry that is DIFFERENT from the old one.
+                const int newX = *rc::gen::inRange(0, 60);
+                const int newY = *rc::gen::inRange(0, 20);
+                const int newW = *rc::gen::inRange(1, 20);
+                const int newH = *rc::gen::inRange(1, 4);
+                QRect newGeo(newX, newY, newW, newH);
+                RC_PRE(oldGeo != newGeo);
+
+                // Apply the geometry change.
+                label.setGeometry(newGeo);
+
+                // The accumulated dirty region should contain both old and new geometry.
+                QRect dirtyRegion = label.dirtyRegion();
+                RC_ASSERT(dirtyRegion.contains(oldGeo));
+                RC_ASSERT(dirtyRegion.contains(newGeo));
             });
     }
 
