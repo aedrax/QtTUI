@@ -199,11 +199,10 @@ void QTuiMainWindow::show()
 
 void QTuiMainWindow::paintEvent(ScreenBuffer &buffer)
 {
-    for (auto *child : childWidgets()) {
-        if (child->isVisible()) {
-            child->paintEvent(buffer);
-        }
-    }
+    // The main window itself has no chrome to paint.
+    // Child painting is handled by RenderScheduler::paintTree() which
+    // recurses into children with clip-rect propagation.
+    Q_UNUSED(buffer);
 }
 
 // --- Events ---

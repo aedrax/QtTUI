@@ -8,6 +8,7 @@
 namespace QtTUI {
 
 class QTuiApplication;
+class QTuiWidget;
 
 class RenderScheduler : public QObject {
     Q_OBJECT
@@ -22,9 +23,12 @@ private slots:
     void executeRenderPass();
 
 private:
+    void paintTree(QTuiWidget *widget, const QRect &parentClipRect);
+
     QTuiApplication *m_app;
     bool m_pending = false;
     QRect m_dirtyUnion;
+    bool m_fullRepaint = false;
 };
 
 } // namespace QtTUI

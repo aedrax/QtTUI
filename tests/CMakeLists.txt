@@ -169,3 +169,9 @@ qttui_add_test(test_focus_rendering test_focus_rendering.cpp)
 
 # Ellipsis truncation property tests (Property 21)
 qttui_add_test(test_ellipsis_truncation test_ellipsis_truncation.cpp)
+
+# Clip-rect enforcement and dirty-only repaint property tests (Properties 3, 5)
+qttui_add_test(test_clip_rect test_clip_rect.cpp)
+
+# Widget background clearing property tests (Properties 22, 23, 24)
+qttui_add_test(test_widget_clearing test_widget_clearing.cpp)

@@ -150,6 +150,60 @@ void QTuiWidget::markDirty(const QRect &region)
     }
 }
 
+void QTuiWidget::clearBackground(ScreenBuffer &buffer, const QRect &clipRect)
+{
+    const QRect geo = geometry();
+    const QRect clearArea = geo.intersected(clipRect);
+    if (clearArea.isEmpty())
+        return;
+
+    const auto theme = themeProperties();
+
+    for (int row = clearArea.y(); row < clearArea.y() + clearArea.height(); ++row) {
+        for (int col = clearArea.x(); col < clearArea.x() + clearArea.width(); ++col) {
+            Cell &cell = buffer.backCell(col, row);
+            cell.character = QLatin1Char(' ');
+            cell.foreground = theme.foreground;
+            cell.background = theme.background;
+            cell.bold = false;
+            cell.italic = false;
+            cell.underline = false;
+            cell.strikethrough = false;
+            cell.inverse = false;
+        }
+    }
+
+    // Handle geometry-shrink clearing: clear old geometry areas not covered by new geometry
+    if (m_hasDirtyRegions && !m_dirtyOld.isEmpty() && m_dirtyOld != geo) {
+        // Determine the region of the old geometry that is not covered by the new geometry
+        // We clear those cells with the parent's background color
+        QTuiWidget *pw = parentWidget();
+        ThemeProperties parentTheme;
+        if (pw) {
+            parentTheme = pw->themeProperties();
+        }
+
+        // Clear rows of old geometry that are outside new geometry
+        const QRect oldClipped = m_dirtyOld.intersected(clipRect);
+        for (int row = oldClipped.y(); row < oldClipped.y() + oldClipped.height(); ++row) {
+            for (int col = oldClipped.x(); col < oldClipped.x() + oldClipped.width(); ++col) {
+                // Only clear cells that are NOT in the new geometry
+                if (!geo.contains(col, row)) {
+                    Cell &cell = buffer.backCell(col, row);
+                    cell.character = QLatin1Char(' ');
+                    cell.foreground = parentTheme.foreground;
+                    cell.background = parentTheme.background;
+                    cell.bold = false;
+                    cell.italic = false;
+                    cell.underline = false;
+                    cell.strikethrough = false;
+                    cell.inverse = false;
+                }
+            }
+        }
+    }
+}
+
 bool QTuiWidget::event(QEvent *event)
 {
     if (event->type() == TuiEventTypes::keyEventType()) {

@@ -38,6 +38,10 @@ public:
     virtual QSize minimumSize() const;
     virtual void paintEvent(ScreenBuffer &buffer) = 0;
 
+    // Clears the widget's geometry with theme background color and space character.
+    // Should be called at the start of paintEvent() implementations.
+    void clearBackground(ScreenBuffer &buffer, const QRect &clipRect);
+
     // Theme integration: returns effective theme properties for this widget
     ThemeProperties themeProperties() const;
 
