@@ -166,3 +166,6 @@ qttui_add_test(test_render_scheduler test_render_scheduler.cpp)
 
 # Focus rendering property tests (Property 28)
 qttui_add_test(test_focus_rendering test_focus_rendering.cpp)
+
+# Ellipsis truncation property tests (Property 21)
+qttui_add_test(test_ellipsis_truncation test_ellipsis_truncation.cpp)

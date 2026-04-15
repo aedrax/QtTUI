@@ -72,6 +72,7 @@ set(QTTUI_SOURCES
     QTuiDockWidget.cpp
     QTuiMdiSubWindow.cpp
     QTuiMdiArea.cpp
+    RenderUtils.cpp
 )
 
 # Platform-specific backend sources
@@ -156,6 +157,7 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiDockWidget.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiMdiSubWindow.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiMdiArea.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/RenderUtils.h
 )
 
 add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})
