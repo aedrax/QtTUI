@@ -175,3 +175,6 @@ qttui_add_test(test_clip_rect test_clip_rect.cpp)
 
 # Widget background clearing property tests (Properties 22, 23, 24)
 qttui_add_test(test_widget_clearing test_widget_clearing.cpp)
+
+# Layout invalidation property tests (Properties 6, 7, 8)
+qttui_add_test(test_layout_invalidation test_layout_invalidation.cpp)

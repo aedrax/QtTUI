@@ -33,6 +33,11 @@ void QTuiBoxLayout::addWidget(QTuiWidget *widget, int stretch)
     }
 
     m_boxItems.append({widget, stretch});
+
+    // Invalidate the layout's parent widget so the entire content area is repainted
+    if (auto *pw = qobject_cast<QTuiWidget *>(parent())) {
+        pw->markDirty();
+    }
 }
 
 void QTuiBoxLayout::removeWidget(QTuiWidget *widget)
@@ -40,6 +45,11 @@ void QTuiBoxLayout::removeWidget(QTuiWidget *widget)
     for (int i = 0; i < m_boxItems.size(); ++i) {
         if (m_boxItems[i].widget == widget) {
             m_boxItems.removeAt(i);
+
+            // Invalidate the layout's parent widget so the entire content area is repainted
+            if (auto *pw = qobject_cast<QTuiWidget *>(parent())) {
+                pw->markDirty();
+            }
             return;
         }
     }

@@ -19,6 +19,7 @@ public:
 
     void addWidget(QTuiWidget *widget, int row, int column,
                    int rowSpan = 1, int columnSpan = 1);
+    void removeWidget(QTuiWidget *widget);
     void addLayout(QTuiLayout *layout, int row, int column,
                    int rowSpan = 1, int columnSpan = 1);
 

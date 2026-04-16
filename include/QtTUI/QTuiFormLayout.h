@@ -19,6 +19,7 @@ public:
 
     void addRow(const QString &labelText, QTuiWidget *field);
     void addRow(QTuiWidget *label, QTuiWidget *field);
+    void removeRow(int row);
 
     int rowCount() const;
 

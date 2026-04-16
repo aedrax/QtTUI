@@ -23,16 +23,43 @@ void QTuiFormLayout::addRow(const QString &labelText, QTuiWidget *field)
 {
     auto *label = new QTuiLabel(labelText);
     m_rows.append({label, field, true});
+
+    // Invalidate the layout's parent widget so the entire content area is repainted
+    if (auto *pw = qobject_cast<QTuiWidget *>(parent())) {
+        pw->markDirty();
+    }
 }
 
 void QTuiFormLayout::addRow(QTuiWidget *label, QTuiWidget *field)
 {
     m_rows.append({label, field, false});
+
+    // Invalidate the layout's parent widget so the entire content area is repainted
+    if (auto *pw = qobject_cast<QTuiWidget *>(parent())) {
+        pw->markDirty();
+    }
 }
 
 int QTuiFormLayout::rowCount() const
 {
     return m_rows.size();
+}
+
+void QTuiFormLayout::removeRow(int row)
+{
+    if (row < 0 || row >= m_rows.size())
+        return;
+
+    const auto &r = m_rows[row];
+    if (r.ownsLabel)
+        delete r.label;
+
+    m_rows.removeAt(row);
+
+    // Invalidate the layout's parent widget so the entire content area is repainted
+    if (auto *pw = qobject_cast<QTuiWidget *>(parent())) {
+        pw->markDirty();
+    }
 }
 
 void QTuiFormLayout::apply(const QRect &availableArea)

@@ -26,6 +26,11 @@ void QTuiGridLayout::addWidget(QTuiWidget *widget, int row, int column,
 
     auto *item = new QTuiWidgetItem(widget);
     m_gridItems.append({item, row, column, rowSpan, columnSpan});
+
+    // Invalidate the layout's parent widget so the entire content area is repainted
+    if (auto *pw = qobject_cast<QTuiWidget *>(parent())) {
+        pw->markDirty();
+    }
 }
 
 void QTuiGridLayout::addLayout(QTuiLayout *layout, int row, int column,
@@ -38,6 +43,31 @@ void QTuiGridLayout::addLayout(QTuiLayout *layout, int row, int column,
 
     auto *item = new QTuiLayoutItemWrapper(layout);
     m_gridItems.append({item, row, column, rowSpan, columnSpan});
+
+    // Invalidate the layout's parent widget so the entire content area is repainted
+    if (auto *pw = qobject_cast<QTuiWidget *>(parent())) {
+        pw->markDirty();
+    }
+}
+
+void QTuiGridLayout::removeWidget(QTuiWidget *widget)
+{
+    if (!widget)
+        return;
+
+    for (int i = 0; i < m_gridItems.size(); ++i) {
+        auto *widgetItem = dynamic_cast<QTuiWidgetItem *>(m_gridItems[i].item);
+        if (widgetItem && widgetItem->widget() == widget) {
+            delete m_gridItems[i].item;
+            m_gridItems.removeAt(i);
+
+            // Invalidate the layout's parent widget so the entire content area is repainted
+            if (auto *pw = qobject_cast<QTuiWidget *>(parent())) {
+                pw->markDirty();
+            }
+            return;
+        }
+    }
 }
 
 void QTuiGridLayout::setRowStretch(int row, int stretch)
