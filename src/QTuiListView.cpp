@@ -118,24 +118,59 @@ void QTuiListView::onDataChanged(const QModelIndex &topLeft, const QModelIndex &
     if (!m_model)
         return;
 
+    const QRect geo = geometry();
+    const int viewHeight = geo.height();
+    if (viewHeight <= 0)
+        return;
+
+    const int firstVisibleRow = m_scrollOffset;
+    const int lastVisibleRow = m_scrollOffset + viewHeight - 1;
+
     int top = qBound(0, topLeft.row(), m_model->rowCount() - 1);
     int bottom = qBound(0, bottomRight.row(), m_model->rowCount() - 1);
 
-    if (top > bottom)
-        qWarning() << "QTuiListView::onDataChanged: out-of-range indices clamped";
+    // Filter out signals entirely outside the visible viewport
+    if (top > lastVisibleRow || bottom < firstVisibleRow)
+        return;
 
-    Q_UNUSED(top);
-    Q_UNUSED(bottom);
+    // Compute the visible dirty rows relative to the widget geometry
+    int dirtyTop = qMax(top, firstVisibleRow) - m_scrollOffset;
+    int dirtyBottom = qMin(bottom, lastVisibleRow) - m_scrollOffset;
+
+    QRect dirtyRect(geo.x(), geo.y() + dirtyTop,
+                    geo.width(), dirtyBottom - dirtyTop + 1);
+    markDirty(dirtyRect);
 }
 
 void QTuiListView::onRowsInserted(const QModelIndex &parent, int first, int last)
 {
     Q_UNUSED(parent);
-    Q_UNUSED(first);
     Q_UNUSED(last);
 
     if (!m_model)
         return;
+
+    const QRect geo = geometry();
+    const int viewHeight = geo.height();
+    if (viewHeight <= 0) {
+        clampCurrentIndex();
+        return;
+    }
+
+    const int firstVisibleRow = m_scrollOffset;
+    const int lastVisibleRow = m_scrollOffset + viewHeight - 1;
+
+    // If insertion is entirely below the visible viewport, no dirty marking needed
+    if (first > lastVisibleRow) {
+        clampCurrentIndex();
+        return;
+    }
+
+    // Mark from insertion point (or top of viewport) to bottom of viewport
+    int dirtyTop = qMax(first, firstVisibleRow) - m_scrollOffset;
+    QRect dirtyRect(geo.x(), geo.y() + dirtyTop,
+                    geo.width(), viewHeight - dirtyTop);
+    markDirty(dirtyRect);
 
     clampCurrentIndex();
 }
@@ -143,11 +178,34 @@ void QTuiListView::onRowsInserted(const QModelIndex &parent, int first, int last
 void QTuiListView::onRowsRemoved(const QModelIndex &parent, int first, int last)
 {
     Q_UNUSED(parent);
-    Q_UNUSED(first);
     Q_UNUSED(last);
 
     if (!m_model)
         return;
+
+    const QRect geo = geometry();
+    const int viewHeight = geo.height();
+    if (viewHeight <= 0) {
+        clampCurrentIndex();
+        ensureCurrentVisible();
+        return;
+    }
+
+    const int firstVisibleRow = m_scrollOffset;
+    const int lastVisibleRow = m_scrollOffset + viewHeight - 1;
+
+    // If removal is entirely below the visible viewport, no dirty marking needed
+    if (first > lastVisibleRow) {
+        clampCurrentIndex();
+        ensureCurrentVisible();
+        return;
+    }
+
+    // Mark from removal point (or top of viewport) to bottom of viewport
+    int dirtyTop = qMax(first, firstVisibleRow) - m_scrollOffset;
+    QRect dirtyRect(geo.x(), geo.y() + dirtyTop,
+                    geo.width(), viewHeight - dirtyTop);
+    markDirty(dirtyRect);
 
     clampCurrentIndex();
     ensureCurrentVisible();
@@ -157,6 +215,7 @@ void QTuiListView::onModelReset()
 {
     m_currentRow = 0;
     m_scrollOffset = 0;
+    markDirty();
 }
 
 void QTuiListView::disconnectModel()

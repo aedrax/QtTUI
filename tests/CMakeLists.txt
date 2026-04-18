@@ -178,3 +178,6 @@ qttui_add_test(test_widget_clearing test_widget_clearing.cpp)
 
 # Layout invalidation property tests (Properties 6, 7, 8)
 qttui_add_test(test_layout_invalidation test_layout_invalidation.cpp)
+
+# Model/View dirty region property tests (Properties 9, 10, 11, 12)
+qttui_add_test(test_model_view_dirty test_model_view_dirty.cpp)

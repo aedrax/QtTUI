@@ -263,9 +263,46 @@ void QTuiTreeView::keyPressEvent(TuiKeyEvent *event)
 
 void QTuiTreeView::onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)
 {
-    Q_UNUSED(topLeft);
     Q_UNUSED(bottomRight);
-    // Data changed but structure didn't, no need to rebuild flat list
+
+    if (!m_model)
+        return;
+
+    const QRect geo = geometry();
+    const int viewHeight = geo.height();
+    if (viewHeight <= 0)
+        return;
+
+    const int firstVisibleRow = m_scrollOffset;
+    const int lastVisibleRow = m_scrollOffset + viewHeight - 1;
+
+    // Map model indices to flat rows and mark visible ones dirty
+    int dirtyTop = -1;
+    int dirtyBottom = -1;
+
+    for (int i = 0; i < m_flatList.size(); ++i) {
+        const QModelIndex &idx = m_flatList.at(i).index;
+        // Check if this flat row corresponds to a changed index
+        if (idx.parent() == topLeft.parent() &&
+            idx.row() >= topLeft.row() && idx.row() <= bottomRight.row()) {
+            // This flat row is affected by the data change
+            if (i >= firstVisibleRow && i <= lastVisibleRow) {
+                if (dirtyTop < 0)
+                    dirtyTop = i;
+                dirtyBottom = i;
+            }
+        }
+    }
+
+    if (dirtyTop < 0)
+        return; // No visible rows affected
+
+    int screenTop = dirtyTop - m_scrollOffset;
+    int screenBottom = dirtyBottom - m_scrollOffset;
+
+    QRect dirtyRect(geo.x(), geo.y() + screenTop,
+                    geo.width(), screenBottom - screenTop + 1);
+    markDirty(dirtyRect);
 }
 
 void QTuiTreeView::onRowsInserted(const QModelIndex &parent, int first, int last)
@@ -278,6 +315,16 @@ void QTuiTreeView::onRowsInserted(const QModelIndex &parent, int first, int last
     if (m_currentRow >= 0 && m_currentRow < m_flatList.size())
         currentIdx = m_flatList.at(m_currentRow).index;
 
+    // Find the flat row corresponding to the insertion point before rebuild
+    int affectedFlatRow = -1;
+    for (int i = 0; i < m_flatList.size(); ++i) {
+        const QModelIndex &idx = m_flatList.at(i).index;
+        if (idx.parent() == parent && idx.row() >= first) {
+            affectedFlatRow = i;
+            break;
+        }
+    }
+
     rebuildFlatList();
 
     if (currentIdx.isValid()) {
@@ -288,19 +335,68 @@ void QTuiTreeView::onRowsInserted(const QModelIndex &parent, int first, int last
     if (m_currentRow >= m_flatList.size())
         m_currentRow = qMax(0, m_flatList.size() - 1);
     scrollToVisible();
+
+    // Mark from affected row to bottom of viewport
+    const QRect geo = geometry();
+    const int viewHeight = geo.height();
+    if (viewHeight <= 0)
+        return;
+
+    const int firstVisibleRow = m_scrollOffset;
+    const int lastVisibleRow = m_scrollOffset + viewHeight - 1;
+
+    // If no affected row found, or it's below viewport, no marking needed
+    if (affectedFlatRow < 0)
+        affectedFlatRow = 0;
+
+    if (affectedFlatRow > lastVisibleRow)
+        return;
+
+    int dirtyTop = qMax(affectedFlatRow, firstVisibleRow) - m_scrollOffset;
+    QRect dirtyRect(geo.x(), geo.y() + dirtyTop,
+                    geo.width(), viewHeight - dirtyTop);
+    markDirty(dirtyRect);
 }
 
 void QTuiTreeView::onRowsRemoved(const QModelIndex &parent, int first, int last)
 {
-    Q_UNUSED(parent);
-    Q_UNUSED(first);
     Q_UNUSED(last);
+
+    // Find the flat row corresponding to the removal point before rebuild
+    int affectedFlatRow = -1;
+    for (int i = 0; i < m_flatList.size(); ++i) {
+        const QModelIndex &idx = m_flatList.at(i).index;
+        if (idx.parent() == parent && idx.row() >= first) {
+            affectedFlatRow = i;
+            break;
+        }
+    }
 
     rebuildFlatList();
 
     if (m_currentRow >= m_flatList.size())
         m_currentRow = qMax(0, m_flatList.size() - 1);
     scrollToVisible();
+
+    // Mark from affected row to bottom of viewport
+    const QRect geo = geometry();
+    const int viewHeight = geo.height();
+    if (viewHeight <= 0)
+        return;
+
+    const int firstVisibleRow = m_scrollOffset;
+    const int lastVisibleRow = m_scrollOffset + viewHeight - 1;
+
+    if (affectedFlatRow < 0)
+        affectedFlatRow = 0;
+
+    if (affectedFlatRow > lastVisibleRow)
+        return;
+
+    int dirtyTop = qMax(affectedFlatRow, firstVisibleRow) - m_scrollOffset;
+    QRect dirtyRect(geo.x(), geo.y() + dirtyTop,
+                    geo.width(), viewHeight - dirtyTop);
+    markDirty(dirtyRect);
 }
 
 void QTuiTreeView::onModelReset()
@@ -310,6 +406,7 @@ void QTuiTreeView::onModelReset()
     m_expandedItems.clear();
     m_flatList.clear();
     rebuildFlatList();
+    markDirty();
 }
 
 // --- Private helpers ---

@@ -161,32 +161,60 @@ void QTuiTableView::onDataChanged(const QModelIndex &topLeft, const QModelIndex 
     if (!m_model)
         return;
 
-    // Clamp indices to valid range
+    const QRect geo = geometry();
+    const int visibleDataRows = geo.height() - m_headerHeight;
+    if (visibleDataRows <= 0)
+        return;
+
+    const int firstVisibleRow = m_scrollOffset;
+    const int lastVisibleRow = m_scrollOffset + visibleDataRows - 1;
+
+    // Clamp to valid model range
     int top = qBound(0, topLeft.row(), m_model->rowCount() - 1);
     int bottom = qBound(0, bottomRight.row(), m_model->rowCount() - 1);
-    int left = qBound(0, topLeft.column(), m_model->columnCount() - 1);
-    int right = qBound(0, bottomRight.column(), m_model->columnCount() - 1);
 
-    if (top > bottom || left > right) {
-        qWarning() << "QTuiTableView::onDataChanged: out-of-range indices clamped";
-    }
+    // Filter out signals entirely outside the visible viewport
+    if (top > lastVisibleRow || bottom < firstVisibleRow)
+        return;
 
-    Q_UNUSED(top);
-    Q_UNUSED(bottom);
-    Q_UNUSED(left);
-    Q_UNUSED(right);
-    // The next paintEvent will redraw affected cells since the model data has changed.
-    // In a full implementation, we'd mark only the affected region dirty.
+    // Compute the visible dirty rows relative to the widget geometry
+    int dirtyTop = qMax(top, firstVisibleRow) - m_scrollOffset + m_headerHeight;
+    int dirtyBottom = qMin(bottom, lastVisibleRow) - m_scrollOffset + m_headerHeight;
+
+    QRect dirtyRect(geo.x(), geo.y() + dirtyTop,
+                    geo.width(), dirtyBottom - dirtyTop + 1);
+    markDirty(dirtyRect);
 }
 
 void QTuiTableView::onRowsInserted(const QModelIndex &parent, int first, int last)
 {
     Q_UNUSED(parent);
-    Q_UNUSED(first);
     Q_UNUSED(last);
 
     if (!m_model)
         return;
+
+    const QRect geo = geometry();
+    const int visibleDataRows = geo.height() - m_headerHeight;
+    if (visibleDataRows <= 0) {
+        clampCurrentIndex();
+        return;
+    }
+
+    const int firstVisibleRow = m_scrollOffset;
+    const int lastVisibleRow = m_scrollOffset + visibleDataRows - 1;
+
+    // If insertion is entirely below the visible viewport, no dirty marking needed
+    if (first > lastVisibleRow) {
+        clampCurrentIndex();
+        return;
+    }
+
+    // Mark from insertion point (or top of viewport) to bottom of viewport
+    int dirtyTop = qMax(first, firstVisibleRow) - m_scrollOffset + m_headerHeight;
+    QRect dirtyRect(geo.x(), geo.y() + dirtyTop,
+                    geo.width(), visibleDataRows - dirtyTop + m_headerHeight);
+    markDirty(dirtyRect);
 
     clampCurrentIndex();
 }
@@ -194,11 +222,34 @@ void QTuiTableView::onRowsInserted(const QModelIndex &parent, int first, int las
 void QTuiTableView::onRowsRemoved(const QModelIndex &parent, int first, int last)
 {
     Q_UNUSED(parent);
-    Q_UNUSED(first);
     Q_UNUSED(last);
 
     if (!m_model)
         return;
+
+    const QRect geo = geometry();
+    const int visibleDataRows = geo.height() - m_headerHeight;
+    if (visibleDataRows <= 0) {
+        clampCurrentIndex();
+        ensureCurrentVisible();
+        return;
+    }
+
+    const int firstVisibleRow = m_scrollOffset;
+    const int lastVisibleRow = m_scrollOffset + visibleDataRows - 1;
+
+    // If removal is entirely below the visible viewport, no dirty marking needed
+    if (first > lastVisibleRow) {
+        clampCurrentIndex();
+        ensureCurrentVisible();
+        return;
+    }
+
+    // Mark from removal point (or top of viewport) to bottom of viewport
+    int dirtyTop = qMax(first, firstVisibleRow) - m_scrollOffset + m_headerHeight;
+    QRect dirtyRect(geo.x(), geo.y() + dirtyTop,
+                    geo.width(), visibleDataRows - dirtyTop + m_headerHeight);
+    markDirty(dirtyRect);
 
     clampCurrentIndex();
     ensureCurrentVisible();
@@ -209,6 +260,7 @@ void QTuiTableView::onModelReset()
     m_currentRow = 0;
     m_currentCol = 0;
     m_scrollOffset = 0;
+    markDirty();
 }
 
 void QTuiTableView::disconnectModel()
