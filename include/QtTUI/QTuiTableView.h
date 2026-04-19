@@ -19,6 +19,7 @@ public:
     void setCurrentIndex(const QModelIndex &index);
 
     int scrollOffset() const;
+    int horizontalScrollOffset() const;
 
     void paintEvent(ScreenBuffer &buffer) override;
 
@@ -38,12 +39,14 @@ private:
     void disconnectModel();
     void connectModel();
     void ensureCurrentVisible();
+    void ensureCurrentColumnVisible();
     void clampCurrentIndex();
 
     QAbstractItemModel *m_model = nullptr;
     int m_currentRow = 0;
     int m_currentCol = 0;
     int m_scrollOffset = 0;
+    int m_horizontalScrollOffset = 0;
     static constexpr int m_headerHeight = 1;
 };
 

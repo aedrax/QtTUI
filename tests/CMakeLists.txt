@@ -181,3 +181,6 @@ qttui_add_test(test_layout_invalidation test_layout_invalidation.cpp)
 
 # Model/View dirty region property tests (Properties 9, 10, 11, 12)
 qttui_add_test(test_model_view_dirty test_model_view_dirty.cpp)
+
+# Table rendering property tests (Properties 13, 14, 15)
+qttui_add_test(test_tableview_rendering test_tableview_rendering.cpp)
