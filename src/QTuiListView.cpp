@@ -1,6 +1,7 @@
 #include <QtTUI/QTuiListView.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/TuiEvents.h>
 #include <QDebug>
 
@@ -53,7 +54,13 @@ int QTuiListView::scrollOffset() const
 void QTuiListView::paintEvent(ScreenBuffer &buffer)
 {
     const QRect geo = geometry();
-    if (geo.width() <= 0 || geo.height() <= 0 || !m_model)
+    if (geo.width() <= 0 || geo.height() <= 0)
+        return;
+
+    // Clear background first
+    clearBackground(buffer, geo);
+
+    if (!m_model)
         return;
 
     const auto theme = themeProperties();
@@ -61,30 +68,48 @@ void QTuiListView::paintEvent(ScreenBuffer &buffer)
     const int viewWidth = geo.width();
     const int viewHeight = geo.height();
 
+    // Handle empty model: background already cleared, nothing more to render
+    if (rows == 0)
+        return;
+
     for (int vr = 0; vr < viewHeight; ++vr) {
         int modelRow = m_scrollOffset + vr;
         int screenY = geo.y() + vr;
 
-        QString itemText;
-        if (modelRow < rows) {
-            QModelIndex idx = m_model->index(modelRow, 0);
-            itemText = m_model->data(idx, Qt::DisplayRole).toString();
+        if (modelRow >= rows)
+            break;
+
+        QModelIndex idx = m_model->index(modelRow, 0);
+        QString itemText = m_model->data(idx, Qt::DisplayRole).toString();
+
+        bool isCurrent = (modelRow == m_currentRow);
+
+        // Set up style cell for renderTextTruncated
+        Cell style;
+        style.bold = false;
+        style.inverse = false;
+        if (isCurrent) {
+            style.foreground = theme.focusForeground;
+            style.background = theme.focusBackground;
+        } else {
+            style.foreground = theme.foreground;
+            style.background = theme.background;
         }
 
-        bool isCurrent = (modelRow == m_currentRow && modelRow < rows);
-        for (int x = 0; x < viewWidth; ++x) {
-            Cell &cell = buffer.backCell(geo.x() + x, screenY);
-            cell.character = (x < itemText.length()) ? itemText.at(x) : QLatin1Char(' ');
-            cell.bold = false;
-            if (isCurrent) {
+        // Fill the entire row with the appropriate background first (for current row highlighting)
+        if (isCurrent) {
+            for (int x = 0; x < viewWidth; ++x) {
+                Cell &cell = buffer.backCell(geo.x() + x, screenY);
+                cell.character = QLatin1Char(' ');
                 cell.foreground = theme.focusForeground;
                 cell.background = theme.focusBackground;
-            } else {
-                cell.foreground = theme.foreground;
-                cell.background = theme.background;
+                cell.bold = false;
+                cell.inverse = false;
             }
-            cell.inverse = isCurrent;
         }
+
+        // Render text with truncation
+        renderTextTruncated(buffer, geo.x(), screenY, itemText, viewWidth, style);
     }
 }
 

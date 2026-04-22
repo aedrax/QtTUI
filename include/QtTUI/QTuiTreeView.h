@@ -58,6 +58,7 @@ private:
     void connectModel();
     void scrollToVisible();
     int flatRowForIndex(const QModelIndex &index) const;
+    void markDirtyFromRowToBottom(int flatRow);
 
     QAbstractItemModel *m_model = nullptr;
     QTuiItemDelegate *m_delegate = nullptr;

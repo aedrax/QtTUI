@@ -184,3 +184,9 @@ qttui_add_test(test_model_view_dirty test_model_view_dirty.cpp)
 
 # Table rendering property tests (Properties 13, 14, 15)
 qttui_add_test(test_tableview_rendering test_tableview_rendering.cpp)
+
+# Model/View DisplayRole rendering and List View scroll property tests (Properties 16, 17)
+qttui_add_test(test_model_view_rendering test_model_view_rendering.cpp)
+
+# Tree indentation, indicators, and expand/collapse property tests (Properties 18, 19, 20)
+qttui_add_test(test_treeview_rendering test_treeview_rendering.cpp)

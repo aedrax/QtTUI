@@ -2,6 +2,7 @@
 #include <QtTUI/QTuiItemDelegate.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/TuiEvents.h>
 
 namespace QtTUI {
@@ -63,12 +64,21 @@ void QTuiTreeView::expand(const QModelIndex &index)
         return;
 
     m_expandedItems.insert(persistent);
+
+    // Find the flat row of the toggled node before rebuild
+    int toggledRow = flatRowForIndex(index);
+
     rebuildFlatList();
+
     // Restore current row to point to the same index after rebuild
     int row = flatRowForIndex(index);
     if (row >= 0)
         m_currentRow = row;
     scrollToVisible();
+
+    // Mark from toggled row to bottom of visible area as dirty
+    markDirtyFromRowToBottom(toggledRow >= 0 ? toggledRow : 0);
+
     emit expanded(index);
 }
 
@@ -81,6 +91,9 @@ void QTuiTreeView::collapse(const QModelIndex &index)
     if (!m_expandedItems.contains(persistent))
         return;
 
+    // Find the flat row of the toggled node before rebuild
+    int toggledRow = flatRowForIndex(index);
+
     m_expandedItems.remove(persistent);
     rebuildFlatList();
     int row = flatRowForIndex(index);
@@ -90,6 +103,10 @@ void QTuiTreeView::collapse(const QModelIndex &index)
     if (m_currentRow >= m_flatList.size())
         m_currentRow = qMax(0, m_flatList.size() - 1);
     scrollToVisible();
+
+    // Mark from toggled row to bottom of visible area as dirty
+    markDirtyFromRowToBottom(toggledRow >= 0 ? toggledRow : 0);
+
     emit collapsed(index);
 }
 
@@ -111,7 +128,13 @@ QTuiItemDelegate *QTuiTreeView::itemDelegate() const
 void QTuiTreeView::paintEvent(ScreenBuffer &buffer)
 {
     const QRect geo = geometry();
-    if (geo.width() <= 0 || geo.height() <= 0 || !m_model)
+    if (geo.width() <= 0 || geo.height() <= 0)
+        return;
+
+    // Clear background first
+    clearBackground(buffer, geo);
+
+    if (!m_model)
         return;
 
     const auto theme = themeProperties();
@@ -121,70 +144,102 @@ void QTuiTreeView::paintEvent(ScreenBuffer &buffer)
     for (int vr = 0; vr < viewHeight; ++vr) {
         int flatRow = m_scrollOffset + vr;
         int screenY = geo.y() + vr;
-        bool isCurrent = (flatRow == m_currentRow && flatRow < m_flatList.size());
 
-        if (flatRow < m_flatList.size()) {
-            const FlattenedItem &item = m_flatList.at(flatRow);
-            bool hasChildren = m_model->hasChildren(item.index);
+        if (flatRow >= m_flatList.size())
+            break;
 
-            // Build display string: indentation + expand indicator + text
-            QString indent(item.depth * m_indentWidth, QLatin1Char(' '));
-            QString indicator;
-            if (hasChildren)
-                indicator = item.expanded ? QStringLiteral("▼ ") : QStringLiteral("▶ ");
-            else
-                indicator = QStringLiteral("  ");
+        const FlattenedItem &item = m_flatList.at(flatRow);
+        bool isCurrent = (flatRow == m_currentRow);
+        bool hasChildren = m_model->hasChildren(item.index);
 
-            QString text;
-            if (m_delegate) {
-                // Delegate painting: let delegate handle the cell area after indent+indicator
-                int prefixLen = indent.length() + indicator.length();
-                // Write prefix first
-                for (int x = 0; x < viewWidth; ++x) {
-                    Cell &cell = buffer.backCell(geo.x() + x, screenY);
-                    QString prefix = indent + indicator;
-                    cell.character = (x < prefix.length()) ? prefix.at(x) : QLatin1Char(' ');
-                    cell.bold = false;
-                    if (isCurrent) {
-                        cell.foreground = theme.focusForeground;
-                        cell.background = theme.focusBackground;
-                    } else {
-                        cell.foreground = theme.foreground;
-                        cell.background = theme.background;
-                    }
-                    cell.inverse = isCurrent;
-                }
-                // Let delegate paint into the remaining area
-                QRect delegateRect(geo.x() + prefixLen, screenY,
-                                   viewWidth - prefixLen, 1);
-                m_delegate->paint(buffer, delegateRect, item.index);
-            } else {
-                text = m_model->data(item.index, Qt::DisplayRole).toString();
-                QString line = indent + indicator + text;
-
-                for (int x = 0; x < viewWidth; ++x) {
-                    Cell &cell = buffer.backCell(geo.x() + x, screenY);
-                    cell.character = (x < line.length()) ? line.at(x) : QLatin1Char(' ');
-                    cell.bold = false;
-                    if (isCurrent) {
-                        cell.foreground = theme.focusForeground;
-                        cell.background = theme.focusBackground;
-                    } else {
-                        cell.foreground = theme.foreground;
-                        cell.background = theme.background;
-                    }
-                    cell.inverse = isCurrent;
-                }
-            }
+        // Determine style
+        Cell style;
+        style.bold = false;
+        style.inverse = false;
+        if (isCurrent) {
+            style.foreground = theme.focusForeground;
+            style.background = theme.focusBackground;
         } else {
-            // Empty row below the last item
+            style.foreground = theme.foreground;
+            style.background = theme.background;
+        }
+
+        // Fill the entire row with the appropriate background (for current row highlighting)
+        if (isCurrent) {
             for (int x = 0; x < viewWidth; ++x) {
                 Cell &cell = buffer.backCell(geo.x() + x, screenY);
                 cell.character = QLatin1Char(' ');
+                cell.foreground = theme.focusForeground;
+                cell.background = theme.focusBackground;
                 cell.bold = false;
-                cell.foreground = theme.foreground;
-                cell.background = theme.background;
                 cell.inverse = false;
+            }
+        }
+
+        // Compute indentation offset
+        int indentOffset = item.depth * m_indentWidth;
+
+        // Render indentation spaces
+        for (int i = 0; i < indentOffset && i < viewWidth; ++i) {
+            Cell &cell = buffer.backCell(geo.x() + i, screenY);
+            cell.character = QLatin1Char(' ');
+            cell.foreground = style.foreground;
+            cell.background = style.background;
+            cell.bold = false;
+            cell.inverse = false;
+        }
+
+        // Render expand/collapse indicator
+        int indicatorOffset = indentOffset;
+        if (hasChildren) {
+            // Use multi-byte indicator characters: ▶ (collapsed) or ▼ (expanded)
+            QChar indicatorChar = item.expanded ? QChar(0x25BC) : QChar(0x25B6);
+            if (indicatorOffset < viewWidth) {
+                Cell &cell = buffer.backCell(geo.x() + indicatorOffset, screenY);
+                cell.character = indicatorChar;
+                cell.foreground = style.foreground;
+                cell.background = style.background;
+                cell.bold = false;
+                cell.inverse = false;
+            }
+            indicatorOffset++;
+            // Space after indicator
+            if (indicatorOffset < viewWidth) {
+                Cell &cell = buffer.backCell(geo.x() + indicatorOffset, screenY);
+                cell.character = QLatin1Char(' ');
+                cell.foreground = style.foreground;
+                cell.background = style.background;
+                cell.bold = false;
+                cell.inverse = false;
+            }
+            indicatorOffset++;
+        } else {
+            // No indicator for leaves, but reserve the same space for alignment
+            for (int i = 0; i < 2 && indicatorOffset < viewWidth; ++i, ++indicatorOffset) {
+                Cell &cell = buffer.backCell(geo.x() + indicatorOffset, screenY);
+                cell.character = QLatin1Char(' ');
+                cell.foreground = style.foreground;
+                cell.background = style.background;
+                cell.bold = false;
+                cell.inverse = false;
+            }
+        }
+
+        // Render item text with truncation
+        if (m_delegate) {
+            // Let delegate paint into the remaining area
+            int remainingWidth = viewWidth - indicatorOffset;
+            if (remainingWidth > 0) {
+                QRect delegateRect(geo.x() + indicatorOffset, screenY,
+                                   remainingWidth, 1);
+                m_delegate->paint(buffer, delegateRect, item.index);
+            }
+        } else {
+            QString text = m_model->data(item.index, Qt::DisplayRole).toString();
+            int remainingWidth = viewWidth - indicatorOffset;
+            if (remainingWidth > 0) {
+                renderTextTruncated(buffer, geo.x() + indicatorOffset, screenY,
+                                    text, remainingWidth, style);
             }
         }
     }
@@ -486,6 +541,26 @@ int QTuiTreeView::flatRowForIndex(const QModelIndex &index) const
             return i;
     }
     return -1;
+}
+
+void QTuiTreeView::markDirtyFromRowToBottom(int flatRow)
+{
+    const QRect geo = geometry();
+    const int viewHeight = geo.height();
+    if (viewHeight <= 0)
+        return;
+
+    const int firstVisibleRow = m_scrollOffset;
+    const int lastVisibleRow = m_scrollOffset + viewHeight - 1;
+
+    // If the affected row is below the visible viewport, nothing to mark
+    if (flatRow > lastVisibleRow)
+        return;
+
+    int dirtyTop = qMax(flatRow, firstVisibleRow) - m_scrollOffset;
+    QRect dirtyRect(geo.x(), geo.y() + dirtyTop,
+                    geo.width(), viewHeight - dirtyTop);
+    markDirty(dirtyRect);
 }
 
 } // namespace QtTUI
