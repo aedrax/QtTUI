@@ -190,3 +190,6 @@ qttui_add_test(test_model_view_rendering test_model_view_rendering.cpp)
 
 # Tree indentation, indicators, and expand/collapse property tests (Properties 18, 19, 20)
 qttui_add_test(test_treeview_rendering test_treeview_rendering.cpp)
+
+# Container rendering property tests (Properties 25, 26, 27)
+qttui_add_test(test_container_rendering test_container_rendering.cpp)

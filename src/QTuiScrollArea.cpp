@@ -158,6 +158,37 @@ void QTuiScrollArea::updateScrollBars()
     }
 }
 
+QRect QTuiScrollArea::contentArea() const
+{
+    const QRect geo = geometry();
+    if (geo.isEmpty())
+        return QRect();
+
+    // Content area (viewport) is the area minus scroll bars
+    int childW = 0;
+    int childH = 0;
+    if (m_widget) {
+        const QRect childGeo = m_widget->geometry();
+        childW = childGeo.width();
+        childH = childGeo.height();
+    }
+
+    bool needsVScroll = childH > geo.height();
+    bool needsHScroll = childW > geo.width();
+
+    if (needsVScroll && !needsHScroll) {
+        needsHScroll = childW > (geo.width() - 1);
+    }
+    if (needsHScroll && !needsVScroll) {
+        needsVScroll = childH > (geo.height() - 1);
+    }
+
+    int viewportW = geo.width() - (needsVScroll ? 1 : 0);
+    int viewportH = geo.height() - (needsHScroll ? 1 : 0);
+
+    return QRect(geo.x(), geo.y(), viewportW, viewportH);
+}
+
 void QTuiScrollArea::paintEvent(ScreenBuffer &buffer)
 {
     const QRect geo = geometry();
@@ -236,6 +267,50 @@ void QTuiScrollArea::paintEvent(ScreenBuffer &buffer)
         m_verticalScrollBar->paintEvent(buffer);
     if (needsHScroll)
         m_horizontalScrollBar->paintEvent(buffer);
+
+    // Render scroll indicators (arrows) when content exceeds viewport
+    if (needsVScroll) {
+        // Up arrow indicator at top-right
+        int indicatorX = geo.x() + geo.width() - 1;
+        int topY = geo.y();
+        if (indicatorX < buffer.width() && topY < buffer.height() && m_scrollY > 0) {
+            Cell &cell = buffer.backCell(indicatorX, topY);
+            cell.character = QChar(0x25B2); // ▲
+            cell.foreground = fg;
+            cell.background = bg;
+        }
+        // Down arrow indicator at bottom-right (above hscroll if present)
+        int bottomY = geo.y() + viewportH - 1;
+        int childH = m_widget ? m_widget->geometry().height() : 0;
+        if (indicatorX < buffer.width() && bottomY < buffer.height()
+            && m_scrollY < qMax(0, childH - viewportH)) {
+            Cell &cell = buffer.backCell(indicatorX, bottomY);
+            cell.character = QChar(0x25BC); // ▼
+            cell.foreground = fg;
+            cell.background = bg;
+        }
+    }
+    if (needsHScroll) {
+        // Left arrow indicator at bottom-left
+        int indicatorY = geo.y() + geo.height() - 1;
+        int leftX = geo.x();
+        if (leftX < buffer.width() && indicatorY < buffer.height() && m_scrollX > 0) {
+            Cell &cell = buffer.backCell(leftX, indicatorY);
+            cell.character = QChar(0x25C4); // ◄
+            cell.foreground = fg;
+            cell.background = bg;
+        }
+        // Right arrow indicator at bottom-right (before vscroll if present)
+        int rightX = geo.x() + viewportW - 1;
+        int childW = m_widget ? m_widget->geometry().width() : 0;
+        if (rightX < buffer.width() && indicatorY < buffer.height()
+            && m_scrollX < qMax(0, childW - viewportW)) {
+            Cell &cell = buffer.backCell(rightX, indicatorY);
+            cell.character = QChar(0x25BA); // ►
+            cell.foreground = fg;
+            cell.background = bg;
+        }
+    }
 
     // Fill corner cell if both scroll bars are visible
     if (needsVScroll && needsHScroll) {

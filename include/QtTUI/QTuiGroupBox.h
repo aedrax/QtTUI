@@ -28,6 +28,8 @@ public:
     void setLayout(QTuiLayout *layout);
     QTuiLayout *layout() const;
 
+    QRect contentArea() const;
+
     void paintEvent(ScreenBuffer &buffer) override;
     QSize minimumSize() const override;
 

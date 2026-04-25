@@ -26,6 +26,8 @@ public:
 
     QTuiTabBar *tabBar() const;
 
+    QRect contentArea() const;
+
     void paintEvent(ScreenBuffer &buffer) override;
 
 signals:

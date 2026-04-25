@@ -21,6 +21,8 @@ public:
 
     void ensureVisible(int x, int y);
 
+    QRect contentArea() const;
+
     void paintEvent(ScreenBuffer &buffer) override;
     QSize minimumSize() const override;
 

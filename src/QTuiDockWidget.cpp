@@ -66,6 +66,15 @@ QSize QTuiDockWidget::minimumSize() const
     return QSize(qMax(titleWidth, contentWidth), 3);
 }
 
+QRect QTuiDockWidget::contentArea() const
+{
+    const QRect geo = geometry();
+    if (geo.width() < 3 || geo.height() < 3)
+        return QRect();
+    // Chrome: 1 row title bar (top border), 1 row bottom border, 1 col left border, 1 col right border
+    return QRect(geo.x() + 1, geo.y() + 1, geo.width() - 2, geo.height() - 2);
+}
+
 void QTuiDockWidget::paintEvent(ScreenBuffer &buffer)
 {
     const QRect geo = geometry();
@@ -195,12 +204,13 @@ void QTuiDockWidget::paintEvent(ScreenBuffer &buffer)
         }
     }
 
-    // --- Paint content widget ---
+    // --- Paint content widget within content area ---
     if (m_widget && m_widget->isVisible()) {
-        // Position content widget inside the bordered area (below title bar)
-        QRect contentRect(x0 + 1, y0 + 1, w - 2, h - 2);
-        m_widget->setGeometry(contentRect);
-        m_widget->paintEvent(buffer);
+        const QRect content = contentArea();
+        if (!content.isEmpty()) {
+            m_widget->setGeometry(content);
+            m_widget->paintEvent(buffer);
+        }
     }
 }
 

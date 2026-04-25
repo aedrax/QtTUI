@@ -65,6 +65,15 @@ QSize QTuiGroupBox::minimumSize() const
     return QSize(qMax(4, titleWidth + 2), 3);
 }
 
+QRect QTuiGroupBox::contentArea() const
+{
+    const QRect geo = geometry();
+    if (geo.width() < 3 || geo.height() < 3)
+        return QRect();
+    // Content area is inside the border: 1 cell inset on all sides
+    return QRect(geo.x() + 1, geo.y() + 1, geo.width() - 2, geo.height() - 2);
+}
+
 void QTuiGroupBox::paintEvent(ScreenBuffer &buffer)
 {
     const QRect geo = geometry();
@@ -80,6 +89,8 @@ void QTuiGroupBox::paintEvent(ScreenBuffer &buffer)
     const int y0 = geo.y();
     const int w = geo.width();
     const int h = geo.height();
+
+    // --- Render chrome first: borders and title ---
 
     // Draw border
     for (int col = 0; col < w; ++col) {
@@ -137,7 +148,7 @@ void QTuiGroupBox::paintEvent(ScreenBuffer &buffer)
         }
     }
 
-    // Clear interior
+    // Clear interior (content area)
     for (int row = 1; row < h - 1; ++row) {
         for (int col = 1; col < w - 1; ++col) {
             int px = x0 + col;
@@ -177,15 +188,25 @@ void QTuiGroupBox::paintEvent(ScreenBuffer &buffer)
         }
     }
 
-    // Apply layout to interior area if set
-    if (m_layout) {
-        QRect interior(x0 + 1, y0 + 1, w - 2, h - 2);
-        m_layout->apply(interior);
+    // --- Compute content area and set child geometries within it ---
+    const QRect content = contentArea();
+
+    // Apply layout to content area if set
+    if (m_layout && !content.isEmpty()) {
+        m_layout->apply(content);
     }
 
-    // Paint child widgets
+    // Ensure child geometries are contained within content area
     const auto children = childWidgets();
     for (auto *child : children) {
+        if (!content.isEmpty()) {
+            QRect childGeo = child->geometry();
+            // Clamp child geometry to content area
+            QRect clamped = childGeo.intersected(content);
+            if (clamped != childGeo && !childGeo.isEmpty()) {
+                child->setGeometry(clamped);
+            }
+        }
         if (child->isVisible())
             child->paintEvent(buffer);
     }

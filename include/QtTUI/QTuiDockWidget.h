@@ -27,6 +27,8 @@ public:
     bool isFloatable() const;
     void setFloatable(bool floatable);
 
+    QRect contentArea() const;
+
     void paintEvent(ScreenBuffer &buffer) override;
     QSize minimumSize() const override;
 

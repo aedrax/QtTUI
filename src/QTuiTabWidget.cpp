@@ -99,15 +99,21 @@ void QTuiTabWidget::onTabChanged(int index)
     if (index == m_currentIndex)
         return;
 
-    // Hide old page
-    if (m_currentIndex >= 0 && m_currentIndex < m_pages.size())
-        m_pages.at(m_currentIndex)->setVisible(false);
+    // Hide old page and mark it dirty
+    if (m_currentIndex >= 0 && m_currentIndex < m_pages.size()) {
+        QTuiWidget *oldPage = m_pages.at(m_currentIndex);
+        oldPage->setVisible(false);
+        oldPage->markDirty();
+    }
 
     m_currentIndex = index;
 
-    // Show new page
-    if (m_currentIndex >= 0 && m_currentIndex < m_pages.size())
-        m_pages.at(m_currentIndex)->setVisible(true);
+    // Show new page and mark it dirty
+    if (m_currentIndex >= 0 && m_currentIndex < m_pages.size()) {
+        QTuiWidget *newPage = m_pages.at(m_currentIndex);
+        newPage->setVisible(true);
+        newPage->markDirty();
+    }
 
     emit currentChanged(m_currentIndex);
 }
@@ -126,12 +132,21 @@ void QTuiTabWidget::updatePageGeometries()
     // Tab bar occupies the first row (North position)
     m_tabBar->setGeometry(QRect(x0, y0, w, 1));
 
-    // Content area is everything below the tab bar
-    QRect contentRect(x0, y0 + 1, w, qMax(0, h - 1));
+    // Content area is below the tab bar and separator line (2 rows of chrome)
+    const QRect content = contentArea();
 
     for (auto *page : m_pages) {
-        page->setGeometry(contentRect);
+        page->setGeometry(content);
     }
+}
+
+QRect QTuiTabWidget::contentArea() const
+{
+    const QRect geo = geometry();
+    if (geo.isEmpty() || geo.height() < 3)
+        return QRect();
+    // Chrome: 1 row for tab bar + 1 row for separator = 2 rows
+    return QRect(geo.x(), geo.y() + 2, geo.width(), qMax(0, geo.height() - 2));
 }
 
 void QTuiTabWidget::paintEvent(ScreenBuffer &buffer)
@@ -152,6 +167,8 @@ void QTuiTabWidget::paintEvent(ScreenBuffer &buffer)
 
     // Update geometries before painting
     updatePageGeometries();
+
+    // --- Render chrome first ---
 
     // Paint the tab bar
     m_tabBar->paintEvent(buffer);
@@ -188,13 +205,13 @@ void QTuiTabWidget::paintEvent(ScreenBuffer &buffer)
         }
     }
 
-    // Paint the current page
+    // --- Paint only the current (active) page within content area ---
     if (m_currentIndex >= 0 && m_currentIndex < m_pages.size()) {
         QTuiWidget *page = m_pages.at(m_currentIndex);
         if (page->isVisible()) {
-            // Adjust page geometry to be below the separator
-            const QRect contentRect(x0, y0 + 2, w, qMax(0, h - 2));
-            page->setGeometry(contentRect);
+            const QRect content = contentArea();
+            // Ensure page geometry is within content area
+            page->setGeometry(content);
             page->paintEvent(buffer);
         }
     }

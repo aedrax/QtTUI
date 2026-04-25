@@ -84,11 +84,18 @@ void QTuiStackedWidget::setCurrentIndex(int index)
     if (index == m_currentIndex)
         return;
 
-    if (m_currentIndex >= 0 && m_currentIndex < m_widgets.size())
-        m_widgets.at(m_currentIndex)->setVisible(false);
+    // Hide old widget and mark it dirty
+    if (m_currentIndex >= 0 && m_currentIndex < m_widgets.size()) {
+        QTuiWidget *oldWidget = m_widgets.at(m_currentIndex);
+        oldWidget->setVisible(false);
+        oldWidget->markDirty();
+    }
 
     m_currentIndex = index;
+
+    // Show new widget and mark it dirty
     m_widgets.at(m_currentIndex)->setVisible(true);
+    m_widgets.at(m_currentIndex)->markDirty();
 
     emit currentChanged(m_currentIndex);
 }
