@@ -152,11 +152,11 @@ void QTuiTreeView::paintEvent(ScreenBuffer &buffer)
         bool isCurrent = (flatRow == m_currentRow);
         bool hasChildren = m_model->hasChildren(item.index);
 
-        // Determine style
+        // Determine style - use focus colors only when widget has focus
         Cell style;
         style.bold = false;
         style.inverse = false;
-        if (isCurrent) {
+        if (isCurrent && hasFocus()) {
             style.foreground = theme.focusForeground;
             style.background = theme.focusBackground;
         } else {
@@ -165,7 +165,7 @@ void QTuiTreeView::paintEvent(ScreenBuffer &buffer)
         }
 
         // Fill the entire row with the appropriate background (for current row highlighting)
-        if (isCurrent) {
+        if (isCurrent && hasFocus()) {
             for (int x = 0; x < viewWidth; ++x) {
                 Cell &cell = buffer.backCell(geo.x() + x, screenY);
                 cell.character = QLatin1Char(' ');

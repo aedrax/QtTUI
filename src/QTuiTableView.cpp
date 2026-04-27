@@ -224,10 +224,10 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
             }
 
             // Determine style based on focus highlighting
-            // Use focusForeground/focusBackground without inverse
+            // Use focusForeground/focusBackground only when widget has focus
             bool isCurrent = (modelRow == m_currentRow && c == m_currentCol && modelRow < rows);
             Cell cellStyle;
-            if (isCurrent) {
+            if (isCurrent && hasFocus()) {
                 cellStyle.foreground = theme.focusForeground;
                 cellStyle.background = theme.focusBackground;
             } else {

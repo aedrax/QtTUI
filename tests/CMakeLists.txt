@@ -193,3 +193,6 @@ qttui_add_test(test_treeview_rendering test_treeview_rendering.cpp)
 
 # Container rendering property tests (Properties 25, 26, 27)
 qttui_add_test(test_container_rendering test_container_rendering.cpp)
+
+# Theme invalidation property tests (Properties 33, 34)
+qttui_add_test(test_theme_invalidation test_theme_invalidation.cpp)

@@ -106,9 +106,14 @@ void QTuiLineEdit::paintEvent(ScreenBuffer &buffer)
         return;
 
     const auto theme = themeProperties();
+    const bool focused = hasFocus();
     int visibleWidth = geo.width();
     int y = geo.y();
     int xStart = geo.x();
+
+    // Determine base colors based on focus state
+    const Color baseFg = focused ? theme.focusForeground : theme.foreground;
+    const Color baseBg = focused ? theme.focusBackground : theme.background;
 
     for (int i = 0; i < visibleWidth; ++i) {
         int textIdx = m_scrollOffset + i;
@@ -121,14 +126,14 @@ void QTuiLineEdit::paintEvent(ScreenBuffer &buffer)
         cell.bold = theme.bold;
         cell.italic = theme.italic;
         cell.underline = theme.underline;
-        // Highlight cursor position
-        if (hasFocus() && textIdx == m_cursorPos) {
-            cell.foreground = theme.focusForeground;
-            cell.background = theme.focusBackground;
+        // Highlight cursor position with inverse when focused
+        if (focused && textIdx == m_cursorPos) {
+            cell.foreground = baseFg;
+            cell.background = baseBg;
             cell.inverse = true;
         } else {
-            cell.foreground = theme.foreground;
-            cell.background = theme.background;
+            cell.foreground = baseFg;
+            cell.background = baseBg;
             cell.inverse = false;
         }
     }

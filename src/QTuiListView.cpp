@@ -88,7 +88,7 @@ void QTuiListView::paintEvent(ScreenBuffer &buffer)
         Cell style;
         style.bold = false;
         style.inverse = false;
-        if (isCurrent) {
+        if (isCurrent && hasFocus()) {
             style.foreground = theme.focusForeground;
             style.background = theme.focusBackground;
         } else {
@@ -97,7 +97,7 @@ void QTuiListView::paintEvent(ScreenBuffer &buffer)
         }
 
         // Fill the entire row with the appropriate background first (for current row highlighting)
-        if (isCurrent) {
+        if (isCurrent && hasFocus()) {
             for (int x = 0; x < viewWidth; ++x) {
                 Cell &cell = buffer.backCell(geo.x() + x, screenY);
                 cell.character = QLatin1Char(' ');

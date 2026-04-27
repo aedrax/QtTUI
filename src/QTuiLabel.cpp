@@ -114,6 +114,10 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
     const int geoW = geo.width();
     const int geoH = geo.height();
 
+    // Determine colors based on focus state
+    const Color fg = hasFocus() ? theme.focusForeground : theme.foreground;
+    const Color bg = hasFocus() ? theme.focusBackground : theme.background;
+
     // Clear the label area with background
     for (int row = 0; row < geoH; ++row) {
         for (int col = 0; col < geoW; ++col) {
@@ -122,8 +126,8 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
                 cell.character = QLatin1Char(' ');
-                cell.foreground = theme.foreground;
-                cell.background = theme.background;
+                cell.foreground = fg;
+                cell.background = bg;
                 cell.bold = theme.bold;
                 cell.italic = theme.italic;
                 cell.underline = theme.underline;
@@ -172,8 +176,8 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
                 cell.character = line.at(i);
-                cell.foreground = theme.foreground;
-                cell.background = theme.background;
+                cell.foreground = fg;
+                cell.background = bg;
                 cell.bold = theme.bold;
                 cell.italic = theme.italic;
                 cell.underline = theme.underline;

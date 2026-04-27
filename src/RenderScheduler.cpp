@@ -14,6 +14,9 @@ RenderScheduler::RenderScheduler(QTuiApplication *app)
     : QObject(app)
     , m_app(app)
 {
+    // Connect theme change signal to mark all visible widgets dirty
+    connect(Theme_Engine::instance(), &Theme_Engine::themeChanged,
+            this, &RenderScheduler::onThemeChanged);
 }
 
 void RenderScheduler::scheduleDirtyRegion(const QRect &region)
@@ -130,6 +133,28 @@ void RenderScheduler::paintTree(QTuiWidget *widget, const QRect &parentClipRect)
                 }
             }
             child->clearDirtyRegions();
+        }
+    }
+}
+
+void RenderScheduler::onThemeChanged()
+{
+    QTuiMainWindow *mainWindow = m_app->mainWindow();
+    if (mainWindow && mainWindow->isVisible()) {
+        markAllVisibleWidgetsDirty(mainWindow);
+    }
+}
+
+void RenderScheduler::markAllVisibleWidgetsDirty(QTuiWidget *widget)
+{
+    if (!widget || !widget->isVisible())
+        return;
+
+    widget->markDirty();
+
+    for (auto *child : widget->childWidgets()) {
+        if (child->isVisible()) {
+            markAllVisibleWidgetsDirty(child);
         }
     }
 }

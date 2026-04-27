@@ -21,9 +21,11 @@ public:
 
 private slots:
     void executeRenderPass();
+    void onThemeChanged();
 
 private:
     void paintTree(QTuiWidget *widget, const QRect &parentClipRect);
+    void markAllVisibleWidgetsDirty(QTuiWidget *widget);
 
     QTuiApplication *m_app;
     bool m_pending = false;
