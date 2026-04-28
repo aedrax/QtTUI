@@ -196,3 +196,6 @@ qttui_add_test(test_container_rendering test_container_rendering.cpp)
 
 # Theme invalidation property tests (Properties 33, 34)
 qttui_add_test(test_theme_invalidation test_theme_invalidation.cpp)
+
+# ANSI round-trip property tests (Properties 30, 31, 32)
+qttui_add_test(test_ansi_roundtrip test_ansi_roundtrip.cpp)
