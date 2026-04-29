@@ -307,6 +307,8 @@ void QTuiTableView::keyPressEvent(TuiKeyEvent *event)
     default:
         break;
     }
+
+    markDirty();
 }
 
 void QTuiTableView::onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)

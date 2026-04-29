@@ -25,6 +25,8 @@ int QTuiTabWidget::addTab(QTuiWidget *page, const QString &label)
     if (m_pages.size() == 1) {
         // First page added, it becomes current via tabBar's setCurrentIndex(0)
         // onTabChanged will be called by the signal
+        // Ensure the first page is dirty so it gets painted on initial render
+        page->markDirty();
     } else {
         page->setVisible(false);
     }
@@ -114,6 +116,9 @@ void QTuiTabWidget::onTabChanged(int index)
         newPage->setVisible(true);
         newPage->markDirty();
     }
+
+    // Mark the TabWidget itself dirty so its paintEvent runs and clears the content area
+    markDirty();
 
     emit currentChanged(m_currentIndex);
 }

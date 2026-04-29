@@ -33,7 +33,11 @@ QByteArray AnsiRenderer::render(const ScreenBuffer &buffer)
         // Emit SGR + character for the first cell in the run
         const Cell &cell = buffer.backCell(runStartX, runY);
         output.append(sgrSequence(cell));
-        output.append(cell.character.unicode() ? cell.character.toLatin1() : ' ');
+        if (cell.character.unicode()) {
+            output.append(QString(cell.character).toUtf8());
+        } else {
+            output.append(' ');
+        }
 
         int prevX = runStartX;
         ++i;
@@ -44,7 +48,11 @@ QByteArray AnsiRenderer::render(const ScreenBuffer &buffer)
                && changed[i].x() == prevX + 1) {
             const Cell &c = buffer.backCell(changed[i].x(), runY);
             output.append(sgrSequence(c));
-            output.append(c.character.unicode() ? c.character.toLatin1() : ' ');
+            if (c.character.unicode()) {
+                output.append(QString(c.character).toUtf8());
+            } else {
+                output.append(' ');
+            }
             prevX = changed[i].x();
             ++i;
         }

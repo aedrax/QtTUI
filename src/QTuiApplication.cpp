@@ -137,8 +137,14 @@ void QTuiApplication::onTerminalResized(QSize newSize)
     m_screenBuffer->resize(newSize.width(), newSize.height());
     m_inputParser->setTerminalSize(newSize);
     m_inputParser->processResize(newSize);
-    // Resize triggers relayout in widgets, schedule a full repaint
-    scheduleRender();
+
+    // The resize event is posted asynchronously by InputParser.
+    // Process pending events so the main window receives the resize event
+    // and relayouts before we repaint.
+    QCoreApplication::processEvents();
+
+    // Now do a full repaint with the updated layout
+    m_scheduler->renderNow();
 }
 
 void QTuiApplication::restoreTerminal()

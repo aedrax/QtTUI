@@ -31,6 +31,7 @@ void QTuiRadioButton::setChecked(bool checked)
     if (m_checked != checked) {
         m_checked = checked;
         emit toggled(m_checked);
+        markDirty();
     }
 }
 

@@ -66,12 +66,17 @@ void QTuiWidget::setVisible(bool visible)
     if (m_visible == visible)
         return;
 
-    // When transitioning to hidden, mark current geometry dirty so the area is cleared
-    if (m_visible && !visible) {
+    const bool wasVisible = m_visible;
+    m_visible = visible;
+
+    if (visible) {
+        // Becoming visible: mark dirty so the widget gets painted on next render pass
+        markDirty();
+    } else if (wasVisible) {
+        // Becoming hidden: mark dirty so the area is cleared on next render pass
         markDirty();
     }
 
-    m_visible = visible;
     emit visibilityChanged(m_visible);
 }
 

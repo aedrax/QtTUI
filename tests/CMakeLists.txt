@@ -199,3 +199,14 @@ qttui_add_test(test_theme_invalidation test_theme_invalidation.cpp)
 
 # ANSI round-trip property tests (Properties 30, 31, 32)
 qttui_add_test(test_ansi_roundtrip test_ansi_roundtrip.cpp)
+
+# Bug condition exploration tests: dirty-tracking bugs (rendering-dirty-tracking-fixes spec)
+qttui_add_test(test_dirty_tracking_bugs test_dirty_tracking_bugs.cpp)
+
+# Preservation property tests: dirty-tracking behavior unchanged (rendering-dirty-tracking-fixes spec)
+qttui_add_test(test_dirty_tracking_preservation test_dirty_tracking_preservation.cpp)
+
+# Initial render verification test (tab content renders without interaction)
+add_executable(test_initial_render test_initial_render.cpp)
+target_link_libraries(test_initial_render PRIVATE QtTUI::QtTUI Qt6::Core)
+add_test(NAME test_initial_render COMMAND test_initial_render)

@@ -21,6 +21,7 @@ void QTuiDoubleSpinBox::setValue(double value)
     if (!qFuzzyCompare(m_value, clamped)) {
         m_value = clamped;
         emit valueChanged(m_value);
+        markDirty();
     }
 }
 

@@ -22,6 +22,7 @@ void QTuiSlider::setValue(int value)
     if (m_value != clamped) {
         m_value = clamped;
         emit valueChanged(m_value);
+        markDirty();
     }
 }
 

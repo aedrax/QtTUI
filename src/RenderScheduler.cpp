@@ -110,28 +110,32 @@ void RenderScheduler::paintTree(QTuiWidget *widget, const QRect &parentClipRect)
         if (child->isVisible()) {
             paintTree(child, clipRect);
         } else if (child->isDirty()) {
-            // Hidden widget that was just marked dirty (transitioned to hidden):
-            // Clear its geometry with the parent's background color
-            ScreenBuffer *buffer = m_app->screenBuffer();
-            if (buffer) {
-                QRect childClip = child->geometry().intersected(clipRect);
-                if (!childClip.isEmpty()) {
-                    ThemeProperties parentTheme = widget->themeProperties();
-                    for (int row = childClip.y(); row < childClip.y() + childClip.height(); ++row) {
-                        for (int col = childClip.x(); col < childClip.x() + childClip.width(); ++col) {
-                            Cell &cell = buffer->backCell(col, row);
-                            cell.character = QLatin1Char(' ');
-                            cell.foreground = parentTheme.foreground;
-                            cell.background = parentTheme.background;
-                            cell.bold = false;
-                            cell.italic = false;
-                            cell.underline = false;
-                            cell.strikethrough = false;
-                            cell.inverse = false;
+            if (!m_fullRepaint) {
+                // Hidden widget that was just marked dirty (transitioned to hidden):
+                // Clear its geometry with the parent's background color.
+                // Skip during full repaint — visible siblings will paint over the area.
+                ScreenBuffer *buffer = m_app->screenBuffer();
+                if (buffer) {
+                    QRect childClip = child->geometry().intersected(clipRect);
+                    if (!childClip.isEmpty()) {
+                        ThemeProperties parentTheme = widget->themeProperties();
+                        for (int row = childClip.y(); row < childClip.y() + childClip.height(); ++row) {
+                            for (int col = childClip.x(); col < childClip.x() + childClip.width(); ++col) {
+                                Cell &cell = buffer->backCell(col, row);
+                                cell.character = QLatin1Char(' ');
+                                cell.foreground = parentTheme.foreground;
+                                cell.background = parentTheme.background;
+                                cell.bold = false;
+                                cell.italic = false;
+                                cell.underline = false;
+                                cell.strikethrough = false;
+                                cell.inverse = false;
+                            }
                         }
                     }
                 }
             }
+            // Always clear dirty state so the widget isn't re-processed
             child->clearDirtyRegions();
         }
     }

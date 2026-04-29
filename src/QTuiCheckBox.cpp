@@ -33,6 +33,7 @@ void QTuiCheckBox::setCheckState(int state)
     if (m_checkState != state) {
         m_checkState = state;
         emit stateChanged(m_checkState);
+        markDirty();
     }
 }
 

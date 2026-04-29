@@ -105,6 +105,7 @@ void QTuiComboBox::setCurrentIndex(int index)
             m_editText = text;
         emit currentIndexChanged(m_currentIndex);
         emit currentTextChanged(text);
+        markDirty();
     }
 }
 

@@ -136,6 +136,8 @@ void QTuiListView::keyPressEvent(TuiKeyEvent *event)
     default:
         break;
     }
+
+    markDirty();
 }
 
 void QTuiListView::onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)

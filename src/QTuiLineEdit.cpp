@@ -97,6 +97,8 @@ void QTuiLineEdit::keyPressEvent(TuiKeyEvent *event)
         else if (m_cursorPos >= m_scrollOffset + visibleWidth)
             m_scrollOffset = m_cursorPos - visibleWidth + 1;
     }
+
+    markDirty();
 }
 
 void QTuiLineEdit::paintEvent(ScreenBuffer &buffer)
