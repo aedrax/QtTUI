@@ -143,4 +143,16 @@ void QTuiCheckBox::keyPressEvent(TuiKeyEvent *event)
     }
 }
 
+void QTuiCheckBox::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+
+    if (m_tristate) {
+        setCheckState((m_checkState + 1) % 3);
+    } else {
+        setCheckState(m_checkState == Checked ? Unchecked : Checked);
+    }
+}
+
 } // namespace QtTUI

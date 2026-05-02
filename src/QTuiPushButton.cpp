@@ -237,4 +237,19 @@ void QTuiPushButton::keyPressEvent(TuiKeyEvent *event)
     }
 }
 
+void QTuiPushButton::mousePressEvent(TuiMouseEvent *event)
+{
+    if (!m_enabled)
+        return;
+
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+
+    emit clicked();
+
+    if (m_checkable) {
+        setChecked(!m_checked);
+    }
+}
+
 } // namespace QtTUI

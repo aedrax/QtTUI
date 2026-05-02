@@ -111,4 +111,14 @@ void QTuiRadioButton::keyPressEvent(TuiKeyEvent *event)
     }
 }
 
+void QTuiRadioButton::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+
+    // Radio buttons only set themselves to checked
+    // Unchecking others is handled by QTuiButtonGroup
+    setChecked(true);
+}
+
 } // namespace QtTUI
