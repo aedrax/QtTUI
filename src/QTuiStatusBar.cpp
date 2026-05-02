@@ -15,6 +15,7 @@ QTuiStatusBar::QTuiStatusBar(QTuiWidget *parent)
 void QTuiStatusBar::showMessage(const QString &text, int timeout)
 {
     m_temporaryMessage = text;
+    markDirty();
     emit messageChanged(currentMessage());
 
     if (timeout > 0)
@@ -27,6 +28,7 @@ void QTuiStatusBar::clearMessage()
 {
     m_temporaryMessage.clear();
     m_timer->stop();
+    markDirty();
     emit messageChanged(currentMessage());
 }
 
@@ -119,6 +121,7 @@ void QTuiStatusBar::paintEvent(ScreenBuffer &buffer)
 void QTuiStatusBar::onTimeout()
 {
     m_temporaryMessage.clear();
+    markDirty();
     emit messageChanged(currentMessage());
 }
 
