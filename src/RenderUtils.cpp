@@ -1,4 +1,5 @@
 #include <QtTUI/RenderUtils.h>
+#include <QtTUI/QtTuiUnicode.h>
 
 namespace QtTUI {
 
@@ -11,32 +12,50 @@ void renderTextTruncated(ScreenBuffer &buffer,
     if (maxWidth <= 0)
         return;
 
-    const int len = text.length();
-    static const QChar ellipsis = QChar(0x2026); // U+2026 '…'
+    static constexpr char32_t ellipsis = U'…'; // U+2026 '…'
 
-    if (len <= maxWidth) {
+    const int totalCols = QtTuiUnicode::stringWidth(text);
+
+    if (totalCols <= maxWidth) {
         // Full string fits — write without truncation
-        for (int i = 0; i < len; ++i) {
-            Cell cell = style;
-            cell.character = text.at(i);
-            buffer.backCell(x + i, y) = cell;
+        int col = 0;
+        int i = 0;
+        QtTuiUnicode::Cluster c;
+        while (QtTuiUnicode::nextCluster(text, i, c)) {
+            buffer.putChar(x + col, y, c.base, c.combining, style);
+            col += c.width;
         }
-    } else if (maxWidth == 1) {
-        // Only room for the ellipsis
-        Cell cell = style;
-        cell.character = ellipsis;
-        buffer.backCell(x, y) = cell;
-    } else {
-        // maxWidth >= 2 and text is longer: write prefix + ellipsis
-        for (int i = 0; i < maxWidth - 1; ++i) {
-            Cell cell = style;
-            cell.character = text.at(i);
-            buffer.backCell(x + i, y) = cell;
-        }
-        Cell cell = style;
-        cell.character = ellipsis;
-        buffer.backCell(x + maxWidth - 1, y) = cell;
+        return;
     }
+
+    if (maxWidth == 1) {
+        // Only room for the ellipsis
+        buffer.putChar(x, y, ellipsis, style);
+        return;
+    }
+
+    // maxWidth >= 2 and text is wider: write a prefix filling maxWidth-1
+    // columns, then the ellipsis. A wide character that would straddle the
+    // truncation boundary is replaced by a space.
+    const int textCols = maxWidth - 1;
+    int col = 0;
+    int i = 0;
+    QtTuiUnicode::Cluster c;
+    while (col < textCols && QtTuiUnicode::nextCluster(text, i, c)) {
+        if (col + c.width > textCols) {
+            buffer.putChar(x + col, y, U' ', style);
+            ++col;
+            break;
+        }
+        buffer.putChar(x + col, y, c.base, c.combining, style);
+        col += c.width;
+    }
+    // Defensive: pad any remaining gap (cannot normally occur because the
+    // text is known to be wider than maxWidth)
+    for (; col < textCols; ++col)
+        buffer.putChar(x + col, y, U' ', style);
+
+    buffer.putChar(x + textCols, y, ellipsis, style);
 }
 
 } // namespace QtTUI

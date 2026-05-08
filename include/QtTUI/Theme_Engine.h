@@ -48,10 +48,10 @@ public:
     void setColorAlias(const QString &name, const Color &color);
     Color resolveColor(const QString &nameOrHex) const;
 
-    // Border rendering helpers
+    // Border rendering helpers (code points; box-drawing chars are width 1)
     struct BorderChars {
-        QChar topLeft, topRight, bottomLeft, bottomRight;
-        QChar horizontal, vertical;
+        char32_t topLeft, topRight, bottomLeft, bottomRight;
+        char32_t horizontal, vertical;
     };
     static BorderChars borderChars(const QString &style);
 

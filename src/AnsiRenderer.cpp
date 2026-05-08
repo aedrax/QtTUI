@@ -8,19 +8,69 @@ namespace QtTUI {
 static constexpr int kMaxTerminalCols = 9999;
 static constexpr int kMaxTerminalRows = 9999;
 
+// True when two cells render with identical SGR attributes (character ignored)
+static bool sameSgrAttributes(const Cell &a, const Cell &b)
+{
+    return a.foreground == b.foreground
+        && a.background == b.background
+        && a.bold == b.bold
+        && a.italic == b.italic
+        && a.underline == b.underline
+        && a.strikethrough == b.strikethrough
+        && a.inverse == b.inverse;
+}
+
+// Encodes one code point as UTF-8 (no QString round-trip)
+static void appendUtf8(QByteArray &output, char32_t u)
+{
+    if (u < 0x80) {
+        output.append(static_cast<char>(u));
+    } else if (u < 0x800) {
+        output.append(static_cast<char>(0xC0 | (u >> 6)));
+        output.append(static_cast<char>(0x80 | (u & 0x3F)));
+    } else if (u < 0x10000) {
+        output.append(static_cast<char>(0xE0 | (u >> 12)));
+        output.append(static_cast<char>(0x80 | ((u >> 6) & 0x3F)));
+        output.append(static_cast<char>(0x80 | (u & 0x3F)));
+    } else {
+        output.append(static_cast<char>(0xF0 | (u >> 18)));
+        output.append(static_cast<char>(0x80 | ((u >> 12) & 0x3F)));
+        output.append(static_cast<char>(0x80 | ((u >> 6) & 0x3F)));
+        output.append(static_cast<char>(0x80 | (u & 0x3F)));
+    }
+}
+
+// Appends the cell's character (base + combining marks) as UTF-8, with an
+// allocation-free fast path for ASCII
+static void appendCellChar(QByteArray &output, const Cell &cell)
+{
+    const char32_t u = cell.ch;
+    if (u == 0) {
+        output.append(' ');
+    } else if (u < 0x80 && cell.combining.isEmpty()) {
+        output.append(static_cast<char>(u));
+        return;
+    } else {
+        appendUtf8(output, u);
+    }
+    if (!cell.combining.isEmpty())
+        output.append(cell.combining.toUtf8());
+}
+
 QByteArray AnsiRenderer::render(const ScreenBuffer &buffer)
 {
-    QVector<QPoint> changed = buffer.diff();
+    // diff() produces positions in row-major order by construction; no sort needed
+    const QVector<QPoint> changed = buffer.diff();
     if (changed.isEmpty())
         return QByteArray();
 
-    // Sort row-major: by y first, then by x
-    std::sort(changed.begin(), changed.end(), [](const QPoint &a, const QPoint &b) {
-        return a.y() < b.y() || (a.y() == b.y() && a.x() < b.x());
-    });
-
     QByteArray output;
-    output.reserve(changed.size() * 30); // rough estimate
+    output.reserve(changed.size() * 8); // rough estimate with SGR state tracking
+
+    // Track the last-emitted SGR attributes across the whole frame: cursor
+    // movement does not affect SGR state, so runs share it too.
+    Cell lastAttrs;
+    bool haveAttrs = false;
 
     int i = 0;
     while (i < changed.size()) {
@@ -30,30 +80,64 @@ QByteArray AnsiRenderer::render(const ScreenBuffer &buffer)
 
         output.append(cursorPosition(runStartX, runY));
 
-        // Emit SGR + character for the first cell in the run
-        const Cell &cell = buffer.backCell(runStartX, runY);
-        output.append(sgrSequence(cell));
-        if (cell.character.unicode()) {
-            output.append(QString(cell.character).toUtf8());
-        } else {
-            output.append(' ');
-        }
+        int prevX = runStartX - 1;
 
-        int prevX = runStartX;
-        ++i;
-
-        // Batch adjacent cells on the same row
+        // Batch adjacent cells on the same row, emitting SGR only on change
         while (i < changed.size()
                && changed[i].y() == runY
                && changed[i].x() == prevX + 1) {
-            const Cell &c = buffer.backCell(changed[i].x(), runY);
-            output.append(sgrSequence(c));
-            if (c.character.unicode()) {
-                output.append(QString(c.character).toUtf8());
-            } else {
-                output.append(' ');
+            const int x = changed[i].x();
+            const Cell &c = buffer.backCell(x, runY);
+            if (!haveAttrs || !sameSgrAttributes(c, lastAttrs)) {
+                output.append(sgrSequence(c));
+                lastAttrs = c;
+                haveAttrs = true;
             }
-            prevX = changed[i].x();
+
+            if (c.isContinuation()) {
+                // A continuation cell alone (its glyph did not precede it in
+                // this run) means the pair was broken by a direct cell write;
+                // emit a space so the terminal column is well-defined.
+                output.append(' ');
+                prevX = x;
+                ++i;
+                continue;
+            }
+
+            if (c.width == 2) {
+                // A wide glyph needs 2 columns; in the last column that is
+                // impossible, so emit a space defensively.
+                if (x + 1 >= buffer.width()) {
+                    output.append(' ');
+                    prevX = x;
+                    ++i;
+                    continue;
+                }
+                const Cell &next = buffer.backCell(x + 1, runY);
+                appendCellChar(output, c);
+                if (next.isContinuation()) {
+                    // The terminal advanced 2 columns by itself: consume the
+                    // continuation position from the diff (pair-atomic diff
+                    // guarantees it is the next entry) and skip it.
+                    ++i;
+                    if (i < changed.size() && changed[i].y() == runY
+                        && changed[i].x() == x + 1) {
+                        ++i;
+                    }
+                    prevX = x + 1;
+                    continue;
+                }
+                // Broken pair (direct write of a wide char without a
+                // continuation cell): the terminal cursor advanced 2 columns
+                // but the model has independent content at x+1. End the run so
+                // the next cell repositions explicitly and overwrites the
+                // glyph's right half.
+                ++i;
+                break;
+            }
+
+            appendCellChar(output, c);
+            prevX = x;
             ++i;
         }
     }

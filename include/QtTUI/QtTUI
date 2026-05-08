@@ -8,6 +8,7 @@
 #include <QtTUI/QtTUIGlobal.h>
 
 // Core infrastructure
+#include <QtTUI/QtTuiUnicode.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/AnsiRenderer.h>
 #include <QtTUI/TerminalBackend.h>

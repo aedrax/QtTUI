@@ -109,7 +109,7 @@ private slots:
 
                     // Random printable ASCII character
                     const auto ch = *rc::gen::inRange(32, 127);
-                    buf.backCell(cx, cy).character = QChar(ch);
+                    buf.backCell(cx, cy).setChar(char32_t(ch));
 
                     // Random colors
                     buf.backCell(cx, cy).foreground = Color(

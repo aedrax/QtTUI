@@ -198,53 +198,53 @@ private slots:
     void borderCharsSingle()
     {
         auto bc = Theme_Engine::borderChars("single");
-        QCOMPARE(bc.topLeft, QChar(0x250C));
-        QCOMPARE(bc.topRight, QChar(0x2510));
-        QCOMPARE(bc.bottomLeft, QChar(0x2514));
-        QCOMPARE(bc.bottomRight, QChar(0x2518));
-        QCOMPARE(bc.horizontal, QChar(0x2500));
-        QCOMPARE(bc.vertical, QChar(0x2502));
+        QCOMPARE(bc.topLeft, char32_t(0x250C));
+        QCOMPARE(bc.topRight, char32_t(0x2510));
+        QCOMPARE(bc.bottomLeft, char32_t(0x2514));
+        QCOMPARE(bc.bottomRight, char32_t(0x2518));
+        QCOMPARE(bc.horizontal, char32_t(0x2500));
+        QCOMPARE(bc.vertical, char32_t(0x2502));
     }
 
     void borderCharsDouble()
     {
         auto bc = Theme_Engine::borderChars("double");
-        QCOMPARE(bc.topLeft, QChar(0x2554));
-        QCOMPARE(bc.topRight, QChar(0x2557));
-        QCOMPARE(bc.bottomLeft, QChar(0x255A));
-        QCOMPARE(bc.bottomRight, QChar(0x255D));
-        QCOMPARE(bc.horizontal, QChar(0x2550));
-        QCOMPARE(bc.vertical, QChar(0x2551));
+        QCOMPARE(bc.topLeft, char32_t(0x2554));
+        QCOMPARE(bc.topRight, char32_t(0x2557));
+        QCOMPARE(bc.bottomLeft, char32_t(0x255A));
+        QCOMPARE(bc.bottomRight, char32_t(0x255D));
+        QCOMPARE(bc.horizontal, char32_t(0x2550));
+        QCOMPARE(bc.vertical, char32_t(0x2551));
     }
 
     void borderCharsRounded()
     {
         auto bc = Theme_Engine::borderChars("rounded");
-        QCOMPARE(bc.topLeft, QChar(0x256D));
-        QCOMPARE(bc.topRight, QChar(0x256E));
-        QCOMPARE(bc.bottomLeft, QChar(0x2570));
-        QCOMPARE(bc.bottomRight, QChar(0x256F));
-        QCOMPARE(bc.horizontal, QChar(0x2500));
-        QCOMPARE(bc.vertical, QChar(0x2502));
+        QCOMPARE(bc.topLeft, char32_t(0x256D));
+        QCOMPARE(bc.topRight, char32_t(0x256E));
+        QCOMPARE(bc.bottomLeft, char32_t(0x2570));
+        QCOMPARE(bc.bottomRight, char32_t(0x256F));
+        QCOMPARE(bc.horizontal, char32_t(0x2500));
+        QCOMPARE(bc.vertical, char32_t(0x2502));
     }
 
     void borderCharsAscii()
     {
         auto bc = Theme_Engine::borderChars("ascii");
-        QCOMPARE(bc.topLeft, QChar('+'));
-        QCOMPARE(bc.topRight, QChar('+'));
-        QCOMPARE(bc.bottomLeft, QChar('+'));
-        QCOMPARE(bc.bottomRight, QChar('+'));
-        QCOMPARE(bc.horizontal, QChar('-'));
-        QCOMPARE(bc.vertical, QChar('|'));
+        QCOMPARE(bc.topLeft, U'+');
+        QCOMPARE(bc.topRight, U'+');
+        QCOMPARE(bc.bottomLeft, U'+');
+        QCOMPARE(bc.bottomRight, U'+');
+        QCOMPARE(bc.horizontal, U'-');
+        QCOMPARE(bc.vertical, U'|');
     }
 
     void borderCharsNone()
     {
         auto bc = Theme_Engine::borderChars("none");
-        QCOMPARE(bc.topLeft, QChar(' '));
-        QCOMPARE(bc.horizontal, QChar(' '));
-        QCOMPARE(bc.vertical, QChar(' '));
+        QCOMPARE(bc.topLeft, U' ');
+        QCOMPARE(bc.horizontal, U' ');
+        QCOMPARE(bc.vertical, U' ');
     }
 
     // ---------------------------------------------------------------

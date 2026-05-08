@@ -14,7 +14,7 @@ private slots:
     // **Validates: Requirements 9.1, 6.3, 7.3, 8.4**
     void ellipsisTruncation()
     {
-        static const QChar ellipsis = QChar(0x2026);
+        static constexpr char32_t ellipsis = 0x2026;
 
         rc::check("Ellipsis truncation produces correct output for all string/width combinations",
             [&]() {
@@ -56,7 +56,7 @@ private slots:
                     // Full string written without truncation
                     for (int i = 0; i < len; ++i) {
                         const Cell &c = buffer.backCell(startX + i, startY);
-                        RC_ASSERT(c.character == text.at(i));
+                        RC_ASSERT(c.ch == text.at(i).unicode());
                         RC_ASSERT(c.foreground == style.foreground);
                         RC_ASSERT(c.background == style.background);
                         RC_ASSERT(c.bold == style.bold);
@@ -70,7 +70,7 @@ private slots:
                 } else if (maxWidth == 1) {
                     // Only ellipsis written
                     const Cell &c = buffer.backCell(startX, startY);
-                    RC_ASSERT(c.character == ellipsis);
+                    RC_ASSERT(c.ch == ellipsis);
                     RC_ASSERT(c.foreground == style.foreground);
                     RC_ASSERT(c.background == style.background);
                     RC_ASSERT(c.bold == style.bold);
@@ -83,14 +83,14 @@ private slots:
                     // First maxWidth-1 chars match prefix of text
                     for (int i = 0; i < maxWidth - 1; ++i) {
                         const Cell &c = buffer.backCell(startX + i, startY);
-                        RC_ASSERT(c.character == text.at(i));
+                        RC_ASSERT(c.ch == text.at(i).unicode());
                         RC_ASSERT(c.foreground == style.foreground);
                         RC_ASSERT(c.background == style.background);
                         RC_ASSERT(c.bold == style.bold);
                     }
                     // Last character is ellipsis
                     const Cell &last = buffer.backCell(startX + maxWidth - 1, startY);
-                    RC_ASSERT(last.character == ellipsis);
+                    RC_ASSERT(last.ch == ellipsis);
                     RC_ASSERT(last.foreground == style.foreground);
                     RC_ASSERT(last.background == style.background);
                     RC_ASSERT(last.bold == style.bold);
@@ -101,6 +101,96 @@ private slots:
                     }
                 }
             });
+    }
+
+    // ------------------------------------------------------------------
+    // Unicode: truncation operates on display COLUMNS, wide glyphs write a
+    // glyph + continuation pair, combining marks attach to the base cell
+    // ------------------------------------------------------------------
+    void wideTextFitsWithoutTruncation()
+    {
+        ScreenBuffer buffer(20, 1);
+        Cell style;
+        const QString cjk = QString::fromUtf8("日本"); // 4 columns
+
+        renderTextTruncated(buffer, 0, 0, cjk, 4, style);
+
+        QCOMPARE(buffer.backCell(0, 0).ch, char32_t(0x65E5)); // 日
+        QVERIFY(buffer.backCell(1, 0).isContinuation());
+        QCOMPARE(buffer.backCell(2, 0).ch, char32_t(0x672C)); // 本
+        QVERIFY(buffer.backCell(3, 0).isContinuation());
+        QCOMPARE(buffer.backCell(4, 0), Cell()); // untouched beyond text
+    }
+
+    void wideTextTruncatedAtCleanBoundary()
+    {
+        ScreenBuffer buffer(20, 1);
+        Cell style;
+        const QString cjk = QString::fromUtf8("日本語"); // 6 columns
+
+        // Width 5: 日(0-1) 本(2-3) then the ellipsis at column 4
+        renderTextTruncated(buffer, 0, 0, cjk, 5, style);
+
+        QCOMPARE(buffer.backCell(0, 0).ch, char32_t(0x65E5));
+        QVERIFY(buffer.backCell(1, 0).isContinuation());
+        QCOMPARE(buffer.backCell(2, 0).ch, char32_t(0x672C));
+        QVERIFY(buffer.backCell(3, 0).isContinuation());
+        QCOMPARE(buffer.backCell(4, 0).ch, char32_t(0x2026)); // …
+        QCOMPARE(buffer.backCell(5, 0), Cell());
+    }
+
+    void wideCharStraddlingBoundaryBecomesSpace()
+    {
+        ScreenBuffer buffer(20, 1);
+        Cell style;
+        const QString cjk = QString::fromUtf8("日本語"); // 6 columns
+
+        // Width 4: 日(0-1); 本 would straddle column 3 (the ellipsis column),
+        // so column 2 becomes a space and the ellipsis lands at column 3
+        renderTextTruncated(buffer, 0, 0, cjk, 4, style);
+
+        QCOMPARE(buffer.backCell(0, 0).ch, char32_t(0x65E5));
+        QVERIFY(buffer.backCell(1, 0).isContinuation());
+        QCOMPARE(buffer.backCell(2, 0).ch, U' ');
+        QCOMPARE(int(buffer.backCell(2, 0).width), 1);
+        QCOMPARE(buffer.backCell(3, 0).ch, char32_t(0x2026));
+        QCOMPARE(buffer.backCell(4, 0), Cell());
+    }
+
+    void combiningMarkAttachesToBaseCell()
+    {
+        ScreenBuffer buffer(20, 1);
+        Cell style;
+        const QString text = QString::fromUtf8("e\xCC\x81x"); // e + U+0301, then x (2 columns)
+
+        renderTextTruncated(buffer, 0, 0, text, 10, style);
+
+        QCOMPARE(buffer.backCell(0, 0).ch, U'e');
+        QCOMPARE(buffer.backCell(0, 0).combining, QString(QChar(0x0301)));
+        QCOMPARE(buffer.backCell(1, 0).ch, U'x'); // combining mark got no cell
+        QCOMPARE(buffer.backCell(2, 0), Cell());
+    }
+
+    void emojiCountsTwoColumns()
+    {
+        ScreenBuffer buffer(20, 1);
+        Cell style;
+        const QString text = QString::fromUtf8("a\xF0\x9F\x98\x80" "b"); // a😀b: 4 columns
+
+        // Width 3: a(0); 😀 straddles the ellipsis column -> space at 1, … at 2
+        renderTextTruncated(buffer, 0, 0, text, 3, style);
+        QCOMPARE(buffer.backCell(0, 0).ch, U'a');
+        QCOMPARE(buffer.backCell(1, 0).ch, U' ');
+        QCOMPARE(buffer.backCell(2, 0).ch, char32_t(0x2026));
+
+        // Width 4: fits exactly
+        ScreenBuffer buffer2(20, 1);
+        renderTextTruncated(buffer2, 0, 0, text, 4, style);
+        QCOMPARE(buffer2.backCell(0, 0).ch, U'a');
+        QCOMPARE(buffer2.backCell(1, 0).ch, char32_t(0x1F600));
+        QCOMPARE(int(buffer2.backCell(1, 0).width), 2);
+        QVERIFY(buffer2.backCell(2, 0).isContinuation());
+        QCOMPARE(buffer2.backCell(3, 0).ch, U'b');
     }
 };
 

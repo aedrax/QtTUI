@@ -25,7 +25,7 @@ private slots:
         buf.swapBuffers();
 
         // Modify one cell in back buffer
-        buf.backCell(2, 1).character = QChar('A');
+        buf.backCell(2, 1).setChar(U'A');
         buf.backCell(2, 1).foreground = Color(255, 0, 0);
 
         AnsiRenderer renderer;
@@ -39,15 +39,44 @@ private slots:
         QVERIFY(result.endsWith("\x1b[0m"));
     }
 
+    void sgrEmittedOnlyOnAttributeChange()
+    {
+        ScreenBuffer buf(20, 2);
+        buf.swapBuffers();
+
+        // Ten adjacent cells with identical attributes, then two bold ones
+        for (int x = 0; x < 10; ++x) {
+            Cell &c = buf.backCell(x, 0);
+            c.setChar(char32_t('a' + x));
+            c.foreground = Color(200, 200, 200);
+        }
+        for (int x = 10; x < 12; ++x) {
+            Cell &c = buf.backCell(x, 0);
+            c.setChar(U'B');
+            c.foreground = Color(200, 200, 200);
+            c.bold = true;
+        }
+
+        AnsiRenderer renderer;
+        QByteArray result = renderer.render(buf);
+
+        // SGR sequences start with "\x1b[0;" (the trailing frame reset is
+        // "\x1b[0m" and does not match). One for the plain run, one for bold.
+        QCOMPARE(result.count("\x1b[0;"), 2);
+        // All twelve characters still present, in order
+        QVERIFY(result.contains("abcdefghij"));
+        QVERIFY(result.contains("BB"));
+    }
+
     void renderAdjacentCellsBatching()
     {
         // Adjacent changed cells on same row should produce only one CUP
         ScreenBuffer buf(10, 3);
         buf.swapBuffers();
 
-        buf.backCell(2, 1).character = QChar('X');
-        buf.backCell(3, 1).character = QChar('Y');
-        buf.backCell(4, 1).character = QChar('Z');
+        buf.backCell(2, 1).setChar(U'X');
+        buf.backCell(3, 1).setChar(U'Y');
+        buf.backCell(4, 1).setChar(U'Z');
 
         AnsiRenderer renderer;
         QByteArray result = renderer.render(buf);
@@ -74,8 +103,8 @@ private slots:
         ScreenBuffer buf(10, 3);
         buf.swapBuffers();
 
-        buf.backCell(1, 0).character = QChar('A');
-        buf.backCell(5, 0).character = QChar('B');
+        buf.backCell(1, 0).setChar(U'A');
+        buf.backCell(5, 0).setChar(U'B');
 
         AnsiRenderer renderer;
         QByteArray result = renderer.render(buf);
@@ -92,9 +121,9 @@ private slots:
         ScreenBuffer buf(5, 5);
         buf.swapBuffers();
 
-        buf.backCell(0, 0).character = QChar('1');
-        buf.backCell(0, 2).character = QChar('2');
-        buf.backCell(0, 4).character = QChar('3');
+        buf.backCell(0, 0).setChar(U'1');
+        buf.backCell(0, 2).setChar(U'2');
+        buf.backCell(0, 4).setChar(U'3');
 
         AnsiRenderer renderer;
         QByteArray result = renderer.render(buf);
@@ -112,7 +141,7 @@ private slots:
         buf.swapBuffers();
 
         // Change only (1,1)
-        buf.backCell(1, 1).character = QChar('Q');
+        buf.backCell(1, 1).setChar(U'Q');
 
         AnsiRenderer renderer;
         QByteArray result = renderer.render(buf);
@@ -161,7 +190,7 @@ private slots:
                     int y = idx / w;
                     // Use unique characters so we can verify them in output
                     char ch = 'A' + (charIdx % 26);
-                    buf.backCell(x, y).character = QChar(ch);
+                    buf.backCell(x, y).setChar(char32_t(ch));
                     // Also vary color to ensure SGR differs
                     buf.backCell(x, y).foreground = Color(
                         static_cast<uint8_t>((charIdx * 37) % 256),
@@ -188,7 +217,7 @@ private slots:
                 //    that was written to that back buffer cell
                 for (const QPoint &pos : diffPositions) {
                     const Cell &cell = buf.backCell(pos.x(), pos.y());
-                    char expectedChar = cell.character.toLatin1();
+                    char expectedChar = static_cast<char>(cell.ch);
                     RC_ASSERT(output.contains(expectedChar));
                 }
 
@@ -354,7 +383,7 @@ private slots:
                 // 4. Modify each adjacent cell with a unique character
                 for (int i = 0; i < n; ++i) {
                     char ch = 'A' + (i % 26);
-                    buf.backCell(startX + i, row).character = QChar(ch);
+                    buf.backCell(startX + i, row).setChar(char32_t(ch));
                 }
 
                 // 5. Render
@@ -455,6 +484,89 @@ private slots:
                 RC_ASSERT(parsed.x() == x);
                 RC_ASSERT(parsed.y() == y);
             });
+    }
+
+    // ------------------------------------------------------------------
+    // Unicode cell model: a wide CJK glyph is emitted exactly once and its
+    // continuation cell produces no output (the terminal advances 2 columns
+    // by itself)
+    // ------------------------------------------------------------------
+    void wideCjkEmitsOnceAndSkipsContinuation()
+    {
+        ScreenBuffer buf(10, 1);
+        buf.swapBuffers(); // front == back
+
+        Cell style;
+        buf.putChar(0, 0, 0x65E5, style); // 日 -> pair at (0,1)
+        buf.putChar(2, 0, U'x', style);   // narrow char right after the pair
+
+        AnsiRenderer renderer;
+        const QByteArray out = renderer.render(buf);
+
+        const QByteArray cjk = QString(QChar(0x65E5)).toUtf8();
+        QCOMPARE(cjk.size(), 3); // sanity: 3-byte UTF-8
+        QCOMPARE(out.count(cjk), 1); // emitted exactly once
+
+        // The whole row renders as ONE run: a single CUP at column 1, no
+        // repositioning for the continuation cell or for 'x'
+        QVERIFY(out.contains("\x1b[1;1H"));
+        QVERIFY(!out.contains("\x1b[1;2H")); // no run restarted at the continuation
+        QVERIFY(!out.contains("\x1b[1;3H")); // 'x' continues the same run
+
+        // No garbage between the glyph and the following narrow char
+        const int cjkPos = out.indexOf(cjk);
+        const int xPos = out.indexOf('x', cjkPos);
+        QVERIFY(xPos == cjkPos + cjk.size()); // 'x' immediately follows (same SGR)
+    }
+
+    void emojiEmitsFourByteUtf8()
+    {
+        ScreenBuffer buf(10, 1);
+        buf.swapBuffers();
+
+        Cell style;
+        buf.putChar(0, 0, 0x1F600, style); // 😀
+
+        AnsiRenderer renderer;
+        const QByteArray out = renderer.render(buf);
+
+        QVERIFY(out.contains(QByteArray("\xF0\x9F\x98\x80")));
+        QCOMPARE(out.count(QByteArray("\xF0\x9F\x98\x80")), 1);
+        QVERIFY(!out.contains("\x1b[1;2H")); // continuation produced no run
+    }
+
+    void combiningMarksAppendedAfterBase()
+    {
+        ScreenBuffer buf(10, 1);
+        buf.swapBuffers();
+
+        Cell style;
+        buf.putChar(0, 0, U'e', QString(QChar(0x0301)), style);
+
+        AnsiRenderer renderer;
+        const QByteArray out = renderer.render(buf);
+        QVERIFY(out.contains(QByteArray("e\xCC\x81"))); // e + combining acute as one cell
+    }
+
+    // Defensive path: a lone continuation cell (its pair broken by a direct
+    // cell write) must render as a space, never as garbage
+    void orphanContinuationRendersAsSpace()
+    {
+        ScreenBuffer buf(10, 1);
+        buf.swapBuffers();
+
+        // Forge an orphan continuation directly (bypassing putChar)
+        Cell &cell = buf.backCell(4, 0);
+        cell.ch = 0;
+        cell.width = 0;
+        cell.foreground = Color(10, 20, 30);
+
+        AnsiRenderer renderer;
+        const QByteArray out = renderer.render(buf);
+        QVERIFY(out.contains("\x1b[1;5H")); // positioned at the cell
+        // The last payload byte before the trailing reset is a space
+        const QByteArray reset = AnsiRenderer::resetAttributes();
+        QVERIFY(out.endsWith(QByteArray(" ") + reset));
     }
 };
 

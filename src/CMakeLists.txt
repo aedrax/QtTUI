@@ -1,5 +1,5 @@
 set(QTTUI_SOURCES
-    placeholder.cpp
+    QtTuiUnicode.cpp
     ScreenBuffer.cpp
     AnsiRenderer.cpp
     TerminalBackend.cpp
@@ -85,6 +85,7 @@ endif()
 set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QtTUI
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QtTUIGlobal.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QtTuiUnicode.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/ScreenBuffer.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/AnsiRenderer.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/TerminalBackend.h

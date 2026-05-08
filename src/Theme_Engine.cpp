@@ -112,12 +112,20 @@ void Theme_Engine::setWidgetOverride(QTuiWidget *widget, const ThemeProperties &
 {
     if (!widget)
         return;
+    if (!m_overrides.contains(widget)) {
+        // Erase the entry when the widget is destroyed so a later widget
+        // allocated at the same address cannot inherit the stale override
+        connect(widget, &QObject::destroyed, this, [this, widget]() {
+            m_overrides.remove(widget);
+        });
+    }
     m_overrides.insert(widget, props);
 }
 
 void Theme_Engine::clearWidgetOverride(QTuiWidget *widget)
 {
-    m_overrides.remove(widget);
+    if (m_overrides.remove(widget))
+        disconnect(widget, &QObject::destroyed, this, nullptr);
 }
 
 ThemeProperties Theme_Engine::effectiveProperties(const QTuiWidget *widget) const
@@ -171,24 +179,24 @@ Color Theme_Engine::resolveColor(const QString &nameOrHex) const
 Theme_Engine::BorderChars Theme_Engine::borderChars(const QString &style)
 {
     if (style == QLatin1String("single")) {
-        return { QChar(0x250C), QChar(0x2510), QChar(0x2514), QChar(0x2518),
-                 QChar(0x2500), QChar(0x2502) };
+        return { char32_t(0x250C), char32_t(0x2510), char32_t(0x2514), char32_t(0x2518),
+                 char32_t(0x2500), char32_t(0x2502) };
     }
     if (style == QLatin1String("double")) {
-        return { QChar(0x2554), QChar(0x2557), QChar(0x255A), QChar(0x255D),
-                 QChar(0x2550), QChar(0x2551) };
+        return { char32_t(0x2554), char32_t(0x2557), char32_t(0x255A), char32_t(0x255D),
+                 char32_t(0x2550), char32_t(0x2551) };
     }
     if (style == QLatin1String("rounded")) {
-        return { QChar(0x256D), QChar(0x256E), QChar(0x2570), QChar(0x256F),
-                 QChar(0x2500), QChar(0x2502) };
+        return { char32_t(0x256D), char32_t(0x256E), char32_t(0x2570), char32_t(0x256F),
+                 char32_t(0x2500), char32_t(0x2502) };
     }
     if (style == QLatin1String("ascii")) {
-        return { QLatin1Char('+'), QLatin1Char('+'), QLatin1Char('+'), QLatin1Char('+'),
-                 QLatin1Char('-'), QLatin1Char('|') };
+        return { U'+', U'+', U'+', U'+',
+                 U'-', U'|' };
     }
     // "none" or unknown
-    return { QLatin1Char(' '), QLatin1Char(' '), QLatin1Char(' '), QLatin1Char(' '),
-             QLatin1Char(' '), QLatin1Char(' ') };
+    return { U' ', U' ', U' ', U' ',
+             U' ', U' ' };
 }
 
 static Color parseColorString(const QString &str, const QHash<QString, Color> &aliases)
