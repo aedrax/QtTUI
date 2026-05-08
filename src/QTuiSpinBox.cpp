@@ -272,4 +272,17 @@ void QTuiSpinBox::keyPressEvent(TuiKeyEvent *event)
     }
 }
 
+void QTuiSpinBox::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+
+    const QRect geo = geometry();
+    int midX = geo.x() + geo.width() / 2;
+    if (event->x() >= midX)
+        stepUp();
+    else
+        stepDown();
+}
+
 } // namespace QtTUI

@@ -221,6 +221,14 @@ void QTuiGroupBox::keyPressEvent(TuiKeyEvent *event)
     QTuiWidget::keyPressEvent(event);
 }
 
+void QTuiGroupBox::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+    if (m_checkable)
+        setChecked(!m_checked);
+}
+
 void QTuiGroupBox::updateChildrenEnabled()
 {
     if (!m_checkable)

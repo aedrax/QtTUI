@@ -134,6 +134,13 @@ void QTuiCollapsible::keyPressEvent(TuiKeyEvent *event)
     QTuiWidget::keyPressEvent(event);
 }
 
+void QTuiCollapsible::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+    setCollapsed(!m_collapsed);
+}
+
 void QTuiCollapsible::updateChildrenVisibility()
 {
     const auto children = childWidgets();

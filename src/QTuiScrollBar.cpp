@@ -227,4 +227,20 @@ void QTuiScrollBar::keyPressEvent(TuiKeyEvent *event)
     }
 }
 
+void QTuiScrollBar::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+
+    const QRect geo = geometry();
+    int newValue;
+
+    if (m_orientation == Qt::Horizontal) {
+        newValue = m_minimum + (event->x() - geo.x()) * (m_maximum - m_minimum) / qMax(1, geo.width() - 1);
+    } else {
+        newValue = m_minimum + (event->y() - geo.y()) * (m_maximum - m_minimum) / qMax(1, geo.height() - 1);
+    }
+    setValue(qBound(m_minimum, newValue, m_maximum));
+}
+
 } // namespace QtTUI

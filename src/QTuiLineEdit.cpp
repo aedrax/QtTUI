@@ -101,6 +101,17 @@ void QTuiLineEdit::keyPressEvent(TuiKeyEvent *event)
     markDirty();
 }
 
+void QTuiLineEdit::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+
+    const QRect geo = geometry();
+    int clickCol = event->x() - geo.x() + m_scrollOffset;
+    m_cursorPos = qBound(0, clickCol, static_cast<int>(m_text.length()));
+    markDirty();
+}
+
 void QTuiLineEdit::paintEvent(ScreenBuffer &buffer)
 {
     const QRect geo = geometry();

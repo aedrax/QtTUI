@@ -199,4 +199,44 @@ void QTuiToolBar::keyPressEvent(TuiKeyEvent *event)
     }
 }
 
+void QTuiToolBar::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+
+    const QRect geo = geometry();
+    int clickX = event->x() - geo.x();
+    if (clickX < 0)
+        return;
+
+    // Walk through items accumulating width to find which was clicked
+    int xPos = 0;
+    int navigableIndex = 0;
+    for (int i = 0; i < m_items.size(); ++i) {
+        const auto &item = m_items.at(i);
+        int itemWidth = 0;
+
+        if (item.isSeparator) {
+            itemWidth = 3; // " | "
+        } else if (item.action) {
+            itemWidth = item.action->text().length() + 2; // padding
+        } else if (item.widget) {
+            itemWidth = item.widget->minimumSize().width();
+        }
+
+        if (clickX >= xPos && clickX < xPos + itemWidth) {
+            if (!item.isSeparator) {
+                m_focusedItem = navigableIndex;
+                if (item.action)
+                    item.action->trigger();
+            }
+            return;
+        }
+
+        xPos += itemWidth;
+        if (!item.isSeparator)
+            navigableIndex++;
+    }
+}
+
 } // namespace QtTUI

@@ -193,4 +193,29 @@ void QTuiTabBar::keyPressEvent(TuiKeyEvent *event)
     }
 }
 
+void QTuiTabBar::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+
+    if (m_tabs.isEmpty())
+        return;
+
+    const QRect geo = geometry();
+    // Convert click position to column offset within the tab bar
+    int col = event->x() - geo.x();
+
+    // Walk through tabs using the same layout as paintEvent:
+    // "Tab1 | Tab2 | Tab3" — each separator is " | " (3 chars)
+    int offset = 0;
+    for (int i = 0; i < m_tabs.size(); ++i) {
+        int tabLen = m_tabs.at(i).length();
+        if (col >= offset && col < offset + tabLen) {
+            setCurrentIndex(i);
+            return;
+        }
+        offset += tabLen + 3; // tab text + " | "
+    }
+}
+
 } // namespace QtTUI

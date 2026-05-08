@@ -311,6 +311,101 @@ void QTuiTableView::keyPressEvent(TuiKeyEvent *event)
     markDirty();
 }
 
+void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+    if (!m_model || m_model->rowCount() == 0 || m_model->columnCount() == 0)
+        return;
+
+    const QRect geo = geometry();
+    const int cols = m_model->columnCount();
+    const int rows = m_model->rowCount();
+    const int viewWidth = geo.width();
+
+    // Calculate clicked row (subtract 1 for header)
+    int clickedRow = (event->y() - geo.y() - m_headerHeight) + m_scrollOffset;
+    if (clickedRow < 0 || clickedRow >= rows)
+        return;
+
+    // Calculate column widths (same logic as paintEvent)
+    QVector<int> colWidths(cols, 0);
+    for (int c = 0; c < cols; ++c) {
+        QString header = m_model->headerData(c, Qt::Horizontal, Qt::DisplayRole).toString();
+        int maxW = header.length();
+        for (int r = 0; r < rows; ++r) {
+            QModelIndex idx = m_model->index(r, c);
+            QString cellText = m_model->data(idx, Qt::DisplayRole).toString();
+            if (cellText.length() > maxW)
+                maxW = cellText.length();
+        }
+        colWidths[c] = qMax(1, maxW);
+    }
+
+    // Constrain total column widths to view width
+    int separatorTotal = (cols > 1) ? (cols - 1) : 0;
+    int availableForCols = viewWidth - separatorTotal;
+    if (availableForCols < cols)
+        availableForCols = cols;
+
+    int totalNatural = 0;
+    for (int c = 0; c < cols; ++c)
+        totalNatural += colWidths[c];
+
+    if (totalNatural > availableForCols) {
+        QVector<int> scaled(cols, 0);
+        for (int c = 0; c < cols; ++c) {
+            int proportional = static_cast<int>(
+                static_cast<double>(colWidths[c]) / totalNatural * availableForCols);
+            if (proportional < 1)
+                proportional = 1;
+            scaled[c] = proportional;
+        }
+        int scaledTotal = 0;
+        for (int c = 0; c < cols; ++c)
+            scaledTotal += scaled[c];
+        int diff = availableForCols - scaledTotal;
+        if (diff > 0) {
+            for (int c = 0; c < cols && diff > 0; ++c) {
+                scaled[c]++;
+                diff--;
+            }
+        } else if (diff < 0) {
+            for (int c = cols - 1; c >= 0 && diff < 0; --c) {
+                if (scaled[c] > 1) {
+                    scaled[c]--;
+                    diff++;
+                }
+            }
+        }
+        colWidths = scaled;
+    }
+
+    // Determine which column was clicked
+    int clickX = event->x() - geo.x();
+    int xOff = 0;
+    int clickedCol = -1;
+    int firstVisibleCol = m_horizontalScrollOffset;
+    if (firstVisibleCol >= cols)
+        firstVisibleCol = 0;
+
+    for (int c = firstVisibleCol; c < cols; ++c) {
+        int colEnd = xOff + colWidths[c];
+        if (clickX >= xOff && clickX < colEnd) {
+            clickedCol = c;
+            break;
+        }
+        xOff = colEnd + 1; // +1 for separator
+    }
+
+    if (clickedCol < 0)
+        clickedCol = cols - 1;
+
+    m_currentRow = clickedRow;
+    m_currentCol = clickedCol;
+    markDirty();
+}
+
 void QTuiTableView::onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)
 {
     if (!m_model)

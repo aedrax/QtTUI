@@ -138,6 +138,22 @@ void QTuiUndoView::keyPressEvent(TuiKeyEvent *event)
     }
 }
 
+void QTuiUndoView::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+    if (!m_stack || m_stack->count() == 0)
+        return;
+
+    const QRect geo = geometry();
+    int clickedRow = (event->y() - geo.y()) + m_scrollOffset;
+    if (clickedRow >= 0 && clickedRow < m_stack->count()) {
+        m_currentIndex = clickedRow;
+        m_stack->setIndex(m_currentIndex + 1);
+        scrollToVisible();
+    }
+}
+
 void QTuiUndoView::onStackChanged()
 {
     if (!m_stack)

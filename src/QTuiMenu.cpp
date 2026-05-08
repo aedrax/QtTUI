@@ -313,4 +313,26 @@ void QTuiMenu::keyPressEvent(TuiKeyEvent *event)
     }
 }
 
+void QTuiMenu::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+
+    const QRect geo = geometry();
+    // Menu items are rendered one per row starting at geo.y()+1 (first row is border)
+    int itemIdx = event->y() - geo.y() - 1;
+    if (itemIdx >= 0 && itemIdx < m_menuItems.size()) {
+        const auto &mi = m_menuItems.at(itemIdx);
+        if (!mi.isSeparator) {
+            if (mi.submenu) {
+                QPoint subPos(geo.x() + geo.width(), geo.y() + 1 + itemIdx);
+                mi.submenu->popup(subPos);
+            } else if (mi.action) {
+                mi.action->trigger();
+                close();
+            }
+        }
+    }
+}
+
 } // namespace QtTUI

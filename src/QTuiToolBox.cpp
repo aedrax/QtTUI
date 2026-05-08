@@ -221,4 +221,37 @@ void QTuiToolBox::keyPressEvent(TuiKeyEvent *event)
     }
 }
 
+void QTuiToolBox::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+    if (m_items.isEmpty())
+        return;
+
+    const QRect geo = geometry();
+    int clickY = event->y() - geo.y();
+    if (clickY < 0)
+        return;
+
+    // Walk through items to find which header row was clicked
+    int currentRow = 0;
+    for (int i = 0; i < m_items.size(); ++i) {
+        if (clickY == currentRow) {
+            // Clicked on this header
+            setCurrentIndex(i);
+            return;
+        }
+        ++currentRow;
+
+        // If this is the current (expanded) item, skip its content rows
+        if (i == m_currentIndex) {
+            int remainingHeaders = m_items.size() - i - 1;
+            int availableRows = geo.height() - currentRow - remainingHeaders;
+            if (availableRows < 1)
+                availableRows = 1;
+            currentRow += availableRows;
+        }
+    }
+}
+
 } // namespace QtTUI

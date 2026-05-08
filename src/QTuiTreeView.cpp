@@ -314,6 +314,21 @@ void QTuiTreeView::keyPressEvent(TuiKeyEvent *event)
     }
 }
 
+void QTuiTreeView::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+    if (!m_model || m_flatList.isEmpty())
+        return;
+
+    const QRect geo = geometry();
+    int clickedRow = (event->y() - geo.y()) + m_scrollOffset;
+    if (clickedRow >= 0 && clickedRow < m_flatList.size()) {
+        m_currentRow = clickedRow;
+        markDirty();
+    }
+}
+
 // --- Model signal slots ---
 
 void QTuiTreeView::onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)

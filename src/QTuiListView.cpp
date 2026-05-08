@@ -140,6 +140,22 @@ void QTuiListView::keyPressEvent(TuiKeyEvent *event)
     markDirty();
 }
 
+void QTuiListView::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+    if (!m_model || m_model->rowCount() == 0)
+        return;
+
+    const QRect geo = geometry();
+    int clickedRow = (event->y() - geo.y()) + m_scrollOffset;
+    if (clickedRow >= 0 && clickedRow < m_model->rowCount()) {
+        m_currentRow = clickedRow;
+        markDirty();
+        emit activated(m_model->index(m_currentRow, 0));
+    }
+}
+
 void QTuiListView::onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)
 {
     if (!m_model)

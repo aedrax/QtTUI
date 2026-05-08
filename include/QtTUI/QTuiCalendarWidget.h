@@ -32,6 +32,7 @@ signals:
 
 protected:
     void keyPressEvent(TuiKeyEvent *event) override;
+    void mousePressEvent(TuiMouseEvent *event) override;
 
 private:
     void showPreviousMonth();

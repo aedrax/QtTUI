@@ -464,4 +464,27 @@ void QTuiComboBox::keyPressEvent(TuiKeyEvent *event)
     }
 }
 
+void QTuiComboBox::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+
+    const QRect geo = geometry();
+
+    if (!m_dropdownOpen) {
+        openDropdown();
+    } else {
+        // Dropdown is open - check if click is in the dropdown area
+        // Dropdown items start at geo.y() + 3
+        int itemIdx = event->y() - geo.y() - 3;
+        if (itemIdx >= 0 && itemIdx < m_items.size()) {
+            setCurrentIndex(itemIdx);
+            closeDropdown();
+        } else {
+            closeDropdown();
+        }
+    }
+    markDirty();
+}
+
 } // namespace QtTUI

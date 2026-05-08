@@ -214,4 +214,32 @@ void QTuiMenuBar::keyPressEvent(TuiKeyEvent *event)
     }
 }
 
+void QTuiMenuBar::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+    if (m_menus.isEmpty())
+        return;
+
+    const QRect geo = geometry();
+    int clickX = event->x() - geo.x();
+    if (clickX < 0)
+        return;
+
+    // Walk through menus accumulating widths to find which was clicked
+    int xPos = 0;
+    for (int i = 0; i < m_menus.size(); ++i) {
+        QString displayTitle = m_menus.at(i)->title();
+        displayTitle.remove(QLatin1Char('&'));
+        int itemWidth = displayTitle.length() + 2; // leading + trailing space
+
+        if (clickX >= xPos && clickX < xPos + itemWidth) {
+            m_activeMenuIndex = i;
+            openMenu(i);
+            return;
+        }
+        xPos += itemWidth;
+    }
+}
+
 } // namespace QtTUI

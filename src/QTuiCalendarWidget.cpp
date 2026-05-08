@@ -312,4 +312,24 @@ void QTuiCalendarWidget::keyPressEvent(TuiKeyEvent *event)
     }
 }
 
+void QTuiCalendarWidget::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+
+    // Simplified: select the cursor date (same as Enter)
+    bool inRange = true;
+    if (m_minimumDate.isValid() && m_cursorDate < m_minimumDate)
+        inRange = false;
+    if (m_maximumDate.isValid() && m_cursorDate > m_maximumDate)
+        inRange = false;
+
+    if (inRange && m_cursorDate != m_selectedDate) {
+        m_selectedDate = m_cursorDate;
+        emit selectionChanged();
+    }
+    if (inRange)
+        emit activated(m_cursorDate);
+}
+
 } // namespace QtTUI
