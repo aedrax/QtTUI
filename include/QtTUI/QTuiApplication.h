@@ -5,7 +5,6 @@
 #include <QtTUI/TerminalBackend.h>
 #include <QtTUI/InputParser.h>
 #include <QtTUI/ScreenBuffer.h>
-#include <QtTUI/AnsiRenderer.h>
 
 #include <QCoreApplication>
 #include <QSize>
@@ -31,11 +30,16 @@ public:
     ScreenBuffer *screenBuffer() const;
     RenderScheduler *scheduler() const;
 
+    // True if the backend successfully entered both the alternate screen and
+    // raw mode at construction. False in headless environments (e.g. tests
+    // without a tty); the application still runs, it just does not control a
+    // terminal.
+    bool terminalInitialized() const;
+
     void setMainWindow(QTuiMainWindow *window);
     QTuiMainWindow *mainWindow() const;
 
     void triggerRender();
-    void scheduleRender();
 
 protected:
     bool event(QEvent *event) override;
@@ -47,13 +51,17 @@ private slots:
 private:
     void restoreTerminal();
 
-    std::unique_ptr<TerminalBackend> m_backend;
-    std::unique_ptr<InputParser> m_inputParser;
+    // QObject-based subsystems are owned via QObject parenting (parent = this);
+    // plain pointers avoid double deletion. Non-QObject subsystems stay in
+    // unique_ptrs.
+    TerminalBackend *m_backend = nullptr;
+    InputParser *m_inputParser = nullptr;
     std::unique_ptr<ScreenBuffer> m_screenBuffer;
-    std::unique_ptr<AnsiRenderer> m_renderer;
-    std::unique_ptr<RenderScheduler> m_scheduler;
+    RenderScheduler *m_scheduler = nullptr;
     QSocketNotifier *m_inputNotifier = nullptr;
     QTuiMainWindow *m_mainWindow = nullptr;
+    bool m_terminalInitialized = false;
+    bool m_messageHandlerInstalled = false;
 
     static QTuiApplication *s_instance;
 };

@@ -8,6 +8,17 @@ InputParser::InputParser(QObject *eventTarget, QObject *parent)
     : QObject(parent)
     , m_eventTarget(eventTarget)
 {
+    m_escapeTimer.setSingleShot(true);
+    connect(&m_escapeTimer, &QTimer::timeout, this, &InputParser::onEscapeTimeout);
+}
+
+void InputParser::onEscapeTimeout()
+{
+    // A bare ESC with no continuation byte within the timeout is the Escape key.
+    if (m_state == State::Escape) {
+        m_state = State::Ground;
+        postKeyEvent(Qt::Key_Escape, Qt::NoModifier);
+    }
 }
 
 void InputParser::processInput(const QByteArray &rawBytes)
@@ -58,10 +69,13 @@ void InputParser::handleGround(char byte)
 {
     auto ubyte = static_cast<unsigned char>(byte);
 
-    // ESC starts an escape sequence
+    // ESC starts an escape sequence; if no continuation byte arrives within
+    // the timeout, onEscapeTimeout delivers it as a bare Escape key press.
     if (byte == '\x1b') {
         m_state = State::Escape;
         m_buffer.clear();
+        if (m_escapeTimeout > 0)
+            m_escapeTimer.start(m_escapeTimeout);
         return;
     }
 
@@ -77,6 +91,14 @@ void InputParser::handleGround(char byte)
             int key = Qt::Key_A + (ubyte - 0x01);
             postKeyEvent(key, Qt::ControlModifier);
         }
+        return;
+    }
+
+    // Ctrl+punctuation: 0x1C-0x1F (Ctrl+\, Ctrl+], Ctrl+^, Ctrl+_)
+    if (ubyte >= 0x1C && ubyte <= 0x1F) {
+        static const int keys[] = { Qt::Key_Backslash, Qt::Key_BracketRight,
+                                    Qt::Key_AsciiCircum, Qt::Key_Underscore };
+        postKeyEvent(keys[ubyte - 0x1C], Qt::ControlModifier);
         return;
     }
 
@@ -141,6 +163,11 @@ void InputParser::handleUtf8(char byte)
         m_state = State::Ground;
         if (decoded.isEmpty() || decoded[0] == QChar(0xFFFD)) {
             postKeyEvent(Qt::Key_unknown, Qt::NoModifier, QString(QChar(0xFFFD)));
+        } else if (decoded.size() >= 2
+                   && decoded[0].isHighSurrogate() && decoded[1].isLowSurrogate()) {
+            // Non-BMP character: use the full code point, not a lone surrogate
+            postKeyEvent(int(QChar::surrogateToUcs4(decoded[0], decoded[1])),
+                         Qt::NoModifier, decoded);
         } else {
             QChar ch = decoded[0];
             postKeyEvent(ch.unicode(), Qt::NoModifier, decoded);
@@ -150,6 +177,9 @@ void InputParser::handleUtf8(char byte)
 
 void InputParser::handleEscape(char byte)
 {
+    // A continuation byte arrived: the ESC is part of a sequence (or Alt chord)
+    m_escapeTimer.stop();
+
     if (byte == '[') {
         m_state = State::CSI;
         m_buffer.clear();
@@ -182,6 +212,8 @@ void InputParser::handleEscape(char byte)
     if (byte == '\x1b') {
         postKeyEvent(Qt::Key_Escape, Qt::NoModifier);
         m_buffer.clear();
+        if (m_escapeTimeout > 0)
+            m_escapeTimer.start(m_escapeTimeout);
         return;
     }
 
@@ -355,6 +387,19 @@ void InputParser::finishSGRMouse(char finalByte)
     x = clampX(x - 1);
     y = clampY(y - 1);
 
+    // Modifier bits: 4 = Shift, 8 = Meta/Alt, 16 = Control
+    Qt::KeyboardModifiers mods = Qt::NoModifier;
+    if (btnCode & 4)  mods |= Qt::ShiftModifier;
+    if (btnCode & 8)  mods |= Qt::AltModifier;
+    if (btnCode & 16) mods |= Qt::ControlModifier;
+
+    // Wheel: bit 64 set; low bits give direction (0 = up/away, 1 = down/toward)
+    if (btnCode & 64) {
+        int delta = ((btnCode & 0x03) == 0) ? 120 : -120;
+        postMouseEvent(TuiMouseEvent::Wheel, Qt::NoButton, QPoint(x, y), mods, delta);
+        return;
+    }
+
     // Decode button from low 2 bits
     Qt::MouseButton button = Qt::NoButton;
     int btnId = btnCode & 0x03;
@@ -373,7 +418,7 @@ void InputParser::finishSGRMouse(char finalByte)
         type = TuiMouseEvent::Release;
     }
 
-    postMouseEvent(type, button, QPoint(x, y));
+    postMouseEvent(type, button, QPoint(x, y), mods);
 }
 
 void InputParser::discardBuffer()
@@ -393,10 +438,11 @@ void InputParser::postKeyEvent(int key, Qt::KeyboardModifiers modifiers, const Q
 }
 
 void InputParser::postMouseEvent(TuiMouseEvent::MouseEventType type,
-                                  Qt::MouseButton button, const QPoint &pos)
+                                  Qt::MouseButton button, const QPoint &pos,
+                                  Qt::KeyboardModifiers modifiers, int wheelDelta)
 {
     if (m_eventTarget) {
-        auto *event = new TuiMouseEvent(type, button, pos);
+        auto *event = new TuiMouseEvent(type, button, pos, modifiers, wheelDelta);
         QCoreApplication::postEvent(m_eventTarget, event);
     }
     emit mouseEventParsed(static_cast<int>(button), pos.x(), pos.y(), static_cast<int>(type));

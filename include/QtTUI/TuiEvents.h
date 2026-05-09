@@ -42,13 +42,16 @@ private:
 // Lightweight mouse event for TUI (no Qt::Gui dependency)
 class TuiMouseEvent : public QEvent {
 public:
-    enum MouseEventType { Press, Release, Move };
+    enum MouseEventType { Press, Release, Move, Wheel };
 
-    TuiMouseEvent(MouseEventType mouseType, Qt::MouseButton button, const QPoint &pos)
+    TuiMouseEvent(MouseEventType mouseType, Qt::MouseButton button, const QPoint &pos,
+                  Qt::KeyboardModifiers modifiers = Qt::NoModifier, int wheelDelta = 0)
         : QEvent(TuiEventTypes::mouseEventType())
         , m_mouseType(mouseType)
         , m_button(button)
         , m_pos(pos)
+        , m_modifiers(modifiers)
+        , m_wheelDelta(wheelDelta)
     {
     }
 
@@ -57,11 +60,16 @@ public:
     QPoint pos() const { return m_pos; }
     int x() const { return m_pos.x(); }
     int y() const { return m_pos.y(); }
+    Qt::KeyboardModifiers modifiers() const { return m_modifiers; }
+    // Wheel events only: +120 per notch away from the user, -120 toward (Qt convention)
+    int wheelDelta() const { return m_wheelDelta; }
 
 private:
     MouseEventType m_mouseType;
     Qt::MouseButton m_button;
     QPoint m_pos;
+    Qt::KeyboardModifiers m_modifiers;
+    int m_wheelDelta;
 };
 
 // Lightweight resize event for TUI (no Qt::Gui dependency)

@@ -206,6 +206,10 @@ qttui_add_test(test_dirty_tracking_bugs test_dirty_tracking_bugs.cpp)
 # Preservation property tests: dirty-tracking behavior unchanged (rendering-dirty-tracking-fixes spec)
 qttui_add_test(test_dirty_tracking_preservation test_dirty_tracking_preservation.cpp)
 
+# QTuiApplication error-handling tests (terminalInitialized(), message
+# handler not installed in headless environments)
+qttui_add_test(test_qtui_application test_qtui_application.cpp)
+
 # Initial render verification test (tab content renders without interaction)
 add_executable(test_initial_render test_initial_render.cpp)
 target_link_libraries(test_initial_render PRIVATE QtTUI::QtTUI Qt6::Core)

@@ -6,6 +6,8 @@
 #include <QtTUI/TerminalBackend.h>
 #include <termios.h>
 
+class QSocketNotifier;
+
 namespace QtTUI {
 
 class PosixBackend : public TerminalBackend {
@@ -26,11 +28,21 @@ public:
 
 private:
     static void handleSigwinch(int sig);
-    void installSigwinchHandler();
+    static void handleSigcont(int sig);
+    static void handleFatalSignal(int sig);
+
+    void installSignalHandlers();
+    void uninstallSignalHandlers();
+    void installFatalSignalHandlers();
+    void uninstallFatalSignalHandlers();
+    void onSignalPipeReadable();
+    void reestablishAfterContinue();
+    bool applyRawTermios();
 
     struct termios m_originalTermios;
     bool m_rawMode = false;
     bool m_alternateScreen = false;
+    QSocketNotifier *m_signalNotifier = nullptr;
 
     static PosixBackend *s_instance;
 };

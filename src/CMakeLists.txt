@@ -161,7 +161,12 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/RenderUtils.h
 )
 
-add_library(QtTUI ${QTTUI_SOURCES} ${QTTUI_HEADERS})
+# QtTUI is deliberately a STATIC library. The public headers carry no export
+# macro (no QTTUI_EXPORT decorations), so BUILD_SHARED_LIBS=ON would silently
+# produce a shared library with no exported symbols on some platforms. If a
+# shared build is ever wanted, do an export-macro pass across the public
+# headers first (see include/QtTUI/QtTUIGlobal.h), then revisit this keyword.
+add_library(QtTUI STATIC ${QTTUI_SOURCES} ${QTTUI_HEADERS})
 add_library(QtTUI::QtTUI ALIAS QtTUI)
 
 target_include_directories(QtTUI

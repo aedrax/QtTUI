@@ -2,14 +2,66 @@
 
 #include "PosixBackend.h"
 
-#include <QCoreApplication>
 #include <QSocketNotifier>
 
+#include <cerrno>
 #include <csignal>
+#include <fcntl.h>
+#include <poll.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
 namespace QtTUI {
+
+namespace {
+
+// State shared with async signal handlers. Signal handlers cannot touch the
+// Qt machinery (heap, mutexes), so everything they need lives in plain
+// file-scope statics.
+int g_signalPipe[2] = {-1, -1};
+struct termios g_savedTermios;
+volatile sig_atomic_t g_rawModeActive = 0;
+volatile sig_atomic_t g_altScreenActive = 0;
+
+const int g_fatalSignals[] = {SIGTERM, SIGHUP, SIGSEGV, SIGABRT, SIGFPE, SIGILL, SIGBUS};
+const int g_fatalSignalCount = static_cast<int>(sizeof(g_fatalSignals) / sizeof(g_fatalSignals[0]));
+struct sigaction g_previousFatalActions[g_fatalSignalCount];
+bool g_fatalHandlersInstalled = false;
+
+struct sigaction g_previousWinchAction;
+struct sigaction g_previousContAction;
+
+// Async-signal-safe: undo exactly what enterRawMode()/enterAlternateScreen()
+// enabled, using only write() and tcsetattr().
+void restoreTerminalFromSignal()
+{
+    if (g_rawModeActive) {
+        // Mirror exitRawMode(): disable SGR mouse reporting, re-show the cursor
+        static const char disableMouse[] = "\x1b[?1006l\x1b[?1000l\x1b[?25h";
+        ssize_t r = ::write(STDOUT_FILENO, disableMouse, sizeof(disableMouse) - 1);
+        (void)r;
+    }
+    if (g_altScreenActive) {
+        // Mirror exitAlternateScreen()
+        static const char leaveAltScreen[] = "\x1b[?1049l";
+        ssize_t r = ::write(STDOUT_FILENO, leaveAltScreen, sizeof(leaveAltScreen) - 1);
+        (void)r;
+    }
+    if (g_rawModeActive)
+        ::tcsetattr(STDIN_FILENO, TCSANOW, &g_savedTermios);
+    g_rawModeActive = 0;
+    g_altScreenActive = 0;
+}
+
+void writeToSignalPipe(char byte)
+{
+    if (g_signalPipe[1] >= 0) {
+        ssize_t r = ::write(g_signalPipe[1], &byte, 1);
+        (void)r; // a full pipe means a wakeup is already pending
+    }
+}
+
+} // namespace
 
 PosixBackend *PosixBackend::s_instance = nullptr;
 
@@ -17,7 +69,7 @@ PosixBackend::PosixBackend(QObject *parent)
     : TerminalBackend(parent)
 {
     s_instance = this;
-    installSigwinchHandler();
+    installSignalHandlers();
 }
 
 PosixBackend::~PosixBackend()
@@ -26,6 +78,7 @@ PosixBackend::~PosixBackend()
         exitAlternateScreen();
     if (m_rawMode)
         exitRawMode();
+    uninstallSignalHandlers();
     if (s_instance == this)
         s_instance = nullptr;
 }
@@ -40,6 +93,20 @@ bool PosixBackend::enterRawMode()
         return false;
     }
 
+    if (!applyRawTermios())
+        return false;
+
+    g_savedTermios = m_originalTermios;
+    g_rawModeActive = 1;
+    m_rawMode = true;
+
+    installFatalSignalHandlers();
+
+    return true;
+}
+
+bool PosixBackend::applyRawTermios()
+{
     struct termios raw = m_originalTermios;
     raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
     raw.c_oflag &= ~(OPOST);
@@ -53,8 +120,6 @@ bool PosixBackend::enterRawMode()
         return false;
     }
 
-    m_rawMode = true;
-
     // Enable SGR mouse reporting (button events + SGR encoding)
     const QByteArray enableMouse("\x1b[?1000h\x1b[?1006h");
     ::write(STDOUT_FILENO, enableMouse.constData(), enableMouse.size());
@@ -67,9 +132,14 @@ bool PosixBackend::exitRawMode()
     if (!m_rawMode)
         return true;
 
-    // Disable SGR mouse reporting
-    const QByteArray disableMouse("\x1b[?1006l\x1b[?1000l");
+    uninstallFatalSignalHandlers();
+
+    // Disable SGR mouse reporting and re-show the cursor (the render pass
+    // hides it while frames are written)
+    const QByteArray disableMouse("\x1b[?1006l\x1b[?1000l\x1b[?25h");
     ::write(STDOUT_FILENO, disableMouse.constData(), disableMouse.size());
+
+    g_rawModeActive = 0;
 
     if (::tcsetattr(STDIN_FILENO, TCSAFLUSH, &m_originalTermios) != 0) {
         qWarning("PosixBackend: failed to restore terminal attributes");
@@ -92,6 +162,7 @@ bool PosixBackend::enterAlternateScreen()
     }
 
     m_alternateScreen = true;
+    g_altScreenActive = 1;
     return true;
 }
 
@@ -107,6 +178,7 @@ bool PosixBackend::exitAlternateScreen()
     }
 
     m_alternateScreen = false;
+    g_altScreenActive = 0;
     return true;
 }
 
@@ -122,7 +194,32 @@ QSize PosixBackend::terminalSize() const
 
 qint64 PosixBackend::write(const QByteArray &data)
 {
-    return ::write(STDOUT_FILENO, data.constData(), data.size());
+    const char *buf = data.constData();
+    const qint64 size = data.size();
+    qint64 total = 0;
+
+    while (total < size) {
+        ssize_t n = ::write(STDOUT_FILENO, buf + total, static_cast<size_t>(size - total));
+        if (n > 0) {
+            total += n;
+            continue;
+        }
+        if (n < 0 && errno == EINTR)
+            continue;
+        if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+            // stdout should be blocking, but be safe: wait until writable
+            struct pollfd pfd;
+            pfd.fd = STDOUT_FILENO;
+            pfd.events = POLLOUT;
+            pfd.revents = 0;
+            if (::poll(&pfd, 1, -1) < 0 && errno != EINTR)
+                return total > 0 ? total : -1;
+            continue;
+        }
+        return total > 0 ? total : -1;
+    }
+
+    return total;
 }
 
 QByteArray PosixBackend::read()
@@ -136,21 +233,148 @@ QByteArray PosixBackend::read()
 
 void PosixBackend::handleSigwinch(int /*sig*/)
 {
-    if (s_instance) {
-        QSize size = s_instance->terminalSize();
-        QMetaObject::invokeMethod(s_instance, [s_instance = s_instance, size]() {
-            emit s_instance->resized(size);
-        }, Qt::QueuedConnection);
-    }
+    // Async-signal-safe: just wake the event loop; the actual size query and
+    // signal emission happen in onSignalPipeReadable().
+    writeToSignalPipe('w');
 }
 
-void PosixBackend::installSigwinchHandler()
+void PosixBackend::handleSigcont(int /*sig*/)
 {
+    writeToSignalPipe('c');
+}
+
+void PosixBackend::handleFatalSignal(int sig)
+{
+    restoreTerminalFromSignal();
+
+    // Re-install the previous disposition and re-raise so the default
+    // behavior (exit status, core dump) is preserved.
+    for (int i = 0; i < g_fatalSignalCount; ++i) {
+        if (g_fatalSignals[i] == sig) {
+            ::sigaction(sig, &g_previousFatalActions[i], nullptr);
+            break;
+        }
+    }
+    ::raise(sig);
+}
+
+void PosixBackend::installSignalHandlers()
+{
+    // Self-pipe: the only thing the SIGWINCH/SIGCONT handlers do is write one
+    // byte here; the notifier on the read end does the real work on the
+    // event loop.
+    if (g_signalPipe[0] < 0) {
+        if (::pipe(g_signalPipe) == 0) {
+            for (int fd : g_signalPipe) {
+                ::fcntl(fd, F_SETFL, ::fcntl(fd, F_GETFL) | O_NONBLOCK);
+                ::fcntl(fd, F_SETFD, FD_CLOEXEC);
+            }
+        } else {
+            g_signalPipe[0] = g_signalPipe[1] = -1;
+            qWarning("PosixBackend: failed to create signal pipe");
+        }
+    }
+
+    if (g_signalPipe[0] >= 0) {
+        m_signalNotifier = new QSocketNotifier(g_signalPipe[0], QSocketNotifier::Read, this);
+        connect(m_signalNotifier, &QSocketNotifier::activated,
+                this, &PosixBackend::onSignalPipeReadable);
+    }
+
     struct sigaction sa;
     sa.sa_handler = &PosixBackend::handleSigwinch;
     sa.sa_flags = SA_RESTART;
     sigemptyset(&sa.sa_mask);
-    ::sigaction(SIGWINCH, &sa, nullptr);
+    ::sigaction(SIGWINCH, &sa, &g_previousWinchAction);
+
+    sa.sa_handler = &PosixBackend::handleSigcont;
+    ::sigaction(SIGCONT, &sa, &g_previousContAction);
+}
+
+void PosixBackend::uninstallSignalHandlers()
+{
+    ::sigaction(SIGWINCH, &g_previousWinchAction, nullptr);
+    ::sigaction(SIGCONT, &g_previousContAction, nullptr);
+
+    delete m_signalNotifier;
+    m_signalNotifier = nullptr;
+
+    if (g_signalPipe[0] >= 0) {
+        ::close(g_signalPipe[0]);
+        ::close(g_signalPipe[1]);
+        g_signalPipe[0] = g_signalPipe[1] = -1;
+    }
+}
+
+void PosixBackend::installFatalSignalHandlers()
+{
+    if (g_fatalHandlersInstalled)
+        return;
+
+    struct sigaction sa;
+    sa.sa_handler = &PosixBackend::handleFatalSignal;
+    sa.sa_flags = 0;
+    sigemptyset(&sa.sa_mask);
+    for (int i = 0; i < g_fatalSignalCount; ++i)
+        ::sigaction(g_fatalSignals[i], &sa, &g_previousFatalActions[i]);
+
+    g_fatalHandlersInstalled = true;
+}
+
+void PosixBackend::uninstallFatalSignalHandlers()
+{
+    if (!g_fatalHandlersInstalled)
+        return;
+
+    for (int i = 0; i < g_fatalSignalCount; ++i)
+        ::sigaction(g_fatalSignals[i], &g_previousFatalActions[i], nullptr);
+
+    g_fatalHandlersInstalled = false;
+}
+
+void PosixBackend::onSignalPipeReadable()
+{
+    // Drain everything queued so a burst of signals produces one update.
+    char buf[64];
+    bool winch = false;
+    bool cont = false;
+    for (;;) {
+        ssize_t n = ::read(g_signalPipe[0], buf, sizeof(buf));
+        if (n > 0) {
+            for (ssize_t i = 0; i < n; ++i) {
+                if (buf[i] == 'w')
+                    winch = true;
+                else if (buf[i] == 'c')
+                    cont = true;
+            }
+            continue;
+        }
+        if (n < 0 && errno == EINTR)
+            continue;
+        break;
+    }
+
+    if (cont)
+        reestablishAfterContinue(); // emits resized() itself
+    else if (winch)
+        emit resized(terminalSize());
+}
+
+void PosixBackend::reestablishAfterContinue()
+{
+    // The shell usually resets the terminal while we are stopped; re-apply
+    // whatever we had enabled, from the state we already track.
+    if (m_rawMode) {
+        applyRawTermios();
+        g_rawModeActive = 1;
+    }
+    if (m_alternateScreen) {
+        const QByteArray seq("\x1b[?1049h");
+        ::write(STDOUT_FILENO, seq.constData(), seq.size());
+    }
+
+    // Force a relayout + full repaint through the normal resize path.
+    emit resized(terminalSize());
 }
 
 } // namespace QtTUI

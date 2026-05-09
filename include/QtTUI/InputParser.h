@@ -6,6 +6,7 @@
 #include <QByteArray>
 #include <QObject>
 #include <QSize>
+#include <QTimer>
 
 namespace QtTUI {
 
@@ -44,8 +45,11 @@ private:
     void discardBuffer();
 
     void postKeyEvent(int key, Qt::KeyboardModifiers modifiers, const QString &text = QString());
-    void postMouseEvent(TuiMouseEvent::MouseEventType type, Qt::MouseButton button, const QPoint &pos);
+    void postMouseEvent(TuiMouseEvent::MouseEventType type, Qt::MouseButton button, const QPoint &pos,
+                        Qt::KeyboardModifiers modifiers = Qt::NoModifier, int wheelDelta = 0);
     void postResizeEvent(const QSize &size);
+
+    void onEscapeTimeout();
 
     int clampX(int x) const;
     int clampY(int y) const;
@@ -56,6 +60,7 @@ private:
     QSize m_terminalSize = QSize(80, 24);
     int m_escapeTimeout = 50;
     int m_utf8Expected = 0;
+    QTimer m_escapeTimer;
 };
 
 } // namespace QtTUI

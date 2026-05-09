@@ -78,6 +78,37 @@ private slots:
     void testBackspace();
     void testEscapeKey();
     void testBacktab();
+    void testLoneEscapeTimeout();
+    void testEscapeSequenceNotBrokenByTimeout();
+    void testCtrlPunctuation();
+    void testMouseWheel();
+    void testMouseModifiers();
+    void testNonBmpUtf8();
+};
+
+// Helper: captures posted TuiMouseEvents (fields the signal doesn't carry)
+class MouseEventReceiver : public QObject {
+public:
+    struct Rec {
+        int type;
+        Qt::MouseButton button;
+        QPoint pos;
+        Qt::KeyboardModifiers modifiers;
+        int wheelDelta;
+    };
+    QList<Rec> recs;
+
+protected:
+    bool event(QEvent *e) override
+    {
+        if (e->type() == TuiEventTypes::mouseEventType()) {
+            auto *me = static_cast<TuiMouseEvent *>(e);
+            recs.append({me->mouseType(), me->button(), me->pos(),
+                         me->modifiers(), me->wheelDelta()});
+            return true;
+        }
+        return QObject::event(e);
+    }
 };
 
 // Feature: qttui-framework, Property 1: Printable character to QKeyEvent mapping
@@ -389,6 +420,117 @@ void TestInputParser::testBacktab()
     QCOMPARE(collector.keys.size(), 1);
     QCOMPARE(collector.keys.last().key, static_cast<int>(Qt::Key_Backtab));
     QCOMPARE(collector.keys.last().modifiers, Qt::ShiftModifier);
+}
+
+void TestInputParser::testLoneEscapeTimeout()
+{
+    InputParser parser(nullptr);
+    parser.setEscapeTimeout(20);
+    EventCollector collector;
+    collector.connectTo(&parser);
+
+    // A bare ESC with no continuation is delivered as Key_Escape after the timeout
+    parser.processInput(QByteArray("\x1b"));
+    QCOMPARE(collector.keys.size(), 0);
+    QTRY_COMPARE_WITH_TIMEOUT(collector.keys.size(), 1, 1000);
+    QCOMPARE(collector.keys.first().key, static_cast<int>(Qt::Key_Escape));
+    QCOMPARE(collector.keys.first().modifiers, Qt::NoModifier);
+
+    // The next printable key must arrive as a plain key, not a spurious Alt chord
+    parser.processInput(QByteArray("a"));
+    QCOMPARE(collector.keys.size(), 2);
+    QCOMPARE(collector.keys.last().key, static_cast<int>(Qt::Key_A));
+    QCOMPARE(collector.keys.last().modifiers, Qt::NoModifier);
+}
+
+void TestInputParser::testEscapeSequenceNotBrokenByTimeout()
+{
+    InputParser parser(nullptr);
+    parser.setEscapeTimeout(20);
+    EventCollector collector;
+    collector.connectTo(&parser);
+
+    // A complete sequence in one burst cancels the pending timeout
+    parser.processInput(QByteArray("\x1b[A"));
+    QCOMPARE(collector.keys.size(), 1);
+    QCOMPARE(collector.keys.first().key, static_cast<int>(Qt::Key_Up));
+
+    // Wait past the timeout: no spurious Escape may appear
+    QTest::qWait(60);
+    QCOMPARE(collector.keys.size(), 1);
+}
+
+void TestInputParser::testCtrlPunctuation()
+{
+    InputParser parser(nullptr);
+    EventCollector collector;
+    collector.connectTo(&parser);
+
+    parser.processInput(QByteArray("\x1c\x1d\x1e\x1f"));
+    QCOMPARE(collector.keys.size(), 4);
+    QCOMPARE(collector.keys[0].key, static_cast<int>(Qt::Key_Backslash));
+    QCOMPARE(collector.keys[1].key, static_cast<int>(Qt::Key_BracketRight));
+    QCOMPARE(collector.keys[2].key, static_cast<int>(Qt::Key_AsciiCircum));
+    QCOMPARE(collector.keys[3].key, static_cast<int>(Qt::Key_Underscore));
+    for (const auto &k : collector.keys)
+        QCOMPARE(k.modifiers, Qt::ControlModifier);
+}
+
+void TestInputParser::testMouseWheel()
+{
+    MouseEventReceiver receiver;
+    InputParser parser(&receiver);
+    EventCollector collector;
+    collector.connectTo(&parser);
+
+    // Wheel up (btnCode 64) and wheel down (btnCode 65)
+    parser.processInput(QByteArray("\x1b[<64;10;5M"));
+    parser.processInput(QByteArray("\x1b[<65;10;5M"));
+    QCoreApplication::processEvents();
+
+    QCOMPARE(receiver.recs.size(), 2);
+    QCOMPARE(receiver.recs[0].type, static_cast<int>(TuiMouseEvent::Wheel));
+    QCOMPARE(receiver.recs[0].button, Qt::NoButton);
+    QCOMPARE(receiver.recs[0].wheelDelta, 120);
+    QCOMPARE(receiver.recs[0].pos, QPoint(9, 4));
+    QCOMPARE(receiver.recs[1].type, static_cast<int>(TuiMouseEvent::Wheel));
+    QCOMPARE(receiver.recs[1].wheelDelta, -120);
+
+    // No phantom button presses may be emitted for wheel input
+    for (const auto &m : collector.mice)
+        QCOMPARE(m.eventType, static_cast<int>(TuiMouseEvent::Wheel));
+}
+
+void TestInputParser::testMouseModifiers()
+{
+    MouseEventReceiver receiver;
+    InputParser parser(&receiver);
+
+    // Ctrl (16) + left press, Shift (4) + right press
+    parser.processInput(QByteArray("\x1b[<16;3;4M"));
+    parser.processInput(QByteArray("\x1b[<6;3;4M"));
+    QCoreApplication::processEvents();
+
+    QCOMPARE(receiver.recs.size(), 2);
+    QCOMPARE(receiver.recs[0].type, static_cast<int>(TuiMouseEvent::Press));
+    QCOMPARE(receiver.recs[0].button, Qt::LeftButton);
+    QCOMPARE(receiver.recs[0].modifiers, Qt::ControlModifier);
+    QCOMPARE(receiver.recs[1].button, Qt::RightButton);
+    QCOMPARE(receiver.recs[1].modifiers, Qt::ShiftModifier);
+}
+
+void TestInputParser::testNonBmpUtf8()
+{
+    InputParser parser(nullptr);
+    EventCollector collector;
+    collector.connectTo(&parser);
+
+    // U+1F600 GRINNING FACE, 4-byte UTF-8: the key must be the code point,
+    // not a lone UTF-16 high surrogate, and text must round-trip
+    parser.processInput(QByteArray("\xF0\x9F\x98\x80"));
+    QCOMPARE(collector.keys.size(), 1);
+    QCOMPARE(collector.keys.first().key, 0x1F600);
+    QCOMPARE(collector.keys.first().text, QString::fromUtf8("\xF0\x9F\x98\x80"));
 }
 
 QTEST_GUILESS_MAIN(TestInputParser)
