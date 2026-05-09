@@ -55,6 +55,7 @@ protected:
 private:
     void relayoutChildren();
     void relayout();
+    bool dispatchShortcut(TuiKeyEvent *event);
     void advanceFocus(bool forward);
     void rebuildFocusChain();
     void collectFocusableWidgets(QTuiWidget *widget, QList<QTuiWidget *> &chain);

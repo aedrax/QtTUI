@@ -37,7 +37,7 @@ public:
             for (int col = geo.x(); col < geo.x() + geo.width(); ++col) {
                 if (col >= 0 && col < buffer.width() && row >= 0 && row < buffer.height()) {
                     Cell &cell = buffer.backCell(col, row);
-                    cell.character = QLatin1Char('X');
+                    cell.setChar(U'X');
                     writtenCells.append(QPoint(col, row));
                 }
             }

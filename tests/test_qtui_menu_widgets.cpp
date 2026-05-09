@@ -247,12 +247,12 @@ private slots:
 
         QString row1;
         for (int col = 0; col < 20; ++col)
-            row1 += buffer.backCell(col, 1).character;
+            row1 += buffer.backCell(col, 1).text();
         QVERIFY(row1.contains(QStringLiteral("New")));
 
         QString row2;
         for (int col = 0; col < 20; ++col)
-            row2 += buffer.backCell(col, 2).character;
+            row2 += buffer.backCell(col, 2).text();
         QVERIFY(row2.contains(QStringLiteral("Open")));
     }
 
@@ -426,7 +426,7 @@ private slots:
 
         QString row;
         for (int col = 0; col < 20; ++col)
-            row += buffer.backCell(col, 0).character;
+            row += buffer.backCell(col, 0).text();
 
         QVERIFY(row.contains(QStringLiteral("File")));
         QVERIFY(row.contains(QStringLiteral("Edit")));

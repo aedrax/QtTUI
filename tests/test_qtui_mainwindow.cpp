@@ -6,11 +6,16 @@
 
 using namespace QtTUI;
 
-// Concrete test widget since QTuiWidget is abstract
+// Concrete test widget since QTuiWidget is abstract. StrongFocus: the Tab
+// navigation tests need these children in the focus chain, which since the
+// focus-policy work only contains widgets with the TabFocus bit.
 class TestChildWidget : public QTuiWidget {
     Q_OBJECT
 public:
-    explicit TestChildWidget(QTuiWidget *parent = nullptr) : QTuiWidget(parent) {}
+    explicit TestChildWidget(QTuiWidget *parent = nullptr) : QTuiWidget(parent)
+    {
+        setFocusPolicy(Qt::StrongFocus);
+    }
     void paintEvent(ScreenBuffer & /*buffer*/) override { ++paintCount; }
     int paintCount = 0;
 };

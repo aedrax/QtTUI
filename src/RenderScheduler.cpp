@@ -27,6 +27,15 @@ void RenderScheduler::scheduleDirtyRegion(const QRect &region)
         m_dirtyUnion = m_dirtyUnion.united(region);
     }
 
+    if (!region.isEmpty()) {
+        m_dirtyRects.append(region);
+        // Keep the intersection tests cheap: collapse to the union past a bound
+        if (m_dirtyRects.size() > 32) {
+            m_dirtyRects.clear();
+            m_dirtyRects.append(m_dirtyUnion);
+        }
+    }
+
     if (!m_pending) {
         m_pending = true;
         QTimer::singleShot(0, this, &RenderScheduler::executeRenderPass);
@@ -50,14 +59,18 @@ void RenderScheduler::executeRenderPass()
     m_pending = false;
     QRect dirtyRegion = m_dirtyUnion;
     m_dirtyUnion = QRect();
+    m_passRects = std::move(m_dirtyRects);
+    m_dirtyRects.clear();
 
     ScreenBuffer *buffer = m_app->screenBuffer();
     if (!buffer)
         return;
 
     // If no dirty regions and not a full repaint, skip paint traversal entirely
-    if (dirtyRegion.isNull() && !m_fullRepaint)
+    if (dirtyRegion.isNull() && !m_fullRepaint) {
+        m_passRects.clear();
         return;
+    }
 
     buffer->setResizedDuringRender(false);
 
@@ -65,26 +78,91 @@ void RenderScheduler::executeRenderPass()
     QTuiMainWindow *mainWindow = m_app->mainWindow();
     if (mainWindow && mainWindow->isVisible()) {
         QRect rootClipRect(0, 0, buffer->width(), buffer->height());
+
+        // Restore content under popups that closed since the last pass. Popups
+        // escape their parent's clip rect, so their vacated regions must be
+        // cleared against the full screen — before anything paints, so fresh
+        // sibling output lands on top of the cleared cells.
+        clearHiddenPopupRegions(mainWindow, rootClipRect);
+
         paintTree(mainWindow, rootClipRect);
+
+        // Topmost pass: visible popups paint above everything painted so far,
+        // clipped only to the screen rather than to their parent widget.
+        paintPopupLayer(mainWindow, rootClipRect);
 
         // If a resize happened during painting, abort and reschedule a full render
         if (buffer->resizedDuringRender()) {
             buffer->setResizedDuringRender(false);
             m_fullRepaint = true;
+            m_passRects.clear();
             scheduleDirtyRegion(QRect(0, 0, buffer->width(), buffer->height()));
             return;
         }
     }
 
     m_fullRepaint = false;
+    m_passRects.clear();
 
     // Diff and write only changed cells to the terminal
     AnsiRenderer renderer;
     QByteArray output = renderer.render(*buffer);
+
+    // Park the hardware cursor at the focused editable widget's position (so
+    // the terminal shows the edit point), or keep it hidden. The hide prefix
+    // prevents visible cursor skitter while the frame's cells are written.
+    QPoint cursorPos(-1, -1);
+    QTuiWidget *focused = QTuiWidget::focusWidget();
+    if (focused && focused->isVisible())
+        cursorPos = focused->terminalCursorPos();
+
+    const bool cursorVisible = cursorPos.x() >= 0 && cursorPos.y() >= 0
+        && cursorPos.x() < buffer->width() && cursorPos.y() < buffer->height();
+
+    if (cursorVisible) {
+        output.prepend("\x1b[?25l");
+        output.append(AnsiRenderer::cursorPosition(cursorPos.x(), cursorPos.y()));
+        output.append("\x1b[?25h");
+    } else if (!output.isEmpty() || m_cursorShown) {
+        output.prepend("\x1b[?25l");
+    }
+    m_cursorShown = cursorVisible;
+
     if (!output.isEmpty()) {
         m_app->backend()->write(output);
     }
     buffer->swapBuffers();
+}
+
+bool RenderScheduler::intersectsPassRects(const QRect &rect) const
+{
+    for (const QRect &damage : m_passRects) {
+        if (rect.intersects(damage))
+            return true;
+    }
+    return false;
+}
+
+void RenderScheduler::clearVacatedRegion(QTuiWidget *parent, const QRect &region)
+{
+    ScreenBuffer *buffer = m_app->screenBuffer();
+    if (!buffer || region.isEmpty())
+        return;
+
+    ThemeProperties parentTheme = parent->themeProperties();
+    for (int row = region.y(); row < region.y() + region.height(); ++row) {
+        for (int col = region.x(); col < region.x() + region.width(); ++col) {
+            Cell &cell = buffer->backCell(col, row);
+            cell.setChar(U' ');
+            cell.foreground = parentTheme.foreground;
+            cell.background = parentTheme.background;
+            cell.bold = false;
+            cell.italic = false;
+            cell.underline = false;
+            cell.strikethrough = false;
+            cell.inverse = false;
+        }
+    }
 }
 
 void RenderScheduler::paintTree(QTuiWidget *widget, const QRect &parentClipRect)
@@ -96,8 +174,20 @@ void RenderScheduler::paintTree(QTuiWidget *widget, const QRect &parentClipRect)
     if (clipRect.isEmpty())
         return;
 
-    // Paint this widget only if it is dirty or we're doing a full repaint
-    if (widget->isDirty() || m_fullRepaint) {
+    // First: clear regions vacated by newly hidden children, BEFORE this widget
+    // and its visible children paint, so their fresh content lands on top.
+    // Hidden popups are excluded: their vacated regions may extend outside this
+    // widget's clip rect and are cleared screen-wide in clearHiddenPopupRegions().
+    for (auto *child : widget->childWidgets()) {
+        if (!child->isVisible() && child->isDirty() && !child->isPopup()) {
+            clearVacatedRegion(widget, child->geometry().intersected(clipRect));
+            child->clearDirtyRegions();
+        }
+    }
+
+    // Paint this widget if it is dirty, we're doing a full repaint, or it
+    // intersects damage from another widget (hidden/moved overlay above it)
+    if (widget->isDirty() || m_fullRepaint || intersectsPassRects(widget->geometry())) {
         ScreenBuffer *buffer = m_app->screenBuffer();
         if (buffer) {
             widget->paintEvent(*buffer);
@@ -105,39 +195,54 @@ void RenderScheduler::paintTree(QTuiWidget *widget, const QRect &parentClipRect)
         widget->clearDirtyRegions();
     }
 
-    // Recurse into visible children, passing the computed clip rect
+    // Recurse into visible children, passing the computed clip rect. Popup
+    // children are skipped here: they belong to the topmost popup layer and
+    // must not be clipped to this widget's rect (see paintPopupLayer()).
     for (auto *child : widget->childWidgets()) {
-        if (child->isVisible()) {
+        if (child->isVisible() && !child->isPopup()) {
             paintTree(child, clipRect);
-        } else if (child->isDirty()) {
-            if (!m_fullRepaint) {
-                // Hidden widget that was just marked dirty (transitioned to hidden):
-                // Clear its geometry with the parent's background color.
-                // Skip during full repaint — visible siblings will paint over the area.
-                ScreenBuffer *buffer = m_app->screenBuffer();
-                if (buffer) {
-                    QRect childClip = child->geometry().intersected(clipRect);
-                    if (!childClip.isEmpty()) {
-                        ThemeProperties parentTheme = widget->themeProperties();
-                        for (int row = childClip.y(); row < childClip.y() + childClip.height(); ++row) {
-                            for (int col = childClip.x(); col < childClip.x() + childClip.width(); ++col) {
-                                Cell &cell = buffer->backCell(col, row);
-                                cell.character = QLatin1Char(' ');
-                                cell.foreground = parentTheme.foreground;
-                                cell.background = parentTheme.background;
-                                cell.bold = false;
-                                cell.italic = false;
-                                cell.underline = false;
-                                cell.strikethrough = false;
-                                cell.inverse = false;
-                            }
-                        }
-                    }
-                }
-            }
-            // Always clear dirty state so the widget isn't re-processed
+        }
+    }
+}
+
+void RenderScheduler::paintPopupLayer(QTuiWidget *root, const QRect &screenRect)
+{
+    // Pre-order collection: a parent popup is collected (and painted) before
+    // any popup in its subtree, so submenus land on top of their menu.
+    QVector<QTuiWidget *> popups;
+    collectVisiblePopups(root, popups);
+
+    // paintTree's repaint condition (dirty / full repaint / intersects damage)
+    // also covers popups: anything repainted underneath a popup schedules
+    // damage that intersects the popup, so the popup repaints on top of it.
+    for (QTuiWidget *popup : popups)
+        paintTree(popup, screenRect);
+}
+
+void RenderScheduler::collectVisiblePopups(QTuiWidget *widget, QVector<QTuiWidget *> &popups)
+{
+    for (auto *child : widget->childWidgets()) {
+        if (!child->isVisible())
+            continue;
+        if (child->isPopup())
+            popups.append(child);
+        collectVisiblePopups(child, popups);
+    }
+}
+
+void RenderScheduler::clearHiddenPopupRegions(QTuiWidget *widget, const QRect &screenRect)
+{
+    for (auto *child : widget->childWidgets()) {
+        if (child->isPopup() && !child->isVisible() && child->isDirty()) {
+            // A popup floats over unrelated widgets, so its QObject parent's
+            // theme is meaningless for the vacated cells; clear with the main
+            // window's theme and let damage-intersecting widgets repaint over.
+            clearVacatedRegion(m_app->mainWindow(), child->geometry().intersected(screenRect));
             child->clearDirtyRegions();
         }
+        // Descend even into hidden widgets: a just-closed menu may still own a
+        // just-closed submenu whose region also needs clearing.
+        clearHiddenPopupRegions(child, screenRect);
     }
 }
 

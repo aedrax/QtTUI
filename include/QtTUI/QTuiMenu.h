@@ -33,6 +33,9 @@ public:
     void paintEvent(ScreenBuffer &buffer) override;
     QSize minimumSize() const override;
 
+    // Clicking outside the menu closes it through the normal close() path
+    void popupOutsideClick() override;
+
 signals:
     void aboutToShow();
     void aboutToHide();
@@ -54,7 +57,6 @@ private:
     QString m_title;
     QList<MenuItem> m_menuItems;
     int m_highlightedIndex = 0;
-    bool m_isPopup = false;
 };
 
 } // namespace QtTUI

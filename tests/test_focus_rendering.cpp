@@ -70,10 +70,14 @@ private slots:
                 const int w2 = *rc::gen::inRange(1, 21);
                 const int h2 = *rc::gen::inRange(1, 21);
 
+                // Labels default to Qt::NoFocus; these tests exercise focus
+                // rendering, so opt them into programmatic focus explicitly.
                 QTuiLabel label1(QStringLiteral("Label A"), &mainWindow);
+                label1.setFocusPolicy(Qt::StrongFocus);
                 label1.setGeometry(QRect(x1, y1, w1, h1));
 
                 QTuiLabel label2(QStringLiteral("Label B"), &mainWindow);
+                label2.setFocusPolicy(Qt::StrongFocus);
                 label2.setGeometry(QRect(x2, y2, w2, h2));
 
                 // Drain initial events from construction
@@ -137,7 +141,9 @@ private slots:
                 const int w = *rc::gen::inRange(5, 30);
                 const int h = *rc::gen::inRange(1, 5);
 
+                // NoFocus labels ignore setFocus(); opt in for this rendering test
                 QTuiLabel label(QStringLiteral("Hello"), &mainWindow);
+                label.setFocusPolicy(Qt::StrongFocus);
                 label.setGeometry(QRect(x, y, w, h));
 
                 ScreenBuffer buffer(80, 24);
@@ -160,7 +166,7 @@ private slots:
                 // Clear buffer and re-render
                 for (int row = 0; row < 24; ++row)
                     for (int col = 0; col < 80; ++col) {
-                        buffer.backCell(col, row).character = QLatin1Char(' ');
+                        buffer.backCell(col, row).setChar(U' ');
                         buffer.backCell(col, row).foreground = Color(0, 0, 0);
                         buffer.backCell(col, row).background = Color(0, 0, 0);
                     }
@@ -286,7 +292,7 @@ private slots:
                 // Clear buffer
                 for (int row = 0; row < 24; ++row)
                     for (int col = 0; col < 80; ++col) {
-                        buffer.backCell(col, row).character = QLatin1Char(' ');
+                        buffer.backCell(col, row).setChar(U' ');
                         buffer.backCell(col, row).foreground = Color(0, 0, 0);
                         buffer.backCell(col, row).background = Color(0, 0, 0);
                     }

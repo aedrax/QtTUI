@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
     for (int y = 0; y < buf->height(); ++y) {
         QString row;
         for (int x = 0; x < buf->width(); ++x) {
-            QChar ch = buf->backCell(x, y).character;
+            QString ch = buf->backCell(x, y).text();
             row += ch.isNull() ? QChar(' ') : ch;
         }
         if (row.contains("VISIBLE_CONTENT_HERE")) {
@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
         for (int y = 0; y < qMin(10, buf->height()); ++y) {
             QString row;
             for (int x = 0; x < buf->width(); ++x) {
-                QChar ch = buf->backCell(x, y).character;
+                QString ch = buf->backCell(x, y).text();
                 row += ch.isNull() ? QChar(' ') : ch;
             }
             qDebug() << "  Row" << y << ":" << row.trimmed();
@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
     for (int y = 0; y < buf->height(); ++y) {
         QString row;
         for (int x = 0; x < buf->width(); ++x) {
-            QChar ch = buf->backCell(x, y).character;
+            QString ch = buf->backCell(x, y).text();
             row += ch.isNull() ? QChar(' ') : ch;
         }
         if (row.contains("Hidden page")) {

@@ -20,6 +20,12 @@ public:
 
     QList<QTuiMenu *> menus() const;
 
+    // Opens the menu whose &-mnemonic (or, failing that, first title letter)
+    // matches ch; returns false if no menu matches. Used by the bar's own
+    // Alt+letter handling and by QTuiMainWindow's global Alt+mnemonic
+    // dispatch, which works without the bar having focus.
+    bool triggerMnemonic(QChar ch);
+
     void paintEvent(ScreenBuffer &buffer) override;
     QSize minimumSize() const override;
 
@@ -28,6 +34,7 @@ protected:
     void mousePressEvent(TuiMouseEvent *event) override;
 
 private:
+    void registerMenu(QTuiMenu *menu);
     void openMenu(int index);
     void closeCurrentMenu();
     int findMnemonicIndex(QChar ch) const;

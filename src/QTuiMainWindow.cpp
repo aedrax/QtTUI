@@ -1,5 +1,7 @@
 #include <QtTUI/QTuiMainWindow.h>
+#include <QtTUI/QTuiAction.h>
 #include <QtTUI/QTuiApplication.h>
+#include <QtTUI/QTuiKeySequence.h>
 #include <QtTUI/QTuiLayout.h>
 #include <QtTUI/QTuiMenuBar.h>
 #include <QtTUI/QTuiToolBar.h>
@@ -22,12 +24,19 @@ void QTuiMainWindow::setCentralWidget(QTuiWidget *widget)
     if (m_centralWidget == widget)
         return;
 
-    if (m_centralWidget)
+    if (m_centralWidget) {
+        disconnect(m_centralWidget, &QObject::destroyed, this, nullptr);
         m_centralWidget->setParent(nullptr);
+    }
 
     m_centralWidget = widget;
 
     if (m_centralWidget) {
+        // Clear the cached pointer if the widget is destroyed externally
+        connect(m_centralWidget, &QObject::destroyed, this, [this]() {
+            m_centralWidget = nullptr;
+            markDirty();
+        });
         m_centralWidget->setParent(this);
         m_centralWidget->setGeometry(geometry());
     }
@@ -50,7 +59,17 @@ void QTuiMainWindow::setLayout(QTuiLayout *layout)
     if (layout && layout->parent() != this)
         layout->setParent(this);
 
+    if (m_layout)
+        disconnect(m_layout, &QObject::destroyed, this, nullptr);
+
     m_layout = layout;
+
+    if (m_layout) {
+        // Clear the cached pointer if the layout is destroyed externally
+        connect(m_layout, &QObject::destroyed, this, [this]() {
+            m_layout = nullptr;
+        });
+    }
     if (!geometry().isEmpty())
         relayoutChildren();
 }
@@ -67,13 +86,21 @@ void QTuiMainWindow::setMenuBar(QTuiMenuBar *menuBar)
     if (m_menuBar == menuBar)
         return;
 
-    if (m_menuBar)
+    if (m_menuBar) {
+        disconnect(m_menuBar, &QObject::destroyed, this, nullptr);
         m_menuBar->setParent(nullptr);
+    }
 
     m_menuBar = menuBar;
 
-    if (m_menuBar)
+    if (m_menuBar) {
+        // Clear the cached pointer if the menu bar is destroyed externally
+        connect(m_menuBar, &QObject::destroyed, this, [this]() {
+            m_menuBar = nullptr;
+            markDirty();
+        });
         m_menuBar->setParent(this);
+    }
 
     rebuildFocusChain();
     if (!geometry().isEmpty())
@@ -95,6 +122,12 @@ void QTuiMainWindow::addToolBar(QTuiToolBar *toolBar)
     toolBar->setParent(this);
     m_toolBars.append(toolBar);
 
+    // Remove the cached pointer if the toolbar is destroyed externally
+    connect(toolBar, &QObject::destroyed, this, [this, toolBar]() {
+        m_toolBars.removeOne(toolBar);
+        markDirty();
+    });
+
     rebuildFocusChain();
     if (!geometry().isEmpty())
         relayout();
@@ -106,6 +139,7 @@ void QTuiMainWindow::removeToolBar(QTuiToolBar *toolBar)
         return;
 
     m_toolBars.removeOne(toolBar);
+    disconnect(toolBar, &QObject::destroyed, this, nullptr);
     toolBar->setParent(nullptr);
 
     rebuildFocusChain();
@@ -125,13 +159,21 @@ void QTuiMainWindow::setStatusBar(QTuiStatusBar *statusBar)
     if (m_statusBar == statusBar)
         return;
 
-    if (m_statusBar)
+    if (m_statusBar) {
+        disconnect(m_statusBar, &QObject::destroyed, this, nullptr);
         m_statusBar->setParent(nullptr);
+    }
 
     m_statusBar = statusBar;
 
-    if (m_statusBar)
+    if (m_statusBar) {
+        // Clear the cached pointer if the status bar is destroyed externally
+        connect(m_statusBar, &QObject::destroyed, this, [this]() {
+            m_statusBar = nullptr;
+            markDirty();
+        });
         m_statusBar->setParent(this);
+    }
 
     rebuildFocusChain();
     if (!geometry().isEmpty())
@@ -158,6 +200,16 @@ void QTuiMainWindow::addDockWidget(Qt::DockWidgetArea area, QTuiDockWidget *dock
     dockWidget->setParent(this);
     m_dockWidgets[area].append(dockWidget);
 
+    // Remove the cached pointer if the dock widget is destroyed externally.
+    // Disconnect first: re-adding a dock to another area must not stack
+    // duplicate connections.
+    disconnect(dockWidget, &QObject::destroyed, this, nullptr);
+    connect(dockWidget, &QObject::destroyed, this, [this, dockWidget]() {
+        for (auto it = m_dockWidgets.begin(); it != m_dockWidgets.end(); ++it)
+            it.value().removeOne(dockWidget);
+        markDirty();
+    });
+
     rebuildFocusChain();
     if (!geometry().isEmpty())
         relayout();
@@ -170,6 +222,7 @@ void QTuiMainWindow::removeDockWidget(QTuiDockWidget *dockWidget)
 
     for (auto it = m_dockWidgets.begin(); it != m_dockWidgets.end(); ++it) {
         if (it.value().removeOne(dockWidget)) {
+            disconnect(dockWidget, &QObject::destroyed, this, nullptr);
             dockWidget->setParent(nullptr);
             break;
         }
@@ -207,29 +260,108 @@ void QTuiMainWindow::paintEvent(ScreenBuffer &buffer)
 
 // --- Events ---
 
+// Collects visible popups in pre-order: a parent popup precedes the popups in
+// its subtree, so the LAST popup containing a point is the topmost one.
+static void collectVisiblePopupsIn(QTuiWidget *widget, QList<QTuiWidget *> &popups)
+{
+    for (auto *child : widget->childWidgets()) {
+        if (!child->isVisible())
+            continue;
+        if (child->isPopup())
+            popups.append(child);
+        collectVisiblePopupsIn(child, popups);
+    }
+}
+
+// True if widget is a visible popup or lives inside one.
+static bool insideVisiblePopup(const QTuiWidget *widget)
+{
+    for (const QTuiWidget *w = widget; w; w = w->parentWidget()) {
+        if (w->isPopup() && w->isVisible())
+            return true;
+    }
+    return false;
+}
+
 void QTuiMainWindow::resizeEvent(TuiResizeEvent *event)
 {
     setGeometry(QRect(0, 0, event->size().width(), event->size().height()));
     relayout();
 }
 
+// True if the sequence's key would type text into the focused widget: bare
+// printable-key shortcuts (e.g. "Q") must yield to text editing.
+static bool shortcutShadowedByEditor(const QTuiKeySequence &seq, QTuiWidget *focused)
+{
+    return seq.isBareTextKey() && focused && focused->acceptsTextInput();
+}
+
+// Global shortcut dispatch (backlog #9): runs before Tab handling and
+// focus-widget delivery. Returns true when the event was consumed.
+//
+// Shortcuts fire even while a popup (menu, dropdown) has focus: modified
+// shortcuts and function keys don't collide with popup navigation keys, and
+// triggering an action closes menus anyway. Bare printable-key shortcuts
+// are suppressed only while the focused widget accepts text input.
+bool QTuiMainWindow::dispatchShortcut(TuiKeyEvent *event)
+{
+    QTuiWidget *focused = QTuiWidget::focusWidget();
+
+    const auto actions = QTuiAction::registeredActions();
+    for (QTuiAction *action : actions) {
+        if (!action->isEnabled())
+            continue;
+        const QTuiKeySequence seq = action->shortcutSequence();
+        if (!seq.matches(event->key(), event->modifiers()))
+            continue;
+        if (shortcutShadowedByEditor(seq, focused))
+            continue;
+        action->trigger();
+        return true;
+    }
+
+    // Menu bar Alt+mnemonics work globally, not only while the bar has focus:
+    // Alt+letter (no Ctrl) opens the matching menu.
+    if (m_menuBar && m_menuBar->isVisible()
+        && (event->modifiers() & Qt::AltModifier)
+        && !(event->modifiers() & Qt::ControlModifier)
+        && !event->text().isEmpty()) {
+        if (m_menuBar->triggerMnemonic(event->text().at(0)))
+            return true;
+    }
+
+    return false;
+}
+
 void QTuiMainWindow::keyPressEvent(TuiKeyEvent *event)
 {
-    // Tab forward
-    if (event->key() == Qt::Key_Tab && !(event->modifiers() & Qt::ShiftModifier)) {
-        advanceFocus(true);
+    if (dispatchShortcut(event))
         return;
-    }
 
-    // Shift+Tab backward (terminals send Key_Backtab for Shift+Tab)
-    if (event->key() == Qt::Key_Backtab
-        || (event->key() == Qt::Key_Tab && (event->modifiers() & Qt::ShiftModifier))) {
-        advanceFocus(false);
-        return;
-    }
-
-    // Find the focused widget anywhere in the tree and dispatch to it
+    // Find the focused widget anywhere in the tree
     QTuiWidget *focused = findFocusedWidget(this);
+
+    // While focus is inside an open popup, the popup is modal for keys: Tab
+    // must not walk the window focus chain out from under it. The popup itself
+    // receives the key (menus ignore Tab).
+    const bool popupHasFocus = focused && insideVisiblePopup(focused);
+
+    if (!popupHasFocus) {
+        // Tab forward
+        if (event->key() == Qt::Key_Tab && !(event->modifiers() & Qt::ShiftModifier)) {
+            advanceFocus(true);
+            return;
+        }
+
+        // Shift+Tab backward (terminals send Key_Backtab for Shift+Tab)
+        if (event->key() == Qt::Key_Backtab
+            || (event->key() == Qt::Key_Tab && (event->modifiers() & Qt::ShiftModifier))) {
+            advanceFocus(false);
+            return;
+        }
+    }
+
+    // Dispatch to the focused widget
     if (focused && focused != this) {
         QCoreApplication::sendEvent(focused, event);
     }
@@ -237,9 +369,41 @@ void QTuiMainWindow::keyPressEvent(TuiKeyEvent *event)
 
 void QTuiMainWindow::mousePressEvent(TuiMouseEvent *event)
 {
-    QTuiWidget *target = findWidgetAt(this, event->pos());
+    // Popups float above everything, so hit-test them first; the topmost
+    // (deepest / most recently opened, i.e. last collected) popup wins.
+    QList<QTuiWidget *> popups;
+    collectVisiblePopupsIn(this, popups);
+
+    QTuiWidget *target = nullptr;
+    for (int i = popups.size() - 1; i >= 0 && !target; --i) {
+        if (popups.at(i)->geometry().contains(event->pos()))
+            target = findWidgetAt(popups.at(i), event->pos());
+    }
+
+    // A press outside every visible popup dismisses them all and is swallowed:
+    // the click does not reach the widget underneath (matching QMenu). Each
+    // popup runs its own close logic via popupOutsideClick().
+    if (!target && !popups.isEmpty() && event->mouseType() == TuiMouseEvent::Press) {
+        for (auto *popup : popups) {
+            if (popup->isVisible()) // an earlier popup may have closed this one
+                popup->popupOutsideClick();
+        }
+        return;
+    }
+
+    if (!target)
+        target = findWidgetAt(this, event->pos());
+
     if (target && target != this) {
-        target->setFocus();
+        // Only an actual press moves focus, and only onto widgets whose
+        // policy has the ClickFocus bit and that are effectively enabled;
+        // Move/Release/Wheel and NoFocus widgets must not steal focus. The
+        // event is still delivered (a disabled target consumes it in the
+        // base event handler).
+        if (event->mouseType() == TuiMouseEvent::Press
+            && (target->focusPolicy() & Qt::ClickFocus)
+            && target->isEffectivelyEnabled())
+            target->setFocus();
         QCoreApplication::sendEvent(target, event);
     }
 }
@@ -351,15 +515,17 @@ void QTuiMainWindow::relayoutChildren()
         return;
     }
 
+    // With a layout installed, geometry management is entirely the layout's
+    // job; the manual clamping below only applies to layout-less windows.
     if (m_layout) {
         m_layout->apply(geometry());
-    } else if (m_centralWidget) {
-        m_centralWidget->setGeometry(geometry());
+        return;
     }
 
+    if (m_centralWidget)
+        m_centralWidget->setGeometry(geometry());
+
     for (auto *child : childWidgets()) {
-        if (m_layout)
-            break;
         if (child != m_centralWidget && child->isVisible()) {
             QRect childGeo = child->geometry();
             QRect bounds = geometry();
@@ -406,17 +572,18 @@ void QTuiMainWindow::rebuildFocusChain()
 
 void QTuiMainWindow::collectFocusableWidgets(QTuiWidget *widget, QList<QTuiWidget *> &chain)
 {
-    auto children = widget->childWidgets();
-    bool hasVisibleChild = false;
-    for (auto *child : children) {
-        if (child->isVisible()) {
-            hasVisibleChild = true;
-            collectFocusableWidgets(child, chain);
-        }
-    }
-    // Leaf visible widgets (no visible children) are focusable
-    if (!hasVisibleChild && widget != this && widget->isVisible()) {
+    // Tab stops are widgets that opted in via focusPolicy (TabFocus bit),
+    // are visible, and are effectively enabled — labels, containers without
+    // key handling, and disabled widgets are skipped (backlog #12). Pre-order:
+    // a focusable container precedes its children.
+    if (widget != this && widget->isVisible()
+        && (widget->focusPolicy() & Qt::TabFocus)
+        && widget->isEffectivelyEnabled()) {
         chain.append(widget);
+    }
+    for (auto *child : widget->childWidgets()) {
+        if (child->isVisible())
+            collectFocusableWidgets(child, chain);
     }
 }
 

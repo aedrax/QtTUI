@@ -9,6 +9,10 @@ QTuiMenu::QTuiMenu(const QString &title, QTuiWidget *parent)
     : QTuiWidget(parent)
     , m_title(title)
 {
+    setFocusPolicy(Qt::StrongFocus);
+    // A menu is always a popup: it renders in the topmost pass, clipped only
+    // to the screen, so it can escape its owner's rect (e.g. a 1-row menu bar)
+    setPopup(true);
     setVisible(false);
 }
 
@@ -69,7 +73,6 @@ void QTuiMenu::addMenu(QTuiMenu *menu)
 
 void QTuiMenu::popup(const QPoint &pos)
 {
-    m_isPopup = true;
     m_highlightedIndex = 0;
     // Skip initial separators
     while (m_highlightedIndex < m_menuItems.size() && m_menuItems.at(m_highlightedIndex).isSeparator)
@@ -84,10 +87,19 @@ void QTuiMenu::popup(const QPoint &pos)
 void QTuiMenu::close()
 {
     if (isVisible()) {
+        // Close any open submenu first so its screen region is restored too
+        for (const auto &item : m_menuItems) {
+            if (item.submenu && item.submenu->isVisible())
+                item.submenu->close();
+        }
         emit aboutToHide();
         setVisible(false);
-        m_isPopup = false;
     }
+}
+
+void QTuiMenu::popupOutsideClick()
+{
+    close();
 }
 
 QList<QTuiAction *> QTuiMenu::actions() const
@@ -108,6 +120,8 @@ void QTuiMenu::navigateToNextItem()
     do {
         m_highlightedIndex = (m_highlightedIndex + 1) % m_menuItems.size();
     } while (m_menuItems.at(m_highlightedIndex).isSeparator && m_highlightedIndex != start);
+    if (m_highlightedIndex != start)
+        markDirty();
 }
 
 void QTuiMenu::navigateToPrevItem()
@@ -118,6 +132,8 @@ void QTuiMenu::navigateToPrevItem()
     do {
         m_highlightedIndex = (m_highlightedIndex - 1 + m_menuItems.size()) % m_menuItems.size();
     } while (m_menuItems.at(m_highlightedIndex).isSeparator && m_highlightedIndex != start);
+    if (m_highlightedIndex != start)
+        markDirty();
 }
 
 QSize QTuiMenu::minimumSize() const
@@ -127,8 +143,11 @@ QSize QTuiMenu::minimumSize() const
         if (item.isSeparator)
             continue;
         int w = 0;
-        if (item.action)
-            w += item.action->text().length();
+        if (item.action) {
+            QString display = item.action->text();
+            display.remove(QLatin1Char('&'));
+            w += display.length();
+        }
         if (item.action && !item.action->shortcut().isEmpty())
             w += 2 + item.action->shortcut().length();
         if (item.submenu)
@@ -162,7 +181,7 @@ void QTuiMenu::paintEvent(ScreenBuffer &buffer)
     for (int row = 0; row < gh && (gy + row) < buffer.height(); ++row) {
         for (int col = 0; col < gw && (gx + col) < buffer.width(); ++col) {
             Cell &cell = buffer.backCell(gx + col, gy + row);
-            cell.character = QLatin1Char(' ');
+            cell.setChar(U' ');
             cell.foreground = fg;
             cell.background = bg;
             cell.bold = false;
@@ -176,11 +195,11 @@ void QTuiMenu::paintEvent(ScreenBuffer &buffer)
         for (int col = 0; col < gw && (gx + col) < buffer.width(); ++col) {
             Cell &cell = buffer.backCell(gx + col, gy);
             if (col == 0)
-                cell.character = border.topLeft;
+                cell.setChar(border.topLeft);
             else if (col == gw - 1)
-                cell.character = border.topRight;
+                cell.setChar(border.topRight);
             else
-                cell.character = border.horizontal;
+                cell.setChar(border.horizontal);
             cell.foreground = fg;
             cell.background = bg;
         }
@@ -192,11 +211,11 @@ void QTuiMenu::paintEvent(ScreenBuffer &buffer)
         for (int col = 0; col < gw && (gx + col) < buffer.width(); ++col) {
             Cell &cell = buffer.backCell(gx + col, bottomY);
             if (col == 0)
-                cell.character = border.bottomLeft;
+                cell.setChar(border.bottomLeft);
             else if (col == gw - 1)
-                cell.character = border.bottomRight;
+                cell.setChar(border.bottomRight);
             else
-                cell.character = border.horizontal;
+                cell.setChar(border.horizontal);
             cell.foreground = fg;
             cell.background = bg;
         }
@@ -211,13 +230,13 @@ void QTuiMenu::paintEvent(ScreenBuffer &buffer)
 
         // Left/right borders
         if (gx < buffer.width()) {
-            buffer.backCell(gx, rowY).character = border.vertical;
+            buffer.backCell(gx, rowY).setChar(border.vertical);
             buffer.backCell(gx, rowY).foreground = fg;
             buffer.backCell(gx, rowY).background = bg;
         }
         int rx = gx + gw - 1;
         if (rx < buffer.width()) {
-            buffer.backCell(rx, rowY).character = border.vertical;
+            buffer.backCell(rx, rowY).setChar(border.vertical);
             buffer.backCell(rx, rowY).foreground = fg;
             buffer.backCell(rx, rowY).background = bg;
         }
@@ -228,7 +247,7 @@ void QTuiMenu::paintEvent(ScreenBuffer &buffer)
             for (int col = 0; col < innerWidth; ++col) {
                 int px = gx + 1 + col;
                 if (px < buffer.width()) {
-                    buffer.backCell(px, rowY).character = border.horizontal;
+                    buffer.backCell(px, rowY).setChar(border.horizontal);
                     buffer.backCell(px, rowY).foreground = fg;
                     buffer.backCell(px, rowY).background = bg;
                 }
@@ -241,6 +260,7 @@ void QTuiMenu::paintEvent(ScreenBuffer &buffer)
         Color itemBg = highlighted ? fg : bg;
 
         QString text = mi.action ? mi.action->text() : QString();
+        text.remove(QLatin1Char('&')); // mnemonic markers are not painted
         QString shortcutStr;
         if (mi.action && !mi.action->shortcut().isEmpty())
             shortcutStr = mi.action->shortcut();
@@ -264,16 +284,16 @@ void QTuiMenu::paintEvent(ScreenBuffer &buffer)
 
             int rightStart = innerWidth - rightLen;
             if (col < truncText.length()) {
-                cell.character = truncText.at(col);
+                cell.setChar(truncText.at(col).unicode());
             } else if (rightLen > 0 && col >= rightStart) {
                 int ri = col - rightStart;
                 QString rightStr = shortcutStr + suffix;
                 if (ri < rightStr.length())
-                    cell.character = rightStr.at(ri);
+                    cell.setChar(rightStr.at(ri).unicode());
                 else
-                    cell.character = QLatin1Char(' ');
+                    cell.setChar(U' ');
             } else {
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
             }
         }
     }
@@ -281,6 +301,10 @@ void QTuiMenu::paintEvent(ScreenBuffer &buffer)
 
 void QTuiMenu::keyPressEvent(TuiKeyEvent *event)
 {
+    // A closed menu can still receive events through direct dispatch; ignore them
+    if (!isVisible())
+        return;
+
     const int key = event->key();
 
     if (key == Qt::Key_Up) {
@@ -315,7 +339,7 @@ void QTuiMenu::keyPressEvent(TuiKeyEvent *event)
 
 void QTuiMenu::mousePressEvent(TuiMouseEvent *event)
 {
-    if (event->mouseType() != TuiMouseEvent::Press)
+    if (!isVisible() || event->mouseType() != TuiMouseEvent::Press)
         return;
 
     const QRect geo = geometry();

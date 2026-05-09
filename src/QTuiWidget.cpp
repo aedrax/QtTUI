@@ -72,12 +72,83 @@ void QTuiWidget::setVisible(bool visible)
     if (visible) {
         // Becoming visible: mark dirty so the widget gets painted on next render pass
         markDirty();
+        if (m_isPopup) {
+            // Remember who had focus so it can be restored when the popup
+            // closes. Openers call setFocus() after setVisible(true), so the
+            // previously focused widget is still current at this point.
+            QTuiWidget *focused = focusWidget();
+            if (focused && !isAncestorOf(focused))
+                m_focusBeforePopup = focused;
+        }
     } else if (wasVisible) {
         // Becoming hidden: mark dirty so the area is cleared on next render pass
         markDirty();
+        if (m_isPopup) {
+            // Popup closing: hand focus back to the widget that was focused
+            // before it opened, but only if focus is still inside the popup.
+            QTuiWidget *focused = focusWidget();
+            if (focused && isAncestorOf(focused)) {
+                if (m_focusBeforePopup && m_focusBeforePopup->isVisible())
+                    m_focusBeforePopup->setFocus();
+                else
+                    setFocusWidget(nullptr);
+            }
+            m_focusBeforePopup.clear();
+        }
     }
 
     emit visibilityChanged(m_visible);
+}
+
+bool QTuiWidget::isEnabled() const
+{
+    return m_enabled;
+}
+
+void QTuiWidget::setEnabled(bool enabled)
+{
+    if (m_enabled == enabled)
+        return;
+
+    m_enabled = enabled;
+
+    // A widget that contains the focus and becomes (effectively) disabled
+    // must release it: keys would otherwise keep flowing to a dead widget.
+    if (!enabled) {
+        QTuiWidget *focused = focusWidget();
+        if (focused && (focused == this || isAncestorOf(focused)))
+            setFocusWidget(nullptr);
+    }
+
+    // Repaint the whole subtree: children pick up the effective state through
+    // isEffectivelyEnabled() when they repaint, and dirtying our geometry
+    // covers theirs (children render inside the parent rect).
+    markDirty();
+    emit enabledChanged(m_enabled);
+}
+
+bool QTuiWidget::isEffectivelyEnabled() const
+{
+    for (const QTuiWidget *w = this; w; w = w->parentWidget()) {
+        if (!w->m_enabled)
+            return false;
+    }
+    return true;
+}
+
+Qt::FocusPolicy QTuiWidget::focusPolicy() const
+{
+    return m_focusPolicy;
+}
+
+void QTuiWidget::setFocusPolicy(Qt::FocusPolicy policy)
+{
+    m_focusPolicy = policy;
+}
+
+bool QTuiWidget::acceptsTextInput() const
+{
+    return false;
 }
 
 bool QTuiWidget::hasFocus() const
@@ -87,7 +158,43 @@ bool QTuiWidget::hasFocus() const
 
 void QTuiWidget::setFocus()
 {
+    if (m_focusPolicy == Qt::NoFocus)
+        return;
     setFocusWidget(this);
+}
+
+QTuiWidget *QTuiWidget::focusWidget()
+{
+    return s_focusWidget;
+}
+
+QPoint QTuiWidget::terminalCursorPos() const
+{
+    return QPoint(-1, -1);
+}
+
+bool QTuiWidget::isPopup() const
+{
+    return m_isPopup;
+}
+
+void QTuiWidget::setPopup(bool popup)
+{
+    m_isPopup = popup;
+}
+
+void QTuiWidget::popupOutsideClick()
+{
+    setVisible(false);
+}
+
+bool QTuiWidget::isAncestorOf(const QTuiWidget *child) const
+{
+    for (const QTuiWidget *w = child; w; w = w->parentWidget()) {
+        if (w == this)
+            return true;
+    }
+    return false;
 }
 
 void QTuiWidget::setFocusWidget(QTuiWidget *widget)
@@ -167,7 +274,7 @@ void QTuiWidget::clearBackground(ScreenBuffer &buffer, const QRect &clipRect)
     for (int row = clearArea.y(); row < clearArea.y() + clearArea.height(); ++row) {
         for (int col = clearArea.x(); col < clearArea.x() + clearArea.width(); ++col) {
             Cell &cell = buffer.backCell(col, row);
-            cell.character = QLatin1Char(' ');
+            cell.setChar(U' ');
             cell.foreground = theme.foreground;
             cell.background = theme.background;
             cell.bold = false;
@@ -195,7 +302,7 @@ void QTuiWidget::clearBackground(ScreenBuffer &buffer, const QRect &clipRect)
                 // Only clear cells that are NOT in the new geometry
                 if (!geo.contains(col, row)) {
                     Cell &cell = buffer.backCell(col, row);
-                    cell.character = QLatin1Char(' ');
+                    cell.setChar(U' ');
                     cell.foreground = parentTheme.foreground;
                     cell.background = parentTheme.background;
                     cell.bold = false;
@@ -211,6 +318,13 @@ void QTuiWidget::clearBackground(ScreenBuffer &buffer, const QRect &clipRect)
 
 bool QTuiWidget::event(QEvent *event)
 {
+    // Effectively-disabled widgets are inert: key and mouse events are
+    // consumed without reaching the handlers (resize events still apply).
+    const bool interactive = event->type() == TuiEventTypes::keyEventType()
+        || event->type() == TuiEventTypes::mouseEventType();
+    if (interactive && !isEffectivelyEnabled())
+        return true;
+
     if (event->type() == TuiEventTypes::keyEventType()) {
         keyPressEvent(static_cast<TuiKeyEvent *>(event));
         return true;

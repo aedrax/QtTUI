@@ -6,9 +6,177 @@
 
 namespace QtTUI {
 
+// Internal dropdown list for QTuiComboBox. A popup child of the combo, so the
+// item list paints in the topmost pass (above sibling widgets, escaping any
+// parent clip rect) and receives its own key/mouse events while open. Key
+// handling is forwarded back to the combo so keyboard behavior is identical
+// whether events arrive here (real pipeline: the popup has focus) or at the
+// combo directly (tests, programmatic dispatch).
+class QTuiComboBoxPopup : public QTuiWidget {
+    Q_OBJECT
+public:
+    explicit QTuiComboBoxPopup(QTuiComboBox *combo)
+        : QTuiWidget(combo)
+        , m_combo(combo)
+    {
+        setFocusPolicy(Qt::StrongFocus); // receives focus while open
+        setPopup(true);
+        setVisible(false);
+    }
+
+    void paintEvent(ScreenBuffer &buffer) override;
+
+    // Clicking outside closes through the combo so m_dropdownOpen stays in sync
+    void popupOutsideClick() override
+    {
+        m_combo->closeDropdown();
+    }
+
+protected:
+    void keyPressEvent(TuiKeyEvent *event) override
+    {
+        m_combo->keyPressEvent(event);
+    }
+
+    void mousePressEvent(TuiMouseEvent *event) override;
+
+private:
+    QTuiComboBox *m_combo;
+};
+
+void QTuiComboBoxPopup::paintEvent(ScreenBuffer &buffer)
+{
+    const QRect geo = geometry();
+    if (!isVisible() || geo.isEmpty())
+        return;
+
+    const auto theme = m_combo->themeProperties();
+    const auto border = Theme_Engine::borderChars(theme.borderStyle);
+
+    // Match the combo body's colors: while the dropdown is open it holds the
+    // focus, so the pair reads as one focused control.
+    Color fg = theme.foreground;
+    Color bg = theme.background;
+    if (hasFocus() || m_combo->hasFocus()) {
+        fg = theme.focusForeground;
+        bg = theme.focusBackground;
+    }
+
+    const int gx = geo.x();
+    const int gy = geo.y();
+    const int gw = geo.width();
+    const int gh = geo.height();
+
+    // Clear the popup area
+    for (int row = 0; row < gh; ++row) {
+        for (int col = 0; col < gw; ++col) {
+            int px = gx + col;
+            int py = gy + row;
+            if (px < buffer.width() && py < buffer.height()) {
+                Cell &cell = buffer.backCell(px, py);
+                cell.setChar(U' ');
+                cell.foreground = fg;
+                cell.background = bg;
+                cell.bold = false;
+                cell.italic = false;
+                cell.underline = false;
+            }
+        }
+    }
+
+    // Top row: separator joining the combo body above (replaces its bottom border)
+    if (gy < buffer.height()) {
+        for (int col = 0; col < gw && (gx + col) < buffer.width(); ++col) {
+            Cell &cell = buffer.backCell(gx + col, gy);
+            if (col == 0 || col == gw - 1)
+                cell.setChar(border.vertical);
+            else
+                cell.setChar(border.horizontal);
+            cell.foreground = fg;
+            cell.background = bg;
+        }
+    }
+
+    // Item rows between the separator and the bottom border
+    const int innerWidth = gw - 2;
+    const QStringList &items = m_combo->m_items;
+    for (int i = 0; i < items.size(); ++i) {
+        int rowY = gy + 1 + i;
+        if (rowY >= buffer.height() || rowY >= gy + gh - 1)
+            break;
+
+        // Left/right borders
+        if (gx < buffer.width()) {
+            Cell &cell = buffer.backCell(gx, rowY);
+            cell.setChar(border.vertical);
+            cell.foreground = fg;
+            cell.background = bg;
+        }
+        int rx = gx + gw - 1;
+        if (rx < buffer.width()) {
+            Cell &cell = buffer.backCell(rx, rowY);
+            cell.setChar(border.vertical);
+            cell.foreground = fg;
+            cell.background = bg;
+        }
+
+        bool highlighted = (i == m_combo->m_dropdownHighlight);
+        Color itemFg = highlighted ? bg : fg;
+        Color itemBg = highlighted ? fg : bg;
+
+        QString itemStr = items.at(i).left(innerWidth);
+        for (int col = 0; col < innerWidth; ++col) {
+            int px = gx + 1 + col;
+            if (px >= buffer.width())
+                break;
+            Cell &cell = buffer.backCell(px, rowY);
+            cell.setChar(col < itemStr.length() ? itemStr.at(col).unicode() : u' ');
+            cell.foreground = itemFg;
+            cell.background = itemBg;
+            cell.bold = highlighted;
+        }
+    }
+
+    // Bottom border
+    int bottomY = gy + gh - 1;
+    if (bottomY > gy && bottomY < buffer.height()) {
+        for (int col = 0; col < gw && (gx + col) < buffer.width(); ++col) {
+            Cell &cell = buffer.backCell(gx + col, bottomY);
+            if (col == 0)
+                cell.setChar(border.bottomLeft);
+            else if (col == gw - 1)
+                cell.setChar(border.bottomRight);
+            else
+                cell.setChar(border.horizontal);
+            cell.foreground = fg;
+            cell.background = bg;
+        }
+    }
+}
+
+void QTuiComboBoxPopup::mousePressEvent(TuiMouseEvent *event)
+{
+    if (!isVisible() || event->mouseType() != TuiMouseEvent::Press)
+        return;
+
+    // Items are rendered one per row starting at geometry().y() + 1 (row 0 is
+    // the separator joining the combo body). Clicks on border rows are ignored.
+    int itemIdx = event->y() - geometry().y() - 1;
+    if (itemIdx >= 0 && itemIdx < m_combo->m_items.size()) {
+        m_combo->setCurrentIndex(itemIdx);
+        m_combo->closeDropdown();
+    }
+}
+
 QTuiComboBox::QTuiComboBox(QTuiWidget *parent)
     : QTuiWidget(parent)
 {
+    setFocusPolicy(Qt::StrongFocus);
+    // Hiding the combo must not leave its dropdown popup floating on screen
+    connect(this, &QTuiWidget::visibilityChanged, this, [this](bool visible) {
+        if (!visible)
+            closeDropdown();
+    });
 }
 
 void QTuiComboBox::addItem(const QString &text)
@@ -70,7 +238,7 @@ void QTuiComboBox::clear()
         emit currentIndexChanged(-1);
         emit currentTextChanged(QString());
     }
-    m_dropdownOpen = false;
+    closeDropdown();
     m_dropdownHighlight = 0;
 }
 
@@ -173,13 +341,30 @@ void QTuiComboBox::openDropdown()
 {
     if (m_items.isEmpty())
         return;
+    if (!m_popup)
+        m_popup = new QTuiComboBoxPopup(this);
     m_dropdownOpen = true;
     m_dropdownHighlight = qMax(0, m_currentIndex);
+
+    // List box directly below the combo body: a separator row, the items, and
+    // a bottom border. The separator overlaps the combo's bottom-border row so
+    // the two read as one box. As a popup it paints in the topmost pass, above
+    // any sibling widgets.
+    const QRect geo = geometry();
+    m_popup->setGeometry(QRect(geo.x(), geo.y() + 2, geo.width(), m_items.size() + 2));
+    m_popup->setVisible(true);
+    m_popup->setFocus();
+    markDirty(); // indicator flips to ▲
 }
 
 void QTuiComboBox::closeDropdown()
 {
+    if (!m_dropdownOpen)
+        return;
     m_dropdownOpen = false;
+    if (m_popup)
+        m_popup->setVisible(false); // popup focus-restore hands focus back to the combo
+    markDirty(); // indicator flips to ▼, bottom border repaints
 }
 
 QSize QTuiComboBox::minimumSize() const
@@ -189,12 +374,10 @@ QSize QTuiComboBox::minimumSize() const
     for (const auto &item : m_items) {
         maxTextWidth = qMax(maxTextWidth, static_cast<int>(item.length()));
     }
-    // Content: text + " ▼" indicator + borders + padding
+    // Content: text + " ▼" indicator + borders + padding. The open dropdown
+    // is a separate popup widget and does not affect the combo's own size.
     int width = maxTextWidth + 4 + 2; // 2 for " ▼", 2 for borders, 2 for padding
     int height = 3; // top border + content row + bottom border
-    if (m_dropdownOpen && !m_items.isEmpty()) {
-        height += m_items.size(); // dropdown rows
-    }
     return QSize(width, height);
 }
 
@@ -212,24 +395,26 @@ void QTuiComboBox::paintEvent(ScreenBuffer &buffer)
     const int geoW = geo.width();
     const int geoH = geo.height();
 
-    // Determine colors based on focus state
+    // Determine colors based on focus state. While the dropdown popup is open
+    // it holds the focus, so treat the combo body as focused too.
     Color fg = theme.foreground;
     Color bg = theme.background;
 
-    if (hasFocus()) {
+    const bool focused = hasFocus() || m_dropdownOpen;
+    if (focused) {
         fg = theme.focusForeground;
         bg = theme.focusBackground;
     }
 
-    // Clear the entire widget area with background
-    int totalH = m_dropdownOpen ? geoH : qMin(geoH, 3);
+    // Clear the combo body (3 rows: border, content, border)
+    int totalH = qMin(geoH, 3);
     for (int row = 0; row < totalH; ++row) {
         for (int col = 0; col < geoW; ++col) {
             int px = geoX + col;
             int py = geoY + row;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = theme.bold;
@@ -247,51 +432,33 @@ void QTuiComboBox::paintEvent(ScreenBuffer &buffer)
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
                 if (col == 0)
-                    cell.character = border.topLeft;
+                    cell.setChar(border.topLeft);
                 else if (col == geoW - 1)
-                    cell.character = border.topRight;
+                    cell.setChar(border.topRight);
                 else
-                    cell.character = border.horizontal;
+                    cell.setChar(border.horizontal);
                 cell.foreground = fg;
                 cell.background = bg;
             }
         }
     }
 
-    // Render bottom border of the main combo area (row 2)
+    // Render bottom border of the combo body (row 2). When the dropdown popup
+    // is open, its top separator row paints over this in the topmost pass.
     if (geoH >= 3) {
         int py = geoY + 2;
-        // If dropdown is open, this becomes a separator, not bottom border
-        if (!m_dropdownOpen) {
-            for (int col = 0; col < geoW; ++col) {
-                int px = geoX + col;
-                if (px < buffer.width() && py < buffer.height()) {
-                    Cell &cell = buffer.backCell(px, py);
-                    if (col == 0)
-                        cell.character = border.bottomLeft;
-                    else if (col == geoW - 1)
-                        cell.character = border.bottomRight;
-                    else
-                        cell.character = border.horizontal;
-                    cell.foreground = fg;
-                    cell.background = bg;
-                }
-            }
-        } else {
-            // Separator between combo display and dropdown
-            for (int col = 0; col < geoW; ++col) {
-                int px = geoX + col;
-                if (px < buffer.width() && py < buffer.height()) {
-                    Cell &cell = buffer.backCell(px, py);
-                    if (col == 0)
-                        cell.character = border.vertical;
-                    else if (col == geoW - 1)
-                        cell.character = border.vertical;
-                    else
-                        cell.character = border.horizontal;
-                    cell.foreground = fg;
-                    cell.background = bg;
-                }
+        for (int col = 0; col < geoW; ++col) {
+            int px = geoX + col;
+            if (px < buffer.width() && py < buffer.height()) {
+                Cell &cell = buffer.backCell(px, py);
+                if (col == 0)
+                    cell.setChar(border.bottomLeft);
+                else if (col == geoW - 1)
+                    cell.setChar(border.bottomRight);
+                else
+                    cell.setChar(border.horizontal);
+                cell.foreground = fg;
+                cell.background = bg;
             }
         }
     }
@@ -302,13 +469,13 @@ void QTuiComboBox::paintEvent(ScreenBuffer &buffer)
         if (py < buffer.height()) {
             int pxLeft = geoX;
             if (pxLeft < buffer.width()) {
-                buffer.backCell(pxLeft, py).character = border.vertical;
+                buffer.backCell(pxLeft, py).setChar(border.vertical);
                 buffer.backCell(pxLeft, py).foreground = fg;
                 buffer.backCell(pxLeft, py).background = bg;
             }
             int pxRight = geoX + geoW - 1;
             if (pxRight < buffer.width()) {
-                buffer.backCell(pxRight, py).character = border.vertical;
+                buffer.backCell(pxRight, py).setChar(border.vertical);
                 buffer.backCell(pxRight, py).foreground = fg;
                 buffer.backCell(pxRight, py).background = bg;
             }
@@ -332,89 +499,26 @@ void QTuiComboBox::paintEvent(ScreenBuffer &buffer)
             int py = contentRow;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = truncated.at(i);
+                cell.setChar(truncated.at(i).unicode());
                 cell.foreground = fg;
                 cell.background = bg;
-                cell.bold = theme.bold || hasFocus();
+                cell.bold = theme.bold || focused;
             }
         }
 
         // Write dropdown indicator at the right end
-        QChar indicator = m_dropdownOpen ? QChar(0x25B2) : QChar(0x25BC); // ▲ or ▼
+        const char32_t indicator = m_dropdownOpen ? char32_t(0x25B2) : char32_t(0x25BC); // ▲ or ▼
         int indicatorPos = geoX + geoW - 2;
         if (indicatorPos > geoX && indicatorPos < buffer.width() && contentRow < buffer.height()) {
             Cell &cell = buffer.backCell(indicatorPos, contentRow);
-            cell.character = indicator;
+            cell.setChar(indicator);
             cell.foreground = fg;
             cell.background = bg;
         }
     }
 
-    // Render dropdown items if open
-    if (m_dropdownOpen && geoH >= 3 && geoW >= 3) {
-        int innerWidth = geoW - 2;
-
-        for (int i = 0; i < m_items.size(); ++i) {
-            int rowY = geoY + 3 + i;
-            if (rowY >= buffer.height())
-                break;
-
-            // Left/right borders for dropdown rows
-            if (geoX < buffer.width()) {
-                buffer.backCell(geoX, rowY).character = border.vertical;
-                buffer.backCell(geoX, rowY).foreground = fg;
-                buffer.backCell(geoX, rowY).background = bg;
-            }
-            int pxRight = geoX + geoW - 1;
-            if (pxRight < buffer.width()) {
-                buffer.backCell(pxRight, rowY).character = border.vertical;
-                buffer.backCell(pxRight, rowY).foreground = fg;
-                buffer.backCell(pxRight, rowY).background = bg;
-            }
-
-            // Highlight the currently navigated item
-            Color itemFg = fg;
-            Color itemBg = bg;
-            bool isHighlighted = (i == m_dropdownHighlight);
-            if (isHighlighted) {
-                // Swap fg/bg for highlight
-                itemFg = bg;
-                itemBg = fg;
-            }
-
-            // Clear and write item text
-            QString itemStr = m_items.at(i).left(innerWidth);
-            for (int col = 0; col < innerWidth; ++col) {
-                int px = geoX + 1 + col;
-                if (px < buffer.width() && rowY < buffer.height()) {
-                    Cell &cell = buffer.backCell(px, rowY);
-                    cell.character = col < itemStr.length() ? itemStr.at(col) : QLatin1Char(' ');
-                    cell.foreground = itemFg;
-                    cell.background = itemBg;
-                    cell.bold = isHighlighted;
-                }
-            }
-        }
-
-        // Bottom border of dropdown
-        int bottomRow = geoY + 3 + m_items.size();
-        if (bottomRow < buffer.height()) {
-            for (int col = 0; col < geoW; ++col) {
-                int px = geoX + col;
-                if (px < buffer.width()) {
-                    Cell &cell = buffer.backCell(px, bottomRow);
-                    if (col == 0)
-                        cell.character = border.bottomLeft;
-                    else if (col == geoW - 1)
-                        cell.character = border.bottomRight;
-                    else
-                        cell.character = border.horizontal;
-                    cell.foreground = fg;
-                    cell.background = bg;
-                }
-            }
-        }
-    }
+    // The open item list is rendered by the QTuiComboBoxPopup popup child in
+    // the scheduler's topmost pass, not here.
 }
 
 void QTuiComboBox::keyPressEvent(TuiKeyEvent *event)
@@ -422,13 +526,20 @@ void QTuiComboBox::keyPressEvent(TuiKeyEvent *event)
     const int key = event->key();
 
     if (m_dropdownOpen) {
-        // Dropdown is open: navigate or select
+        // Dropdown is open: navigate or select. The highlight is rendered by
+        // the popup, so navigation dirties the popup rather than the combo.
         if (key == Qt::Key_Up) {
-            if (m_dropdownHighlight > 0)
+            if (m_dropdownHighlight > 0) {
                 m_dropdownHighlight--;
+                if (m_popup)
+                    m_popup->markDirty();
+            }
         } else if (key == Qt::Key_Down) {
-            if (m_dropdownHighlight < m_items.size() - 1)
+            if (m_dropdownHighlight < m_items.size() - 1) {
                 m_dropdownHighlight++;
+                if (m_popup)
+                    m_popup->markDirty();
+            }
         } else if (key == Qt::Key_Return || key == Qt::Key_Enter) {
             // Select highlighted item and close
             setCurrentIndex(m_dropdownHighlight);
@@ -454,11 +565,13 @@ void QTuiComboBox::keyPressEvent(TuiKeyEvent *event)
             if (ch.isPrint()) {
                 m_editText.append(ch);
                 emit currentTextChanged(m_editText);
+                markDirty();
             }
         } else if (m_editable && key == Qt::Key_Backspace) {
             if (!m_editText.isEmpty()) {
                 m_editText.chop(1);
                 emit currentTextChanged(m_editText);
+                markDirty();
             }
         }
     }
@@ -469,22 +582,16 @@ void QTuiComboBox::mousePressEvent(TuiMouseEvent *event)
     if (event->mouseType() != TuiMouseEvent::Press)
         return;
 
-    const QRect geo = geometry();
-
-    if (!m_dropdownOpen) {
+    // A click on the combo body toggles the dropdown. Clicks on the open item
+    // list are handled by QTuiComboBoxPopup; while the dropdown is open, real
+    // clicks elsewhere are consumed as outside-clicks by QTuiMainWindow before
+    // reaching us, so the close branch only serves direct event dispatch.
+    if (!m_dropdownOpen)
         openDropdown();
-    } else {
-        // Dropdown is open - check if click is in the dropdown area
-        // Dropdown items start at geo.y() + 3
-        int itemIdx = event->y() - geo.y() - 3;
-        if (itemIdx >= 0 && itemIdx < m_items.size()) {
-            setCurrentIndex(itemIdx);
-            closeDropdown();
-        } else {
-            closeDropdown();
-        }
-    }
-    markDirty();
+    else
+        closeDropdown();
 }
 
 } // namespace QtTUI
+
+#include "QTuiComboBox.moc"

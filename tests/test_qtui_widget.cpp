@@ -5,11 +5,16 @@
 
 using namespace QtTUI;
 
-// Concrete test widget since QTuiWidget is abstract
+// Concrete test widget since QTuiWidget is abstract. StrongFocus: these
+// tests exercise focus transfer, and plain widgets default to Qt::NoFocus
+// (whose setFocus() is a no-op).
 class TestWidget : public QTuiWidget {
     Q_OBJECT
 public:
-    explicit TestWidget(QTuiWidget *parent = nullptr) : QTuiWidget(parent) {}
+    explicit TestWidget(QTuiWidget *parent = nullptr) : QTuiWidget(parent)
+    {
+        setFocusPolicy(Qt::StrongFocus);
+    }
     void paintEvent(ScreenBuffer & /*buffer*/) override {}
 };
 

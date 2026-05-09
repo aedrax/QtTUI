@@ -9,14 +9,13 @@ namespace QtTUI {
 QTuiMenuBar::QTuiMenuBar(QTuiWidget *parent)
     : QTuiWidget(parent)
 {
+    setFocusPolicy(Qt::StrongFocus);
 }
 
 QTuiMenu *QTuiMenuBar::addMenu(const QString &title)
 {
     auto *menu = new QTuiMenu(title, this);
-    m_menus.append(menu);
-    if (m_activeMenuIndex < 0 && !m_menus.isEmpty())
-        m_activeMenuIndex = 0;
+    registerMenu(menu);
     return menu;
 }
 
@@ -24,9 +23,27 @@ void QTuiMenuBar::addMenu(QTuiMenu *menu)
 {
     if (!menu)
         return;
+    registerMenu(menu);
+}
+
+void QTuiMenuBar::registerMenu(QTuiMenu *menu)
+{
     m_menus.append(menu);
     if (m_activeMenuIndex < 0 && !m_menus.isEmpty())
         m_activeMenuIndex = 0;
+
+    // Keep m_menuOpen in sync when the menu closes itself (Escape inside the
+    // menu, action trigger, outside click) instead of through closeCurrentMenu()
+    connect(menu, &QTuiWidget::visibilityChanged, this, [this, menu](bool visible) {
+        if (!visible && m_menuOpen && m_activeMenuIndex >= 0
+            && m_activeMenuIndex < m_menus.size()
+            && m_menus.at(m_activeMenuIndex) == menu) {
+            m_menuOpen = false;
+            markDirty();
+        }
+    });
+
+    markDirty();
 }
 
 QList<QTuiMenu *> QTuiMenuBar::menus() const
@@ -43,23 +60,38 @@ void QTuiMenuBar::openMenu(int index)
     m_activeMenuIndex = index;
     m_menuOpen = true;
 
-    // Calculate position below the menu title
+    // Calculate position below the menu title. Widths must match paintEvent(),
+    // which strips '&' mnemonic markers from the painted titles.
     QRect geo = geometry();
     int xOffset = 0;
     for (int i = 0; i < index; ++i) {
-        xOffset += m_menus.at(i)->title().length() + 2; // title + padding
+        QString displayTitle = m_menus.at(i)->title();
+        displayTitle.remove(QLatin1Char('&'));
+        xOffset += displayTitle.length() + 2; // title + padding
     }
 
     QPoint pos(geo.x() + xOffset, geo.y() + 1);
     m_menus.at(index)->popup(pos);
+    markDirty();
 }
 
 void QTuiMenuBar::closeCurrentMenu()
 {
     if (m_menuOpen && m_activeMenuIndex >= 0 && m_activeMenuIndex < m_menus.size()) {
         m_menus.at(m_activeMenuIndex)->close();
+        markDirty();
     }
     m_menuOpen = false;
+}
+
+bool QTuiMenuBar::triggerMnemonic(QChar ch)
+{
+    const int idx = findMnemonicIndex(ch);
+    if (idx < 0)
+        return false;
+    m_activeMenuIndex = idx;
+    openMenu(idx);
+    return true;
 }
 
 int QTuiMenuBar::findMnemonicIndex(QChar ch) const
@@ -107,7 +139,7 @@ void QTuiMenuBar::paintEvent(ScreenBuffer &buffer)
         int py = geo.y();
         if (py < buffer.height()) {
             Cell &cell = buffer.backCell(px, py);
-            cell.character = QLatin1Char(' ');
+            cell.setChar(U' ');
             cell.foreground = fg;
             cell.background = bg;
             cell.bold = false;
@@ -133,7 +165,7 @@ void QTuiMenuBar::paintEvent(ScreenBuffer &buffer)
         // Leading space
         if (xPos < buffer.width()) {
             Cell &cell = buffer.backCell(xPos, py);
-            cell.character = QLatin1Char(' ');
+            cell.setChar(U' ');
             cell.foreground = titleFg;
             cell.background = titleBg;
         }
@@ -143,7 +175,7 @@ void QTuiMenuBar::paintEvent(ScreenBuffer &buffer)
         for (int c = 0; c < displayTitle.length(); ++c) {
             if (xPos < buffer.width()) {
                 Cell &cell = buffer.backCell(xPos, py);
-                cell.character = displayTitle.at(c);
+                cell.setChar(displayTitle.at(c).unicode());
                 cell.foreground = titleFg;
                 cell.background = titleBg;
                 cell.bold = isActive;
@@ -154,7 +186,7 @@ void QTuiMenuBar::paintEvent(ScreenBuffer &buffer)
         // Trailing space
         if (xPos < buffer.width()) {
             Cell &cell = buffer.backCell(xPos, py);
-            cell.character = QLatin1Char(' ');
+            cell.setChar(U' ');
             cell.foreground = titleFg;
             cell.background = titleBg;
         }
@@ -179,6 +211,7 @@ void QTuiMenuBar::keyPressEvent(TuiKeyEvent *event)
             openMenu(newIndex);
         } else {
             m_activeMenuIndex = newIndex;
+            markDirty();
         }
     } else if (key == Qt::Key_Right) {
         if (m_menus.isEmpty())
@@ -192,6 +225,7 @@ void QTuiMenuBar::keyPressEvent(TuiKeyEvent *event)
             openMenu(newIndex);
         } else {
             m_activeMenuIndex = newIndex;
+            markDirty();
         }
     } else if (key == Qt::Key_Return || key == Qt::Key_Enter || key == Qt::Key_Down) {
         if (!m_menuOpen && m_activeMenuIndex >= 0) {
@@ -204,13 +238,8 @@ void QTuiMenuBar::keyPressEvent(TuiKeyEvent *event)
     } else if (mods & Qt::AltModifier) {
         // Alt+letter mnemonic activation
         QString text = event->text();
-        if (!text.isEmpty()) {
-            int idx = findMnemonicIndex(text.at(0));
-            if (idx >= 0) {
-                m_activeMenuIndex = idx;
-                openMenu(idx);
-            }
-        }
+        if (!text.isEmpty())
+            triggerMnemonic(text.at(0));
     }
 }
 

@@ -57,11 +57,11 @@ private slots:
                 // Snapshot the front buffer BEFORE scheduling.
                 // After exactly one render pass, swapBuffers() copies back→front.
                 // We mark a sentinel in the back buffer so we can detect the swap.
-                const QChar sentinel('S');
-                buf->backCell(0, 0).character = sentinel;
+                const char32_t sentinel = U'S';
+                buf->backCell(0, 0).setChar(sentinel);
 
                 // Ensure front buffer does NOT have the sentinel yet.
-                RC_ASSERT(buf->frontCell(0, 0).character != sentinel);
+                RC_ASSERT(buf->frontCell(0, 0).ch != sentinel);
 
                 // --- Call scheduleDirtyRegion() N times in the same tick ---
                 for (int i = 0; i < N; ++i) {
@@ -84,19 +84,19 @@ private slots:
                 // --- Verify exactly ONE render pass occurred ---
                 // After one swapBuffers(), the sentinel should now be in the
                 // front buffer.
-                RC_ASSERT(buf->frontCell(0, 0).character == sentinel);
+                RC_ASSERT(buf->frontCell(0, 0).ch == sentinel);
 
                 // Write a second sentinel to the back buffer.
-                const QChar sentinel2('T');
-                buf->backCell(0, 0).character = sentinel2;
+                const char32_t sentinel2 = U'T';
+                buf->backCell(0, 0).setChar(sentinel2);
 
                 // Process events again, no additional render should fire.
                 QCoreApplication::processEvents();
 
                 // The second sentinel should NOT have been swapped to front,
                 // proving no extra render pass occurred.
-                RC_ASSERT(buf->frontCell(0, 0).character == sentinel);
-                RC_ASSERT(buf->frontCell(0, 0).character != sentinel2);
+                RC_ASSERT(buf->frontCell(0, 0).ch == sentinel);
+                RC_ASSERT(buf->frontCell(0, 0).ch != sentinel2);
 
                 // Scheduler should still have no pending render.
                 RC_ASSERT(!scheduler->hasPendingRender());
@@ -282,8 +282,8 @@ private slots:
 
         // Processing events should not trigger another render.
         ScreenBuffer *buf = app.screenBuffer();
-        const QChar sentinel('X');
-        buf->backCell(0, 0).character = sentinel;
+        const char32_t sentinel = U'X';
+        buf->backCell(0, 0).setChar(sentinel);
 
         QCoreApplication::processEvents();
 

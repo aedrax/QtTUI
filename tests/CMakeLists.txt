@@ -176,6 +176,13 @@ qttui_add_test(test_clip_rect test_clip_rect.cpp)
 # Widget background clearing property tests (Properties 22, 23, 24)
 qttui_add_test(test_widget_clearing test_widget_clearing.cpp)
 
+# Hidden-widget compositing regression tests (content restored under hidden overlays)
+qttui_add_test(test_hidden_widget_restore test_hidden_widget_restore.cpp)
+
+# Popup layer tests: menus/dropdowns render topmost above parent clip rects,
+# outside-click dismissal, focus restore (popup-overlay-layer)
+qttui_add_test(test_popup_rendering test_popup_rendering.cpp)
+
 # Layout invalidation property tests (Properties 6, 7, 8)
 qttui_add_test(test_layout_invalidation test_layout_invalidation.cpp)
 
@@ -206,6 +213,10 @@ qttui_add_test(test_dirty_tracking_bugs test_dirty_tracking_bugs.cpp)
 # Preservation property tests: dirty-tracking behavior unchanged (rendering-dirty-tracking-fixes spec)
 qttui_add_test(test_dirty_tracking_preservation test_dirty_tracking_preservation.cpp)
 
+# Lifetime regression tests: deleting widgets/models still referenced by
+# layouts, views, main window caches, or theme overrides must not dangle
+qttui_add_test(test_lifetime test_lifetime.cpp)
+
 # QTuiApplication error-handling tests (terminalInitialized(), message
 # handler not installed in headless environments)
 qttui_add_test(test_qtui_application test_qtui_application.cpp)
@@ -214,3 +225,11 @@ qttui_add_test(test_qtui_application test_qtui_application.cpp)
 add_executable(test_initial_render test_initial_render.cpp)
 target_link_libraries(test_initial_render PRIVATE QtTUI::QtTUI Qt6::Core)
 add_test(NAME test_initial_render COMMAND test_initial_render)
+
+# Global shortcut dispatch tests: QTuiKeySequence parsing, QTuiAction
+# registry, main-window shortcut/mnemonic dispatch (backlog #9)
+qttui_add_test(test_shortcut_dispatch test_shortcut_dispatch.cpp)
+
+# Enabled state + focus policy tests: disabled widgets are inert, Tab chain
+# and mouse focus honor focusPolicy, group box disables children (backlog #12)
+qttui_add_test(test_enabled_focuspolicy test_enabled_focuspolicy.cpp)

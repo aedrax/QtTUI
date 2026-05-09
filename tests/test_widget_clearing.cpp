@@ -39,7 +39,7 @@ public:
         // Then write content character to the first cell only
         if (!geo.isEmpty() && geo.x() < buffer.width() && geo.y() < buffer.height()) {
             Cell &cell = buffer.backCell(geo.x(), geo.y());
-            cell.character = contentChar;
+            cell.setChar(contentChar.unicode());
         }
     }
 };
@@ -65,7 +65,7 @@ public:
             for (int col = geo.x(); col < geo.x() + geo.width(); ++col) {
                 if (col >= 0 && col < buffer.width() && row >= 0 && row < buffer.height()) {
                     Cell &cell = buffer.backCell(col, row);
-                    cell.character = QLatin1Char(' ');
+                    cell.setChar(U' ');
                     cell.foreground = theme.foreground;
                     cell.background = theme.background;
                 }
@@ -112,7 +112,7 @@ private slots:
                 for (int row = y; row < y + h && row < buf->height(); ++row) {
                     for (int col = x; col < x + w && col < buf->width(); ++col) {
                         Cell &cell = buf->backCell(col, row);
-                        cell.character = QLatin1Char('Z');
+                        cell.setChar(U'Z');
                         cell.foreground = Color(255, 0, 0);
                         cell.background = Color(0, 255, 0);
                     }
@@ -132,10 +132,10 @@ private slots:
                         const Cell &cell = buf->backCell(col, row);
                         if (col == geo.x() && row == geo.y()) {
                             // First cell has the content character
-                            RC_ASSERT(cell.character == widget->contentChar);
+                            RC_ASSERT(cell.ch == widget->contentChar.unicode());
                         } else {
                             // All other cells should be cleared to theme background
-                            RC_ASSERT(cell.character == QLatin1Char(' '));
+                            RC_ASSERT(cell.ch == U' ');
                             RC_ASSERT(cell.background == theme.background);
                             RC_ASSERT(cell.foreground == theme.foreground);
                         }
@@ -201,7 +201,7 @@ private slots:
                     for (int col = oldGeo.x(); col < oldGeo.x() + oldGeo.width() && col < buf->width(); ++col) {
                         if (!newGeo.contains(col, row)) {
                             const Cell &cell = buf->backCell(col, row);
-                            RC_ASSERT(cell.character == QLatin1Char(' '));
+                            RC_ASSERT(cell.ch == U' ');
                             RC_ASSERT(cell.background == parentTheme.background);
                         }
                     }
@@ -248,7 +248,7 @@ private slots:
                 // Verify the widget was painted (first cell has content char)
                 ScreenBuffer *buf = app.screenBuffer();
                 RC_PRE(x < buf->width() && y < buf->height());
-                RC_ASSERT(buf->backCell(x, y).character == widget->contentChar);
+                RC_ASSERT(buf->backCell(x, y).ch == widget->contentChar.unicode());
 
                 // Now hide the widget
                 widget->setVisible(false);
@@ -264,7 +264,7 @@ private slots:
                 for (int row = geo.y(); row < geo.y() + geo.height() && row < buf->height(); ++row) {
                     for (int col = geo.x(); col < geo.x() + geo.width() && col < buf->width(); ++col) {
                         const Cell &cell = buf->backCell(col, row);
-                        RC_ASSERT(cell.character == QLatin1Char(' '));
+                        RC_ASSERT(cell.ch == U' ');
                         RC_ASSERT(cell.background == parentTheme.background);
                     }
                 }
@@ -295,7 +295,7 @@ private slots:
         for (int row = 3; row < 7; ++row) {
             for (int col = 5; col < 15; ++col) {
                 Cell &cell = buf->backCell(col, row);
-                cell.character = QLatin1Char('G');
+                cell.setChar(U'G');
                 cell.foreground = Color(100, 100, 100);
                 cell.background = Color(200, 200, 200);
             }
@@ -311,9 +311,9 @@ private slots:
             for (int col = 5; col < 15; ++col) {
                 const Cell &cell = buf->backCell(col, row);
                 if (col == 5 && row == 3) {
-                    QCOMPARE(cell.character, widget->contentChar);
+                    QCOMPARE(cell.ch, char32_t(widget->contentChar.unicode()));
                 } else {
-                    QCOMPARE(cell.character, QLatin1Char(' '));
+                    QCOMPARE(cell.ch, U' ');
                     QVERIFY(cell.background == theme.background);
                     QVERIFY(cell.foreground == theme.foreground);
                 }

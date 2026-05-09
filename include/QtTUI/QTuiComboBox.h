@@ -10,6 +10,8 @@ class QAbstractItemModel;
 
 namespace QtTUI {
 
+class QTuiComboBoxPopup;
+
 class QTuiComboBox : public QTuiWidget {
     Q_OBJECT
     Q_PROPERTY(int currentIndex READ currentIndex WRITE setCurrentIndex NOTIFY currentIndexChanged)
@@ -37,6 +39,8 @@ public:
 
     void paintEvent(ScreenBuffer &buffer) override;
     QSize minimumSize() const override;
+    // Bare printable-key shortcuts must not fire while this widget has focus
+    bool acceptsTextInput() const override { return isEditable(); }
 
 signals:
     void currentIndexChanged(int index);
@@ -47,6 +51,9 @@ protected:
     void mousePressEvent(TuiMouseEvent *event) override;
 
 private:
+    // Internal popup widget that renders the open item list (QTuiComboBox.cpp)
+    friend class QTuiComboBoxPopup;
+
     void openDropdown();
     void closeDropdown();
     void syncItemsFromModel();
@@ -58,6 +65,7 @@ private:
     int m_dropdownHighlight = 0;
     QAbstractItemModel *m_model = nullptr;
     QString m_editText;
+    QTuiComboBoxPopup *m_popup = nullptr;
 };
 
 } // namespace QtTUI
