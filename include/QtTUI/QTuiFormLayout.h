@@ -23,6 +23,9 @@ public:
 
     int rowCount() const;
 
+    int count() const override;
+    QSize minimumSize() const override;
+
     void apply(const QRect &availableArea) override;
 
 private:
@@ -31,6 +34,9 @@ private:
         QTuiWidget *field;
         bool ownsLabel;
     };
+
+    void watchRowWidgets(const FormRow &row);
+
     QList<FormRow> m_rows;
 };
 

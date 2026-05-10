@@ -3,6 +3,7 @@
 
 #include <QtTUI/QtTUIGlobal.h>
 #include <QtTUI/QTuiSizePolicy.h>
+#include <QPointer>
 #include <QRect>
 #include <QSize>
 
@@ -47,7 +48,9 @@ public:
     QTuiWidget *widget() const;
 
 private:
-    QTuiWidget *m_widget;
+    // Guarded pointer: nulls automatically if the widget is destroyed while
+    // still referenced by a layout, so the null checks above stay valid.
+    QPointer<QTuiWidget> m_widget;
 };
 
 class QTuiSpacerItem : public QTuiLayoutItem {
@@ -87,7 +90,9 @@ public:
     QTuiLayout *layout() const;
 
 private:
-    QTuiLayout *m_layout;
+    // Guarded pointer: nulls automatically if the nested layout is destroyed
+    // while still referenced, so the null checks above stay valid.
+    QPointer<QTuiLayout> m_layout;
     QRect m_geometry;
 };
 

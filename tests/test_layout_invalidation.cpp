@@ -421,6 +421,99 @@ private slots:
                 }
             });
     }
+
+    // -----------------------------------------------------------------------
+    // Layout invalidation: structural changes re-apply the last applied rect
+    // on the next event-loop pass, so a widget added to a live layout gets
+    // geometry without waiting for a terminal resize.
+    // -----------------------------------------------------------------------
+    void widgetAddedToLiveLayoutGetsGeometry()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 80, 24));
+        mainWindow.setVisible(true);
+        app.setMainWindow(&mainWindow);
+
+        auto *layout = new QTuiBoxLayout(QTuiBoxLayout::TopToBottom, &mainWindow);
+        QTuiLabel label1(QStringLiteral("One"), &mainWindow);
+        layout->addWidget(&label1, 1);
+        layout->apply(QRect(0, 0, 80, 24));
+        QCOMPARE(label1.geometry(), QRect(0, 0, 80, 24));
+
+        // Add a second widget AFTER the layout has been applied
+        QTuiLabel label2(QStringLiteral("Two"), &mainWindow);
+        layout->addWidget(&label2, 1);
+        QVERIFY(label2.geometry().isEmpty()); // stale until the next pass
+
+        QTest::qWait(20); // let the coalesced invalidate pass run
+
+        QCOMPARE(label2.geometry(), QRect(0, 12, 80, 12));
+        QCOMPARE(label1.geometry(), QRect(0, 0, 80, 12));
+    }
+
+    // Removing a widget from a live layout redistributes on the next pass
+    void widgetRemovedFromLiveLayoutRedistributes()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 80, 24));
+        mainWindow.setVisible(true);
+        app.setMainWindow(&mainWindow);
+
+        auto *layout = new QTuiBoxLayout(QTuiBoxLayout::TopToBottom, &mainWindow);
+        QTuiLabel label1(QStringLiteral("One"), &mainWindow);
+        QTuiLabel label2(QStringLiteral("Two"), &mainWindow);
+        layout->addWidget(&label1, 1);
+        layout->addWidget(&label2, 1);
+        layout->apply(QRect(0, 0, 80, 24));
+        QCOMPARE(label1.geometry(), QRect(0, 0, 80, 12));
+
+        layout->removeWidget(&label2);
+        QTest::qWait(20);
+
+        QCOMPARE(label1.geometry(), QRect(0, 0, 80, 24));
+    }
+
+    // A user visibility change re-applies the layout on the next pass: the
+    // hidden widget's space is redistributed to its siblings.
+    void visibilityChangeReappliesLayout()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 80, 24));
+        mainWindow.setVisible(true);
+        app.setMainWindow(&mainWindow);
+
+        auto *layout = new QTuiBoxLayout(QTuiBoxLayout::TopToBottom, &mainWindow);
+        QTuiLabel label1(QStringLiteral("One"), &mainWindow);
+        QTuiLabel label2(QStringLiteral("Two"), &mainWindow);
+        layout->addWidget(&label1, 1);
+        layout->addWidget(&label2, 1);
+        layout->apply(QRect(0, 0, 80, 24));
+
+        label2.setVisible(false); // user hides
+        QTest::qWait(20);
+        QCOMPARE(label1.geometry(), QRect(0, 0, 80, 24));
+        QVERIFY(!label2.isVisible());
+
+        label2.setVisible(true); // user shows again
+        QTest::qWait(20);
+        QCOMPARE(label1.geometry(), QRect(0, 0, 80, 12));
+        QCOMPARE(label2.geometry(), QRect(0, 12, 80, 12));
+    }
 };
 
 QTEST_APPLESS_MAIN(TestLayoutInvalidation)

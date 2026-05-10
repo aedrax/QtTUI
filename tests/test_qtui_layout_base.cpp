@@ -288,6 +288,85 @@ private slots:
     }
 
     // ---------------------------------------------------------------
+    // QTuiLayoutItemWrapper (nested layout) tests
+    // ---------------------------------------------------------------
+
+    // count() is virtual: a wrapper around a concrete layout that keeps its
+    // own item list (e.g. box) must see the real item count, so nested
+    // layouts are no longer reported as empty.
+    void wrapperSeesConcreteLayoutCount()
+    {
+        QTuiBoxLayout box(QTuiBoxLayout::TopToBottom);
+        QTuiLayoutItemWrapper emptyWrapper(&box);
+        QVERIFY(emptyWrapper.isEmpty());
+
+        auto *w = new LayoutTestWidget(QSize(4, 2));
+        box.addWidget(w, 1);
+        QCOMPARE(static_cast<QTuiLayout &>(box).count(), 1); // virtual dispatch
+        QVERIFY(!emptyWrapper.isEmpty());
+
+        delete w;
+        QVERIFY(emptyWrapper.isEmpty()); // destroyed widget drops the entry
+    }
+
+    // The wrapper reports the wrapped layout's aggregated minimum size.
+    void wrapperAggregatesMinimumSize()
+    {
+        QTuiBoxLayout box(QTuiBoxLayout::TopToBottom);
+        auto *a = new LayoutTestWidget(QSize(12, 3));
+        auto *b = new LayoutTestWidget(QSize(8, 2));
+        box.addWidget(a, 0);
+        box.addWidget(b, 0);
+
+        // Vertical box: sum heights, max widths
+        QCOMPARE(box.minimumSize(), QSize(12, 5));
+
+        QTuiLayoutItemWrapper wrapper(&box);
+        QCOMPARE(wrapper.minimumSize(), QSize(12, 5));
+        QCOMPARE(wrapper.sizeHint(), QSize(12, 5));
+
+        // Margins are part of the aggregate
+        box.setContentsMargins(1, 2, 3, 4);
+        QCOMPARE(wrapper.minimumSize(), QSize(12 + 1 + 3, 5 + 2 + 4));
+
+        delete a;
+        delete b;
+    }
+
+    // Horizontal box aggregates the other way around: sum widths, max heights
+    void horizontalBoxMinimumSize()
+    {
+        QTuiBoxLayout box(QTuiBoxLayout::LeftToRight);
+        auto *a = new LayoutTestWidget(QSize(12, 3));
+        auto *b = new LayoutTestWidget(QSize(8, 2));
+        box.addWidget(a, 0);
+        box.addWidget(b, 0);
+        QCOMPARE(box.minimumSize(), QSize(20, 3));
+        delete a;
+        delete b;
+    }
+
+    // setGeometry on the wrapper applies the wrapped layout in that rect
+    void wrapperSetGeometryAppliesNestedLayout()
+    {
+        QTuiBoxLayout box(QTuiBoxLayout::TopToBottom);
+        auto *a = new LayoutTestWidget();
+        auto *b = new LayoutTestWidget();
+        box.addWidget(a, 1);
+        box.addWidget(b, 1);
+
+        QTuiLayoutItemWrapper wrapper(&box);
+        wrapper.setGeometry(QRect(3, 4, 10, 8));
+
+        QCOMPARE(wrapper.geometry(), QRect(3, 4, 10, 8));
+        QCOMPARE(a->geometry(), QRect(3, 4, 10, 4));
+        QCOMPARE(b->geometry(), QRect(3, 8, 10, 4));
+
+        delete a;
+        delete b;
+    }
+
+    // ---------------------------------------------------------------
     // QTuiLayout base class tests
     // ---------------------------------------------------------------
 

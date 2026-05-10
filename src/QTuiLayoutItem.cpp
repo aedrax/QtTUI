@@ -136,12 +136,16 @@ QTuiLayoutItemWrapper::QTuiLayoutItemWrapper(QTuiLayout *layout)
 
 QSize QTuiLayoutItemWrapper::sizeHint() const
 {
-    return QSize(0, 0);
+    if (!m_layout)
+        return QSize(0, 0);
+    return m_layout->minimumSize();
 }
 
 QSize QTuiLayoutItemWrapper::minimumSize() const
 {
-    return QSize(0, 0);
+    if (!m_layout)
+        return QSize(0, 0);
+    return m_layout->minimumSize();
 }
 
 QSize QTuiLayoutItemWrapper::maximumSize() const

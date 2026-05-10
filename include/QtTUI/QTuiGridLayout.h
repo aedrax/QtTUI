@@ -32,9 +32,15 @@ public:
     int rowCount() const;
     int columnCount() const;
 
+    int count() const override;
+    QTuiLayoutItem *itemAt(int index) const override;
+    QSize minimumSize() const override;
+
     void apply(const QRect &availableArea) override;
 
 private:
+    void computeCellMinima(QVector<int> &rowMinH, QVector<int> &colMinW) const;
+
     struct GridItem {
         QTuiLayoutItem *item;
         int row, column, rowSpan, columnSpan;

@@ -204,6 +204,51 @@ private slots:
         delete field2;
     }
 
+    // The label created by addRow(QString, field) must be parented into the
+    // widget tree (next to the field), otherwise the render pass — which
+    // walks childWidgets() — never paints it.
+    void createdLabelParentedIntoWidgetTree()
+    {
+        FormTestWidget container;
+        auto *field = new FormTestWidget(QSize(10, 1), &container);
+
+        QTuiFormLayout layout;
+        layout.addRow(QStringLiteral("Name:"), field);
+
+        QTuiLabel *foundLabel = nullptr;
+        for (auto *child : container.childWidgets()) {
+            if (auto *lbl = qobject_cast<QTuiLabel *>(child))
+                foundLabel = lbl;
+        }
+        QVERIFY2(foundLabel != nullptr,
+                 "created label is not a child of the field's parent widget");
+        QCOMPARE(foundLabel->text(), QStringLiteral("Name:"));
+    }
+
+    // If the field is parentless at addRow() time but parented later, apply()
+    // must reparent the still-parentless owned label into the tree.
+    void createdLabelReparentedOnApply()
+    {
+        QTuiFormLayout layout;
+        auto *field = new FormTestWidget(QSize(10, 1)); // no parent yet
+        layout.addRow(QStringLiteral("X:"), field);
+
+        FormTestWidget container;
+        field->setParent(&container);
+
+        layout.apply(QRect(0, 0, 40, 10));
+
+        QTuiLabel *foundLabel = nullptr;
+        for (auto *child : container.childWidgets()) {
+            if (auto *lbl = qobject_cast<QTuiLabel *>(child))
+                foundLabel = lbl;
+        }
+        QVERIFY2(foundLabel != nullptr,
+                 "owned label was not reparented into the tree by apply()");
+        // And it was laid out in the label column
+        QCOMPARE(foundLabel->geometry(), QRect(0, 0, 2, 1));
+    }
+
     // Verify QTuiLabel basic functionality used by form layout
     void labelMinimumSizeMatchesTextLength()
     {

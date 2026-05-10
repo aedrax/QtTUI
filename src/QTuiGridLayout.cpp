@@ -27,10 +27,26 @@ void QTuiGridLayout::addWidget(QTuiWidget *widget, int row, int column,
     auto *item = new QTuiWidgetItem(widget);
     m_gridItems.append({item, row, column, rowSpan, columnSpan});
 
+    // Drop the entry if the widget is destroyed while still in the layout
+    connect(widget, &QObject::destroyed, this, [this, item]() {
+        for (int i = 0; i < m_gridItems.size(); ++i) {
+            if (m_gridItems[i].item == item) {
+                delete m_gridItems[i].item;
+                m_gridItems.removeAt(i);
+                break;
+            }
+        }
+        if (auto *pw = qobject_cast<QTuiWidget *>(parent())) {
+            pw->markDirty();
+        }
+        invalidate();
+    });
+
     // Invalidate the layout's parent widget so the entire content area is repainted
     if (auto *pw = qobject_cast<QTuiWidget *>(parent())) {
         pw->markDirty();
     }
+    invalidate();
 }
 
 void QTuiGridLayout::addLayout(QTuiLayout *layout, int row, int column,
@@ -48,6 +64,7 @@ void QTuiGridLayout::addLayout(QTuiLayout *layout, int row, int column,
     if (auto *pw = qobject_cast<QTuiWidget *>(parent())) {
         pw->markDirty();
     }
+    invalidate();
 }
 
 void QTuiGridLayout::removeWidget(QTuiWidget *widget)
@@ -60,11 +77,13 @@ void QTuiGridLayout::removeWidget(QTuiWidget *widget)
         if (widgetItem && widgetItem->widget() == widget) {
             delete m_gridItems[i].item;
             m_gridItems.removeAt(i);
+            disconnect(widget, &QObject::destroyed, this, nullptr);
 
             // Invalidate the layout's parent widget so the entire content area is repainted
             if (auto *pw = qobject_cast<QTuiWidget *>(parent())) {
                 pw->markDirty();
             }
+            invalidate();
             return;
         }
     }
@@ -119,8 +138,75 @@ int QTuiGridLayout::columnCount() const
     return maxCol;
 }
 
+int QTuiGridLayout::count() const
+{
+    return m_gridItems.size();
+}
+
+QTuiLayoutItem *QTuiGridLayout::itemAt(int index) const
+{
+    if (index < 0 || index >= m_gridItems.size())
+        return nullptr;
+    return m_gridItems.at(index).item;
+}
+
+// Compute per-row/per-column minimum sizes from single-span items plus the
+// configured row/column minimums. The vectors must be pre-sized to
+// rowCount()/columnCount() and zero-initialized.
+void QTuiGridLayout::computeCellMinima(QVector<int> &rowMinH, QVector<int> &colMinW) const
+{
+    const int rows = rowMinH.size();
+    const int cols = colMinW.size();
+
+    for (const auto &gi : m_gridItems) {
+        if (gi.item->isEmpty())
+            continue;
+        const QSize minSz = gi.item->minimumSize();
+        if (gi.rowSpan == 1 && gi.row < rows)
+            rowMinH[gi.row] = std::max(rowMinH[gi.row], minSz.height());
+        if (gi.columnSpan == 1 && gi.column < cols)
+            colMinW[gi.column] = std::max(colMinW[gi.column], minSz.width());
+    }
+
+    // Apply configured minimum sizes
+    for (auto it = m_rowMinHeights.cbegin(); it != m_rowMinHeights.cend(); ++it) {
+        if (it.key() < rows)
+            rowMinH[it.key()] = std::max(rowMinH[it.key()], it.value());
+    }
+    for (auto it = m_colMinWidths.cbegin(); it != m_colMinWidths.cend(); ++it) {
+        if (it.key() < cols)
+            colMinW[it.key()] = std::max(colMinW[it.key()], it.value());
+    }
+}
+
+QSize QTuiGridLayout::minimumSize() const
+{
+    const QSize margins(m_marginLeft + m_marginRight,
+                        m_marginTop + m_marginBottom);
+
+    const int rows = rowCount();
+    const int cols = columnCount();
+    if (rows == 0 || cols == 0)
+        return margins;
+
+    QVector<int> rowMinH(rows, 0);
+    QVector<int> colMinW(cols, 0);
+    computeCellMinima(rowMinH, colMinW);
+
+    int width = 0;
+    for (int c = 0; c < cols; ++c)
+        width += colMinW[c];
+    int height = 0;
+    for (int r = 0; r < rows; ++r)
+        height += rowMinH[r];
+
+    return QSize(width, height) + margins;
+}
+
 void QTuiGridLayout::apply(const QRect &availableArea)
 {
+    recordAppliedRect(availableArea);
+
     if (m_gridItems.isEmpty())
         return;
 
@@ -137,26 +223,7 @@ void QTuiGridLayout::apply(const QRect &availableArea)
     // Compute minimum sizes for each row and column from single-span items
     QVector<int> rowMinH(rows, 0);
     QVector<int> colMinW(cols, 0);
-
-    for (const auto &gi : m_gridItems) {
-        if (gi.item->isEmpty())
-            continue;
-        const QSize minSz = gi.item->minimumSize();
-        if (gi.rowSpan == 1)
-            rowMinH[gi.row] = std::max(rowMinH[gi.row], minSz.height());
-        if (gi.columnSpan == 1)
-            colMinW[gi.column] = std::max(colMinW[gi.column], minSz.width());
-    }
-
-    // Apply configured minimum sizes
-    for (auto it = m_rowMinHeights.cbegin(); it != m_rowMinHeights.cend(); ++it) {
-        if (it.key() < rows)
-            rowMinH[it.key()] = std::max(rowMinH[it.key()], it.value());
-    }
-    for (auto it = m_colMinWidths.cbegin(); it != m_colMinWidths.cend(); ++it) {
-        if (it.key() < cols)
-            colMinW[it.key()] = std::max(colMinW[it.key()], it.value());
-    }
+    computeCellMinima(rowMinH, colMinW);
 
     // --- Pass 2: Distribution ---
     // Distribute available space according to stretch factors

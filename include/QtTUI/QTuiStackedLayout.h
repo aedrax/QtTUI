@@ -18,6 +18,9 @@ public:
     int addWidget(QTuiWidget *widget);
     QTuiWidget *widget(int index) const;
 
+    int count() const override;
+    QSize minimumSize() const override;
+
     int currentIndex() const;
     void setCurrentIndex(int index);
     QTuiWidget *currentWidget() const;

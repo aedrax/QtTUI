@@ -16,6 +16,26 @@ int QTuiStackedLayout::addWidget(QTuiWidget *widget)
     const int index = m_widgets.size();
     m_widgets.append(widget);
 
+    // Drop the entry if the widget is destroyed while still in the layout
+    connect(widget, &QObject::destroyed, this, [this, widget]() {
+        const int removedIndex = m_widgets.indexOf(widget);
+        if (removedIndex < 0)
+            return;
+        m_widgets.removeAt(removedIndex);
+        if (m_widgets.isEmpty()) {
+            m_currentIndex = -1;
+        } else if (removedIndex < m_currentIndex) {
+            --m_currentIndex;
+        } else if (removedIndex == m_currentIndex) {
+            if (m_currentIndex >= m_widgets.size())
+                m_currentIndex = m_widgets.size() - 1;
+            m_widgets.at(m_currentIndex)->setVisible(true);
+            // The newly promoted page needs current geometry
+            invalidate();
+            emit currentChanged(m_currentIndex);
+        }
+    });
+
     if (m_widgets.size() == 1) {
         // First widget: make it current and visible
         m_currentIndex = 0;
@@ -26,6 +46,8 @@ int QTuiStackedLayout::addWidget(QTuiWidget *widget)
         widget->setVisible(false);
     }
 
+    invalidate();
+
     return index;
 }
 
@@ -34,6 +56,22 @@ QTuiWidget *QTuiStackedLayout::widget(int index) const
     if (index < 0 || index >= m_widgets.size())
         return nullptr;
     return m_widgets.at(index);
+}
+
+int QTuiStackedLayout::count() const
+{
+    return m_widgets.size();
+}
+
+QSize QTuiStackedLayout::minimumSize() const
+{
+    // A stacked layout must be able to show any of its pages, so its minimum
+    // is the maximum over all pages.
+    QSize size(0, 0);
+    for (QTuiWidget *widget : m_widgets)
+        size = size.expandedTo(widget->minimumSize());
+    return size + QSize(m_marginLeft + m_marginRight,
+                        m_marginTop + m_marginBottom);
 }
 
 int QTuiStackedLayout::currentIndex() const
@@ -57,6 +95,11 @@ void QTuiStackedLayout::setCurrentIndex(int index)
     // Show the new current widget
     m_widgets.at(m_currentIndex)->setVisible(true);
 
+    // Re-apply the last applied area so a page switched to after a resize
+    // gets current geometry instead of a stale pre-resize rect.
+    if (m_everApplied)
+        apply(m_lastAppliedRect);
+
     emit currentChanged(m_currentIndex);
 }
 
@@ -76,6 +119,8 @@ void QTuiStackedLayout::setCurrentWidget(QTuiWidget *widget)
 
 void QTuiStackedLayout::apply(const QRect &availableArea)
 {
+    recordAppliedRect(availableArea);
+
     if (m_widgets.isEmpty())
         return;
 

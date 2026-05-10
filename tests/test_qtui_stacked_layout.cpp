@@ -228,6 +228,51 @@ private slots:
         delete w0; delete w1;
     }
 
+    // A page switched to after apply() must get the current geometry, not a
+    // stale (or empty) pre-switch rect.
+    void pageSwitchedAfterApplyGetsCurrentGeometry()
+    {
+        QTuiStackedLayout layout;
+        auto *w0 = new StackedTestWidget();
+        auto *w1 = new StackedTestWidget();
+
+        layout.addWidget(w0);
+        layout.addWidget(w1);
+
+        // Initial apply, then a "resize" while page 0 is current
+        layout.apply(QRect(0, 0, 40, 20));
+        layout.apply(QRect(2, 3, 30, 10));
+        QCOMPARE(w0->geometry(), QRect(2, 3, 30, 10));
+        QCOMPARE(w1->geometry(), QRect()); // never laid out yet
+
+        // Switching pages must re-apply the last area to the new page
+        layout.setCurrentIndex(1);
+        QCOMPARE(w1->geometry(), QRect(2, 3, 30, 10));
+        QVERIFY(w1->isVisible());
+        QVERIFY(!w0->isVisible());
+
+        delete w0;
+        delete w1;
+    }
+
+    // Switching pages before any apply() must not invent a geometry
+    void pageSwitchBeforeApplyLeavesGeometryUntouched()
+    {
+        QTuiStackedLayout layout;
+        auto *w0 = new StackedTestWidget();
+        auto *w1 = new StackedTestWidget();
+
+        layout.addWidget(w0);
+        layout.addWidget(w1);
+
+        layout.setCurrentIndex(1);
+        QCOMPARE(w1->geometry(), QRect());
+        QVERIFY(w1->isVisible());
+
+        delete w0;
+        delete w1;
+    }
+
     // Req 31.5: setting same index doesn't emit signal
     void currentChangedNotEmittedForSameIndex()
     {

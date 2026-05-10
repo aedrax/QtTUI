@@ -34,10 +34,32 @@ void QTuiBoxLayout::addWidget(QTuiWidget *widget, int stretch)
 
     m_boxItems.append({widget, stretch});
 
+    // Drop the entry if the widget is destroyed while still in the layout
+    connect(widget, &QObject::destroyed, this, [this, widget]() {
+        for (int i = 0; i < m_boxItems.size(); ++i) {
+            if (m_boxItems[i].widget == widget) {
+                m_boxItems.removeAt(i);
+                break;
+            }
+        }
+        m_layoutHidden.remove(widget);
+        if (auto *pw = qobject_cast<QTuiWidget *>(parent())) {
+            pw->markDirty();
+        }
+        invalidate();
+    });
+
+    // Visibility changes affect measurement and distribution, so the layout
+    // must be re-applied.
+    connect(widget, &QTuiWidget::visibilityChanged, this, [this]() {
+        invalidate();
+    });
+
     // Invalidate the layout's parent widget so the entire content area is repainted
     if (auto *pw = qobject_cast<QTuiWidget *>(parent())) {
         pw->markDirty();
     }
+    invalidate();
 }
 
 void QTuiBoxLayout::removeWidget(QTuiWidget *widget)
@@ -45,11 +67,15 @@ void QTuiBoxLayout::removeWidget(QTuiWidget *widget)
     for (int i = 0; i < m_boxItems.size(); ++i) {
         if (m_boxItems[i].widget == widget) {
             m_boxItems.removeAt(i);
+            m_layoutHidden.remove(widget);
+            // Detach all bookkeeping (destroyed + visibilityChanged)
+            disconnect(widget, nullptr, this, nullptr);
 
             // Invalidate the layout's parent widget so the entire content area is repainted
             if (auto *pw = qobject_cast<QTuiWidget *>(parent())) {
                 pw->markDirty();
             }
+            invalidate();
             return;
         }
     }
@@ -70,10 +96,48 @@ const QList<QTuiBoxLayout::Item> &QTuiBoxLayout::items() const
     return m_boxItems;
 }
 
+// A widget participates in measurement/distribution unless the USER hid it.
+// Widgets this layout hid itself (overflow) remain candidates so they can be
+// re-shown when space returns.
+bool QTuiBoxLayout::participatesInLayout(QTuiWidget *widget) const
+{
+    return widget && (widget->isVisible() || m_layoutHidden.contains(widget));
+}
+
+QSize QTuiBoxLayout::minimumSize() const
+{
+    const bool vertical = (m_direction == TopToBottom);
+    int along = 0;
+    int across = 0;
+    for (const auto &item : m_boxItems) {
+        if (!participatesInLayout(item.widget))
+            continue;
+        const QSize minSz = item.widget->minimumSize();
+        if (vertical) {
+            along += minSz.height();
+            across = std::max(across, minSz.width());
+        } else {
+            along += minSz.width();
+            across = std::max(across, minSz.height());
+        }
+    }
+    const QSize content = vertical ? QSize(across, along) : QSize(along, across);
+    return content + QSize(m_marginLeft + m_marginRight,
+                           m_marginTop + m_marginBottom);
+}
+
 void QTuiBoxLayout::apply(const QRect &availableArea)
 {
+    recordAppliedRect(availableArea);
+
     if (m_boxItems.isEmpty())
         return;
+
+    // Eligibility: user-hidden widgets are skipped entirely — no space, no
+    // geometry, and they must never be force-shown by the layout.
+    QVector<bool> eligible(m_boxItems.size());
+    for (int i = 0; i < m_boxItems.size(); ++i)
+        eligible[i] = participatesInLayout(m_boxItems[i].widget);
 
     // Subtract margins (using inherited margin members from QTuiLayout)
     const int contentX = availableArea.x() + m_marginLeft;
@@ -88,12 +152,14 @@ void QTuiBoxLayout::apply(const QRect &availableArea)
     int fixedSpace = 0;
     int totalStretch = 0;
 
-    for (const auto &item : m_boxItems) {
-        if (item.stretch == 0) {
-            const QSize minSz = item.widget->minimumSize();
+    for (int i = 0; i < m_boxItems.size(); ++i) {
+        if (!eligible[i])
+            continue;
+        if (m_boxItems[i].stretch == 0) {
+            const QSize minSz = m_boxItems[i].widget->minimumSize();
             fixedSpace += vertical ? minSz.height() : minSz.width();
         } else {
-            totalStretch += item.stretch;
+            totalStretch += m_boxItems[i].stretch;
         }
     }
 
@@ -105,9 +171,11 @@ void QTuiBoxLayout::apply(const QRect &availableArea)
     QVector<int> allocations(m_boxItems.size(), 0);
     QVector<bool> locked(m_boxItems.size(), false);
 
-    // Initial allocation for stretch=0 widgets
+    // Initial allocation for stretch=0 widgets; ineligible widgets get nothing
     for (int i = 0; i < m_boxItems.size(); ++i) {
-        if (m_boxItems[i].stretch == 0) {
+        if (!eligible[i]) {
+            locked[i] = true;
+        } else if (m_boxItems[i].stretch == 0) {
             const QSize minSz = m_boxItems[i].widget->minimumSize();
             allocations[i] = vertical ? minSz.height() : minSz.width();
             locked[i] = true;
@@ -174,15 +242,23 @@ void QTuiBoxLayout::apply(const QRect &availableArea)
     int consumed = 0;
 
     for (int i = 0; i < m_boxItems.size(); ++i) {
+        QTuiWidget *widget = m_boxItems[i].widget;
+
+        // User-hidden widget: leave it alone (no geometry, never force-shown)
+        if (!eligible[i])
+            continue;
+
         int alloc = allocations[i];
 
-        // If this widget would exceed available space, hide it
+        // If this widget would exceed available space, hide it (and remember
+        // that WE hid it, so it stays a candidate for when space returns)
         if (consumed + alloc > totalSpace) {
             alloc = std::max(0, totalSpace - consumed);
             if (alloc == 0) {
                 qWarning() << "QTuiBoxLayout::apply: widget does not fit, hiding";
-                m_boxItems[i].widget->setGeometry(QRect(0, 0, 0, 0));
-                m_boxItems[i].widget->setVisible(false);
+                widget->setGeometry(QRect(0, 0, 0, 0));
+                m_layoutHidden.insert(widget);
+                widget->setVisible(false);
                 continue;
             }
         }
@@ -194,8 +270,9 @@ void QTuiBoxLayout::apply(const QRect &availableArea)
             geom = QRect(pos, contentY, alloc, contentH);
         }
 
-        m_boxItems[i].widget->setGeometry(geom);
-        m_boxItems[i].widget->setVisible(true);
+        widget->setGeometry(geom);
+        widget->setVisible(true);
+        m_layoutHidden.remove(widget);
         pos += alloc;
         consumed += alloc;
     }

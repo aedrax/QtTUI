@@ -1,5 +1,6 @@
 #include <QtTest/QtTest>
 #include <rapidcheck.h>
+#include <QtTUI/QTuiBoxLayout.h>
 #include <QtTUI/QTuiGridLayout.h>
 #include <QtTUI/QTuiWidget.h>
 #include <QtTUI/ScreenBuffer.h>
@@ -204,6 +205,67 @@ private slots:
         QCOMPARE(w->geometry().height(), 12);
 
         delete w;
+    }
+
+    // A nested layout added via addLayout must actually lay out its children
+    // when the grid assigns it a cell (wrapper->setGeometry → nested apply).
+    void addLayoutLaysOutNestedChildren()
+    {
+        QTuiGridLayout grid;
+        auto *w0 = new GridTestWidget(QSize(5, 2));
+        grid.addWidget(w0, 0, 0);
+
+        auto *nested = new QTuiBoxLayout(QTuiBoxLayout::TopToBottom, &grid);
+        auto *n1 = new GridTestWidget();
+        auto *n2 = new GridTestWidget();
+        nested->addWidget(n1, 1);
+        nested->addWidget(n2, 1);
+        grid.addLayout(nested, 0, 1);
+
+        grid.apply(QRect(0, 0, 40, 20));
+
+        // The nested layout's children fill column 1, stacked vertically
+        const int col1x = w0->geometry().width();
+        QVERIFY(col1x > 0);
+        QCOMPARE(n1->geometry().x(), col1x);
+        QCOMPARE(n2->geometry().x(), col1x);
+        QCOMPARE(n1->geometry().width(), 40 - col1x);
+        QCOMPARE(n2->geometry().width(), 40 - col1x);
+        QCOMPARE(n1->geometry().y(), 0);
+        QCOMPARE(n2->geometry().y(), n1->geometry().y() + n1->geometry().height());
+        QCOMPARE(n1->geometry().height() + n2->geometry().height(), 20);
+
+        delete w0;
+        delete n1;
+        delete n2;
+    }
+
+    // The nested layout's aggregated minimum size must constrain the grid's
+    // column measurement, exactly like a widget's minimumSize does.
+    void addLayoutMinimumSizeConstrainsColumn()
+    {
+        QTuiGridLayout grid;
+        auto *w0 = new GridTestWidget(QSize(5, 2));
+        grid.addWidget(w0, 0, 0);
+
+        auto *nested = new QTuiBoxLayout(QTuiBoxLayout::TopToBottom, &grid);
+        auto *n1 = new GridTestWidget(QSize(12, 3));
+        auto *n2 = new GridTestWidget(QSize(8, 2));
+        nested->addWidget(n1, 0);
+        nested->addWidget(n2, 0);
+        grid.addLayout(nested, 0, 1);
+
+        // Box aggregate: width = max(12, 8) = 12, height = 3 + 2 = 5
+        QCOMPARE(nested->minimumSize(), QSize(12, 5));
+        QCOMPARE(grid.minimumSize(), QSize(5 + 12, 5));
+
+        // Tight area: column 1 still gets at least the nested minimum width
+        grid.apply(QRect(0, 0, 17, 5));
+        QCOMPARE(n1->geometry().width(), 12);
+
+        delete w0;
+        delete n1;
+        delete n2;
     }
 
     // RapidCheck property: stretch factor distribution sums to available width

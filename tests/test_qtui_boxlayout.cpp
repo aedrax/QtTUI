@@ -267,6 +267,91 @@ private slots:
         QCOMPARE(layout.items()[0].stretch, 0);
         delete w;
     }
+
+    // A widget hidden by the USER must be skipped during measurement and
+    // distribution (its space goes to the others) and must never be
+    // force-shown by apply().
+    void userHiddenWidgetSkippedAndNotForceShown()
+    {
+        QTuiBoxLayout layout(QTuiBoxLayout::TopToBottom);
+        auto *a = new LayoutTestWidget(QSize(0, 4));
+        auto *b = new LayoutTestWidget(QSize(0, 4));
+        auto *c = new LayoutTestWidget(QSize(0, 4));
+        layout.addWidget(a, 1);
+        layout.addWidget(b, 1);
+        layout.addWidget(c, 1);
+
+        b->setVisible(false); // user hides b
+
+        layout.apply(QRect(0, 0, 20, 12));
+
+        // b stays hidden even though there is plenty of space
+        QVERIFY(!b->isVisible());
+        // its space is redistributed to a and c, contiguously
+        QCOMPARE(a->geometry().y(), 0);
+        QCOMPARE(c->geometry().y(), a->geometry().height());
+        QCOMPARE(a->geometry().height() + c->geometry().height(), 12);
+
+        // Re-applying must not force-show the user-hidden widget either
+        layout.apply(QRect(0, 0, 20, 12));
+        QVERIFY(!b->isVisible());
+
+        delete a;
+        delete b;
+        delete c;
+    }
+
+    // A widget the LAYOUT hid because it did not fit must come back
+    // automatically when space returns.
+    void layoutHiddenWidgetReappearsWhenSpaceReturns()
+    {
+        QTuiBoxLayout layout(QTuiBoxLayout::TopToBottom);
+        auto *a = new LayoutTestWidget(QSize(0, 6));
+        auto *b = new LayoutTestWidget(QSize(0, 6));
+        layout.addWidget(a, 0);
+        layout.addWidget(b, 0);
+
+        // Only a fits: the layout hides b
+        layout.apply(QRect(0, 0, 20, 6));
+        QVERIFY(a->isVisible());
+        QVERIFY(!b->isVisible());
+
+        // Space returns: b (hidden by the layout, not the user) reappears
+        layout.apply(QRect(0, 0, 20, 12));
+        QVERIFY(b->isVisible());
+        QCOMPARE(b->geometry(), QRect(0, 6, 20, 6));
+
+        delete a;
+        delete b;
+    }
+
+    // User-hidden and layout-hidden widgets must be distinguished: after both
+    // kinds of hide, only the layout-hidden one is restored by apply().
+    void userHiddenNotRestoredWhileLayoutHiddenIs()
+    {
+        QTuiBoxLayout layout(QTuiBoxLayout::TopToBottom);
+        auto *a = new LayoutTestWidget(QSize(0, 6));
+        auto *b = new LayoutTestWidget(QSize(0, 6));
+        auto *c = new LayoutTestWidget(QSize(0, 6));
+        layout.addWidget(a, 0);
+        layout.addWidget(b, 0);
+        layout.addWidget(c, 0);
+
+        b->setVisible(false);          // user hides b
+        layout.apply(QRect(0, 0, 20, 6)); // a fits, layout hides c
+        QVERIFY(!b->isVisible());
+        QVERIFY(!c->isVisible());
+
+        layout.apply(QRect(0, 0, 20, 18)); // room for everything
+        QVERIFY(!b->isVisible()); // user-hidden: stays hidden
+        QVERIFY(c->isVisible());  // layout-hidden: restored
+        // c packs directly after a — b takes no space
+        QCOMPARE(c->geometry().y(), a->geometry().height());
+
+        delete a;
+        delete b;
+        delete c;
+    }
 };
 
 QTEST_MAIN(TestQTuiBoxLayout)
