@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiTableWidgetItem.h>
+#include <QtTUI/QTuiTableWidget.h>
 
 namespace QtTUI {
 
@@ -16,6 +17,8 @@ QString QTuiTableWidgetItem::text() const
 void QTuiTableWidgetItem::setText(const QString &text)
 {
     m_data[Qt::DisplayRole] = text;
+    if (m_tableWidget)
+        m_tableWidget->syncItemToModel(m_row, m_column);
 }
 
 Qt::ItemFlags QTuiTableWidgetItem::flags() const
@@ -36,6 +39,8 @@ QVariant QTuiTableWidgetItem::data(int role) const
 void QTuiTableWidgetItem::setData(int role, const QVariant &value)
 {
     m_data[role] = value;
+    if (m_tableWidget)
+        m_tableWidget->syncItemToModel(m_row, m_column);
 }
 
 QTuiTableWidget *QTuiTableWidgetItem::tableWidget() const

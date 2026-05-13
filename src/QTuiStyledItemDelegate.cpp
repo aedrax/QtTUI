@@ -35,7 +35,7 @@ void QTuiStyledItemDelegate::paint(ScreenBuffer &buffer, const QRect &rect,
         int cx = x + col;
         if (cx >= 0 && cx < buffer.width() && y >= 0 && y < buffer.height()) {
             Cell &cell = buffer.backCell(cx, y);
-            cell.character = QLatin1Char(' ');
+            cell.setChar(U' ');
             cell.foreground = props.foreground;
             cell.background = props.background;
             cell.bold = props.bold;
@@ -49,7 +49,7 @@ void QTuiStyledItemDelegate::paint(ScreenBuffer &buffer, const QRect &rect,
         int cx = x + i;
         if (cx >= 0 && cx < buffer.width() && y >= 0 && y < buffer.height()) {
             Cell &cell = buffer.backCell(cx, y);
-            cell.character = text.at(i);
+            cell.setChar(text.at(i).unicode());
         }
     }
 }

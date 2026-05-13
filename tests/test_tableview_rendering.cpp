@@ -140,13 +140,13 @@ private slots:
                     int renderedLen = qMin(headerText.length(), colW);
                     for (int i = 0; i < renderedLen; ++i) {
                         const Cell &cell = buf.backCell(xOff + i, 0);
-                        RC_ASSERT(cell.character == headerText.at(i));
+                        RC_ASSERT(cell.ch == headerText.at(i).unicode());
                     }
 
                     // Remaining chars in column should be spaces (padding)
                     for (int i = renderedLen; i < colW; ++i) {
                         const Cell &cell = buf.backCell(xOff + i, 0);
-                        RC_ASSERT(cell.character == QLatin1Char(' '));
+                        RC_ASSERT(cell.ch == U' ');
                     }
 
                     xOff += colW;
@@ -154,7 +154,7 @@ private slots:
                     // Separator space between columns
                     if (c < cols - 1) {
                         const Cell &sep = buf.backCell(xOff, 0);
-                        RC_ASSERT(sep.character == QLatin1Char(' '));
+                        RC_ASSERT(sep.ch == U' ');
                         xOff++;
                     }
                 }
@@ -213,7 +213,7 @@ private slots:
                     const Cell &cell = buf.backCell(x, 0);
                     // All cells in header row should be written (either text or padding)
                     // since the implementation fills the entire row
-                    if (cell.bold || cell.character != QLatin1Char(' ')
+                    if (cell.bold || cell.ch != U' '
                         || cell.foreground != Color(255, 255, 255)
                         || cell.background != Color(0, 0, 0)) {
                         usedWidth = x + 1;
@@ -284,7 +284,7 @@ private slots:
                     // Verify bold and correct characters
                     for (int i = 0; i < renderedLen; ++i) {
                         const Cell &cell = buf.backCell(xOff + i, 0);
-                        RC_ASSERT(cell.character == headerText.at(i));
+                        RC_ASSERT(cell.ch == headerText.at(i).unicode());
                         RC_ASSERT(cell.bold == true);
                     }
 
@@ -377,7 +377,7 @@ private slots:
                     // Read header row text
                     QString headerRow;
                     for (int x = 0; x < viewWidth; ++x)
-                        headerRow.append(buf.backCell(x, 0).character);
+                        headerRow.append(buf.backCell(x, 0).text());
 
                     // The header for column c should be visible (single char)
                     QChar expectedChar = QChar('A' + c);

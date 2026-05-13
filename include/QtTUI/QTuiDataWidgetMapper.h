@@ -4,6 +4,7 @@
 #include <QtTUI/QtTUIGlobal.h>
 #include <QObject>
 #include <QList>
+#include <QModelIndex>
 
 class QAbstractItemModel;
 
@@ -45,9 +46,11 @@ signals:
 
 private slots:
     void onWidgetTextChanged();
+    void onModelDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight);
 
 private:
     void populate();
+    void populateWidget(QTuiWidget *widget, int section);
     void connectWidgetSignals(QTuiWidget *widget);
     void disconnectWidgetSignals(QTuiWidget *widget);
 

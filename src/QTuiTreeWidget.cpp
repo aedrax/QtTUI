@@ -127,6 +127,58 @@ void QTuiTreeWidgetModel::rebuild()
     endResetModel();
 }
 
+QModelIndex QTuiTreeWidgetModel::indexForItem(QTuiTreeWidgetItem *item) const
+{
+    if (!item || !m_topLevelItemsRef)
+        return {};
+
+    QTuiTreeWidgetItem *parentItem = item->parent();
+    int row = -1;
+    if (!parentItem) {
+        row = m_topLevelItemsRef->indexOf(item);
+    } else {
+        for (int i = 0; i < parentItem->childCount(); ++i) {
+            if (parentItem->child(i) == item) {
+                row = i;
+                break;
+            }
+        }
+    }
+    if (row < 0)
+        return {};
+    return createIndex(row, 0, item);
+}
+
+void QTuiTreeWidgetModel::itemDataChanged(QTuiTreeWidgetItem *item, int column)
+{
+    QModelIndex idx = indexForItem(item);
+    if (!idx.isValid())
+        return;
+    const int col = qBound(0, column, qMax(0, m_columnCount - 1));
+    QModelIndex cell = (col == 0) ? idx : createIndex(idx.row(), col, item);
+    emit dataChanged(cell, cell);
+}
+
+void QTuiTreeWidgetModel::beginInsertItem(QTuiTreeWidgetItem *parent, int row)
+{
+    beginInsertRows(parent ? indexForItem(parent) : QModelIndex(), row, row);
+}
+
+void QTuiTreeWidgetModel::endInsertItem()
+{
+    endInsertRows();
+}
+
+void QTuiTreeWidgetModel::beginRemoveItem(QTuiTreeWidgetItem *parent, int row)
+{
+    beginRemoveRows(parent ? indexForItem(parent) : QModelIndex(), row, row);
+}
+
+void QTuiTreeWidgetModel::endRemoveItem()
+{
+    endRemoveRows();
+}
+
 // ---- QTuiTreeWidget ----
 
 QTuiTreeWidget::QTuiTreeWidget(QTuiWidget *parent)
@@ -150,13 +202,25 @@ void QTuiTreeWidget::addTopLevelItem(QTuiTreeWidgetItem *item)
         return;
 
     if (item->m_parent) {
-        item->m_parent->m_children.removeOne(item);
+        // Detach from the old parent with proper removal signals when the
+        // old parent belongs to a tree widget.
+        QTuiTreeWidget *oldTree = item->m_treeWidget;
+        int oldRow = item->m_parent->m_children.indexOf(item);
+        if (oldTree && oldRow >= 0) {
+            oldTree->beginRemoveItem(item->m_parent, oldRow);
+            item->m_parent->m_children.removeAt(oldRow);
+            oldTree->endRemoveItem();
+        } else {
+            item->m_parent->m_children.removeOne(item);
+        }
         item->m_parent = nullptr;
     }
 
     item->setTreeWidgetRecursive(this);
+    // The model contract requires begin* BEFORE the container mutation
+    beginInsertItem(nullptr, m_topLevelItems.size());
     m_topLevelItems.append(item);
-    syncFromItems();
+    endInsertItem();
 }
 
 QTuiTreeWidgetItem *QTuiTreeWidget::topLevelItem(int index) const
@@ -176,20 +240,24 @@ QTuiTreeWidgetItem *QTuiTreeWidget::takeTopLevelItem(int index)
     if (index < 0 || index >= m_topLevelItems.size())
         return nullptr;
 
+    beginRemoveItem(nullptr, index);
     QTuiTreeWidgetItem *taken = m_topLevelItems.takeAt(index);
+    endRemoveItem();
     taken->m_parent = nullptr;
     taken->setTreeWidgetRecursive(nullptr);
-    syncFromItems();
     return taken;
 }
 
 void QTuiTreeWidget::setHeaderLabels(const QStringList &labels)
 {
+    // Changing the column count restructures every index: full reset, with
+    // begin* called before any mutation as the model contract requires.
+    m_internalModel->beginResetModel();
     m_columnCount = qMax(m_columnCount, labels.size());
     m_internalModel->m_columnCount = m_columnCount;
     for (int i = 0; i < labels.size(); ++i)
         m_internalModel->m_headerData[i] = labels.at(i);
-    syncFromItems();
+    m_internalModel->endResetModel();
 }
 
 int QTuiTreeWidget::columnCount() const
@@ -201,9 +269,14 @@ void QTuiTreeWidget::setColumnCount(int columns)
 {
     if (columns < 1)
         columns = 1;
+    if (columns == m_columnCount)
+        return;
+    // Changing the column count restructures every index: full reset, with
+    // begin* called before any mutation as the model contract requires.
+    m_internalModel->beginResetModel();
     m_columnCount = columns;
     m_internalModel->m_columnCount = columns;
-    syncFromItems();
+    m_internalModel->endResetModel();
 }
 
 QTuiTreeWidgetItem *QTuiTreeWidget::currentItem() const
@@ -259,7 +332,34 @@ void QTuiTreeWidget::keyPressEvent(TuiKeyEvent *event)
 
 void QTuiTreeWidget::syncFromItems()
 {
+    // Full model reset: only for operations that genuinely restructure
+    // everything. Item-level mutations use the targeted helpers below.
     m_internalModel->rebuild();
+}
+
+void QTuiTreeWidget::notifyItemDataChanged(QTuiTreeWidgetItem *item, int column)
+{
+    m_internalModel->itemDataChanged(item, column);
+}
+
+void QTuiTreeWidget::beginInsertItem(QTuiTreeWidgetItem *parent, int row)
+{
+    m_internalModel->beginInsertItem(parent, row);
+}
+
+void QTuiTreeWidget::endInsertItem()
+{
+    m_internalModel->endInsertItem();
+}
+
+void QTuiTreeWidget::beginRemoveItem(QTuiTreeWidgetItem *parent, int row)
+{
+    m_internalModel->beginRemoveItem(parent, row);
+}
+
+void QTuiTreeWidget::endRemoveItem()
+{
+    m_internalModel->endRemoveItem();
 }
 
 QTuiTreeWidgetItem *QTuiTreeWidget::itemFromIndex(const QModelIndex &index) const

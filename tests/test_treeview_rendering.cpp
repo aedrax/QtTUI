@@ -198,13 +198,13 @@ private slots:
                     // spaces (indentation) or indicator chars
                     // The indentation portion (depth * indentWidth) should be spaces
                     for (int x = 0; x < item.depth * indentWidth && x < viewWidth; ++x) {
-                        QChar ch = buf.backCell(x, vr).character;
+                        QString ch = buf.backCell(x, vr).text();
                         RC_ASSERT(ch == QLatin1Char(' '));
                     }
 
                     // Verify text starts at the correct offset
                     if (expectedTextStart < viewWidth && !item.text.isEmpty()) {
-                        QChar firstTextChar = buf.backCell(expectedTextStart, vr).character;
+                        QString firstTextChar = buf.backCell(expectedTextStart, vr).text();
                         RC_ASSERT(firstTextChar == item.text.at(0));
                     }
                 }
@@ -262,7 +262,7 @@ private slots:
                     for (int i = 0; i < rootChildren && i < viewHeight; ++i) {
                         QModelIndex idx = model.index(i, 0);
                         bool hasKids = model.hasChildren(idx);
-                        QChar indicatorChar = buf.backCell(0, i).character;
+                        QString indicatorChar = buf.backCell(0, i).text();
 
                         if (hasKids) {
                             // Collapsed parent: should show ▶
@@ -293,7 +293,7 @@ private slots:
                     }
 
                     if (parentRow >= 0 && parentRow < viewHeight) {
-                        QChar indicatorChar = buf.backCell(0, parentRow).character;
+                        QString indicatorChar = buf.backCell(0, parentRow).text();
                         RC_ASSERT(indicatorChar == QChar(0x25BC)); // ▼
                     }
 
@@ -303,7 +303,7 @@ private slots:
                     TreeTestModel::Node *parentNode = parentNodes.first();
                     for (int c = 0; c < parentNode->children.size() && childRow < viewHeight; ++c, ++childRow) {
                         bool childHasKids = !parentNode->children.at(c)->children.isEmpty();
-                        QChar childIndicator = buf.backCell(2, childRow).character; // indent=2
+                        QString childIndicator = buf.backCell(2, childRow).text(); // indent=2
 
                         if (childHasKids) {
                             RC_ASSERT(childIndicator == QChar(0x25B6)); // ▶
@@ -383,8 +383,8 @@ private slots:
                     // At depth 1, indentation is 2 chars, so text starts at offset 2 + 2 = 4
                     // (indent=2, indicator=2)
                     // First 2 chars should be spaces (indentation)
-                    QChar indent0 = buf.backCell(0, childStartRow + c).character;
-                    QChar indent1 = buf.backCell(1, childStartRow + c).character;
+                    QString indent0 = buf.backCell(0, childStartRow + c).text();
+                    QString indent1 = buf.backCell(1, childStartRow + c).text();
                     RC_ASSERT(indent0 == QLatin1Char(' '));
                     RC_ASSERT(indent1 == QLatin1Char(' '));
                 }
@@ -407,7 +407,7 @@ private slots:
                     // and should be "Root1"
                     QString expectedText = QStringLiteral("Root1");
                     // indicator at offset 0 (leaf or parent), text at offset 2
-                    QChar textStart = buf2.backCell(2, 1).character;
+                    QString textStart = buf2.backCell(2, 1).text();
                     RC_ASSERT(textStart == expectedText.at(0));
                 }
             });

@@ -22,17 +22,31 @@ void QTuiTreeWidgetItem::addChild(QTuiTreeWidgetItem *child)
     if (!child || m_children.contains(child))
         return;
 
-    // Remove from previous parent if any
+    // Remove from previous parent if any, with proper removal signals when
+    // the old parent belongs to a tree widget.
     if (child->m_parent) {
-        child->m_parent->m_children.removeOne(child);
+        QTuiTreeWidget *oldTree = child->m_treeWidget;
+        int oldRow = child->m_parent->m_children.indexOf(child);
+        if (oldTree && oldRow >= 0) {
+            oldTree->beginRemoveItem(child->m_parent, oldRow);
+            child->m_parent->m_children.removeAt(oldRow);
+            oldTree->endRemoveItem();
+        } else {
+            child->m_parent->m_children.removeOne(child);
+        }
     }
 
     child->m_parent = this;
     child->setTreeWidgetRecursive(m_treeWidget);
-    m_children.append(child);
 
-    if (m_treeWidget)
-        m_treeWidget->syncFromItems();
+    if (m_treeWidget) {
+        // The model contract requires begin* BEFORE the container mutation
+        m_treeWidget->beginInsertItem(this, m_children.size());
+        m_children.append(child);
+        m_treeWidget->endInsertItem();
+    } else {
+        m_children.append(child);
+    }
 }
 
 QTuiTreeWidgetItem *QTuiTreeWidgetItem::child(int index) const
@@ -52,12 +66,17 @@ QTuiTreeWidgetItem *QTuiTreeWidgetItem::takeChild(int index)
     if (index < 0 || index >= m_children.size())
         return nullptr;
 
-    QTuiTreeWidgetItem *taken = m_children.takeAt(index);
+    QTuiTreeWidgetItem *taken = nullptr;
+    if (m_treeWidget) {
+        // The model contract requires begin* BEFORE the container mutation
+        m_treeWidget->beginRemoveItem(this, index);
+        taken = m_children.takeAt(index);
+        m_treeWidget->endRemoveItem();
+    } else {
+        taken = m_children.takeAt(index);
+    }
     taken->m_parent = nullptr;
     taken->setTreeWidgetRecursive(nullptr);
-
-    if (m_treeWidget)
-        m_treeWidget->syncFromItems();
 
     return taken;
 }
@@ -106,8 +125,10 @@ void QTuiTreeWidgetItem::setData(int column, int role, const QVariant &value)
     ensureColumnCount(column + 1);
     m_columnData[column][role] = value;
 
+    // Targeted dataChanged instead of a full model reset, so views keep
+    // their expansion state and current item.
     if (m_treeWidget)
-        m_treeWidget->syncFromItems();
+        m_treeWidget->notifyItemDataChanged(this, column);
 }
 
 int QTuiTreeWidgetItem::columnCount() const

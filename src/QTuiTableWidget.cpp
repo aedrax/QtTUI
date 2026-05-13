@@ -110,8 +110,13 @@ void QTuiTableWidget::setRowCount(int rows)
     if (rows == m_internalModel->m_rows)
         return;
     int cols = m_internalModel->m_columns;
+    // The model contract requires beginResetModel() BEFORE any mutation the
+    // model can observe (the item grid is read through m_itemsRef).
+    m_internalModel->beginResetModel();
     resizeItemGrid(rows, cols);
-    m_internalModel->setDimensions(rows, cols);
+    m_internalModel->m_rows = rows;
+    m_internalModel->m_columns = cols;
+    m_internalModel->endResetModel();
 }
 
 int QTuiTableWidget::rowCount() const
@@ -124,8 +129,13 @@ void QTuiTableWidget::setColumnCount(int columns)
     if (columns == m_internalModel->m_columns)
         return;
     int rows = m_internalModel->m_rows;
+    // The model contract requires beginResetModel() BEFORE any mutation the
+    // model can observe (the item grid is read through m_itemsRef).
+    m_internalModel->beginResetModel();
     resizeItemGrid(rows, columns);
-    m_internalModel->setDimensions(rows, columns);
+    m_internalModel->m_rows = rows;
+    m_internalModel->m_columns = columns;
+    m_internalModel->endResetModel();
 }
 
 int QTuiTableWidget::columnCount() const

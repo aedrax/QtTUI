@@ -33,6 +33,7 @@ private slots:
     void onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight);
     void onRowsInserted(const QModelIndex &parent, int first, int last);
     void onRowsRemoved(const QModelIndex &parent, int first, int last);
+    void onLayoutChanged();
     void onModelReset();
 
 private:

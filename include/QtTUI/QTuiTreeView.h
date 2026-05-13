@@ -43,7 +43,9 @@ protected:
 private slots:
     void onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight);
     void onRowsInserted(const QModelIndex &parent, int first, int last);
+    void onRowsAboutToBeRemoved(const QModelIndex &parent, int first, int last);
     void onRowsRemoved(const QModelIndex &parent, int first, int last);
+    void onLayoutChanged();
     void onModelReset();
 
 private:
@@ -67,6 +69,9 @@ private:
     QSet<QPersistentModelIndex> m_expandedItems;
     int m_currentRow = 0;
     int m_scrollOffset = 0;
+    // Flat row affected by an in-flight removal, captured in
+    // onRowsAboutToBeRemoved while the indexes are still valid.
+    int m_pendingRemovalFlatRow = -1;
     static constexpr int m_indentWidth = 2;
 };
 

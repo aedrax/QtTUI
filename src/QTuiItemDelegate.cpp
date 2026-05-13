@@ -24,7 +24,7 @@ void QTuiItemDelegate::paint(ScreenBuffer &buffer, const QRect &rect,
     for (int i = 0; i < text.length() && i < maxWidth; ++i) {
         if (x + i >= 0 && x + i < buffer.width() && y >= 0 && y < buffer.height()) {
             Cell &cell = buffer.backCell(x + i, y);
-            cell.character = text.at(i);
+            cell.setChar(text.at(i).unicode());
         }
     }
 }

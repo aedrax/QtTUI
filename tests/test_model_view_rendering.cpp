@@ -165,7 +165,7 @@ private slots:
                     // Read rendered text from buffer
                     QString renderedText;
                     for (int x = 0; x < viewWidth; ++x) {
-                        QChar ch = buf.backCell(x, vr).character;
+                        QString ch = buf.backCell(x, vr).text();
                         renderedText.append(ch);
                     }
 
@@ -233,7 +233,7 @@ private slots:
                     int availWidth = viewWidth - textOffset;
                     QString renderedText;
                     for (int x = textOffset; x < viewWidth; ++x) {
-                        QChar ch = buf.backCell(x, vr).character;
+                        QString ch = buf.backCell(x, vr).text();
                         renderedText.append(ch);
                     }
 

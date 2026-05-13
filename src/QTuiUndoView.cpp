@@ -8,11 +8,13 @@ namespace QtTUI {
 QTuiUndoView::QTuiUndoView(QTuiWidget *parent)
     : QTuiWidget(parent)
 {
+    setFocusPolicy(Qt::StrongFocus);
 }
 
 QTuiUndoView::QTuiUndoView(QTuiUndoStack *stack, QTuiWidget *parent)
     : QTuiWidget(parent)
 {
+    setFocusPolicy(Qt::StrongFocus);
     setStack(stack);
 }
 
@@ -24,6 +26,7 @@ void QTuiUndoView::setStack(QTuiUndoStack *stack)
     if (m_stack) {
         disconnect(m_stack, &QTuiUndoStack::indexChanged,
                    this, &QTuiUndoView::onStackChanged);
+        disconnect(m_stack, &QObject::destroyed, this, nullptr);
     }
 
     m_stack = stack;
@@ -33,11 +36,19 @@ void QTuiUndoView::setStack(QTuiUndoStack *stack)
     if (m_stack) {
         connect(m_stack, &QTuiUndoStack::indexChanged,
                 this, &QTuiUndoView::onStackChanged);
+        // Guard against the stack being deleted while still set on the view
+        connect(m_stack, &QObject::destroyed, this, [this]() {
+            m_stack = nullptr;
+            m_currentIndex = 0;
+            m_scrollOffset = 0;
+            markDirty();
+        });
         if (m_stack->index() > 0)
             m_currentIndex = m_stack->index() - 1;
         else
             m_currentIndex = 0;
     }
+    markDirty();
 }
 
 QTuiUndoStack *QTuiUndoView::stack() const
@@ -83,7 +94,7 @@ void QTuiUndoView::paintEvent(ScreenBuffer &buffer)
 
             for (int x = 0; x < viewWidth; ++x) {
                 Cell &cell = buffer.backCell(geo.x() + x, screenY);
-                cell.character = (x < text.length()) ? text.at(x) : QLatin1Char(' ');
+                cell.setChar((x < text.length()) ? text.at(x).unicode() : u' ');
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = isCurrent;
@@ -94,7 +105,7 @@ void QTuiUndoView::paintEvent(ScreenBuffer &buffer)
         } else {
             for (int x = 0; x < viewWidth; ++x) {
                 Cell &cell = buffer.backCell(geo.x() + x, screenY);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = theme.foreground;
                 cell.background = theme.background;
                 cell.bold = false;
@@ -118,6 +129,7 @@ void QTuiUndoView::keyPressEvent(TuiKeyEvent *event)
         if (m_currentIndex > 0) {
             --m_currentIndex;
             scrollToVisible();
+            markDirty();
         }
         break;
 
@@ -125,6 +137,7 @@ void QTuiUndoView::keyPressEvent(TuiKeyEvent *event)
         if (m_currentIndex < commandCount - 1) {
             ++m_currentIndex;
             scrollToVisible();
+            markDirty();
         }
         break;
 
@@ -151,6 +164,7 @@ void QTuiUndoView::mousePressEvent(TuiMouseEvent *event)
         m_currentIndex = clickedRow;
         m_stack->setIndex(m_currentIndex + 1);
         scrollToVisible();
+        markDirty();
     }
 }
 
@@ -164,6 +178,7 @@ void QTuiUndoView::onStackChanged()
         m_currentIndex = qMax(0, commandCount - 1);
 
     scrollToVisible();
+    markDirty();
 }
 
 void QTuiUndoView::scrollToVisible()

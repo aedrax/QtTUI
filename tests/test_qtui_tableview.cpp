@@ -203,7 +203,7 @@ private slots:
                 // Read the header row (y=0) from the buffer
                 QString headerRow;
                 for (int x = 0; x < viewWidth; ++x)
-                    headerRow.append(buf.backCell(x, 0).character);
+                    headerRow.append(buf.backCell(x, 0).text());
 
                 // Each header text should appear (truncated to column width)
                 int colWidth = viewWidth / cols;

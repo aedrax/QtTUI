@@ -10,6 +10,22 @@ namespace QtTUI {
 QTuiListView::QTuiListView(QTuiWidget *parent)
     : QTuiWidget(parent)
 {
+    setFocusPolicy(Qt::StrongFocus);
+    // Layouts resize views through setGeometry(); no resize events are
+    // delivered to child widgets. Re-clamp scrolling whenever our geometry
+    // changes so the current row stays visible after a shrink or grow.
+    connect(this, &QTuiWidget::geometryChanged, this, [this](const QRect &) {
+        if (!m_model)
+            return;
+        const int visibleRows = geometry().height();
+        if (visibleRows > 0) {
+            m_scrollOffset = qBound(0, m_scrollOffset,
+                                    qMax(0, m_model->rowCount() - visibleRows));
+        }
+        clampCurrentIndex();
+        ensureCurrentVisible();
+        markDirty();
+    });
 }
 
 void QTuiListView::setModel(QAbstractItemModel *model)
@@ -42,8 +58,12 @@ void QTuiListView::setCurrentIndex(const QModelIndex &index)
 {
     if (!m_model)
         return;
-    m_currentRow = qBound(0, index.row(), qMax(0, m_model->rowCount() - 1));
+    int row = qBound(0, index.row(), qMax(0, m_model->rowCount() - 1));
+    if (row == m_currentRow)
+        return;
+    m_currentRow = row;
     ensureCurrentVisible();
+    markDirty();
 }
 
 int QTuiListView::scrollOffset() const
@@ -100,7 +120,7 @@ void QTuiListView::paintEvent(ScreenBuffer &buffer)
         if (isCurrent && hasFocus()) {
             for (int x = 0; x < viewWidth; ++x) {
                 Cell &cell = buffer.backCell(geo.x() + x, screenY);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = theme.focusForeground;
                 cell.background = theme.focusBackground;
                 cell.bold = false;
@@ -254,6 +274,22 @@ void QTuiListView::onRowsRemoved(const QModelIndex &parent, int first, int last)
     ensureCurrentVisible();
 }
 
+void QTuiListView::onLayoutChanged()
+{
+    // Rows may have been reordered wholesale (e.g. proxy sort): re-clamp the
+    // current row and scroll offset, then repaint everything.
+    clampCurrentIndex();
+    if (m_model) {
+        const int visibleRows = geometry().height();
+        if (visibleRows > 0) {
+            m_scrollOffset = qBound(0, m_scrollOffset,
+                                    qMax(0, m_model->rowCount() - visibleRows));
+        }
+    }
+    ensureCurrentVisible();
+    markDirty();
+}
+
 void QTuiListView::onModelReset()
 {
     m_currentRow = 0;
@@ -272,8 +308,11 @@ void QTuiListView::disconnectModel()
                this, &QTuiListView::onRowsInserted);
     disconnect(m_model, &QAbstractItemModel::rowsRemoved,
                this, &QTuiListView::onRowsRemoved);
+    disconnect(m_model, &QAbstractItemModel::layoutChanged,
+               this, &QTuiListView::onLayoutChanged);
     disconnect(m_model, &QAbstractItemModel::modelReset,
                this, &QTuiListView::onModelReset);
+    disconnect(m_model, &QObject::destroyed, this, nullptr);
 }
 
 void QTuiListView::connectModel()
@@ -287,8 +326,15 @@ void QTuiListView::connectModel()
             this, &QTuiListView::onRowsInserted);
     connect(m_model, &QAbstractItemModel::rowsRemoved,
             this, &QTuiListView::onRowsRemoved);
+    connect(m_model, &QAbstractItemModel::layoutChanged,
+            this, &QTuiListView::onLayoutChanged);
     connect(m_model, &QAbstractItemModel::modelReset,
             this, &QTuiListView::onModelReset);
+    // Guard against the model being deleted while still set on the view
+    connect(m_model, &QObject::destroyed, this, [this]() {
+        m_model = nullptr;
+        onModelReset();
+    });
 }
 
 void QTuiListView::ensureCurrentVisible()

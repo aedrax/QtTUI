@@ -51,6 +51,7 @@ private slots:
 
     // Model sync (Req 22.2)
     void testItemSyncsToModel();
+    void testItemSetTextEmitsDataChanged();
 
     // Resize shrinks and cleans up items
     void testShrinkDeletesItems();
@@ -297,6 +298,35 @@ void TestQTuiTableWidget::testItemSyncsToModel()
     QAbstractItemModel *m = tw.model();
     QCOMPARE(m->data(m->index(0, 0), Qt::DisplayRole).toString(),
              QStringLiteral("Synced"));
+}
+
+// Regression: setText/setData on an item already placed in the table must
+// notify the internal model (dataChanged) so the view repaints.
+void TestQTuiTableWidget::testItemSetTextEmitsDataChanged()
+{
+    QTuiTableWidget tw(2, 2);
+    auto *item = new QTuiTableWidgetItem("Before");
+    tw.setItem(1, 0, item);
+
+    QSignalSpy spy(tw.model(), &QAbstractItemModel::dataChanged);
+
+    item->setText("After");
+    QCOMPARE(spy.count(), 1);
+    QModelIndex changed = spy.last().at(0).value<QModelIndex>();
+    QCOMPARE(changed.row(), 1);
+    QCOMPARE(changed.column(), 0);
+    QCOMPARE(tw.model()->data(tw.model()->index(1, 0), Qt::DisplayRole).toString(),
+             QStringLiteral("After"));
+
+    // setData must notify as well
+    spy.clear();
+    item->setData(Qt::UserRole, 42);
+    QCOMPARE(spy.count(), 1);
+
+    // A standalone item (not in a table) must not crash
+    QTuiTableWidgetItem standalone("Loose");
+    standalone.setText("Still loose");
+    QCOMPARE(standalone.text(), QStringLiteral("Still loose"));
 }
 
 void TestQTuiTableWidget::testShrinkDeletesItems()

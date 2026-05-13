@@ -8,6 +8,16 @@ namespace QtTUI {
 QTuiColumnView::QTuiColumnView(QTuiWidget *parent)
     : QTuiWidget(parent)
 {
+    setFocusPolicy(Qt::StrongFocus);
+    // Layouts resize views through setGeometry(); no resize events are
+    // delivered to child widgets. Re-clamp the column scroll offset whenever
+    // our geometry changes so the active column stays visible.
+    connect(this, &QTuiWidget::geometryChanged, this, [this](const QRect &) {
+        if (!m_model)
+            return;
+        scrollToVisible();
+        markDirty();
+    });
 }
 
 void QTuiColumnView::setModel(QAbstractItemModel *model)
@@ -25,6 +35,7 @@ void QTuiColumnView::setModel(QAbstractItemModel *model)
         connectModel();
         rebuildColumns();
     }
+    markDirty();
 }
 
 QAbstractItemModel *QTuiColumnView::model() const
@@ -85,6 +96,7 @@ void QTuiColumnView::setCurrentIndex(const QModelIndex &index)
 
     m_activeColumn = m_columns.size() - 1;
     scrollToVisible();
+    markDirty();
 }
 
 int QTuiColumnView::defaultColumnWidth() const
@@ -94,8 +106,10 @@ int QTuiColumnView::defaultColumnWidth() const
 
 void QTuiColumnView::setDefaultColumnWidth(int width)
 {
-    if (width > 0)
+    if (width > 0 && width != m_defaultColumnWidth) {
         m_defaultColumnWidth = width;
+        markDirty();
+    }
 }
 
 QList<int> QTuiColumnView::columnWidths() const
@@ -105,7 +119,10 @@ QList<int> QTuiColumnView::columnWidths() const
 
 void QTuiColumnView::setColumnWidths(const QList<int> &widths)
 {
+    if (m_columnWidths == widths)
+        return;
     m_columnWidths = widths;
+    markDirty();
 }
 
 QSize QTuiColumnView::minimumSize() const
@@ -134,7 +151,7 @@ void QTuiColumnView::paintEvent(ScreenBuffer &buffer)
     for (int y = 0; y < viewHeight; ++y) {
         for (int x = 0; x < viewWidth; ++x) {
             Cell &cell = buffer.backCell(geo.x() + x, geo.y() + y);
-            cell.character = QLatin1Char(' ');
+            cell.setChar(U' ');
             cell.foreground = theme.foreground;
             cell.background = theme.background;
             cell.bold = false;
@@ -171,7 +188,7 @@ void QTuiColumnView::paintEvent(ScreenBuffer &buffer)
 
                 for (int x = 0; x < drawWidth; ++x) {
                     Cell &cell = buffer.backCell(geo.x() + xOffset + x, screenY);
-                    cell.character = (x < text.length()) ? text.at(x) : QLatin1Char(' ');
+                    cell.setChar((x < text.length()) ? text.at(x).unicode() : u' ');
                     cell.bold = false;
 
                     if (isCurrent) {
@@ -193,7 +210,7 @@ void QTuiColumnView::paintEvent(ScreenBuffer &buffer)
         if (xOffset < viewWidth && ci < m_columns.size() - 1) {
             for (int vr = 0; vr < viewHeight; ++vr) {
                 Cell &cell = buffer.backCell(geo.x() + xOffset, geo.y() + vr);
-                cell.character = QChar(0x2502); // │ vertical line
+                cell.setChar(0x2502); // │ vertical line
                 cell.foreground = theme.foreground;
                 cell.background = theme.background;
                 cell.bold = false;
@@ -218,6 +235,7 @@ void QTuiColumnView::keyPressEvent(TuiKeyEvent *event)
             --activeCol.currentRow;
             // When moving up/down, rebuild child columns for new selection
             rebuildColumns();
+            markDirty();
         }
         break;
 
@@ -225,6 +243,7 @@ void QTuiColumnView::keyPressEvent(TuiKeyEvent *event)
         if (activeCol.currentRow < rowCount - 1) {
             ++activeCol.currentRow;
             rebuildColumns();
+            markDirty();
         }
         break;
 
@@ -236,6 +255,7 @@ void QTuiColumnView::keyPressEvent(TuiKeyEvent *event)
             if (m_activeColumn + 1 < m_columns.size()) {
                 ++m_activeColumn;
                 scrollToVisible();
+                markDirty();
             }
         }
         break;
@@ -247,6 +267,7 @@ void QTuiColumnView::keyPressEvent(TuiKeyEvent *event)
             // Trim columns to the right of the new active column's child
             rebuildColumns();
             scrollToVisible();
+            markDirty();
         }
         break;
 
@@ -270,6 +291,7 @@ void QTuiColumnView::onDataChanged(const QModelIndex &topLeft, const QModelIndex
     Q_UNUSED(topLeft);
     Q_UNUSED(bottomRight);
     // Data changed but structure didn't, just repaint
+    markDirty();
 }
 
 void QTuiColumnView::onRowsInserted(const QModelIndex &parent, int first, int last)
@@ -278,6 +300,7 @@ void QTuiColumnView::onRowsInserted(const QModelIndex &parent, int first, int la
     Q_UNUSED(first);
     Q_UNUSED(last);
     rebuildColumns();
+    markDirty();
 }
 
 void QTuiColumnView::onRowsRemoved(const QModelIndex &parent, int first, int last)
@@ -286,6 +309,15 @@ void QTuiColumnView::onRowsRemoved(const QModelIndex &parent, int first, int las
     Q_UNUSED(first);
     Q_UNUSED(last);
     rebuildColumns();
+    markDirty();
+}
+
+void QTuiColumnView::onLayoutChanged()
+{
+    // Rows may have been reordered wholesale (e.g. proxy sort). Rebuild the
+    // column chain, which re-clamps each column's current row.
+    rebuildColumns();
+    markDirty();
 }
 
 void QTuiColumnView::onModelReset()
@@ -294,6 +326,7 @@ void QTuiColumnView::onModelReset()
     m_activeColumn = 0;
     m_scrollOffset = 0;
     rebuildColumns();
+    markDirty();
 }
 
 // --- Private helpers ---
@@ -309,8 +342,15 @@ void QTuiColumnView::connectModel()
             this, &QTuiColumnView::onRowsInserted);
     connect(m_model, &QAbstractItemModel::rowsRemoved,
             this, &QTuiColumnView::onRowsRemoved);
+    connect(m_model, &QAbstractItemModel::layoutChanged,
+            this, &QTuiColumnView::onLayoutChanged);
     connect(m_model, &QAbstractItemModel::modelReset,
             this, &QTuiColumnView::onModelReset);
+    // Guard against the model being deleted while still set on the view
+    connect(m_model, &QObject::destroyed, this, [this]() {
+        m_model = nullptr;
+        onModelReset();
+    });
 }
 
 void QTuiColumnView::disconnectModel()
@@ -324,8 +364,11 @@ void QTuiColumnView::disconnectModel()
                this, &QTuiColumnView::onRowsInserted);
     disconnect(m_model, &QAbstractItemModel::rowsRemoved,
                this, &QTuiColumnView::onRowsRemoved);
+    disconnect(m_model, &QAbstractItemModel::layoutChanged,
+               this, &QTuiColumnView::onLayoutChanged);
     disconnect(m_model, &QAbstractItemModel::modelReset,
                this, &QTuiColumnView::onModelReset);
+    disconnect(m_model, &QObject::destroyed, this, nullptr);
 }
 
 void QTuiColumnView::rebuildColumns()

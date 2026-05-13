@@ -57,6 +57,8 @@ private slots:
     // Item-to-model synchronization
     void testItemSyncsToModel();
     void testChildSyncsToModel();
+    void testSetTextEmitsDataChangedNotReset();
+    void testSetTextPreservesExpansionState();
 
     // Iterator (Req 23.10, 23.11)
     void testIteratorAll();
@@ -375,6 +377,61 @@ void TestQTuiTreeWidget::testChildSyncsToModel()
     QModelIndex childIdx = model->index(0, 0, rootIdx);
     QCOMPARE(model->data(childIdx, Qt::DisplayRole).toString(),
              QStringLiteral("Child"));
+}
+
+// Regression: item text/data changes must be reported as a targeted
+// dataChanged for that item's index, not as a full model reset.
+void TestQTuiTreeWidget::testSetTextEmitsDataChangedNotReset()
+{
+    QTuiTreeWidget tw;
+    auto *item = new QTuiTreeWidgetItem(QStringList{QStringLiteral("Before")});
+    tw.addTopLevelItem(item);
+    tw.addTopLevelItem(new QTuiTreeWidgetItem(QStringList{QStringLiteral("Other")}));
+
+    QSignalSpy changeSpy(tw.model(), &QAbstractItemModel::dataChanged);
+    QSignalSpy resetSpy(tw.model(), &QAbstractItemModel::modelReset);
+
+    item->setText(0, QStringLiteral("After"));
+
+    QCOMPARE(resetSpy.count(), 0);
+    QCOMPARE(changeSpy.count(), 1);
+    QModelIndex changed = changeSpy.last().at(0).value<QModelIndex>();
+    QCOMPARE(changed.row(), 0);
+    QCOMPARE(changed.column(), 0);
+    QCOMPARE(tw.model()->data(changed, Qt::DisplayRole).toString(),
+             QStringLiteral("After"));
+}
+
+// Regression: setText on an item used to reset the whole internal model,
+// wiping the view's expansion state and current item.
+void TestQTuiTreeWidget::testSetTextPreservesExpansionState()
+{
+    QTuiTreeWidget tw;
+    tw.setGeometry(QRect(0, 0, 40, 10));
+
+    auto *root = new QTuiTreeWidgetItem(QStringList{QStringLiteral("Root")});
+    tw.addTopLevelItem(root);
+    auto *child = new QTuiTreeWidgetItem(QStringList{QStringLiteral("Child")});
+    root->addChild(child);
+    auto *second = new QTuiTreeWidgetItem(QStringList{QStringLiteral("Second")});
+    tw.addTopLevelItem(second);
+
+    QModelIndex rootIdx = tw.model()->index(0, 0);
+    tw.expand(rootIdx);
+    QVERIFY(tw.isExpanded(rootIdx));
+
+    tw.setCurrentItem(second);
+    QCOMPARE(tw.currentItem(), second);
+
+    // Rename items; expansion state and current item must survive
+    root->setText(0, QStringLiteral("Renamed Root"));
+    child->setText(0, QStringLiteral("Renamed Child"));
+
+    QVERIFY(tw.isExpanded(tw.model()->index(0, 0)));
+    QCOMPARE(tw.currentItem(), second);
+    QCOMPARE(root->text(0), QStringLiteral("Renamed Root"));
+    QCOMPARE(tw.model()->data(tw.model()->index(0, 0)).toString(),
+             QStringLiteral("Renamed Root"));
 }
 
 void TestQTuiTreeWidget::testIteratorAll()

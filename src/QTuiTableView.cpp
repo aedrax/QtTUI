@@ -10,6 +10,22 @@ namespace QtTUI {
 QTuiTableView::QTuiTableView(QTuiWidget *parent)
     : QTuiWidget(parent)
 {
+    setFocusPolicy(Qt::StrongFocus);
+    // Layouts resize views through setGeometry(); no resize events are
+    // delivered to child widgets. Re-clamp scrolling whenever our geometry
+    // changes so the current cell stays visible after a shrink or grow.
+    connect(this, &QTuiWidget::geometryChanged, this, [this](const QRect &) {
+        if (!m_model)
+            return;
+        const int rows = m_model->rowCount();
+        const int visibleDataRows = geometry().height() - m_headerHeight;
+        if (visibleDataRows > 0)
+            m_scrollOffset = qBound(0, m_scrollOffset, qMax(0, rows - visibleDataRows));
+        clampCurrentIndex();
+        ensureCurrentVisible();
+        ensureCurrentColumnVisible();
+        markDirty();
+    });
 }
 
 void QTuiTableView::setModel(QAbstractItemModel *model)
@@ -23,6 +39,7 @@ void QTuiTableView::setModel(QAbstractItemModel *model)
     m_currentCol = 0;
     m_scrollOffset = 0;
     m_horizontalScrollOffset = 0;
+    invalidateColumnWidths();
 
     if (m_model)
         connectModel();
@@ -44,9 +61,14 @@ void QTuiTableView::setCurrentIndex(const QModelIndex &index)
 {
     if (!m_model)
         return;
-    m_currentRow = qBound(0, index.row(), qMax(0, m_model->rowCount() - 1));
-    m_currentCol = qBound(0, index.column(), qMax(0, m_model->columnCount() - 1));
+    int row = qBound(0, index.row(), qMax(0, m_model->rowCount() - 1));
+    int col = qBound(0, index.column(), qMax(0, m_model->columnCount() - 1));
+    if (row == m_currentRow && col == m_currentCol)
+        return;
+    m_currentRow = row;
+    m_currentCol = col;
     ensureCurrentVisible();
+    markDirty();
 }
 
 int QTuiTableView::scrollOffset() const
@@ -74,66 +96,9 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
     if (cols == 0)
         return;
 
-    // --- Content-based column width calculation ---
-    // Step 1: Compute natural width for each column as max(header width, max data cell width)
-    QVector<int> colWidths(cols, 0);
-    for (int c = 0; c < cols; ++c) {
-        QString header = m_model->headerData(c, Qt::Horizontal, Qt::DisplayRole).toString();
-        int maxW = header.length();
-        for (int r = 0; r < rows; ++r) {
-            QModelIndex idx = m_model->index(r, c);
-            QString cellText = m_model->data(idx, Qt::DisplayRole).toString();
-            if (cellText.length() > maxW)
-                maxW = cellText.length();
-        }
-        colWidths[c] = qMax(1, maxW); // at least 1 char per column
-    }
-
-    // Step 2: Constrain total column widths to view width
-    // Account for separators: 1 space between each pair of columns
-    int separatorTotal = (cols > 1) ? (cols - 1) : 0;
-    int availableForCols = viewWidth - separatorTotal;
-    if (availableForCols < cols)
-        availableForCols = cols; // ensure at least 1 char per column
-
-    int totalNatural = 0;
-    for (int c = 0; c < cols; ++c)
-        totalNatural += colWidths[c];
-
-    if (totalNatural > availableForCols) {
-        // Proportionally scale down, ensuring each column gets at least 1 char
-        QVector<int> scaled(cols, 0);
-        for (int c = 0; c < cols; ++c) {
-            int proportional = static_cast<int>(
-                static_cast<double>(colWidths[c]) / totalNatural * availableForCols);
-            if (proportional < 1)
-                proportional = 1;
-            scaled[c] = proportional;
-        }
-        // Adjust to fit exactly in availableForCols
-        int scaledTotal = 0;
-        for (int c = 0; c < cols; ++c)
-            scaledTotal += scaled[c];
-
-        // Distribute remainder or trim excess
-        int diff = availableForCols - scaledTotal;
-        if (diff > 0) {
-            // Add extra chars to widest columns first
-            for (int c = 0; c < cols && diff > 0; ++c) {
-                scaled[c]++;
-                diff--;
-            }
-        } else if (diff < 0) {
-            // Remove chars from widest columns (but keep minimum 1)
-            for (int c = cols - 1; c >= 0 && diff < 0; --c) {
-                if (scaled[c] > 1) {
-                    scaled[c]--;
-                    diff++;
-                }
-            }
-        }
-        colWidths = scaled;
-    }
+    // Final (post-scaling) column widths, shared with mouse hit testing and
+    // horizontal scrolling.
+    const QVector<int> colWidths = effectiveColumnWidths();
 
     // --- Determine visible columns based on horizontal scroll offset ---
     int firstVisibleCol = m_horizontalScrollOffset;
@@ -159,7 +124,7 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
             int textLen = qMin(header.length(), availWidth);
             for (int i = textLen; i < availWidth; ++i) {
                 Cell &cell = buffer.backCell(xOff + i, geo.y());
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = theme.foreground;
                 cell.background = theme.background;
                 cell.bold = true;
@@ -169,7 +134,7 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
             // Render separator space between columns
             if (c < cols - 1 && xOff < geo.x() + viewWidth) {
                 Cell &sep = buffer.backCell(xOff, geo.y());
-                sep.character = QLatin1Char(' ');
+                sep.setChar(U' ');
                 sep.foreground = theme.foreground;
                 sep.background = theme.background;
                 sep.bold = false;
@@ -180,7 +145,7 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
         // Fill remaining header row with background
         for (int x = xOff; x < geo.x() + viewWidth; ++x) {
             Cell &cell = buffer.backCell(x, geo.y());
-            cell.character = QLatin1Char(' ');
+            cell.setChar(U' ');
             cell.foreground = theme.foreground;
             cell.background = theme.background;
             cell.bold = false;
@@ -195,7 +160,7 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
             int screenY = geo.y() + m_headerHeight + vr;
             for (int x = geo.x(); x < geo.x() + viewWidth; ++x) {
                 Cell &cell = buffer.backCell(x, screenY);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = theme.foreground;
                 cell.background = theme.background;
                 cell.bold = false;
@@ -244,7 +209,7 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
             int textLen = qMin(cellText.length(), availWidth);
             for (int i = textLen; i < availWidth; ++i) {
                 Cell &cell = buffer.backCell(xOff + i, screenY);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = cellStyle.foreground;
                 cell.background = cellStyle.background;
                 cell.bold = false;
@@ -255,7 +220,7 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
             // Render separator space between columns
             if (c < cols - 1 && xOff < geo.x() + viewWidth) {
                 Cell &sep = buffer.backCell(xOff, screenY);
-                sep.character = QLatin1Char(' ');
+                sep.setChar(U' ');
                 sep.foreground = theme.foreground;
                 sep.background = theme.background;
                 sep.bold = false;
@@ -266,7 +231,7 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
         // Fill remaining row with background
         for (int x = xOff; x < geo.x() + viewWidth; ++x) {
             Cell &cell = buffer.backCell(x, screenY);
-            cell.character = QLatin1Char(' ');
+            cell.setChar(U' ');
             cell.foreground = theme.foreground;
             cell.background = theme.background;
             cell.bold = false;
@@ -321,65 +286,14 @@ void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
     const QRect geo = geometry();
     const int cols = m_model->columnCount();
     const int rows = m_model->rowCount();
-    const int viewWidth = geo.width();
 
     // Calculate clicked row (subtract 1 for header)
     int clickedRow = (event->y() - geo.y() - m_headerHeight) + m_scrollOffset;
     if (clickedRow < 0 || clickedRow >= rows)
         return;
 
-    // Calculate column widths (same logic as paintEvent)
-    QVector<int> colWidths(cols, 0);
-    for (int c = 0; c < cols; ++c) {
-        QString header = m_model->headerData(c, Qt::Horizontal, Qt::DisplayRole).toString();
-        int maxW = header.length();
-        for (int r = 0; r < rows; ++r) {
-            QModelIndex idx = m_model->index(r, c);
-            QString cellText = m_model->data(idx, Qt::DisplayRole).toString();
-            if (cellText.length() > maxW)
-                maxW = cellText.length();
-        }
-        colWidths[c] = qMax(1, maxW);
-    }
-
-    // Constrain total column widths to view width
-    int separatorTotal = (cols > 1) ? (cols - 1) : 0;
-    int availableForCols = viewWidth - separatorTotal;
-    if (availableForCols < cols)
-        availableForCols = cols;
-
-    int totalNatural = 0;
-    for (int c = 0; c < cols; ++c)
-        totalNatural += colWidths[c];
-
-    if (totalNatural > availableForCols) {
-        QVector<int> scaled(cols, 0);
-        for (int c = 0; c < cols; ++c) {
-            int proportional = static_cast<int>(
-                static_cast<double>(colWidths[c]) / totalNatural * availableForCols);
-            if (proportional < 1)
-                proportional = 1;
-            scaled[c] = proportional;
-        }
-        int scaledTotal = 0;
-        for (int c = 0; c < cols; ++c)
-            scaledTotal += scaled[c];
-        int diff = availableForCols - scaledTotal;
-        if (diff > 0) {
-            for (int c = 0; c < cols && diff > 0; ++c) {
-                scaled[c]++;
-                diff--;
-            }
-        } else if (diff < 0) {
-            for (int c = cols - 1; c >= 0 && diff < 0; --c) {
-                if (scaled[c] > 1) {
-                    scaled[c]--;
-                    diff++;
-                }
-            }
-        }
-        colWidths = scaled;
-    }
+    // Same final column widths as paintEvent
+    const QVector<int> colWidths = effectiveColumnWidths();
 
     // Determine which column was clicked
     int clickX = event->x() - geo.x();
@@ -410,6 +324,8 @@ void QTuiTableView::onDataChanged(const QModelIndex &topLeft, const QModelIndex 
 {
     if (!m_model)
         return;
+
+    invalidateColumnWidths();
 
     const QRect geo = geometry();
     const int visibleDataRows = geo.height() - m_headerHeight;
@@ -444,6 +360,8 @@ void QTuiTableView::onRowsInserted(const QModelIndex &parent, int first, int las
     if (!m_model)
         return;
 
+    invalidateColumnWidths();
+
     const QRect geo = geometry();
     const int visibleDataRows = geo.height() - m_headerHeight;
     if (visibleDataRows <= 0) {
@@ -477,6 +395,8 @@ void QTuiTableView::onRowsRemoved(const QModelIndex &parent, int first, int last
     if (!m_model)
         return;
 
+    invalidateColumnWidths();
+
     const QRect geo = geometry();
     const int visibleDataRows = geo.height() - m_headerHeight;
     if (visibleDataRows <= 0) {
@@ -505,12 +425,75 @@ void QTuiTableView::onRowsRemoved(const QModelIndex &parent, int first, int last
     ensureCurrentVisible();
 }
 
+void QTuiTableView::onColumnsInserted(const QModelIndex &parent, int first, int last)
+{
+    Q_UNUSED(parent);
+    Q_UNUSED(first);
+    Q_UNUSED(last);
+
+    if (!m_model)
+        return;
+
+    invalidateColumnWidths();
+    clampCurrentIndex();
+    m_horizontalScrollOffset = qBound(0, m_horizontalScrollOffset,
+                                      qMax(0, m_model->columnCount() - 1));
+    ensureCurrentColumnVisible();
+    markDirty();
+}
+
+void QTuiTableView::onColumnsRemoved(const QModelIndex &parent, int first, int last)
+{
+    Q_UNUSED(parent);
+    Q_UNUSED(first);
+    Q_UNUSED(last);
+
+    if (!m_model)
+        return;
+
+    invalidateColumnWidths();
+    clampCurrentIndex();
+    m_horizontalScrollOffset = qBound(0, m_horizontalScrollOffset,
+                                      qMax(0, m_model->columnCount() - 1));
+    ensureCurrentColumnVisible();
+    markDirty();
+}
+
+void QTuiTableView::onHeaderDataChanged(Qt::Orientation orientation, int first, int last)
+{
+    Q_UNUSED(first);
+    Q_UNUSED(last);
+
+    if (orientation != Qt::Horizontal)
+        return;
+
+    // Header text feeds the column width calculation
+    invalidateColumnWidths();
+
+    const QRect geo = geometry();
+    if (geo.width() <= 0 || geo.height() <= 0)
+        return;
+    markDirty(QRect(geo.x(), geo.y(), geo.width(), m_headerHeight));
+}
+
+void QTuiTableView::onLayoutChanged()
+{
+    // Rows/columns may have been reordered wholesale (e.g. proxy sort).
+    // Treat cached row/column-derived state as stale.
+    invalidateColumnWidths();
+    clampCurrentIndex();
+    ensureCurrentVisible();
+    ensureCurrentColumnVisible();
+    markDirty();
+}
+
 void QTuiTableView::onModelReset()
 {
     m_currentRow = 0;
     m_currentCol = 0;
     m_scrollOffset = 0;
     m_horizontalScrollOffset = 0;
+    invalidateColumnWidths();
     markDirty();
 }
 
@@ -525,8 +508,17 @@ void QTuiTableView::disconnectModel()
                this, &QTuiTableView::onRowsInserted);
     disconnect(m_model, &QAbstractItemModel::rowsRemoved,
                this, &QTuiTableView::onRowsRemoved);
+    disconnect(m_model, &QAbstractItemModel::columnsInserted,
+               this, &QTuiTableView::onColumnsInserted);
+    disconnect(m_model, &QAbstractItemModel::columnsRemoved,
+               this, &QTuiTableView::onColumnsRemoved);
+    disconnect(m_model, &QAbstractItemModel::headerDataChanged,
+               this, &QTuiTableView::onHeaderDataChanged);
+    disconnect(m_model, &QAbstractItemModel::layoutChanged,
+               this, &QTuiTableView::onLayoutChanged);
     disconnect(m_model, &QAbstractItemModel::modelReset,
                this, &QTuiTableView::onModelReset);
+    disconnect(m_model, &QObject::destroyed, this, nullptr);
 }
 
 void QTuiTableView::connectModel()
@@ -540,8 +532,21 @@ void QTuiTableView::connectModel()
             this, &QTuiTableView::onRowsInserted);
     connect(m_model, &QAbstractItemModel::rowsRemoved,
             this, &QTuiTableView::onRowsRemoved);
+    connect(m_model, &QAbstractItemModel::columnsInserted,
+            this, &QTuiTableView::onColumnsInserted);
+    connect(m_model, &QAbstractItemModel::columnsRemoved,
+            this, &QTuiTableView::onColumnsRemoved);
+    connect(m_model, &QAbstractItemModel::headerDataChanged,
+            this, &QTuiTableView::onHeaderDataChanged);
+    connect(m_model, &QAbstractItemModel::layoutChanged,
+            this, &QTuiTableView::onLayoutChanged);
     connect(m_model, &QAbstractItemModel::modelReset,
             this, &QTuiTableView::onModelReset);
+    // Guard against the model being deleted while still set on the view
+    connect(m_model, &QObject::destroyed, this, [this]() {
+        m_model = nullptr;
+        onModelReset();
+    });
 }
 
 void QTuiTableView::ensureCurrentVisible()
@@ -572,59 +577,140 @@ void QTuiTableView::ensureCurrentColumnVisible()
     if (m_currentCol < m_horizontalScrollOffset)
         m_horizontalScrollOffset = m_currentCol;
 
-    // If current column is beyond the visible range, scroll right
-    // Compute how many columns fit starting from m_horizontalScrollOffset
     const int viewWidth = geometry().width();
-    int usedWidth = 0;
-    int lastVisibleCol = m_horizontalScrollOffset;
-    for (int c = m_horizontalScrollOffset; c < cols; ++c) {
-        // Compute column width (same logic as paintEvent)
-        QString header = m_model->headerData(c, Qt::Horizontal, Qt::DisplayRole).toString();
-        int colW = header.length();
-        int rows = m_model->rowCount();
-        for (int r = 0; r < rows; ++r) {
-            QModelIndex idx = m_model->index(r, c);
-            QString cellText = m_model->data(idx, Qt::DisplayRole).toString();
-            if (cellText.length() > colW)
-                colW = cellText.length();
-        }
-        colW = qMax(1, colW);
+    if (viewWidth <= 0)
+        return;
 
-        int needed = colW + (c > m_horizontalScrollOffset ? 1 : 0); // +1 for separator
-        if (usedWidth + needed > viewWidth)
-            break;
-        usedWidth += needed;
-        lastVisibleCol = c;
-    }
+    // Use the same final (post-scaling) widths that paintEvent renders with,
+    // so scrolling and painting always agree on which columns are visible.
+    const QVector<int> colWidths = effectiveColumnWidths();
+    if (colWidths.size() != cols)
+        return;
 
-    if (m_currentCol > lastVisibleCol) {
-        // Scroll right until current column is visible
-        while (m_horizontalScrollOffset < m_currentCol) {
-            m_horizontalScrollOffset++;
-            // Recompute last visible col
-            usedWidth = 0;
-            lastVisibleCol = m_horizontalScrollOffset;
-            for (int c = m_horizontalScrollOffset; c < cols; ++c) {
-                QString header = m_model->headerData(c, Qt::Horizontal, Qt::DisplayRole).toString();
-                int colW = header.length();
-                int rows = m_model->rowCount();
-                for (int r = 0; r < rows; ++r) {
-                    QModelIndex idx = m_model->index(r, c);
-                    QString cellText = m_model->data(idx, Qt::DisplayRole).toString();
-                    if (cellText.length() > colW)
-                        colW = cellText.length();
-                }
-                colW = qMax(1, colW);
-                int needed = colW + (c > m_horizontalScrollOffset ? 1 : 0);
-                if (usedWidth + needed > viewWidth)
-                    break;
-                usedWidth += needed;
-                lastVisibleCol = c;
-            }
-            if (m_currentCol <= lastVisibleCol)
+    // Last fully visible column when rendering starts at firstCol
+    const auto lastVisibleFrom = [&](int firstCol) {
+        int usedWidth = 0;
+        int lastVisibleCol = firstCol;
+        for (int c = firstCol; c < cols; ++c) {
+            int needed = colWidths.at(c) + (c > firstCol ? 1 : 0); // +1 separator
+            if (usedWidth + needed > viewWidth)
                 break;
+            usedWidth += needed;
+            lastVisibleCol = c;
         }
+        return lastVisibleCol;
+    };
+
+    // Scroll right until the current column is visible
+    while (m_horizontalScrollOffset < m_currentCol
+           && m_currentCol > lastVisibleFrom(m_horizontalScrollOffset)) {
+        m_horizontalScrollOffset++;
     }
+}
+
+void QTuiTableView::invalidateColumnWidths()
+{
+    m_columnWidthsStale = true;
+}
+
+const QVector<int> &QTuiTableView::effectiveColumnWidths() const
+{
+    const QRect geo = geometry();
+
+    // The cache is keyed on the viewport: sampling depends on the vertical
+    // scroll offset and the geometry, scaling depends on the view width.
+    if (!m_columnWidthsStale
+        && m_columnWidthsScrollOffset == m_scrollOffset
+        && m_columnWidthsGeometry == geo) {
+        return m_cachedColumnWidths;
+    }
+
+    m_columnWidthsStale = false;
+    m_columnWidthsScrollOffset = m_scrollOffset;
+    m_columnWidthsGeometry = geo;
+    m_cachedColumnWidths.clear();
+
+    if (!m_model)
+        return m_cachedColumnWidths;
+
+    const int cols = m_model->columnCount();
+    const int rows = m_model->rowCount();
+    if (cols == 0)
+        return m_cachedColumnWidths;
+
+    // Sample only the header plus the rows currently in the viewport instead
+    // of scanning the entire model on every paint (O(visible) not O(rows)).
+    // If the geometry has no data rows yet, fall back to a bounded sample
+    // from the top of the model.
+    static constexpr int FallbackSampleRows = 100;
+    const int visibleDataRows = geo.height() - m_headerHeight;
+    const int sampleFirst = qBound(0, m_scrollOffset, qMax(0, rows - 1));
+    const int sampleCount = visibleDataRows > 0 ? visibleDataRows : FallbackSampleRows;
+    const int sampleEnd = qMin(rows, sampleFirst + sampleCount);
+
+    // Step 1: Natural width per column = max(header width, widest sampled cell)
+    QVector<int> colWidths(cols, 0);
+    for (int c = 0; c < cols; ++c) {
+        QString header = m_model->headerData(c, Qt::Horizontal, Qt::DisplayRole).toString();
+        int maxW = header.length();
+        for (int r = sampleFirst; r < sampleEnd; ++r) {
+            QModelIndex idx = m_model->index(r, c);
+            const int len = m_model->data(idx, Qt::DisplayRole).toString().length();
+            if (len > maxW)
+                maxW = len;
+        }
+        colWidths[c] = qMax(1, maxW); // at least 1 char per column
+    }
+
+    // Step 2: Constrain total column widths to view width
+    // Account for separators: 1 space between each pair of columns
+    const int viewWidth = geo.width();
+    int separatorTotal = (cols > 1) ? (cols - 1) : 0;
+    int availableForCols = viewWidth - separatorTotal;
+    if (availableForCols < cols)
+        availableForCols = cols; // ensure at least 1 char per column
+
+    int totalNatural = 0;
+    for (int c = 0; c < cols; ++c)
+        totalNatural += colWidths[c];
+
+    if (totalNatural > availableForCols) {
+        // Proportionally scale down, ensuring each column gets at least 1 char
+        QVector<int> scaled(cols, 0);
+        for (int c = 0; c < cols; ++c) {
+            int proportional = static_cast<int>(
+                static_cast<double>(colWidths[c]) / totalNatural * availableForCols);
+            if (proportional < 1)
+                proportional = 1;
+            scaled[c] = proportional;
+        }
+        // Adjust to fit exactly in availableForCols
+        int scaledTotal = 0;
+        for (int c = 0; c < cols; ++c)
+            scaledTotal += scaled[c];
+
+        // Distribute remainder or trim excess
+        int diff = availableForCols - scaledTotal;
+        if (diff > 0) {
+            // Add extra chars to leading columns first
+            for (int c = 0; c < cols && diff > 0; ++c) {
+                scaled[c]++;
+                diff--;
+            }
+        } else if (diff < 0) {
+            // Remove chars from trailing columns (but keep minimum 1)
+            for (int c = cols - 1; c >= 0 && diff < 0; --c) {
+                if (scaled[c] > 1) {
+                    scaled[c]--;
+                    diff++;
+                }
+            }
+        }
+        colWidths = scaled;
+    }
+
+    m_cachedColumnWidths = colWidths;
+    return m_cachedColumnWidths;
 }
 
 void QTuiTableView::clampCurrentIndex()

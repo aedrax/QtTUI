@@ -4,6 +4,7 @@
 #include <QtTUI/QTuiWidget.h>
 #include <QAbstractItemModel>
 #include <QModelIndex>
+#include <QVector>
 
 namespace QtTUI {
 
@@ -34,6 +35,10 @@ private slots:
     void onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight);
     void onRowsInserted(const QModelIndex &parent, int first, int last);
     void onRowsRemoved(const QModelIndex &parent, int first, int last);
+    void onColumnsInserted(const QModelIndex &parent, int first, int last);
+    void onColumnsRemoved(const QModelIndex &parent, int first, int last);
+    void onHeaderDataChanged(Qt::Orientation orientation, int first, int last);
+    void onLayoutChanged();
     void onModelReset();
 
 private:
@@ -42,6 +47,8 @@ private:
     void ensureCurrentVisible();
     void ensureCurrentColumnVisible();
     void clampCurrentIndex();
+    void invalidateColumnWidths();
+    const QVector<int> &effectiveColumnWidths() const;
 
     QAbstractItemModel *m_model = nullptr;
     int m_currentRow = 0;
@@ -49,6 +56,14 @@ private:
     int m_scrollOffset = 0;
     int m_horizontalScrollOffset = 0;
     static constexpr int m_headerHeight = 1;
+
+    // Cached final (post-scaling) column widths shared by painting, hit
+    // testing and horizontal scrolling. Recomputed lazily when model content
+    // changes or when the viewport (geometry / vertical scroll) moves.
+    mutable QVector<int> m_cachedColumnWidths;
+    mutable bool m_columnWidthsStale = true;
+    mutable int m_columnWidthsScrollOffset = -1;
+    mutable QRect m_columnWidthsGeometry;
 };
 
 } // namespace QtTUI

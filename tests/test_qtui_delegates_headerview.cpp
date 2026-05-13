@@ -150,11 +150,11 @@ private slots:
         QRect rect(2, 1, 10, 1);
         delegate.paint(buffer, rect, model.index(0, 0));
 
-        QCOMPARE(buffer.backCell(2, 1).character, QChar('H'));
-        QCOMPARE(buffer.backCell(3, 1).character, QChar('e'));
-        QCOMPARE(buffer.backCell(4, 1).character, QChar('l'));
-        QCOMPARE(buffer.backCell(5, 1).character, QChar('l'));
-        QCOMPARE(buffer.backCell(6, 1).character, QChar('o'));
+        QCOMPARE(buffer.backCell(2, 1).ch, U'H');
+        QCOMPARE(buffer.backCell(3, 1).ch, U'e');
+        QCOMPARE(buffer.backCell(4, 1).ch, U'l');
+        QCOMPARE(buffer.backCell(5, 1).ch, U'l');
+        QCOMPARE(buffer.backCell(6, 1).ch, U'o');
     }
 
     void itemDelegate_paintSkipsInvalidIndex()
@@ -163,7 +163,7 @@ private slots:
         ScreenBuffer buffer(10, 5);
         QRect rect(0, 0, 5, 1);
         delegate.paint(buffer, rect, QModelIndex());
-        QCOMPARE(buffer.backCell(0, 0).character, QChar(' '));
+        QCOMPARE(buffer.backCell(0, 0).ch, U' ');
     }
 
     void itemDelegate_createEditorReturnsNullptr()
@@ -248,7 +248,7 @@ private slots:
 
         // Verify themed colors on text cell
         const Cell &cell = buffer.backCell(0, 0);
-        QCOMPARE(cell.character, QChar('S'));
+        QCOMPARE(cell.ch, U'S');
         QCOMPARE(cell.foreground, props.foreground);
         QCOMPARE(cell.background, props.background);
         QCOMPARE(cell.bold, props.bold);
@@ -257,7 +257,7 @@ private slots:
 
         // Verify background fill beyond text
         const Cell &bgCell = buffer.backCell(7, 0);
-        QCOMPARE(bgCell.character, QChar(' '));
+        QCOMPARE(bgCell.ch, U' ');
         QCOMPARE(bgCell.foreground, props.foreground);
         QCOMPARE(bgCell.background, props.background);
     }
@@ -505,21 +505,21 @@ private slots:
         hv.paintEvent(buffer);
 
         // "Name" starts at x=0 (section 0, default size 10)
-        QCOMPARE(buffer.backCell(0, 0).character, QChar('N'));
-        QCOMPARE(buffer.backCell(1, 0).character, QChar('a'));
-        QCOMPARE(buffer.backCell(2, 0).character, QChar('m'));
-        QCOMPARE(buffer.backCell(3, 0).character, QChar('e'));
+        QCOMPARE(buffer.backCell(0, 0).ch, U'N');
+        QCOMPARE(buffer.backCell(1, 0).ch, U'a');
+        QCOMPARE(buffer.backCell(2, 0).ch, U'm');
+        QCOMPARE(buffer.backCell(3, 0).ch, U'e');
 
         // "Age" starts at x=10 (section 1)
-        QCOMPARE(buffer.backCell(10, 0).character, QChar('A'));
-        QCOMPARE(buffer.backCell(11, 0).character, QChar('g'));
-        QCOMPARE(buffer.backCell(12, 0).character, QChar('e'));
+        QCOMPARE(buffer.backCell(10, 0).ch, U'A');
+        QCOMPARE(buffer.backCell(11, 0).ch, U'g');
+        QCOMPARE(buffer.backCell(12, 0).ch, U'e');
 
         // "City" starts at x=20 (section 2)
-        QCOMPARE(buffer.backCell(20, 0).character, QChar('C'));
-        QCOMPARE(buffer.backCell(21, 0).character, QChar('i'));
-        QCOMPARE(buffer.backCell(22, 0).character, QChar('t'));
-        QCOMPARE(buffer.backCell(23, 0).character, QChar('y'));
+        QCOMPARE(buffer.backCell(20, 0).ch, U'C');
+        QCOMPARE(buffer.backCell(21, 0).ch, U'i');
+        QCOMPARE(buffer.backCell(22, 0).ch, U't');
+        QCOMPARE(buffer.backCell(23, 0).ch, U'y');
     }
 
     void headerView_paintSkipsHiddenSections()
@@ -538,11 +538,11 @@ private slots:
         hv.paintEvent(buffer);
 
         // "AAA" at x=0
-        QCOMPARE(buffer.backCell(0, 0).character, QChar('A'));
+        QCOMPARE(buffer.backCell(0, 0).ch, U'A');
         // "CCC" follows at x=10 (section 0 width), skipping hidden BBB
-        QCOMPARE(buffer.backCell(10, 0).character, QChar('C'));
-        QCOMPARE(buffer.backCell(11, 0).character, QChar('C'));
-        QCOMPARE(buffer.backCell(12, 0).character, QChar('C'));
+        QCOMPARE(buffer.backCell(10, 0).ch, U'C');
+        QCOMPARE(buffer.backCell(11, 0).ch, U'C');
+        QCOMPARE(buffer.backCell(12, 0).ch, U'C');
     }
 
     void headerView_keyNavigateHorizontal()

@@ -14,6 +14,7 @@ QTuiHeaderView::QTuiHeaderView(Qt::Orientation orientation, QTuiWidget *parent)
     : QTuiWidget(parent)
     , m_orientation(orientation)
 {
+    setFocusPolicy(Qt::StrongFocus);
 }
 
 void QTuiHeaderView::setModel(QAbstractItemModel *model)
@@ -35,6 +36,9 @@ void QTuiHeaderView::setModel(QAbstractItemModel *model)
         });
         connect(m_model, &QAbstractItemModel::modelReset,
                 this, &QTuiHeaderView::initSections);
+        // Sections may be reordered/re-counted wholesale (e.g. proxy sort)
+        connect(m_model, &QAbstractItemModel::layoutChanged,
+                this, [this]() { initSections(); });
         if (m_orientation == Qt::Horizontal) {
             connect(m_model, &QAbstractItemModel::columnsInserted,
                     this, &QTuiHeaderView::initSections);
@@ -46,9 +50,15 @@ void QTuiHeaderView::setModel(QAbstractItemModel *model)
             connect(m_model, &QAbstractItemModel::rowsRemoved,
                     this, &QTuiHeaderView::initSections);
         }
+        // Guard against the model being deleted while still set on the view
+        connect(m_model, &QObject::destroyed, this, [this]() {
+            m_model = nullptr;
+            initSections();
+        });
     }
 
     initSections();
+    markDirty();
 }
 
 QAbstractItemModel *QTuiHeaderView::model() const
@@ -81,6 +91,7 @@ void QTuiHeaderView::resizeSection(int logicalIndex, int size)
 
     m_sectionSizes[logicalIndex] = size;
     emit sectionResized(logicalIndex, oldSize, size);
+    markDirty();
 }
 
 bool QTuiHeaderView::isSectionHidden(int logicalIndex) const
@@ -92,11 +103,14 @@ void QTuiHeaderView::setSectionHidden(int logicalIndex, bool hide)
 {
     if (logicalIndex < 0 || logicalIndex >= count())
         return;
+    if (hide == isSectionHidden(logicalIndex))
+        return;
 
     if (hide)
         m_hiddenSections.insert(logicalIndex);
     else
         m_hiddenSections.remove(logicalIndex);
+    markDirty();
 }
 
 int QTuiHeaderView::count() const
@@ -169,7 +183,7 @@ void QTuiHeaderView::paintEvent(ScreenBuffer &buffer)
                     continue;
 
                 Cell &cell = buffer.backCell(px, y);
-                cell.character = (col < label.length()) ? label.at(col) : QLatin1Char(' ');
+                cell.setChar((col < label.length()) ? label.at(col).unicode() : u' ');
 
                 if (isFocused) {
                     cell.foreground = focusFg;
@@ -190,7 +204,7 @@ void QTuiHeaderView::paintEvent(ScreenBuffer &buffer)
         for (int px = x; px < geo.x() + geo.width() && px < buffer.width(); ++px) {
             if (y >= 0 && y < buffer.height()) {
                 Cell &cell = buffer.backCell(px, y);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = fg;
                 cell.background = bg;
             }
@@ -216,7 +230,7 @@ void QTuiHeaderView::paintEvent(ScreenBuffer &buffer)
                     continue;
 
                 Cell &cell = buffer.backCell(px, row);
-                cell.character = (col < label.length()) ? label.at(col) : QLatin1Char(' ');
+                cell.setChar((col < label.length()) ? label.at(col).unicode() : u' ');
 
                 if (isFocused) {
                     cell.foreground = focusFg;
@@ -247,29 +261,37 @@ void QTuiHeaderView::keyPressEvent(TuiKeyEvent *event)
     case Qt::Key_Left:
         if (m_orientation == Qt::Horizontal) {
             int prev = nextVisibleSection(m_focusedSection, -1);
-            if (prev >= 0)
+            if (prev >= 0) {
                 m_focusedSection = prev;
+                markDirty();
+            }
         }
         break;
     case Qt::Key_Right:
         if (m_orientation == Qt::Horizontal) {
             int next = nextVisibleSection(m_focusedSection, 1);
-            if (next >= 0)
+            if (next >= 0) {
                 m_focusedSection = next;
+                markDirty();
+            }
         }
         break;
     case Qt::Key_Up:
         if (m_orientation == Qt::Vertical) {
             int prev = nextVisibleSection(m_focusedSection, -1);
-            if (prev >= 0)
+            if (prev >= 0) {
                 m_focusedSection = prev;
+                markDirty();
+            }
         }
         break;
     case Qt::Key_Down:
         if (m_orientation == Qt::Vertical) {
             int next = nextVisibleSection(m_focusedSection, 1);
-            if (next >= 0)
+            if (next >= 0) {
                 m_focusedSection = next;
+                markDirty();
+            }
         }
         break;
     case Qt::Key_Return:
@@ -314,6 +336,7 @@ void QTuiHeaderView::initSections()
             validHidden.insert(idx);
     }
     m_hiddenSections = validHidden;
+    markDirty();
 }
 
 int QTuiHeaderView::nextVisibleSection(int from, int direction) const

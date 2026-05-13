@@ -4,6 +4,7 @@
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
 #include <QAbstractListModel>
+#include <QSortFilterProxyModel>
 
 using namespace QtTUI;
 
@@ -142,6 +143,53 @@ private slots:
                     RC_ASSERT(!cur.isValid());
                 }
             });
+    }
+
+    // Regression: sorting through a QSortFilterProxyModel emits layoutChanged
+    // (not rowsMoved/modelReset); the view must handle it by re-clamping its
+    // current index / scroll offset, marking itself dirty, and rendering the
+    // new order.
+    void proxyModelSortReordersView()
+    {
+        SimpleListModel model(5); // "Item0" .. "Item4" (ascending)
+
+        QSortFilterProxyModel proxy;
+        proxy.setSourceModel(&model);
+
+        QTuiListView lv;
+        const int viewHeight = 3;
+        lv.setGeometry(QRect(0, 0, 20, viewHeight));
+        lv.setModel(&proxy);
+
+        // Move to the last row so the view is scrolled down
+        lv.setCurrentIndex(proxy.index(4, 0));
+        QCOMPARE(lv.scrollOffset(), 2);
+        lv.clearDirtyRegions();
+
+        // Descending sort reorders every row and emits layoutChanged
+        proxy.sort(0, Qt::DescendingOrder);
+
+        // The view must have noticed the change
+        QVERIFY(lv.isDirty());
+
+        // Current index and scroll offset must still be valid and consistent
+        QModelIndex cur = lv.currentIndex();
+        QVERIFY(cur.isValid());
+        QVERIFY(cur.row() < proxy.rowCount());
+        const int scrollOff = lv.scrollOffset();
+        QVERIFY(cur.row() >= scrollOff);
+        QVERIFY(cur.row() < scrollOff + viewHeight);
+
+        // Painting must show the new (descending) order at the top of the
+        // visible window: with scrollOffset 2 the first visible row is
+        // proxy row 2 == "Item2" in descending order.
+        ScreenBuffer buf(20, viewHeight);
+        lv.paintEvent(buf);
+        QString firstLine;
+        for (int x = 0; x < 20; ++x)
+            firstLine.append(buf.backCell(x, 0).text());
+        QCOMPARE(firstLine.trimmed(),
+                 proxy.data(proxy.index(scrollOff, 0)).toString());
     }
 
     // Feature: qttui-framework, Property 23: ListView vertical scrolling

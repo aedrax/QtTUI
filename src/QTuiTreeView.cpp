@@ -10,6 +10,21 @@ namespace QtTUI {
 QTuiTreeView::QTuiTreeView(QTuiWidget *parent)
     : QTuiWidget(parent)
 {
+    setFocusPolicy(Qt::StrongFocus);
+    // Layouts resize views through setGeometry(); no resize events are
+    // delivered to child widgets. Re-clamp scrolling whenever our geometry
+    // changes so the current row stays visible after a shrink or grow.
+    connect(this, &QTuiWidget::geometryChanged, this, [this](const QRect &) {
+        if (!m_model)
+            return;
+        const int visibleRows = geometry().height();
+        if (visibleRows > 0) {
+            m_scrollOffset = qBound(0, m_scrollOffset,
+                                    qMax(0, int(m_flatList.size()) - visibleRows));
+        }
+        scrollToVisible();
+        markDirty();
+    });
 }
 
 void QTuiTreeView::setModel(QAbstractItemModel *model)
@@ -21,6 +36,7 @@ void QTuiTreeView::setModel(QAbstractItemModel *model)
     m_model = model;
     m_currentRow = 0;
     m_scrollOffset = 0;
+    m_pendingRemovalFlatRow = -1;
     m_expandedItems.clear();
     m_flatList.clear();
 
@@ -45,9 +61,10 @@ QModelIndex QTuiTreeView::currentIndex() const
 void QTuiTreeView::setCurrentIndex(const QModelIndex &index)
 {
     int row = flatRowForIndex(index);
-    if (row >= 0) {
+    if (row >= 0 && row != m_currentRow) {
         m_currentRow = row;
         scrollToVisible();
+        markDirty();
     }
 }
 
@@ -168,7 +185,7 @@ void QTuiTreeView::paintEvent(ScreenBuffer &buffer)
         if (isCurrent && hasFocus()) {
             for (int x = 0; x < viewWidth; ++x) {
                 Cell &cell = buffer.backCell(geo.x() + x, screenY);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = theme.focusForeground;
                 cell.background = theme.focusBackground;
                 cell.bold = false;
@@ -182,7 +199,7 @@ void QTuiTreeView::paintEvent(ScreenBuffer &buffer)
         // Render indentation spaces
         for (int i = 0; i < indentOffset && i < viewWidth; ++i) {
             Cell &cell = buffer.backCell(geo.x() + i, screenY);
-            cell.character = QLatin1Char(' ');
+            cell.setChar(U' ');
             cell.foreground = style.foreground;
             cell.background = style.background;
             cell.bold = false;
@@ -193,10 +210,10 @@ void QTuiTreeView::paintEvent(ScreenBuffer &buffer)
         int indicatorOffset = indentOffset;
         if (hasChildren) {
             // Use multi-byte indicator characters: ▶ (collapsed) or ▼ (expanded)
-            QChar indicatorChar = item.expanded ? QChar(0x25BC) : QChar(0x25B6);
+            const char32_t indicatorChar = item.expanded ? char32_t(0x25BC) : char32_t(0x25B6);
             if (indicatorOffset < viewWidth) {
                 Cell &cell = buffer.backCell(geo.x() + indicatorOffset, screenY);
-                cell.character = indicatorChar;
+                cell.setChar(indicatorChar);
                 cell.foreground = style.foreground;
                 cell.background = style.background;
                 cell.bold = false;
@@ -206,7 +223,7 @@ void QTuiTreeView::paintEvent(ScreenBuffer &buffer)
             // Space after indicator
             if (indicatorOffset < viewWidth) {
                 Cell &cell = buffer.backCell(geo.x() + indicatorOffset, screenY);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = style.foreground;
                 cell.background = style.background;
                 cell.bold = false;
@@ -217,7 +234,7 @@ void QTuiTreeView::paintEvent(ScreenBuffer &buffer)
             // No indicator for leaves, but reserve the same space for alignment
             for (int i = 0; i < 2 && indicatorOffset < viewWidth; ++i, ++indicatorOffset) {
                 Cell &cell = buffer.backCell(geo.x() + indicatorOffset, screenY);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = style.foreground;
                 cell.background = style.background;
                 cell.bold = false;
@@ -255,6 +272,7 @@ void QTuiTreeView::keyPressEvent(TuiKeyEvent *event)
         if (m_currentRow > 0) {
             --m_currentRow;
             scrollToVisible();
+            markDirty();
         }
         break;
 
@@ -262,6 +280,7 @@ void QTuiTreeView::keyPressEvent(TuiKeyEvent *event)
         if (m_currentRow < m_flatList.size() - 1) {
             ++m_currentRow;
             scrollToVisible();
+            markDirty();
         }
         break;
 
@@ -274,6 +293,7 @@ void QTuiTreeView::keyPressEvent(TuiKeyEvent *event)
                 // Already expanded: move to first child
                 ++m_currentRow;
                 scrollToVisible();
+                markDirty();
             }
         }
         break;
@@ -290,6 +310,7 @@ void QTuiTreeView::keyPressEvent(TuiKeyEvent *event)
             if (parentRow >= 0) {
                 m_currentRow = parentRow;
                 scrollToVisible();
+                markDirty();
             }
         }
         break;
@@ -428,20 +449,35 @@ void QTuiTreeView::onRowsInserted(const QModelIndex &parent, int first, int last
     markDirty(dirtyRect);
 }
 
-void QTuiTreeView::onRowsRemoved(const QModelIndex &parent, int first, int last)
+void QTuiTreeView::onRowsAboutToBeRemoved(const QModelIndex &parent, int first, int last)
 {
     Q_UNUSED(last);
 
-    // Find the flat row corresponding to the removal point before rebuild
-    int affectedFlatRow = -1;
+    // Find the flat row corresponding to the removal point while the flat
+    // list's indexes (and their internal pointers) are still valid. Doing
+    // this in onRowsRemoved would call parent() on indexes whose internal
+    // pointers may already have been freed by the model.
+    m_pendingRemovalFlatRow = -1;
     for (int i = 0; i < m_flatList.size(); ++i) {
         const QModelIndex &idx = m_flatList.at(i).index;
         if (idx.parent() == parent && idx.row() >= first) {
-            affectedFlatRow = i;
+            m_pendingRemovalFlatRow = i;
             break;
         }
     }
+}
 
+void QTuiTreeView::onRowsRemoved(const QModelIndex &parent, int first, int last)
+{
+    Q_UNUSED(parent);
+    Q_UNUSED(first);
+    Q_UNUSED(last);
+
+    // Captured before the removal, while indexes were still valid
+    int affectedFlatRow = m_pendingRemovalFlatRow;
+    m_pendingRemovalFlatRow = -1;
+
+    // Rebuild directly from the model; the old flat list is stale
     rebuildFlatList();
 
     if (m_currentRow >= m_flatList.size())
@@ -469,6 +505,26 @@ void QTuiTreeView::onRowsRemoved(const QModelIndex &parent, int first, int last)
     markDirty(dirtyRect);
 }
 
+void QTuiTreeView::onLayoutChanged()
+{
+    // Rows may have been reordered wholesale (e.g. proxy sort). Try to keep
+    // the current item; the expanded set uses persistent indexes and updates
+    // automatically.
+    QModelIndex currentIdx;
+    if (m_currentRow >= 0 && m_currentRow < m_flatList.size())
+        currentIdx = m_flatList.at(m_currentRow).index;
+
+    rebuildFlatList();
+
+    int row = currentIdx.isValid() ? flatRowForIndex(currentIdx) : -1;
+    if (row >= 0)
+        m_currentRow = row;
+    if (m_currentRow >= m_flatList.size())
+        m_currentRow = qMax(0, m_flatList.size() - 1);
+    scrollToVisible();
+    markDirty();
+}
+
 void QTuiTreeView::onModelReset()
 {
     m_currentRow = 0;
@@ -490,10 +546,15 @@ void QTuiTreeView::disconnectModel()
                this, &QTuiTreeView::onDataChanged);
     disconnect(m_model, &QAbstractItemModel::rowsInserted,
                this, &QTuiTreeView::onRowsInserted);
+    disconnect(m_model, &QAbstractItemModel::rowsAboutToBeRemoved,
+               this, &QTuiTreeView::onRowsAboutToBeRemoved);
     disconnect(m_model, &QAbstractItemModel::rowsRemoved,
                this, &QTuiTreeView::onRowsRemoved);
+    disconnect(m_model, &QAbstractItemModel::layoutChanged,
+               this, &QTuiTreeView::onLayoutChanged);
     disconnect(m_model, &QAbstractItemModel::modelReset,
                this, &QTuiTreeView::onModelReset);
+    disconnect(m_model, &QObject::destroyed, this, nullptr);
 }
 
 void QTuiTreeView::connectModel()
@@ -505,10 +566,19 @@ void QTuiTreeView::connectModel()
             this, &QTuiTreeView::onDataChanged);
     connect(m_model, &QAbstractItemModel::rowsInserted,
             this, &QTuiTreeView::onRowsInserted);
+    connect(m_model, &QAbstractItemModel::rowsAboutToBeRemoved,
+            this, &QTuiTreeView::onRowsAboutToBeRemoved);
     connect(m_model, &QAbstractItemModel::rowsRemoved,
             this, &QTuiTreeView::onRowsRemoved);
+    connect(m_model, &QAbstractItemModel::layoutChanged,
+            this, &QTuiTreeView::onLayoutChanged);
     connect(m_model, &QAbstractItemModel::modelReset,
             this, &QTuiTreeView::onModelReset);
+    // Guard against the model being deleted while still set on the view
+    connect(m_model, &QObject::destroyed, this, [this]() {
+        m_model = nullptr;
+        onModelReset();
+    });
 }
 
 void QTuiTreeView::rebuildFlatList()

@@ -1,9 +1,29 @@
 #include <QtTUI/QTuiDataWidgetMapper.h>
 #include <QtTUI/QTuiWidget.h>
+#include <QtTUI/QTuiSpinBox.h>
+#include <QtTUI/QTuiDoubleSpinBox.h>
+#include <QtTUI/QTuiComboBox.h>
+#include <QtTUI/QTuiCheckBox.h>
 #include <QAbstractItemModel>
 #include <QMetaProperty>
 
 namespace QtTUI {
+
+// Property used to move data between the model and a mapped widget.
+// Mirrors the widget-type dispatch in connectWidgetSignals(): the names
+// must match each widget's Q_PROPERTY declarations exactly.
+static QByteArray mappedPropertyName(const QTuiWidget *widget)
+{
+    if (qobject_cast<const QTuiSpinBox *>(widget))
+        return QByteArrayLiteral("value");
+    if (qobject_cast<const QTuiDoubleSpinBox *>(widget))
+        return QByteArrayLiteral("value");
+    if (qobject_cast<const QTuiComboBox *>(widget))
+        return QByteArrayLiteral("currentIndex");
+    if (qobject_cast<const QTuiCheckBox *>(widget))
+        return QByteArrayLiteral("checkState");
+    return QByteArrayLiteral("text");
+}
 
 QTuiDataWidgetMapper::QTuiDataWidgetMapper(QObject *parent)
     : QObject(parent)
@@ -14,8 +34,24 @@ void QTuiDataWidgetMapper::setModel(QAbstractItemModel *model)
 {
     if (m_model == model)
         return;
+
+    if (m_model)
+        disconnect(m_model, nullptr, this, nullptr);
+
     m_model = model;
     m_currentIndex = -1;
+
+    if (m_model) {
+        // Guard against the model being deleted while still set on the mapper
+        connect(m_model, &QObject::destroyed, this, [this]() {
+            m_model = nullptr;
+            m_currentIndex = -1;
+        });
+        // Keep mapped widgets in sync when the model changes underneath us
+        // (mirrors QDataWidgetMapper behavior)
+        connect(m_model, &QAbstractItemModel::dataChanged,
+                this, &QTuiDataWidgetMapper::onModelDataChanged);
+    }
 }
 
 QAbstractItemModel *QTuiDataWidgetMapper::model() const
@@ -33,6 +69,16 @@ void QTuiDataWidgetMapper::addMapping(QTuiWidget *widget, int section)
 
     m_mappings.append({widget, section});
 
+    // Drop the mapping if the widget is destroyed while still mapped
+    connect(widget, &QObject::destroyed, this, [this, widget]() {
+        for (int i = 0; i < m_mappings.size(); ++i) {
+            if (m_mappings[i].widget == widget) {
+                m_mappings.removeAt(i);
+                break;
+            }
+        }
+    });
+
     if (m_submitPolicy == AutoSubmit)
         connectWidgetSignals(widget);
 
@@ -46,6 +92,7 @@ void QTuiDataWidgetMapper::removeMapping(QTuiWidget *widget)
     for (int i = 0; i < m_mappings.size(); ++i) {
         if (m_mappings[i].widget == widget) {
             disconnectWidgetSignals(widget);
+            disconnect(widget, &QObject::destroyed, this, nullptr);
             m_mappings.removeAt(i);
             return;
         }
@@ -54,8 +101,10 @@ void QTuiDataWidgetMapper::removeMapping(QTuiWidget *widget)
 
 void QTuiDataWidgetMapper::clearMapping()
 {
-    for (const auto &m : m_mappings)
+    for (const auto &m : m_mappings) {
         disconnectWidgetSignals(m.widget);
+        disconnect(m.widget, &QObject::destroyed, this, nullptr);
+    }
     m_mappings.clear();
 }
 
@@ -129,7 +178,7 @@ bool QTuiDataWidgetMapper::submit()
 
     bool allOk = true;
     for (const auto &m : m_mappings) {
-        QVariant value = m.widget->property("text");
+        QVariant value = m.widget->property(mappedPropertyName(m.widget).constData());
         QModelIndex idx = m_model->index(m_currentIndex, m.section);
         if (idx.isValid()) {
             if (!m_model->setData(idx, value, Qt::EditRole))
@@ -149,14 +198,44 @@ void QTuiDataWidgetMapper::populate()
     if (!m_model || m_currentIndex < 0)
         return;
 
+    for (const auto &m : m_mappings)
+        populateWidget(m.widget, m.section);
+}
+
+void QTuiDataWidgetMapper::populateWidget(QTuiWidget *widget, int section)
+{
+    if (!m_model || m_currentIndex < 0)
+        return;
+
+    QModelIndex idx = m_model->index(m_currentIndex, section);
+    if (!idx.isValid())
+        return;
+
+    QVariant value = m_model->data(idx, Qt::EditRole);
+    if (!value.isValid())
+        value = m_model->data(idx, Qt::DisplayRole);
+
+    const QByteArray prop = mappedPropertyName(widget);
+    if (prop == QByteArrayLiteral("text"))
+        widget->setProperty(prop.constData(), value.toString());
+    else
+        widget->setProperty(prop.constData(), value);
+}
+
+void QTuiDataWidgetMapper::onModelDataChanged(const QModelIndex &topLeft,
+                                              const QModelIndex &bottomRight)
+{
+    if (!m_model || m_currentIndex < 0)
+        return;
+    if (topLeft.parent().isValid())
+        return; // the mapper only maps top-level rows
+    if (m_currentIndex < topLeft.row() || m_currentIndex > bottomRight.row())
+        return;
+
+    // Repopulate only the widgets mapped to changed sections
     for (const auto &m : m_mappings) {
-        QModelIndex idx = m_model->index(m_currentIndex, m.section);
-        if (idx.isValid()) {
-            QVariant value = m_model->data(idx, Qt::EditRole);
-            if (!value.isValid())
-                value = m_model->data(idx, Qt::DisplayRole);
-            m.widget->setProperty("text", value.toString());
-        }
+        if (m.section >= topLeft.column() && m.section <= bottomRight.column())
+            populateWidget(m.widget, m.section);
     }
 }
 
@@ -171,7 +250,7 @@ void QTuiDataWidgetMapper::onWidgetTextChanged()
 
     for (const auto &m : m_mappings) {
         if (m.widget == senderWidget) {
-            QVariant value = m.widget->property("text");
+            QVariant value = m.widget->property(mappedPropertyName(m.widget).constData());
             QModelIndex idx = m_model->index(m_currentIndex, m.section);
             if (idx.isValid())
                 m_model->setData(idx, value, Qt::EditRole);
@@ -203,6 +282,24 @@ void QTuiDataWidgetMapper::connectWidgetSignals(QTuiWidget *widget)
     }
     // Try valueChanged(double) for double spin boxes
     signalIdx = mo->indexOfSignal("valueChanged(double)");
+    if (signalIdx >= 0) {
+        const QMetaMethod signal = mo->method(signalIdx);
+        const QMetaMethod slot = metaObject()->method(
+            metaObject()->indexOfSlot("onWidgetTextChanged()"));
+        connect(widget, signal, this, slot);
+        return;
+    }
+    // Try currentIndexChanged(int) for combo boxes
+    signalIdx = mo->indexOfSignal("currentIndexChanged(int)");
+    if (signalIdx >= 0) {
+        const QMetaMethod signal = mo->method(signalIdx);
+        const QMetaMethod slot = metaObject()->method(
+            metaObject()->indexOfSlot("onWidgetTextChanged()"));
+        connect(widget, signal, this, slot);
+        return;
+    }
+    // Try stateChanged(int) for check boxes
+    signalIdx = mo->indexOfSignal("stateChanged(int)");
     if (signalIdx >= 0) {
         const QMetaMethod signal = mo->method(signalIdx);
         const QMetaMethod slot = metaObject()->method(

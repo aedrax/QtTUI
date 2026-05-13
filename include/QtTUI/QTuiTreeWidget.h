@@ -21,6 +21,15 @@ public:
     void rebuild();
 private:
     friend class QTuiTreeWidget;
+    // Targeted change notification helpers used by QTuiTreeWidget so item
+    // mutations do not have to reset the whole model.
+    QModelIndex indexForItem(QTuiTreeWidgetItem *item) const;
+    void itemDataChanged(QTuiTreeWidgetItem *item, int column);
+    void beginInsertItem(QTuiTreeWidgetItem *parent, int row);
+    void endInsertItem();
+    void beginRemoveItem(QTuiTreeWidgetItem *parent, int row);
+    void endRemoveItem();
+
     QList<QTuiTreeWidgetItem *> *m_topLevelItemsRef = nullptr;
     int m_columnCount = 1;
     QHash<int, QVariant> m_headerData;
@@ -48,6 +57,12 @@ protected:
 private:
     friend class QTuiTreeWidgetItem;
     void syncFromItems();
+    // Targeted notification forwarders used by QTuiTreeWidgetItem
+    void notifyItemDataChanged(QTuiTreeWidgetItem *item, int column);
+    void beginInsertItem(QTuiTreeWidgetItem *parent, int row);
+    void endInsertItem();
+    void beginRemoveItem(QTuiTreeWidgetItem *parent, int row);
+    void endRemoveItem();
     QTuiTreeWidgetItem *itemFromIndex(const QModelIndex &index) const;
     QTuiTreeWidgetModel *m_internalModel;
     QList<QTuiTreeWidgetItem *> m_topLevelItems;

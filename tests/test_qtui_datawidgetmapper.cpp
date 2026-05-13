@@ -6,6 +6,7 @@
 #include <QtTUI/QTuiDataWidgetMapper.h>
 #include <QtTUI/QTuiWidget.h>
 #include <QtTUI/QTuiLineEdit.h>
+#include <QtTUI/QTuiSpinBox.h>
 #include <QtTUI/ScreenBuffer.h>
 
 using namespace QtTUI;
@@ -85,6 +86,8 @@ private slots:
     void testRemoveMapping();
     void testClearMapping();
     void testNavigationBoundsChecking();
+    void testSpinBoxValuePropertyMapping();
+    void testModelDataChangedRepopulatesWidgets();
 };
 
 void TestQTuiDataWidgetMapper::testMappingPopulatesWidgets()
@@ -374,6 +377,57 @@ void TestQTuiDataWidgetMapper::testNavigationBoundsChecking()
     mapper.toPrevious();
     QCOMPARE(mapper.currentIndex(), 0);
     QCOMPARE(spy.count(), countBefore); // No new signal
+}
+
+// Regression: the mapper used to hardcode the "text" property, silently
+// breaking spin boxes (whose user property is "value").
+void TestQTuiDataWidgetMapper::testSpinBoxValuePropertyMapping()
+{
+    MapperTestModel model(3, 2);
+    model.setData(model.index(0, 1), 42);
+    model.setData(model.index(1, 1), 7);
+
+    QTuiDataWidgetMapper mapper;
+    mapper.setModel(&model);
+
+    QTuiSpinBox spin;
+    mapper.addMapping(&spin, 1);
+
+    mapper.toFirst();
+    QCOMPARE(spin.value(), 42);
+
+    mapper.toNext();
+    QCOMPARE(spin.value(), 7);
+
+    // Submitting must write the spin box's value property back to the model
+    mapper.setSubmitPolicy(QTuiDataWidgetMapper::ManualSubmit);
+    spin.setValue(9);
+    QVERIFY(mapper.submit());
+    QCOMPARE(model.data(model.index(1, 1)).toString(), QStringLiteral("9"));
+}
+
+// Regression: external model edits must repopulate mapped widgets showing
+// the current row (real QDataWidgetMapper behavior).
+void TestQTuiDataWidgetMapper::testModelDataChangedRepopulatesWidgets()
+{
+    MapperTestModel model(3, 2);
+    QTuiDataWidgetMapper mapper;
+    mapper.setModel(&model);
+    mapper.setSubmitPolicy(QTuiDataWidgetMapper::ManualSubmit);
+
+    QTuiLineEdit edit0;
+    mapper.addMapping(&edit0, 0);
+
+    mapper.setCurrentIndex(1);
+    QCOMPARE(edit0.text(), QStringLiteral("R1C0"));
+
+    // Edit the current row directly on the model
+    model.setData(model.index(1, 0), QStringLiteral("External"));
+    QCOMPARE(edit0.text(), QStringLiteral("External"));
+
+    // A change on a different row must not disturb the widget
+    model.setData(model.index(2, 0), QStringLiteral("Elsewhere"));
+    QCOMPARE(edit0.text(), QStringLiteral("External"));
 }
 
 QTEST_MAIN(TestQTuiDataWidgetMapper)
