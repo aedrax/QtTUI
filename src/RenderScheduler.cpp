@@ -198,8 +198,10 @@ void RenderScheduler::paintTree(QTuiWidget *widget, const QRect &parentClipRect)
     // Recurse into visible children, passing the computed clip rect. Popup
     // children are skipped here: they belong to the topmost popup layer and
     // must not be clipped to this widget's rect (see paintPopupLayer()).
+    // Children painted by their parent are skipped too: their geometry is not
+    // a screen position.
     for (auto *child : widget->childWidgets()) {
-        if (child->isVisible() && !child->isPopup()) {
+        if (child->isVisible() && !child->isPopup() && !child->isPaintedByParent()) {
             paintTree(child, clipRect);
         }
     }

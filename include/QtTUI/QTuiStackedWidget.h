@@ -24,6 +24,7 @@ public:
     QTuiWidget *currentWidget() const;
     void setCurrentWidget(QTuiWidget *widget);
 
+    QSize minimumSize() const override;
     void paintEvent(ScreenBuffer &buffer) override;
 
 signals:

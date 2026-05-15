@@ -67,29 +67,34 @@ QStringList QTuiLabel::wrapText(const QString &text, int width) const
     if (width <= 0 || text.isEmpty())
         return lines;
 
-    if (!m_wordWrap) {
-        lines.append(text);
-        return lines;
-    }
+    // Each newline starts a new line
+    const QStringList textLines = text.split(QLatin1Char('\n'));
+    if (!m_wordWrap)
+        return textLines;
 
-    // Word-wrap: break at word boundaries
-    const QStringList words = text.split(QLatin1Char(' '), Qt::SkipEmptyParts);
-    QString currentLine;
-
-    for (const QString &word : words) {
-        if (currentLine.isEmpty()) {
-            // If a single word exceeds width, force it onto its own line
-            currentLine = word;
-        } else if (QtTuiUnicode::stringWidth(currentLine) + 1
-                       + QtTuiUnicode::stringWidth(word) <= width) {
-            currentLine += QLatin1Char(' ') + word;
-        } else {
-            lines.append(currentLine);
-            currentLine = word;
+    // Word-wrap: break each line at word boundaries
+    for (const QString &textLine : textLines) {
+        const QStringList words = textLine.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+        if (words.isEmpty()) {
+            lines.append(QString());
+            continue;
         }
-    }
-    if (!currentLine.isEmpty())
+
+        QString currentLine;
+        for (const QString &word : words) {
+            if (currentLine.isEmpty()) {
+                // If a single word exceeds width, force it onto its own line
+                currentLine = word;
+            } else if (QtTuiUnicode::stringWidth(currentLine) + 1
+                           + QtTuiUnicode::stringWidth(word) <= width) {
+                currentLine += QLatin1Char(' ') + word;
+            } else {
+                lines.append(currentLine);
+                currentLine = word;
+            }
+        }
         lines.append(currentLine);
+    }
 
     return lines;
 }
@@ -99,16 +104,21 @@ QSize QTuiLabel::minimumSize() const
     if (m_text.isEmpty())
         return QSize(0, 1);
 
-    if (!m_wordWrap)
-        return QSize(QtTuiUnicode::stringWidth(m_text), 1);
+    // Each newline starts a new line
+    const QStringList textLines = m_text.split(QLatin1Char('\n'));
+    int width = 0;
+    for (const QString &line : textLines) {
+        if (!m_wordWrap) {
+            width = qMax(width, QtTuiUnicode::stringWidth(line));
+            continue;
+        }
+        // With word wrap, minimum width is the longest word
+        const QStringList words = line.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+        for (const QString &w : words)
+            width = qMax(width, QtTuiUnicode::stringWidth(w));
+    }
 
-    // With word wrap, minimum width is the longest word, height depends on wrapping
-    const QStringList words = m_text.split(QLatin1Char(' '), Qt::SkipEmptyParts);
-    int maxWordLen = 0;
-    for (const QString &w : words)
-        maxWordLen = qMax(maxWordLen, QtTuiUnicode::stringWidth(w));
-
-    return QSize(maxWordLen, 1);
+    return QSize(width, int(textLines.size()));
 }
 
 void QTuiLabel::paintEvent(ScreenBuffer &buffer)

@@ -12,6 +12,17 @@ QTuiMdiArea::QTuiMdiArea(QTuiWidget *parent)
     : QTuiWidget(parent)
 {
     setFocusPolicy(Qt::StrongFocus);
+
+    // Sub-window geometry is in screen coordinates. When a parent layout
+    // moves the area, move the sub-windows by the same offset.
+    connect(this, &QTuiWidget::geometryChanged, this, [this](const QRect &geo) {
+        const QPoint delta = geo.topLeft() - m_lastOrigin;
+        m_lastOrigin = geo.topLeft();
+        if (delta.isNull())
+            return;
+        for (auto *sub : m_subWindows)
+            sub->setGeometry(sub->geometry().translated(delta));
+    });
 }
 
 QTuiMdiSubWindow *QTuiMdiArea::addSubWindow(QTuiWidget *widget)

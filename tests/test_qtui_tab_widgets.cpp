@@ -243,6 +243,26 @@ private slots:
         QCOMPARE(ms.height(), 1);
     }
 
+    void tabWidget_minimumSizeShowsContent()
+    {
+        // 2 rows of chrome + 1 row for the page (TabTestWidget is 3x1)
+        QTuiTabWidget tw;
+        tw.addTab(new TabTestWidget(), QStringLiteral("AB"));
+        tw.addTab(new TabTestWidget(), QStringLiteral("CD"));
+        const QSize ms = tw.minimumSize();
+        QCOMPARE(ms, QSize(7, 3));
+
+        // At its minimum size, the content area must not be empty
+        tw.setGeometry(QRect(QPoint(0, 0), ms));
+        QVERIFY(!tw.contentArea().isEmpty());
+    }
+
+    void tabWidget_minimumSizeEmpty()
+    {
+        QTuiTabWidget tw;
+        QCOMPARE(tw.minimumSize().height(), 3);
+    }
+
     void tabBar_paintEvent()
     {
         QTuiTabBar bar;

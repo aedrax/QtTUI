@@ -66,6 +66,13 @@ public:
     bool isPopup() const;
     void setPopup(bool popup);
 
+    // A widget painted by its parent keeps its geometry in the parent's own
+    // coordinate space (for example the content of a QTuiScrollArea, which is
+    // relative to the scroll area). The render pass and the mouse hit test
+    // skip it, because its geometry is not a screen position.
+    bool isPaintedByParent() const;
+    void setPaintedByParent(bool paintedByParent);
+
     // Called on each visible popup when a mouse press lands outside every
     // visible popup (see QTuiMainWindow::mousePressEvent). The default
     // implementation hides the popup; subclasses override it to run their full
@@ -119,6 +126,7 @@ private:
     bool m_enabled = true;
     bool m_hasFocus = false;
     bool m_isPopup = false;
+    bool m_paintedByParent = false;
     Qt::FocusPolicy m_focusPolicy = Qt::NoFocus;
 
     // Widget focused before this popup became visible; restored when it hides

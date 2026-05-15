@@ -35,6 +35,8 @@ protected:
 private:
     QList<QTuiMdiSubWindow *> m_subWindows;
     QTuiMdiSubWindow *m_activeWindow = nullptr;
+    // Top-left corner of the last geometry, to move the sub-windows with the area
+    QPoint m_lastOrigin;
 };
 
 } // namespace QtTUI

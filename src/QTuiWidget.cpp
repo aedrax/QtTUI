@@ -183,6 +183,16 @@ void QTuiWidget::setPopup(bool popup)
     m_isPopup = popup;
 }
 
+bool QTuiWidget::isPaintedByParent() const
+{
+    return m_paintedByParent;
+}
+
+void QTuiWidget::setPaintedByParent(bool paintedByParent)
+{
+    m_paintedByParent = paintedByParent;
+}
+
 void QTuiWidget::popupOutsideClick()
 {
     setVisible(false);

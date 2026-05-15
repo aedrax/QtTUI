@@ -447,6 +447,24 @@ private slots:
         sub.showNormal(); // already normal, should be no-op
         QCOMPARE(spy.count(), 0);
     }
+
+    void mdiArea_subWindowsMoveWithArea()
+    {
+        // A parent layout sets the area geometry after addSubWindow().
+        // The sub-windows must move with the area, not stay at (0,0).
+        QTuiMdiArea area;
+        auto *sub1 = area.addSubWindow(new MdiContentWidget());
+        auto *sub2 = area.addSubWindow(new MdiContentWidget());
+        const QPoint offset = sub2->geometry().topLeft() - sub1->geometry().topLeft();
+
+        area.setGeometry(QRect(5, 10, 40, 12));
+
+        QCOMPARE(sub1->geometry().topLeft(), QPoint(5, 10));
+        QCOMPARE(sub2->geometry().topLeft(), QPoint(5, 10) + offset);
+
+        area.setGeometry(QRect(8, 12, 40, 12));
+        QCOMPARE(sub1->geometry().topLeft(), QPoint(8, 12));
+    }
 };
 
 QTEST_MAIN(TestQTuiMdiWidgets)

@@ -114,6 +114,15 @@ void QTuiStackedWidget::setCurrentWidget(QTuiWidget *widget)
         setCurrentIndex(index);
 }
 
+QSize QTuiStackedWidget::minimumSize() const
+{
+    // Any page can become current, so reserve space for the largest one
+    QSize size(0, 0);
+    for (auto *w : m_widgets)
+        size = size.expandedTo(w->minimumSize());
+    return size;
+}
+
 void QTuiStackedWidget::paintEvent(ScreenBuffer &buffer)
 {
     const QRect geo = geometry();

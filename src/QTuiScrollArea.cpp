@@ -34,8 +34,13 @@ void QTuiScrollArea::setWidget(QTuiWidget *widget)
     if (m_widget == widget)
         return;
 
+    if (m_widget)
+        m_widget->setPaintedByParent(false);
     m_widget = widget;
     if (m_widget) {
+        // The content geometry is relative to the scroll area, and
+        // paintEvent() paints the content through a separate buffer
+        m_widget->setPaintedByParent(true);
         m_widget->setVisible(true);
     }
     m_scrollX = 0;

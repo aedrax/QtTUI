@@ -28,6 +28,7 @@ public:
 
     QRect contentArea() const;
 
+    QSize minimumSize() const override;
     void paintEvent(ScreenBuffer &buffer) override;
 
 signals:

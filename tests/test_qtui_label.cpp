@@ -256,6 +256,31 @@ private slots:
         QCOMPARE(label.minimumSize(), QSize(0, 1));
     }
 
+    void minimumSizeMultiLine()
+    {
+        QTuiLabel label(QStringLiteral("Line 1\nLonger line 2\nL3"));
+        QCOMPARE(label.minimumSize(), QSize(13, 3));
+        label.setWordWrap(true);
+        // Minimum width = longest word ("Longer" = 6)
+        QCOMPARE(label.minimumSize(), QSize(6, 3));
+    }
+
+    void paintMultiLine()
+    {
+        QTuiLabel label(QStringLiteral("ab\ncd"));
+        label.setGeometry(QRect(0, 0, 4, 2));
+        label.setAlignment(Qt::AlignLeft | Qt::AlignTop);
+
+        ScreenBuffer buffer(4, 2);
+        label.paintEvent(buffer);
+
+        QCOMPARE(buffer.backCell(0, 0).ch, U'a');
+        QCOMPARE(buffer.backCell(1, 0).ch, U'b');
+        QCOMPARE(buffer.backCell(2, 0).ch, U' ');
+        QCOMPARE(buffer.backCell(0, 1).ch, U'c');
+        QCOMPARE(buffer.backCell(1, 1).ch, U'd');
+    }
+
     void minimumSizeWithWrap()
     {
         QTuiLabel label(QStringLiteral("Hello World"));

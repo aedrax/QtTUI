@@ -145,6 +145,20 @@ void QTuiTabWidget::updatePageGeometries()
     }
 }
 
+QSize QTuiTabWidget::minimumSize() const
+{
+    // Chrome is 2 rows (tab bar + separator). The content area needs at
+    // least 1 row, else contentArea() is empty and no page paints.
+    int width = m_tabBar->minimumSize().width();
+    int pageHeight = 1;
+    for (auto *page : m_pages) {
+        const QSize ms = page->minimumSize();
+        width = qMax(width, ms.width());
+        pageHeight = qMax(pageHeight, ms.height());
+    }
+    return QSize(width, 2 + pageHeight);
+}
+
 QRect QTuiTabWidget::contentArea() const
 {
     const QRect geo = geometry();

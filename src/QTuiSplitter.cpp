@@ -120,6 +120,11 @@ QTuiSplitter::QTuiSplitter(Qt::Orientation orientation, QTuiWidget *parent)
     : QTuiWidget(parent)
     , m_orientation(orientation)
 {
+    // A parent layout sets the geometry without a resize event, so lay out
+    // the children again each time the geometry changes
+    connect(this, &QTuiWidget::geometryChanged, this, [this](const QRect &) {
+        recalculateLayout();
+    });
 }
 
 void QTuiSplitter::addWidget(QTuiWidget *widget)

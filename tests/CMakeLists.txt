@@ -183,6 +183,10 @@ qttui_add_test(test_hidden_widget_restore test_hidden_widget_restore.cpp)
 # outside-click dismissal, focus restore (popup-overlay-layer)
 qttui_add_test(test_popup_rendering test_popup_rendering.cpp)
 
+# Widgets painted by their parent (scroll area content): skipped by the
+# render pass and the mouse hit test
+qttui_add_test(test_painted_by_parent test_painted_by_parent.cpp)
+
 # Layout invalidation property tests (Properties 6, 7, 8)
 qttui_add_test(test_layout_invalidation test_layout_invalidation.cpp)
 

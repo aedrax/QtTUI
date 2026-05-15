@@ -434,6 +434,31 @@ private slots:
         QCOMPARE(sizes[0] + sizes[1] + sizes[2], 30);
     }
 
+    void splitter_setGeometryLaysOutChildren()
+    {
+        // A parent layout calls setGeometry() after addWidget() and sends
+        // no resize event. The children must still get geometry.
+        QTuiSplitter sp(Qt::Horizontal);
+        auto *w1 = new SplitterTestWidget();
+        auto *w2 = new SplitterTestWidget();
+        sp.addWidget(w1);
+        sp.addWidget(w2);
+
+        sp.setGeometry(QRect(0, 5, 21, 3));
+
+        QCOMPARE(w1->geometry(), QRect(0, 5, 10, 3));
+        QCOMPARE(w2->geometry(), QRect(11, 5, 10, 3));
+    }
+
+    void stacked_minimumSizeIsLargestPage()
+    {
+        QTuiStackedWidget sw;
+        QCOMPARE(sw.minimumSize(), QSize(0, 0));
+        sw.addWidget(new SplitterTestWidget(QSize(5, 2)));
+        sw.addWidget(new SplitterTestWidget(QSize(3, 4)));
+        QCOMPARE(sw.minimumSize(), QSize(5, 4));
+    }
+
     void splitter_minimumSize()
     {
         QTuiSplitter sp;

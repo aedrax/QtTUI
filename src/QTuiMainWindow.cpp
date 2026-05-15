@@ -607,7 +607,8 @@ QTuiWidget *QTuiMainWindow::findWidgetAt(QTuiWidget *root, const QPoint &pos)
         best = root;
 
     for (auto *child : root->childWidgets()) {
-        if (!child->isVisible())
+        // A child painted by its parent has no screen geometry to hit
+        if (!child->isVisible() || child->isPaintedByParent())
             continue;
         QTuiWidget *found = findWidgetAt(child, pos);
         if (found)
