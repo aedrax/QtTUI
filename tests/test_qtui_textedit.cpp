@@ -15,6 +15,12 @@ static void sendKey(QTuiTextEdit &w, int key, Qt::KeyboardModifiers mods = Qt::N
     QCoreApplication::sendEvent(&w, &ev);
 }
 
+static void sendMouse(QTuiTextEdit &w, TuiMouseEvent::MouseEventType type, int x, int y)
+{
+    TuiMouseEvent ev(type, Qt::LeftButton, QPoint(x, y));
+    QCoreApplication::sendEvent(&w, &ev);
+}
+
 class TestQTuiTextEdit : public QObject {
     Q_OBJECT
 private slots:
@@ -421,7 +427,328 @@ private slots:
         ScreenBuffer buf(20, 5);
         te.paintEvent(buf);
         // Just verify no crash; check first cell has content
-        QCOMPARE(buf.backCell(0, 0).character, QChar('L'));
+        QCOMPARE(buf.backCell(0, 0).ch, U'L');
+    }
+
+    void horizontalScroll_typingPastRightEdge()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 5, 3)); // 5 visible columns
+        te.setFocus();
+
+        const QString typed = QStringLiteral("abcdefgh");
+        for (QChar ch : typed)
+            sendKey(te, ch.unicode(), Qt::NoModifier, QString(ch));
+
+        QCOMPARE(te.cursorColumn(), 8);
+        // Cursor must remain visible: scrolled so cursor sits on the last column
+        QCOMPARE(te.terminalCursorPos(), QPoint(4, 0));
+
+        // The viewport shows the tail of the line ("efgh" + cursor cell)
+        ScreenBuffer buf(5, 3);
+        te.paintEvent(buf);
+        QCOMPARE(buf.backCell(0, 0).ch, U'e');
+        QCOMPARE(buf.backCell(3, 0).ch, U'h');
+        QCOMPARE(buf.backCell(4, 0).ch, U' '); // cursor past end of text
+        QVERIFY(buf.backCell(4, 0).inverse);                // rendered as the cursor
+    }
+
+    void horizontalScroll_homeScrollsBack()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 5, 3));
+        te.setFocus();
+
+        const QString typed = QStringLiteral("abcdefgh");
+        for (QChar ch : typed)
+            sendKey(te, ch.unicode(), Qt::NoModifier, QString(ch));
+
+        sendKey(te, Qt::Key_Home, Qt::NoModifier);
+        QCOMPARE(te.terminalCursorPos(), QPoint(0, 0));
+
+        ScreenBuffer buf(5, 3);
+        te.paintEvent(buf);
+        QCOMPARE(buf.backCell(0, 0).ch, U'a');
+        QCOMPARE(buf.backCell(4, 0).ch, U'e');
+    }
+
+    void deleteKey_removesCharRightOfCursor()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("abc");
+
+        QSignalSpy spy(&te, &QTuiTextEdit::textChanged);
+        sendKey(te, Qt::Key_Delete, Qt::NoModifier);
+        QCOMPARE(te.toPlainText(), QStringLiteral("bc"));
+        QCOMPARE(te.cursorColumn(), 0);
+        QCOMPARE(spy.count(), 1);
+    }
+
+    void deleteKey_atLineEnd_mergesWithNextLine()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("Hello\nWorld");
+
+        sendKey(te, Qt::Key_End, Qt::NoModifier);
+        QCOMPARE(te.cursorColumn(), 5);
+
+        sendKey(te, Qt::Key_Delete, Qt::NoModifier);
+        QCOMPARE(te.toPlainText(), QStringLiteral("HelloWorld"));
+        QCOMPARE(te.cursorRow(), 0);
+        QCOMPARE(te.cursorColumn(), 5);
+    }
+
+    void deleteKey_atDocEnd_noop()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("abc");
+
+        sendKey(te, Qt::Key_End, Qt::NoModifier);
+        QSignalSpy spy(&te, &QTuiTextEdit::textChanged);
+        sendKey(te, Qt::Key_Delete, Qt::NoModifier);
+        QCOMPARE(te.toPlainText(), QStringLiteral("abc"));
+        QCOMPARE(spy.count(), 0);
+    }
+
+    void selection_backspaceDeletesSelection()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("Hello");
+
+        sendKey(te, Qt::Key_Right, Qt::ShiftModifier);
+        sendKey(te, Qt::Key_Right, Qt::ShiftModifier);
+        sendKey(te, Qt::Key_Right, Qt::ShiftModifier);
+        QCOMPARE(te.selectedText(), QStringLiteral("Hel"));
+
+        QSignalSpy spy(&te, &QTuiTextEdit::textChanged);
+        sendKey(te, Qt::Key_Backspace, Qt::NoModifier);
+        QCOMPARE(te.toPlainText(), QStringLiteral("lo"));
+        QCOMPARE(te.cursorRow(), 0);
+        QCOMPARE(te.cursorColumn(), 0);
+        QCOMPARE(te.hasSelection(), false);
+        QCOMPARE(spy.count(), 1);
+    }
+
+    void selection_deleteKeyDeletesSelection()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("Hello");
+
+        sendKey(te, Qt::Key_Right, Qt::ShiftModifier);
+        sendKey(te, Qt::Key_Right, Qt::ShiftModifier);
+        QCOMPARE(te.selectedText(), QStringLiteral("He"));
+
+        sendKey(te, Qt::Key_Delete, Qt::NoModifier);
+        QCOMPARE(te.toPlainText(), QStringLiteral("llo"));
+        QCOMPARE(te.cursorColumn(), 0);
+        QCOMPARE(te.hasSelection(), false);
+    }
+
+    void selection_typingReplacesSelection()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("Hello");
+
+        sendKey(te, Qt::Key_Right, Qt::ShiftModifier);
+        sendKey(te, Qt::Key_Right, Qt::ShiftModifier);
+        sendKey(te, Qt::Key_Right, Qt::ShiftModifier);
+        QCOMPARE(te.selectedText(), QStringLiteral("Hel"));
+
+        sendKey(te, Qt::Key_X, Qt::NoModifier, "x");
+        QCOMPARE(te.toPlainText(), QStringLiteral("xlo"));
+        QCOMPARE(te.cursorColumn(), 1);
+        QCOMPARE(te.hasSelection(), false);
+    }
+
+    void selection_multiLineBackspaceDeletes()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("abc\ndef\nghi");
+
+        // Cursor to (0,2), then select down+right => (0,2)..(1,3) = "c\ndef"
+        sendKey(te, Qt::Key_Right, Qt::NoModifier);
+        sendKey(te, Qt::Key_Right, Qt::NoModifier);
+        sendKey(te, Qt::Key_Down, Qt::ShiftModifier);
+        sendKey(te, Qt::Key_Right, Qt::ShiftModifier);
+        QCOMPARE(te.selectedText(), QStringLiteral("c\ndef"));
+
+        sendKey(te, Qt::Key_Backspace, Qt::NoModifier);
+        QCOMPARE(te.toPlainText(), QStringLiteral("ab\nghi"));
+        QCOMPARE(te.cursorRow(), 0);
+        QCOMPARE(te.cursorColumn(), 2);
+        QCOMPARE(te.hasSelection(), false);
+    }
+
+    void selection_multiLineTypingReplaces()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("abc\ndef\nghi");
+
+        sendKey(te, Qt::Key_Right, Qt::NoModifier);
+        sendKey(te, Qt::Key_Right, Qt::NoModifier);
+        sendKey(te, Qt::Key_Down, Qt::ShiftModifier);
+        sendKey(te, Qt::Key_Right, Qt::ShiftModifier);
+        QCOMPARE(te.selectedText(), QStringLiteral("c\ndef"));
+
+        sendKey(te, Qt::Key_X, Qt::NoModifier, "X");
+        QCOMPARE(te.toPlainText(), QStringLiteral("abX\nghi"));
+        QCOMPARE(te.cursorRow(), 0);
+        QCOMPARE(te.cursorColumn(), 3);
+    }
+
+    void stickyColumn_preservedAcrossShortLine()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("LongLine\nHi\nAnother");
+
+        sendKey(te, Qt::Key_End, Qt::NoModifier);
+        QCOMPARE(te.cursorColumn(), 8);
+
+        // Down onto the short line clamps the visible cursor...
+        sendKey(te, Qt::Key_Down, Qt::NoModifier);
+        QCOMPARE(te.cursorRow(), 1);
+        QCOMPARE(te.cursorColumn(), 2);
+
+        // ...but the desired column survives to the next line
+        sendKey(te, Qt::Key_Down, Qt::NoModifier);
+        QCOMPARE(te.cursorRow(), 2);
+        QCOMPARE(te.cursorColumn(), 7); // "Another" length, clamped from 8
+
+        // And going back up restores the full column on the long line
+        sendKey(te, Qt::Key_Up, Qt::NoModifier);
+        QCOMPARE(te.cursorColumn(), 2);
+        sendKey(te, Qt::Key_Up, Qt::NoModifier);
+        QCOMPARE(te.cursorColumn(), 8);
+    }
+
+    void stickyColumn_resetByHorizontalMove()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("LongLine\nHi");
+
+        sendKey(te, Qt::Key_End, Qt::NoModifier);
+        sendKey(te, Qt::Key_Down, Qt::NoModifier);
+        QCOMPARE(te.cursorColumn(), 2);
+
+        // Horizontal move resets the desired column
+        sendKey(te, Qt::Key_Left, Qt::NoModifier);
+        QCOMPARE(te.cursorColumn(), 1);
+        sendKey(te, Qt::Key_Up, Qt::NoModifier);
+        QCOMPARE(te.cursorRow(), 0);
+        QCOMPARE(te.cursorColumn(), 1);
+    }
+
+    void mousePress_placesCursor()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(2, 1, 20, 5)); // offset geometry
+        te.setFocus();
+        te.setPlainText("Hello\nWorld");
+
+        sendMouse(te, TuiMouseEvent::Press, 5, 2); // widget-relative (3, 1)
+        QCOMPARE(te.cursorRow(), 1);
+        QCOMPARE(te.cursorColumn(), 3);
+    }
+
+    void mousePress_clampsToLineLength()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(2, 1, 20, 5));
+        te.setFocus();
+        te.setPlainText("Hello\nWorld");
+
+        sendMouse(te, TuiMouseEvent::Press, 12, 1); // widget-relative col 10, row 0
+        QCOMPARE(te.cursorRow(), 0);
+        QCOMPARE(te.cursorColumn(), 5); // clamped to "Hello" length
+    }
+
+    void mousePress_accountsForScroll()
+    {
+        // Vertical scroll offset
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 3));
+        te.setFocus();
+        te.setPlainText("L0\nL1\nL2\nL3\nL4\nL5");
+        for (int i = 0; i < 5; ++i)
+            sendKey(te, Qt::Key_Down, Qt::NoModifier);
+        QCOMPARE(te.cursorRow(), 5); // scrolled so rows 3..5 are visible
+
+        sendMouse(te, TuiMouseEvent::Press, 0, 0); // top visible row = document row 3
+        QCOMPARE(te.cursorRow(), 3);
+        QCOMPARE(te.cursorColumn(), 0);
+
+        // Horizontal scroll offset
+        QTuiTextEdit te2;
+        te2.setGeometry(QRect(0, 0, 5, 1));
+        te2.setFocus();
+        const QString typed = QStringLiteral("abcdefgh");
+        for (QChar ch : typed)
+            sendKey(te2, ch.unicode(), Qt::NoModifier, QString(ch));
+
+        sendMouse(te2, TuiMouseEvent::Press, 1, 0); // screen col 1 = text col 5
+        QCOMPARE(te2.cursorColumn(), 5);
+    }
+
+    void mousePress_ignoresNonPress()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("Hello");
+
+        sendMouse(te, TuiMouseEvent::Move, 3, 0);
+        sendMouse(te, TuiMouseEvent::Release, 3, 0);
+        QCOMPARE(te.cursorRow(), 0);
+        QCOMPARE(te.cursorColumn(), 0);
+    }
+
+    void mousePress_clearsSelection()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+        te.setPlainText("Hello");
+
+        sendKey(te, Qt::Key_Right, Qt::ShiftModifier);
+        sendKey(te, Qt::Key_Right, Qt::ShiftModifier);
+        QCOMPARE(te.hasSelection(), true);
+
+        sendMouse(te, TuiMouseEvent::Press, 0, 0);
+        QCOMPARE(te.hasSelection(), false);
+    }
+
+    void typing_nonBmpCharacterKeepsSurrogatePair()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 40, 10));
+        te.setFocus();
+
+        const QString emoji = QString::fromUtf8("\xF0\x9F\x98\x80"); // U+1F600, surrogate pair
+        QCOMPARE(emoji.length(), 2);
+
+        sendKey(te, 0, Qt::NoModifier, emoji);
+        QCOMPARE(te.toPlainText(), emoji);
+        QCOMPARE(te.cursorColumn(), 2); // advanced past both UTF-16 code units
     }
 
     // ===================================================================

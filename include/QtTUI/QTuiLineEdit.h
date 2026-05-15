@@ -21,6 +21,9 @@ public:
     void paintEvent(ScreenBuffer &buffer) override;
 
     QSize minimumSize() const override;
+    // Bare printable-key shortcuts must not fire while this widget has focus
+    bool acceptsTextInput() const override { return true; }
+    QPoint terminalCursorPos() const override;
 
 signals:
     void textChanged(const QString &text);
@@ -31,9 +34,11 @@ protected:
     void mousePressEvent(TuiMouseEvent *event) override;
 
 private:
+    void adjustScrollToCursor();
+
     QString m_text;
-    int m_cursorPos = 0;
-    int m_scrollOffset = 0;
+    int m_cursorPos = 0;     // code-unit index into m_text (cluster boundary)
+    int m_scrollOffset = 0;  // display columns scrolled off the left edge
 };
 
 } // namespace QtTUI

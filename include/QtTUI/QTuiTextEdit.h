@@ -28,17 +28,23 @@ public:
 
     void paintEvent(ScreenBuffer &buffer) override;
     QSize minimumSize() const override;
+    // Bare printable-key shortcuts must not fire while this widget has focus
+    bool acceptsTextInput() const override { return true; }
+    QPoint terminalCursorPos() const override;
 
 signals:
     void textChanged();
 
 protected:
     void keyPressEvent(TuiKeyEvent *event) override;
+    void mousePressEvent(TuiMouseEvent *event) override;
 
 private:
-    void insertChar(QChar ch);
+    void insertText(const QString &text);
     void insertNewLine();
     void deleteBackward();
+    void deleteForward();
+    void deleteSelection();
     void moveCursor(int dRow, int dCol);
     void scrollToVisible();
     void clearSelection();
@@ -47,8 +53,10 @@ private:
 
     QStringList m_lines;
     int m_cursorRow = 0;
-    int m_cursorCol = 0;
+    int m_cursorCol = 0;  // code-unit index into the line (cluster boundary)
     int m_scrollRow = 0;
+    int m_scrollCol = 0;  // display columns scrolled off the left edge
+    int m_desiredCol = 0; // sticky DISPLAY column for vertical cursor movement
     bool m_readOnly = false;
 
     // Selection state

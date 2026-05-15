@@ -208,6 +208,141 @@ private slots:
                 RC_ASSERT(le.text() == s);
             });
     }
+
+    // Non-BMP characters (e.g. emoji) arrive from the parser as a full
+    // surrogate pair in event->text(); the whole pair must be inserted.
+    void emojiInsert_producesFullSurrogatePair()
+    {
+        QTuiLineEdit le;
+        le.setGeometry(QRect(0, 0, 80, 1));
+
+        const QString emoji = QString::fromUtf8("\xF0\x9F\x98\x80"); // U+1F600 GRINNING FACE
+        QCOMPARE(emoji.length(), 2); // sanity: it is a surrogate pair in UTF-16
+
+        sendKey(le, 0, emoji);
+        QCOMPARE(le.text(), emoji);
+        QCOMPARE(le.cursorPosition(), 2); // cursor advanced past both code units
+
+        // A following ASCII char lands after the pair, not between the surrogates
+        sendKey(le, 'a', QStringLiteral("a"));
+        QCOMPARE(le.text(), emoji + QStringLiteral("a"));
+        QCOMPARE(le.cursorPosition(), 3);
+    }
+
+    void emojiInsert_midText()
+    {
+        QTuiLineEdit le;
+        le.setGeometry(QRect(0, 0, 80, 1));
+        le.setText(QStringLiteral("ab"));
+        le.setCursorPosition(1);
+
+        const QString emoji = QString::fromUtf8("\xF0\x9F\x98\x80");
+        sendKey(le, 0, emoji);
+        QCOMPARE(le.text(), QStringLiteral("a") + emoji + QStringLiteral("b"));
+        QCOMPARE(le.cursorPosition(), 3);
+    }
+
+    // ------------------------------------------------------------------
+    // Unicode width: typing CJK moves the terminal cursor by COLUMNS (two
+    // per character) while cursorPosition() stays in code units
+    // ------------------------------------------------------------------
+    void cjkTyping_cursorInColumns()
+    {
+        QTuiLineEdit le;
+        le.setGeometry(QRect(0, 0, 80, 1));
+        le.setFocus();
+
+        const QChar ji(0x65E5), hon(0x672C), go(0x8A9E); // 日 本 語
+        sendKey(le, 0, QString(ji));
+        sendKey(le, 0, QString(hon));
+        sendKey(le, 0, QString(go));
+
+        QCOMPARE(le.text(), QString() + ji + hon + go);
+        QCOMPARE(le.cursorPosition(), 3);                  // 3 code units
+        QCOMPARE(le.terminalCursorPos(), QPoint(6, 0));    // 6 columns
+    }
+
+    void cjkPaint_wideCellsWithContinuations()
+    {
+        QTuiLineEdit le;
+        le.setGeometry(QRect(0, 0, 10, 1));
+        le.setText(QString::fromUtf8("日本"));
+
+        ScreenBuffer buf(10, 1);
+        le.paintEvent(buf);
+
+        QCOMPARE(buf.backCell(0, 0).ch, char32_t(0x65E5));
+        QCOMPARE(int(buf.backCell(0, 0).width), 2);
+        QVERIFY(buf.backCell(1, 0).isContinuation());
+        QCOMPARE(buf.backCell(2, 0).ch, char32_t(0x672C));
+        QVERIFY(buf.backCell(3, 0).isContinuation());
+        QCOMPARE(buf.backCell(4, 0).ch, U' ');
+    }
+
+    void backspaceDeletesWholeEmoji()
+    {
+        QTuiLineEdit le;
+        le.setGeometry(QRect(0, 0, 80, 1));
+
+        const QString emoji = QString::fromUtf8("\xF0\x9F\x98\x80"); // U+1F600
+        le.setText(QStringLiteral("a") + emoji + QStringLiteral("b"));
+        sendKey(le, Qt::Key_End);
+
+        sendKey(le, Qt::Key_Backspace); // removes 'b'
+        QCOMPARE(le.text(), QStringLiteral("a") + emoji);
+        QCOMPARE(le.cursorPosition(), 3);
+
+        sendKey(le, Qt::Key_Backspace); // removes the WHOLE surrogate pair
+        QCOMPARE(le.text(), QStringLiteral("a"));
+        QCOMPARE(le.cursorPosition(), 1);
+    }
+
+    void deleteRemovesWholeEmoji()
+    {
+        QTuiLineEdit le;
+        le.setGeometry(QRect(0, 0, 80, 1));
+
+        const QString emoji = QString::fromUtf8("\xF0\x9F\x98\x80");
+        le.setText(emoji + QStringLiteral("b"));
+        sendKey(le, Qt::Key_Home);
+
+        sendKey(le, Qt::Key_Delete); // removes the WHOLE surrogate pair
+        QCOMPARE(le.text(), QStringLiteral("b"));
+        QCOMPARE(le.cursorPosition(), 0);
+    }
+
+    void leftRightMoveByWholeEmoji()
+    {
+        QTuiLineEdit le;
+        le.setGeometry(QRect(0, 0, 80, 1));
+
+        const QString emoji = QString::fromUtf8("\xF0\x9F\x98\x80");
+        le.setText(QStringLiteral("a") + emoji + QStringLiteral("b"));
+        sendKey(le, Qt::Key_End);
+        QCOMPARE(le.cursorPosition(), 4);
+
+        sendKey(le, Qt::Key_Left);
+        QCOMPARE(le.cursorPosition(), 3); // before 'b'
+        sendKey(le, Qt::Key_Left);
+        QCOMPARE(le.cursorPosition(), 1); // skipped the whole pair
+        sendKey(le, Qt::Key_Right);
+        QCOMPARE(le.cursorPosition(), 3); // skipped it forward too
+    }
+
+    void backspaceDeletesCombiningSequence()
+    {
+        QTuiLineEdit le;
+        le.setGeometry(QRect(0, 0, 80, 1));
+
+        // "aé" : 'a' then e-with-combining-acute (one cluster)
+        le.setText(QString::fromUtf8("ae\xCC\x81"));
+        sendKey(le, Qt::Key_End);
+        QCOMPARE(le.cursorPosition(), 3);
+
+        sendKey(le, Qt::Key_Backspace); // removes base + mark together
+        QCOMPARE(le.text(), QStringLiteral("a"));
+        QCOMPARE(le.cursorPosition(), 1);
+    }
 };
 
 QTEST_MAIN(TestQTuiLineEdit)
