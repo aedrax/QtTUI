@@ -12,14 +12,14 @@ public:
     explicit Label(const QString &text, QTuiWidget *parent = nullptr)
         : QTuiWidget(parent), m_text(text) {}
 
-    void setText(const QString &t) { m_text = t; }
+    void setText(const QString &t) { if (m_text == t) return; m_text = t; markDirty(); }
     QSize minimumSize() const override { return QSize(0, 1); }
 
     void paintEvent(ScreenBuffer &buf) override {
         const QRect g = geometry();
         for (int x = 0; x < g.width(); ++x) {
             Cell &c = buf.backCell(g.x() + x, g.y());
-            c.character = (x < m_text.size()) ? m_text.at(x) : QLatin1Char(' ');
+            c.setChar((x < m_text.size()) ? m_text.at(x).unicode() : u' ');
             c.foreground = Color(100, 200, 100);
             c.bold = true;
         }

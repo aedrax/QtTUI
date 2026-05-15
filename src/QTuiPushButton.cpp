@@ -9,6 +9,7 @@ QTuiPushButton::QTuiPushButton(const QString &text, QTuiWidget *parent)
     : QTuiWidget(parent)
     , m_text(text)
 {
+    setFocusPolicy(Qt::StrongFocus);
 }
 
 QString QTuiPushButton::text() const
@@ -21,6 +22,7 @@ void QTuiPushButton::setText(const QString &text)
     if (m_text != text) {
         m_text = text;
         emit textChanged(m_text);
+        markDirty();
     }
 }
 
@@ -31,20 +33,10 @@ QString QTuiPushButton::icon() const
 
 void QTuiPushButton::setIcon(const QString &icon)
 {
+    if (m_icon == icon)
+        return;
     m_icon = icon;
-}
-
-bool QTuiPushButton::isEnabled() const
-{
-    return m_enabled;
-}
-
-void QTuiPushButton::setEnabled(bool enabled)
-{
-    if (m_enabled != enabled) {
-        m_enabled = enabled;
-        emit enabledChanged(m_enabled);
-    }
+    markDirty();
 }
 
 bool QTuiPushButton::isCheckable() const
@@ -54,7 +46,10 @@ bool QTuiPushButton::isCheckable() const
 
 void QTuiPushButton::setCheckable(bool checkable)
 {
+    if (m_checkable == checkable)
+        return;
     m_checkable = checkable;
+    markDirty();
 }
 
 bool QTuiPushButton::isChecked() const
@@ -96,11 +91,13 @@ void QTuiPushButton::paintEvent(ScreenBuffer &buffer)
     const int geoW = geo.width();
     const int geoH = geo.height();
 
-    // Determine colors based on state
+    // Determine colors based on state; a disabled ancestor also renders
+    // this button with the disabled palette.
+    const bool enabled = isEffectivelyEnabled();
     Color fg = theme.foreground;
     Color bg = theme.background;
 
-    if (!m_enabled) {
+    if (!enabled) {
         fg = theme.disabledForeground;
         bg = theme.disabledBackground;
     } else if (hasFocus()) {
@@ -109,7 +106,7 @@ void QTuiPushButton::paintEvent(ScreenBuffer &buffer)
     }
 
     // If checked, use inverse colors as visual indicator
-    if (m_checkable && m_checked && m_enabled) {
+    if (m_checkable && m_checked && enabled) {
         std::swap(fg, bg);
     }
 
@@ -120,7 +117,7 @@ void QTuiPushButton::paintEvent(ScreenBuffer &buffer)
             int py = geoY + row;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = theme.bold;
@@ -138,11 +135,11 @@ void QTuiPushButton::paintEvent(ScreenBuffer &buffer)
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
                 if (col == 0)
-                    cell.character = border.topLeft;
+                    cell.setChar(border.topLeft);
                 else if (col == geoW - 1)
-                    cell.character = border.topRight;
+                    cell.setChar(border.topRight);
                 else
-                    cell.character = border.horizontal;
+                    cell.setChar(border.horizontal);
                 cell.foreground = fg;
                 cell.background = bg;
             }
@@ -157,11 +154,11 @@ void QTuiPushButton::paintEvent(ScreenBuffer &buffer)
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
                 if (col == 0)
-                    cell.character = border.bottomLeft;
+                    cell.setChar(border.bottomLeft);
                 else if (col == geoW - 1)
-                    cell.character = border.bottomRight;
+                    cell.setChar(border.bottomRight);
                 else
-                    cell.character = border.horizontal;
+                    cell.setChar(border.horizontal);
                 cell.foreground = fg;
                 cell.background = bg;
             }
@@ -176,7 +173,7 @@ void QTuiPushButton::paintEvent(ScreenBuffer &buffer)
             int pxLeft = geoX;
             if (pxLeft < buffer.width()) {
                 Cell &cell = buffer.backCell(pxLeft, py);
-                cell.character = border.vertical;
+                cell.setChar(border.vertical);
                 cell.foreground = fg;
                 cell.background = bg;
             }
@@ -184,7 +181,7 @@ void QTuiPushButton::paintEvent(ScreenBuffer &buffer)
             int pxRight = geoX + geoW - 1;
             if (pxRight < buffer.width()) {
                 Cell &cell = buffer.backCell(pxRight, py);
-                cell.character = border.vertical;
+                cell.setChar(border.vertical);
                 cell.foreground = fg;
                 cell.background = bg;
             }
@@ -211,10 +208,10 @@ void QTuiPushButton::paintEvent(ScreenBuffer &buffer)
             int py = contentRow;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = content.at(i);
+                cell.setChar(content.at(i).unicode());
                 cell.foreground = fg;
                 cell.background = bg;
-                cell.bold = theme.bold || (!m_enabled ? false : hasFocus());
+                cell.bold = theme.bold || (enabled && hasFocus());
                 cell.italic = theme.italic;
                 cell.underline = theme.underline;
             }
@@ -224,7 +221,9 @@ void QTuiPushButton::paintEvent(ScreenBuffer &buffer)
 
 void QTuiPushButton::keyPressEvent(TuiKeyEvent *event)
 {
-    if (!m_enabled)
+    // The base event() already drops events for disabled widgets; this guard
+    // covers direct handler invocation (subclasses, tests).
+    if (!isEffectivelyEnabled())
         return;
 
     const int key = event->key();
@@ -239,7 +238,7 @@ void QTuiPushButton::keyPressEvent(TuiKeyEvent *event)
 
 void QTuiPushButton::mousePressEvent(TuiMouseEvent *event)
 {
-    if (!m_enabled)
+    if (!isEffectivelyEnabled())
         return;
 
     if (event->mouseType() != TuiMouseEvent::Press)

@@ -136,7 +136,7 @@ void QTuiStackedWidget::paintEvent(ScreenBuffer &buffer)
             int py = y0 + row;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = false;

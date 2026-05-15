@@ -20,7 +20,7 @@ public:
         const QRect g = geometry();
         for (int x = 0; x < g.width(); ++x) {
             Cell &c = buf.backCell(g.x() + x, g.y());
-            c.character = (x < m_text.size()) ? m_text.at(x) : QLatin1Char(' ');
+            c.setChar((x < m_text.size()) ? m_text.at(x).unicode() : u' ');
             c.foreground = Color(180, 220, 255);
         }
     }

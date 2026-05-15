@@ -39,6 +39,8 @@ public:
 
     void paintEvent(ScreenBuffer &buffer) override;
     QSize minimumSize() const override;
+    // Bare printable-key shortcuts must not fire while this widget has focus
+    bool acceptsTextInput() const override { return true; }
 
 signals:
     void valueChanged(double value);

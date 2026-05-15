@@ -12,12 +12,16 @@
 
 using namespace QtTUI;
 
-// Simple focusable test widget
+// Simple focusable test widget (StrongFocus: plain widgets default to
+// Qt::NoFocus, whose setFocus() is a no-op)
 class UtilTestWidget : public QTuiWidget {
     Q_OBJECT
 public:
     explicit UtilTestWidget(QTuiWidget *parent = nullptr)
-        : QTuiWidget(parent) {}
+        : QTuiWidget(parent)
+    {
+        setFocusPolicy(Qt::StrongFocus);
+    }
     void paintEvent(ScreenBuffer &buffer) override
     {
         const QRect geo = geometry();
@@ -26,7 +30,7 @@ public:
                 int px = geo.x() + col;
                 int py = geo.y() + row;
                 if (px < buffer.width() && py < buffer.height())
-                    buffer.backCell(px, py).character = QLatin1Char('X');
+                    buffer.backCell(px, py).setChar(U'X');
             }
     }
     QSize minimumSize() const override { return QSize(4, 2); }
@@ -184,7 +188,7 @@ private slots:
         bool foundDiag = false;
         for (int i = 0; i < 3; ++i) {
             const Cell &cell = buffer.backCell(2 - i, i);
-            if (cell.character != QLatin1Char(' ')) {
+            if (cell.ch != U' ') {
                 foundDiag = true;
                 break;
             }
@@ -398,13 +402,13 @@ private slots:
         // Row 0 should contain month name header
         QString headerRow;
         for (int col = 0; col < 22; ++col)
-            headerRow += buffer.backCell(col, 0).character;
+            headerRow += buffer.backCell(col, 0).text();
         QVERIFY(headerRow.contains(QStringLiteral("2025")));
 
         // Row 1 should contain weekday abbreviations
         QString weekdayRow;
         for (int col = 0; col < 22; ++col)
-            weekdayRow += buffer.backCell(col, 1).character;
+            weekdayRow += buffer.backCell(col, 1).text();
         QVERIFY(weekdayRow.contains(QStringLiteral("Mo")));
         QVERIFY(weekdayRow.contains(QStringLiteral("Su")));
 
@@ -414,7 +418,7 @@ private slots:
         for (int row = 2; row < 8; ++row) {
             QString gridRow;
             for (int col = 0; col < 22; ++col)
-                gridRow += buffer.backCell(col, row).character;
+                gridRow += buffer.backCell(col, row).text();
             if (gridRow.contains(QStringLiteral("15"))) {
                 found15 = true;
                 break;

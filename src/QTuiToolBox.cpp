@@ -8,6 +8,7 @@ namespace QtTUI {
 QTuiToolBox::QTuiToolBox(QTuiWidget *parent)
     : QTuiWidget(parent)
 {
+    setFocusPolicy(Qt::StrongFocus);
 }
 
 int QTuiToolBox::addItem(QTuiWidget *widget, const QString &label)
@@ -96,6 +97,7 @@ void QTuiToolBox::setCurrentIndex(int index)
     m_items.at(m_currentIndex).widget->setVisible(true);
 
     emit currentChanged(m_currentIndex);
+    markDirty();
 }
 
 QSize QTuiToolBox::minimumSize() const
@@ -135,7 +137,7 @@ void QTuiToolBox::paintEvent(ScreenBuffer &buffer)
             int py = y0 + row;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = false;
@@ -167,9 +169,9 @@ void QTuiToolBox::paintEvent(ScreenBuffer &buffer)
                     continue;
                 Cell &cell = buffer.backCell(px, py);
                 if (col < headerLine.length())
-                    cell.character = headerLine.at(col);
+                    cell.setChar(headerLine.at(col).unicode());
                 else
-                    cell.character = QLatin1Char(' ');
+                    cell.setChar(U' ');
                 cell.foreground = headerFg;
                 cell.background = headerBg;
                 cell.bold = theme.bold || isFocusedHeader;
@@ -204,12 +206,16 @@ void QTuiToolBox::keyPressEvent(TuiKeyEvent *event)
 
     switch (event->key()) {
     case Qt::Key_Up:
-        if (m_focusedHeader > 0)
+        if (m_focusedHeader > 0) {
             --m_focusedHeader;
+            markDirty();
+        }
         break;
     case Qt::Key_Down:
-        if (m_focusedHeader < m_items.size() - 1)
+        if (m_focusedHeader < m_items.size() - 1) {
             ++m_focusedHeader;
+            markDirty();
+        }
         break;
     case Qt::Key_Return:
     case Qt::Key_Space:

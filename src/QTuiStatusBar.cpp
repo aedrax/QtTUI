@@ -76,7 +76,7 @@ void QTuiStatusBar::paintEvent(ScreenBuffer &buffer)
     for (int col = 0; col < geo.width() && (geo.x() + col) < buffer.width(); ++col) {
         int px = geo.x() + col;
         Cell &cell = buffer.backCell(px, py);
-        cell.character = QLatin1Char(' ');
+        cell.setChar(U' ');
         cell.foreground = fg;
         cell.background = bg;
         cell.bold = false;
@@ -99,7 +99,7 @@ void QTuiStatusBar::paintEvent(ScreenBuffer &buffer)
     for (int i = 0; i < msg.length() && i < availableForMessage; ++i) {
         if (xPos < buffer.width()) {
             Cell &cell = buffer.backCell(xPos, py);
-            cell.character = msg.at(i);
+            cell.setChar(msg.at(i).unicode());
             cell.foreground = fg;
             cell.background = bg;
         }

@@ -11,6 +11,7 @@ namespace QtTUI {
 QTuiMdiArea::QTuiMdiArea(QTuiWidget *parent)
     : QTuiWidget(parent)
 {
+    setFocusPolicy(Qt::StrongFocus);
 }
 
 QTuiMdiSubWindow *QTuiMdiArea::addSubWindow(QTuiWidget *widget)
@@ -136,7 +137,7 @@ void QTuiMdiArea::paintEvent(ScreenBuffer &buffer)
             int py = geo.y() + row;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = theme.foreground;
                 cell.background = bg;
                 cell.bold = false;

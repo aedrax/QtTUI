@@ -8,6 +8,7 @@ namespace QtTUI {
 QTuiMdiSubWindow::QTuiMdiSubWindow(QTuiWidget *parent)
     : QTuiWidget(parent)
 {
+    setFocusPolicy(Qt::StrongFocus);
 }
 
 void QTuiMdiSubWindow::setWidget(QTuiWidget *widget)
@@ -111,11 +112,11 @@ void QTuiMdiSubWindow::paintEvent(ScreenBuffer &buffer)
             continue;
         Cell &cell = buffer.backCell(px, y0);
         if (col == 0)
-            cell.character = border.topLeft;
+            cell.setChar(border.topLeft);
         else if (col == w - 1)
-            cell.character = border.topRight;
+            cell.setChar(border.topRight);
         else
-            cell.character = border.horizontal;
+            cell.setChar(border.horizontal);
         cell.foreground = fg;
         cell.background = bg;
         cell.bold = theme.bold;
@@ -134,7 +135,7 @@ void QTuiMdiSubWindow::paintEvent(ScreenBuffer &buffer)
             int px = x0 + titleCol + i;
             if (px < buffer.width() && y0 < buffer.height()) {
                 Cell &cell = buffer.backCell(px, y0);
-                cell.character = titleStr.at(i);
+                cell.setChar(titleStr.at(i).unicode());
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = true;
@@ -156,7 +157,7 @@ void QTuiMdiSubWindow::paintEvent(ScreenBuffer &buffer)
             int px = maxStart + i;
             if (px >= x0 + 1 && px < buffer.width() && y0 < buffer.height()) {
                 Cell &cell = buffer.backCell(px, y0);
-                cell.character = maxStr.at(i);
+                cell.setChar(maxStr.at(i).unicode());
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = theme.bold;
@@ -168,7 +169,7 @@ void QTuiMdiSubWindow::paintEvent(ScreenBuffer &buffer)
             int px = closeStart + i;
             if (px >= x0 + 1 && px < buffer.width() && y0 < buffer.height()) {
                 Cell &cell = buffer.backCell(px, y0);
-                cell.character = closeStr.at(i);
+                cell.setChar(closeStr.at(i).unicode());
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = theme.bold;
@@ -185,11 +186,11 @@ void QTuiMdiSubWindow::paintEvent(ScreenBuffer &buffer)
                 continue;
             Cell &cell = buffer.backCell(px, by);
             if (col == 0)
-                cell.character = border.bottomLeft;
+                cell.setChar(border.bottomLeft);
             else if (col == w - 1)
-                cell.character = border.bottomRight;
+                cell.setChar(border.bottomRight);
             else
-                cell.character = border.horizontal;
+                cell.setChar(border.horizontal);
             cell.foreground = fg;
             cell.background = bg;
             cell.bold = theme.bold;
@@ -203,7 +204,7 @@ void QTuiMdiSubWindow::paintEvent(ScreenBuffer &buffer)
             continue;
         if (x0 < buffer.width()) {
             Cell &cell = buffer.backCell(x0, py);
-            cell.character = border.vertical;
+            cell.setChar(border.vertical);
             cell.foreground = fg;
             cell.background = bg;
             cell.bold = theme.bold;
@@ -211,7 +212,7 @@ void QTuiMdiSubWindow::paintEvent(ScreenBuffer &buffer)
         int rx = x0 + w - 1;
         if (rx < buffer.width()) {
             Cell &cell = buffer.backCell(rx, py);
-            cell.character = border.vertical;
+            cell.setChar(border.vertical);
             cell.foreground = fg;
             cell.background = bg;
             cell.bold = theme.bold;
@@ -225,7 +226,7 @@ void QTuiMdiSubWindow::paintEvent(ScreenBuffer &buffer)
             int py = y0 + row;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = false;

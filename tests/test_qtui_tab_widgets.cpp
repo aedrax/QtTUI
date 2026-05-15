@@ -25,7 +25,7 @@ public:
                 int px = geo.x() + col;
                 int py = geo.y() + row;
                 if (px < buffer.width() && py < buffer.height()) {
-                    buffer.backCell(px, py).character = QLatin1Char('X');
+                    buffer.backCell(px, py).setChar(U'X');
                 }
             }
         }
@@ -257,7 +257,7 @@ private slots:
         // Collect the rendered row
         QString row;
         for (int col = 0; col < 20; ++col)
-            row += buffer.backCell(col, 0).character;
+            row += buffer.backCell(col, 0).text();
 
         QVERIFY(row.contains(QStringLiteral("Tab1")));
         QVERIFY(row.contains(QStringLiteral("Tab2")));
@@ -417,7 +417,7 @@ private slots:
         // Tab bar row should contain "Tab1"
         QString topRow;
         for (int col = 0; col < 20; ++col)
-            topRow += buffer.backCell(col, 0).character;
+            topRow += buffer.backCell(col, 0).text();
         QVERIFY(topRow.contains(QStringLiteral("Tab1")));
     }
 
@@ -606,7 +606,7 @@ private slots:
         // First header row should contain the expand indicator and "Section1"
         QString row0;
         for (int col = 0; col < 20; ++col)
-            row0 += buffer.backCell(col, 0).character;
+            row0 += buffer.backCell(col, 0).text();
         QVERIFY(row0.contains(QStringLiteral("Section1")));
         // Current item uses ▼ indicator
         QVERIFY(row0.contains(QChar(0x25BC)));

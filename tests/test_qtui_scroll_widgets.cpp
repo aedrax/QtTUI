@@ -25,7 +25,7 @@ public:
                 if (px < buffer.width() && py < buffer.height()) {
                     Cell &cell = buffer.backCell(px, py);
                     // Fill with a character based on position for verification
-                    cell.character = QChar('A' + ((row + col) % 26));
+                    cell.setChar(char32_t('A' + ((row + col) % 26)));
                 }
             }
         }
@@ -251,9 +251,9 @@ private slots:
         bool foundTrack = false;
         for (int row = 0; row < 10; ++row) {
             const Cell &cell = buffer.backCell(0, row);
-            if (cell.character == QChar(0x2588))
+            if (cell.ch == 0x2588)
                 foundThumb = true;
-            else if (cell.character == QChar(0x2502))
+            else if (cell.ch == 0x2502)
                 foundTrack = true;
         }
         QVERIFY(foundThumb);
@@ -276,9 +276,9 @@ private slots:
         bool foundTrack = false;
         for (int col = 0; col < 10; ++col) {
             const Cell &cell = buffer.backCell(col, 0);
-            if (cell.character == QChar(0x2588))
+            if (cell.ch == 0x2588)
                 foundThumb = true;
-            else if (cell.character == QChar(0x2500))
+            else if (cell.ch == 0x2500)
                 foundTrack = true;
         }
         QVERIFY(foundThumb);
@@ -495,8 +495,8 @@ private slots:
             for (int col = 0; col < 9; ++col) {
                 const Cell &cell = buffer.backCell(col, row);
                 // Our test widget fills with 'A' + ((row+col) % 26)
-                QChar expected = QChar('A' + ((row + col) % 26));
-                if (cell.character == expected) {
+                const char32_t expected = char32_t('A' + ((row + col) % 26));
+                if (cell.ch == expected) {
                     hasChildContent = true;
                 }
             }
@@ -507,7 +507,7 @@ private slots:
         bool hasScrollBarChar = false;
         for (int row = 0; row < 9; ++row) {
             const Cell &cell = buffer.backCell(9, row);
-            if (cell.character == QChar(0x2588) || cell.character == QChar(0x2502)) {
+            if (cell.ch == 0x2588 || cell.ch == 0x2502) {
                 hasScrollBarChar = true;
                 break;
             }

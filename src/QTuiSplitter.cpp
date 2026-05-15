@@ -13,6 +13,7 @@ QTuiSplitterHandle::QTuiSplitterHandle(Qt::Orientation orientation, QTuiSplitter
     : QTuiWidget(parent)
     , m_orientation(orientation)
 {
+    setFocusPolicy(Qt::StrongFocus);
 }
 
 Qt::Orientation QTuiSplitterHandle::orientation() const
@@ -50,9 +51,9 @@ void QTuiSplitterHandle::paintEvent(ScreenBuffer &buffer)
     const int h = geo.height();
 
     // Render divider line: │ for horizontal splitter, ─ for vertical splitter
-    QChar divChar = (m_orientation == Qt::Horizontal)
-                        ? QChar(0x2502)   // │ vertical line (divides left/right)
-                        : QChar(0x2500);  // ─ horizontal line (divides top/bottom)
+    const char32_t divChar = (m_orientation == Qt::Horizontal)
+                        ? char32_t(0x2502)   // │ vertical line (divides left/right)
+                        : char32_t(0x2500);  // ─ horizontal line (divides top/bottom)
 
     for (int row = 0; row < h; ++row) {
         for (int col = 0; col < w; ++col) {
@@ -60,7 +61,7 @@ void QTuiSplitterHandle::paintEvent(ScreenBuffer &buffer)
             int py = y0 + row;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = divChar;
+                cell.setChar(divChar);
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = theme.bold;
@@ -137,6 +138,7 @@ void QTuiSplitter::addWidget(QTuiWidget *widget)
     m_sizes.append(0); // will be computed in recalculateLayout
 
     recalculateLayout();
+    markDirty();
 }
 
 int QTuiSplitter::count() const
@@ -160,9 +162,12 @@ void QTuiSplitter::setSizes(const QList<int> &sizes)
 {
     if (sizes.size() != m_widgets.size())
         return;
+    if (m_sizes == sizes)
+        return;
 
     m_sizes = sizes;
     recalculateLayout();
+    markDirty();
 }
 
 Qt::Orientation QTuiSplitter::orientation() const
@@ -181,6 +186,7 @@ void QTuiSplitter::setOrientation(Qt::Orientation orientation)
         h->m_orientation = orientation;
 
     recalculateLayout();
+    markDirty();
 }
 
 QTuiSplitterHandle *QTuiSplitter::handle(int index) const
@@ -365,6 +371,7 @@ void QTuiSplitter::moveSplitter(int handleIndex, int delta)
     position += handleIndex; // account for handles before this one
 
     emit splitterMoved(position, handleIndex);
+    markDirty();
 }
 
 void QTuiSplitter::paintEvent(ScreenBuffer &buffer)
@@ -384,7 +391,7 @@ void QTuiSplitter::paintEvent(ScreenBuffer &buffer)
             int py = geo.y() + row;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = false;

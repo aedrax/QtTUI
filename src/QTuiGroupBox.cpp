@@ -19,7 +19,10 @@ QString QTuiGroupBox::title() const
 
 void QTuiGroupBox::setTitle(const QString &title)
 {
+    if (m_title == title)
+        return;
     m_title = title;
+    markDirty();
 }
 
 bool QTuiGroupBox::isCheckable() const
@@ -29,7 +32,13 @@ bool QTuiGroupBox::isCheckable() const
 
 void QTuiGroupBox::setCheckable(bool checkable)
 {
+    if (m_checkable == checkable)
+        return;
     m_checkable = checkable;
+    // Only a checkable group box is interactive (Space/Enter toggles it);
+    // a plain group box is a passive container that Tab must skip.
+    setFocusPolicy(checkable ? Qt::StrongFocus : Qt::NoFocus);
+    markDirty();
 }
 
 bool QTuiGroupBox::isChecked() const
@@ -44,6 +53,7 @@ void QTuiGroupBox::setChecked(bool checked)
     m_checked = checked;
     updateChildrenEnabled();
     emit toggled(m_checked);
+    markDirty();
 }
 
 void QTuiGroupBox::setLayout(QTuiLayout *layout)
@@ -99,11 +109,11 @@ void QTuiGroupBox::paintEvent(ScreenBuffer &buffer)
         if (y0 < buffer.height() && px < buffer.width()) {
             Cell &cell = buffer.backCell(px, y0);
             if (col == 0)
-                cell.character = border.topLeft;
+                cell.setChar(border.topLeft);
             else if (col == w - 1)
-                cell.character = border.topRight;
+                cell.setChar(border.topRight);
             else
-                cell.character = border.horizontal;
+                cell.setChar(border.horizontal);
             cell.foreground = fg;
             cell.background = bg;
             cell.bold = theme.bold;
@@ -113,11 +123,11 @@ void QTuiGroupBox::paintEvent(ScreenBuffer &buffer)
         if (by < buffer.height() && px < buffer.width()) {
             Cell &cell = buffer.backCell(px, by);
             if (col == 0)
-                cell.character = border.bottomLeft;
+                cell.setChar(border.bottomLeft);
             else if (col == w - 1)
-                cell.character = border.bottomRight;
+                cell.setChar(border.bottomRight);
             else
-                cell.character = border.horizontal;
+                cell.setChar(border.horizontal);
             cell.foreground = fg;
             cell.background = bg;
             cell.bold = theme.bold;
@@ -132,7 +142,7 @@ void QTuiGroupBox::paintEvent(ScreenBuffer &buffer)
         // Left
         if (x0 < buffer.width()) {
             Cell &cell = buffer.backCell(x0, py);
-            cell.character = border.vertical;
+            cell.setChar(border.vertical);
             cell.foreground = fg;
             cell.background = bg;
             cell.bold = theme.bold;
@@ -141,7 +151,7 @@ void QTuiGroupBox::paintEvent(ScreenBuffer &buffer)
         int rx = x0 + w - 1;
         if (rx < buffer.width()) {
             Cell &cell = buffer.backCell(rx, py);
-            cell.character = border.vertical;
+            cell.setChar(border.vertical);
             cell.foreground = fg;
             cell.background = bg;
             cell.bold = theme.bold;
@@ -155,7 +165,7 @@ void QTuiGroupBox::paintEvent(ScreenBuffer &buffer)
             int py = y0 + row;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = false;
@@ -180,7 +190,7 @@ void QTuiGroupBox::paintEvent(ScreenBuffer &buffer)
             int px = x0 + titleCol + i;
             if (px < buffer.width() && y0 < buffer.height()) {
                 Cell &cell = buffer.backCell(px, y0);
-                cell.character = titleStr.at(i);
+                cell.setChar(titleStr.at(i).unicode());
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = theme.bold;
@@ -225,8 +235,26 @@ void QTuiGroupBox::mousePressEvent(TuiMouseEvent *event)
 {
     if (event->mouseType() != TuiMouseEvent::Press)
         return;
-    if (m_checkable)
-        setChecked(!m_checked);
+    if (!m_checkable)
+        return;
+
+    // Only clicks on the painted "[x] Title" span in the top border toggle
+    // the checkbox. Mirror paintEvent: the title is drawn on row geo.y(),
+    // starting at column geo.x() + 2, truncated to width - 4, and only when
+    // the title is non-empty and the box is wider than 4 cells.
+    const QRect geo = geometry();
+    if (m_title.isEmpty() || geo.width() <= 4)
+        return;
+    if (event->y() != geo.y())
+        return;
+
+    const int titleLen = 4 + static_cast<int>(m_title.length()); // "[x] " prefix + title
+    const int span = qMin(titleLen, geo.width() - 4);
+    const int startX = geo.x() + 2;
+    if (event->x() < startX || event->x() >= startX + span)
+        return;
+
+    setChecked(!m_checked);
 }
 
 void QTuiGroupBox::updateChildrenEnabled()
@@ -234,9 +262,12 @@ void QTuiGroupBox::updateChildrenEnabled()
     if (!m_checkable)
         return;
 
+    // Unchecking disables the children instead of hiding them (matching
+    // QGroupBox): they stay visible but inert, rendered with the disabled
+    // palette, and drop out of the Tab focus chain.
     const auto children = childWidgets();
     for (auto *child : children) {
-        child->setVisible(m_checked);
+        child->setEnabled(m_checked);
     }
 }
 

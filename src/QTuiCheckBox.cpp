@@ -9,6 +9,7 @@ QTuiCheckBox::QTuiCheckBox(const QString &text, QTuiWidget *parent)
     : QTuiWidget(parent)
     , m_text(text)
 {
+    setFocusPolicy(Qt::StrongFocus);
 }
 
 QString QTuiCheckBox::text() const
@@ -18,7 +19,10 @@ QString QTuiCheckBox::text() const
 
 void QTuiCheckBox::setText(const QString &text)
 {
+    if (m_text == text)
+        return;
     m_text = text;
+    markDirty();
 }
 
 int QTuiCheckBox::checkState() const
@@ -90,7 +94,7 @@ void QTuiCheckBox::paintEvent(ScreenBuffer &buffer)
             int py = geoY + row;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = theme.bold;
@@ -118,7 +122,7 @@ void QTuiCheckBox::paintEvent(ScreenBuffer &buffer)
             int px = geoX + i;
             if (px < buffer.width()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = content.at(i);
+                cell.setChar(content.at(i).unicode());
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = theme.bold;

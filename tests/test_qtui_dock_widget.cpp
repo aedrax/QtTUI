@@ -69,7 +69,7 @@ private slots:
         // Extract the title bar row
         QString titleRow;
         for (int col = 0; col < 20; ++col)
-            titleRow += buffer.backCell(col, 0).character;
+            titleRow += buffer.backCell(col, 0).text();
 
         QVERIFY(titleRow.contains(QStringLiteral("Log")));
         QVERIFY(titleRow.contains(QStringLiteral("[X]")));
@@ -240,8 +240,8 @@ private slots:
         dock.paintEvent(buffer);
 
         // Bottom row should have border characters
-        QChar bottomLeft = buffer.backCell(0, 3).character;
-        QChar bottomRight = buffer.backCell(14, 3).character;
+        QString bottomLeft = buffer.backCell(0, 3).text();
+        QString bottomRight = buffer.backCell(14, 3).text();
         // They should be border chars (not spaces)
         QVERIFY(bottomLeft != QLatin1Char(' '));
         QVERIFY(bottomRight != QLatin1Char(' '));

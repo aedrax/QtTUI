@@ -94,10 +94,10 @@ void QTuiFocusFrame::paintEvent(ScreenBuffer &buffer)
     const int y1 = y0 + h - 1;
 
     // Draw the four corners
-    auto setCell = [&](int x, int y, QChar ch) {
+    auto setCell = [&](int x, int y, char32_t ch) {
         if (x >= 0 && x < buffer.width() && y >= 0 && y < buffer.height()) {
             Cell &cell = buffer.backCell(x, y);
-            cell.character = ch;
+            cell.setChar(ch);
             cell.foreground = fg;
             cell.background = bg;
             cell.bold = theme.bold;

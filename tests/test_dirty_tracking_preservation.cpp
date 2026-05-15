@@ -523,7 +523,7 @@ private slots:
 
                 // Write the ASCII character to the back buffer
                 Cell &cell = buffer.backCell(0, 0);
-                cell.character = asciiChar;
+                cell.setChar(asciiChar.unicode());
                 cell.foreground = Color(255, 255, 255);
                 cell.background = Color(0, 0, 0);
 
@@ -573,14 +573,14 @@ private slots:
 
                 // Record what's in the buffer at the label's position
                 QRect geo = label.geometry();
-                QChar charBefore = buffer->backCell(geo.x(), geo.y()).character;
+                QString charBefore = buffer->backCell(geo.x(), geo.y()).text();
 
                 // Swap buffers to simulate a new frame
                 buffer->swapBuffers();
 
                 // Write something different to the back buffer at the label's position
                 Cell &cell = buffer->backCell(geo.x(), geo.y());
-                cell.character = QLatin1Char('Z');
+                cell.setChar(U'Z');
 
                 // The label is NOT dirty, so if paintTree runs, it should NOT
                 // overwrite our 'Z' with the label's content

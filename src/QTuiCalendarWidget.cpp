@@ -13,6 +13,7 @@ QTuiCalendarWidget::QTuiCalendarWidget(QTuiWidget *parent)
     , m_displayYear(QDate::currentDate().year())
     , m_displayMonth(QDate::currentDate().month())
 {
+    setFocusPolicy(Qt::StrongFocus);
     setGeometry(QRect(0, 0, 22, 9));
 }
 
@@ -32,6 +33,7 @@ void QTuiCalendarWidget::setSelectedDate(const QDate &date)
     m_displayYear = clamped.year();
     m_displayMonth = clamped.month();
     emit selectionChanged();
+    markDirty();
 }
 
 int QTuiCalendarWidget::yearShown() const
@@ -46,6 +48,8 @@ int QTuiCalendarWidget::monthShown() const
 
 void QTuiCalendarWidget::setMinimumDate(const QDate &date)
 {
+    if (m_minimumDate == date)
+        return;
     m_minimumDate = date;
     if (m_minimumDate.isValid() && m_cursorDate < m_minimumDate)
         m_cursorDate = m_minimumDate;
@@ -53,10 +57,13 @@ void QTuiCalendarWidget::setMinimumDate(const QDate &date)
         m_selectedDate = m_minimumDate;
         emit selectionChanged();
     }
+    markDirty();
 }
 
 void QTuiCalendarWidget::setMaximumDate(const QDate &date)
 {
+    if (m_maximumDate == date)
+        return;
     m_maximumDate = date;
     if (m_maximumDate.isValid() && m_cursorDate > m_maximumDate)
         m_cursorDate = m_maximumDate;
@@ -64,6 +71,7 @@ void QTuiCalendarWidget::setMaximumDate(const QDate &date)
         m_selectedDate = m_maximumDate;
         emit selectionChanged();
     }
+    markDirty();
 }
 
 QDate QTuiCalendarWidget::minimumDate() const
@@ -105,6 +113,7 @@ void QTuiCalendarWidget::showPreviousMonth()
     // Move cursor to same day in new month, or last day if month is shorter
     int day = qMin(m_cursorDate.day(), QDate(m_displayYear, m_displayMonth, 1).daysInMonth());
     m_cursorDate = clampDate(QDate(m_displayYear, m_displayMonth, day));
+    markDirty();
 }
 
 void QTuiCalendarWidget::showNextMonth()
@@ -116,6 +125,7 @@ void QTuiCalendarWidget::showNextMonth()
     }
     int day = qMin(m_cursorDate.day(), QDate(m_displayYear, m_displayMonth, 1).daysInMonth());
     m_cursorDate = clampDate(QDate(m_displayYear, m_displayMonth, day));
+    markDirty();
 }
 
 void QTuiCalendarWidget::paintEvent(ScreenBuffer &buffer)
@@ -132,10 +142,10 @@ void QTuiCalendarWidget::paintEvent(ScreenBuffer &buffer)
     const Color bg = theme.background;
     const QDate today = QDate::currentDate();
 
-    auto setCell = [&](int x, int y, QChar ch, Color cellFg, Color cellBg, bool bold = false, bool underline = false) {
+    auto setCell = [&](int x, int y, char32_t ch, Color cellFg, Color cellBg, bool bold = false, bool underline = false) {
         if (x >= 0 && x < buffer.width() && y >= 0 && y < buffer.height()) {
             Cell &cell = buffer.backCell(x, y);
-            cell.character = ch;
+            cell.setChar(ch);
             cell.foreground = cellFg;
             cell.background = cellBg;
             cell.bold = bold;
@@ -146,7 +156,7 @@ void QTuiCalendarWidget::paintEvent(ScreenBuffer &buffer)
     auto writeString = [&](int x, int y, const QString &str, Color cellFg, Color cellBg, bool bold = false, bool underline = false) {
         const int len = static_cast<int>(str.length());
         for (int i = 0; i < len; ++i) {
-            setCell(x + i, y, str.at(i), cellFg, cellBg, bold, underline);
+            setCell(x + i, y, str.at(i).unicode(), cellFg, cellBg, bold, underline);
         }
     };
 
@@ -157,7 +167,7 @@ void QTuiCalendarWidget::paintEvent(ScreenBuffer &buffer)
     // Clear the widget area
     for (int row = 0; row < geo.height(); ++row) {
         for (int col = 0; col < w; ++col) {
-            setCell(x0 + col, y0 + row, QLatin1Char(' '), fg, bg);
+            setCell(x0 + col, y0 + row, U' ', fg, bg);
         }
     }
 
@@ -244,6 +254,7 @@ void QTuiCalendarWidget::keyPressEvent(TuiKeyEvent *event)
                 m_displayMonth = m_cursorDate.month();
                 m_displayYear = m_cursorDate.year();
             }
+            markDirty();
         }
         break;
     }
@@ -256,6 +267,7 @@ void QTuiCalendarWidget::keyPressEvent(TuiKeyEvent *event)
                 m_displayMonth = m_cursorDate.month();
                 m_displayYear = m_cursorDate.year();
             }
+            markDirty();
         }
         break;
     }
@@ -268,6 +280,7 @@ void QTuiCalendarWidget::keyPressEvent(TuiKeyEvent *event)
                 m_displayMonth = m_cursorDate.month();
                 m_displayYear = m_cursorDate.year();
             }
+            markDirty();
         }
         break;
     }
@@ -280,6 +293,7 @@ void QTuiCalendarWidget::keyPressEvent(TuiKeyEvent *event)
                 m_displayMonth = m_cursorDate.month();
                 m_displayYear = m_cursorDate.year();
             }
+            markDirty();
         }
         break;
     }
@@ -301,6 +315,7 @@ void QTuiCalendarWidget::keyPressEvent(TuiKeyEvent *event)
         if (inRange && m_cursorDate != m_selectedDate) {
             m_selectedDate = m_cursorDate;
             emit selectionChanged();
+            markDirty();
         }
         if (inRange)
             emit activated(m_cursorDate);
@@ -327,6 +342,7 @@ void QTuiCalendarWidget::mousePressEvent(TuiMouseEvent *event)
     if (inRange && m_cursorDate != m_selectedDate) {
         m_selectedDate = m_cursorDate;
         emit selectionChanged();
+        markDirty();
     }
     if (inRange)
         emit activated(m_cursorDate);

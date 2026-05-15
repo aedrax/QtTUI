@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiLabel.h>
+#include <QtTUI/QtTuiUnicode.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 
@@ -20,6 +21,7 @@ void QTuiLabel::setText(const QString &text)
     if (m_text != text) {
         m_text = text;
         emit textChanged(m_text);
+        markDirty();
     }
 }
 
@@ -30,7 +32,10 @@ Qt::Alignment QTuiLabel::alignment() const
 
 void QTuiLabel::setAlignment(Qt::Alignment alignment)
 {
+    if (m_alignment == alignment)
+        return;
     m_alignment = alignment;
+    markDirty();
 }
 
 bool QTuiLabel::wordWrap() const
@@ -40,7 +45,10 @@ bool QTuiLabel::wordWrap() const
 
 void QTuiLabel::setWordWrap(bool on)
 {
+    if (m_wordWrap == on)
+        return;
     m_wordWrap = on;
+    markDirty();
 }
 
 QTuiWidget *QTuiLabel::buddy() const
@@ -72,7 +80,8 @@ QStringList QTuiLabel::wrapText(const QString &text, int width) const
         if (currentLine.isEmpty()) {
             // If a single word exceeds width, force it onto its own line
             currentLine = word;
-        } else if (currentLine.length() + 1 + word.length() <= width) {
+        } else if (QtTuiUnicode::stringWidth(currentLine) + 1
+                       + QtTuiUnicode::stringWidth(word) <= width) {
             currentLine += QLatin1Char(' ') + word;
         } else {
             lines.append(currentLine);
@@ -91,13 +100,13 @@ QSize QTuiLabel::minimumSize() const
         return QSize(0, 1);
 
     if (!m_wordWrap)
-        return QSize(m_text.length(), 1);
+        return QSize(QtTuiUnicode::stringWidth(m_text), 1);
 
     // With word wrap, minimum width is the longest word, height depends on wrapping
     const QStringList words = m_text.split(QLatin1Char(' '), Qt::SkipEmptyParts);
     int maxWordLen = 0;
     for (const QString &w : words)
-        maxWordLen = qMax(maxWordLen, static_cast<int>(w.length()));
+        maxWordLen = qMax(maxWordLen, QtTuiUnicode::stringWidth(w));
 
     return QSize(maxWordLen, 1);
 }
@@ -125,7 +134,7 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
             int py = geoY + row;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = theme.bold;
@@ -158,30 +167,38 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
             break;
 
         const QString &line = lines.at(lineIdx);
-        int textLen = qMin(static_cast<int>(line.length()), geoW);
+        const int textCols = qMin(QtTuiUnicode::stringWidth(line), geoW);
 
-        // Horizontal alignment: determine starting column
+        // Horizontal alignment: determine starting column (display columns)
         int startCol = 0;
         if (m_alignment & Qt::AlignHCenter) {
-            startCol = (geoW - textLen) / 2;
+            startCol = (geoW - textCols) / 2;
         } else if (m_alignment & Qt::AlignRight) {
-            startCol = geoW - textLen;
+            startCol = geoW - textCols;
         }
         // AlignLeft: startCol stays 0
         startCol = qMax(0, startCol);
 
-        for (int i = 0; i < textLen; ++i) {
-            int px = geoX + startCol + i;
-            int py = geoY + row;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                cell.character = line.at(i);
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = theme.bold;
-                cell.italic = theme.italic;
-                cell.underline = theme.underline;
-            }
+        // Write clusters until the widget (or buffer) edge; a wide character
+        // straddling the right edge is left as the background space.
+        Cell style;
+        style.foreground = fg;
+        style.background = bg;
+        style.bold = theme.bold;
+        style.italic = theme.italic;
+        style.underline = theme.underline;
+
+        const int py = geoY + row;
+        if (py >= buffer.height())
+            continue;
+        int col = startCol;
+        int i = 0;
+        QtTuiUnicode::Cluster c;
+        while (QtTuiUnicode::nextCluster(line, i, c)) {
+            if (col + c.width > geoW || geoX + col + c.width > buffer.width())
+                break;
+            buffer.putChar(geoX + col, py, c.base, c.combining, style);
+            col += c.width;
         }
     }
 }

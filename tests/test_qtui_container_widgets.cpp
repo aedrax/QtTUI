@@ -26,7 +26,7 @@ public:
                 int px = geo.x() + col;
                 int py = geo.y() + row;
                 if (px < buffer.width() && py < buffer.height()) {
-                    buffer.backCell(px, py).character = QLatin1Char('X');
+                    buffer.backCell(px, py).setChar(U'X');
                 }
             }
         }
@@ -37,6 +37,12 @@ public:
 static void sendKey(QTuiWidget &w, int key, Qt::KeyboardModifiers mods = Qt::NoModifier)
 {
     TuiKeyEvent ev(key, mods);
+    QCoreApplication::sendEvent(&w, &ev);
+}
+
+static void sendMousePress(QTuiWidget &w, const QPoint &pos)
+{
+    TuiMouseEvent ev(TuiMouseEvent::Press, Qt::LeftButton, pos);
     QCoreApplication::sendEvent(&w, &ev);
 }
 
@@ -121,18 +127,21 @@ private slots:
         auto *child1 = new ContainerTestWidget(&gb);
         auto *child2 = new ContainerTestWidget(&gb);
 
-        QCOMPARE(child1->isVisible(), true);
-        QCOMPARE(child2->isVisible(), true);
+        QCOMPARE(child1->isEnabled(), true);
+        QCOMPARE(child2->isEnabled(), true);
 
-        // Uncheck - children should be hidden
+        // Uncheck - children are disabled but stay visible (matches
+        // QGroupBox; they previously were hidden, which was a defect)
         gb.setChecked(false);
-        QCOMPARE(child1->isVisible(), false);
-        QCOMPARE(child2->isVisible(), false);
-
-        // Re-check - children should be visible again
-        gb.setChecked(true);
+        QCOMPARE(child1->isEnabled(), false);
+        QCOMPARE(child2->isEnabled(), false);
         QCOMPARE(child1->isVisible(), true);
         QCOMPARE(child2->isVisible(), true);
+
+        // Re-check - children should be enabled again
+        gb.setChecked(true);
+        QCOMPARE(child1->isEnabled(), true);
+        QCOMPARE(child2->isEnabled(), true);
     }
 
     void groupBox_keyPressTogglesCheckable()
@@ -142,20 +151,21 @@ private slots:
         gb.setChecked(true);
 
         auto *child = new ContainerTestWidget(&gb);
-        QCOMPARE(child->isVisible(), true);
+        QCOMPARE(child->isEnabled(), true);
 
         QSignalSpy spy(&gb, &QTuiGroupBox::toggled);
 
-        // Space toggles
+        // Space toggles; children are disabled, not hidden (matches QGroupBox)
         sendKey(gb, Qt::Key_Space);
         QCOMPARE(gb.isChecked(), false);
-        QCOMPARE(child->isVisible(), false);
+        QCOMPARE(child->isEnabled(), false);
+        QCOMPARE(child->isVisible(), true);
         QCOMPARE(spy.count(), 1);
 
         // Enter toggles back
         sendKey(gb, Qt::Key_Return);
         QCOMPARE(gb.isChecked(), true);
-        QCOMPARE(child->isVisible(), true);
+        QCOMPARE(child->isEnabled(), true);
         QCOMPARE(spy.count(), 2);
     }
 
@@ -207,18 +217,18 @@ private slots:
 
         // Top-left corner should be a border character (not space)
         const Cell &topLeft = buffer.backCell(0, 0);
-        QVERIFY(topLeft.character != QLatin1Char(' '));
+        QVERIFY(topLeft.ch != U' ');
 
         // Bottom-right corner should be a border character
         const Cell &bottomRight = buffer.backCell(9, 4);
-        QVERIFY(bottomRight.character != QLatin1Char(' '));
+        QVERIFY(bottomRight.ch != U' ');
 
         // Title "Box" should appear in top border
         // Title starts at col 2
         bool foundTitle = false;
         QString topRow;
         for (int col = 0; col < 10; ++col) {
-            topRow += buffer.backCell(col, 0).character;
+            topRow += buffer.backCell(col, 0).text();
         }
         if (topRow.contains(QStringLiteral("Box")))
             foundTitle = true;
@@ -238,7 +248,7 @@ private slots:
         // Top row should contain "[x] Opt"
         QString topRow;
         for (int col = 0; col < 15; ++col) {
-            topRow += buffer.backCell(col, 0).character;
+            topRow += buffer.backCell(col, 0).text();
         }
         QVERIFY(topRow.contains(QStringLiteral("[x]")));
         QVERIFY(topRow.contains(QStringLiteral("Opt")));
@@ -256,9 +266,81 @@ private slots:
 
         QString topRow;
         for (int col = 0; col < 15; ++col) {
-            topRow += buffer.backCell(col, 0).character;
+            topRow += buffer.backCell(col, 0).text();
         }
         QVERIFY(topRow.contains(QStringLiteral("[ ]")));
+    }
+
+    void groupBox_mousePressOnTitleRowToggles()
+    {
+        QTuiGroupBox gb(QStringLiteral("Opt"));
+        gb.setCheckable(true);
+        gb.setChecked(true);
+        gb.setGeometry(QRect(0, 0, 15, 5));
+
+        QSignalSpy spy(&gb, &QTuiGroupBox::toggled);
+
+        // Painted title span is "[x] Opt" (7 chars) on row 0, columns 2..8.
+        sendMousePress(gb, QPoint(2, 0)); // first '[' cell
+        QCOMPARE(gb.isChecked(), false);
+        QCOMPARE(spy.count(), 1);
+
+        sendMousePress(gb, QPoint(8, 0)); // last title char 't'
+        QCOMPARE(gb.isChecked(), true);
+        QCOMPARE(spy.count(), 2);
+    }
+
+    void groupBox_mousePressOutsideTitleSpanDoesNotToggle()
+    {
+        QTuiGroupBox gb(QStringLiteral("Opt"));
+        gb.setCheckable(true);
+        gb.setChecked(true);
+        gb.setGeometry(QRect(0, 0, 15, 5));
+
+        QSignalSpy spy(&gb, &QTuiGroupBox::toggled);
+
+        // Content area (inside the border, padding around children)
+        sendMousePress(gb, QPoint(5, 2));
+        // Bottom border
+        sendMousePress(gb, QPoint(5, 4));
+        // Title row but left of the title span (border corner)
+        sendMousePress(gb, QPoint(0, 0));
+        sendMousePress(gb, QPoint(1, 0));
+        // Title row but right of the "[x] Opt" span (span ends at col 8)
+        sendMousePress(gb, QPoint(9, 0));
+        sendMousePress(gb, QPoint(13, 0));
+
+        QCOMPARE(gb.isChecked(), true);
+        QCOMPARE(spy.count(), 0);
+    }
+
+    void groupBox_mousePressIgnoredWhenNotCheckable()
+    {
+        QTuiGroupBox gb(QStringLiteral("Opt"));
+        gb.setCheckable(false);
+        gb.setGeometry(QRect(0, 0, 15, 5));
+
+        QSignalSpy spy(&gb, &QTuiGroupBox::toggled);
+        sendMousePress(gb, QPoint(3, 0)); // on the title span
+        QCOMPARE(gb.isChecked(), true);
+        QCOMPARE(spy.count(), 0);
+    }
+
+    void groupBox_mousePressUsesAbsoluteCoordinates()
+    {
+        // Geometry offset from origin: hit-test must use absolute coords.
+        QTuiGroupBox gb(QStringLiteral("Opt"));
+        gb.setCheckable(true);
+        gb.setChecked(true);
+        gb.setGeometry(QRect(5, 3, 15, 5));
+
+        // Title span "[x] Opt" on row 3, columns 7..13.
+        sendMousePress(gb, QPoint(7, 3));
+        QCOMPARE(gb.isChecked(), false);
+
+        // Same column, one row down: no toggle.
+        sendMousePress(gb, QPoint(7, 4));
+        QCOMPARE(gb.isChecked(), false);
     }
 
     // ---------------------------------------------------------------
@@ -396,7 +478,7 @@ private slots:
         // Title bar should contain ▼ (expanded indicator) and "Info"
         QString titleRow;
         for (int col2 = 0; col2 < 15; ++col2) {
-            titleRow += buffer.backCell(col2, 0).character;
+            titleRow += buffer.backCell(col2, 0).text();
         }
         QVERIFY(titleRow.contains(QChar(0x25BC))); // ▼
         QVERIFY(titleRow.contains(QStringLiteral("Info")));
@@ -414,10 +496,65 @@ private slots:
         // Title bar should contain ▶ (collapsed indicator)
         QString titleRow;
         for (int col2 = 0; col2 < 15; ++col2) {
-            titleRow += buffer.backCell(col2, 0).character;
+            titleRow += buffer.backCell(col2, 0).text();
         }
         QVERIFY(titleRow.contains(QChar(0x25B6))); // ▶
         QVERIFY(titleRow.contains(QStringLiteral("Info")));
+    }
+
+    void collapsible_mousePressOnHeaderRowToggles()
+    {
+        QTuiCollapsible col(QStringLiteral("Info"));
+        col.setGeometry(QRect(0, 0, 15, 5));
+        QCOMPARE(col.isExpanded(), true);
+
+        QSignalSpy spy(&col, &QTuiCollapsible::toggled);
+
+        // Header bar occupies the entire top row (row 0).
+        sendMousePress(col, QPoint(4, 0));
+        QCOMPARE(col.isCollapsed(), true);
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(spy.at(0).at(0).toBool(), false); // expanded = false
+
+        sendMousePress(col, QPoint(14, 0)); // far end of the header row
+        QCOMPARE(col.isExpanded(), true);
+        QCOMPARE(spy.count(), 2);
+        QCOMPARE(spy.at(1).at(0).toBool(), true);
+    }
+
+    void collapsible_mousePressOnContentAreaDoesNotToggle()
+    {
+        QTuiCollapsible col(QStringLiteral("Info"));
+        col.setGeometry(QRect(0, 0, 15, 5));
+
+        auto *child = new ContainerTestWidget(&col);
+        QCOMPARE(child->isVisible(), true);
+
+        QSignalSpy spy(&col, &QTuiCollapsible::toggled);
+
+        // Clicks below the header row must not collapse.
+        sendMousePress(col, QPoint(4, 1));
+        sendMousePress(col, QPoint(4, 2));
+        sendMousePress(col, QPoint(14, 4));
+
+        QCOMPARE(col.isExpanded(), true);
+        QCOMPARE(child->isVisible(), true);
+        QCOMPARE(spy.count(), 0);
+    }
+
+    void collapsible_mousePressUsesAbsoluteCoordinates()
+    {
+        // Geometry offset from origin: hit-test must use absolute coords.
+        QTuiCollapsible col(QStringLiteral("Info"));
+        col.setGeometry(QRect(2, 4, 15, 5));
+
+        // Header row is absolute row 4.
+        sendMousePress(col, QPoint(5, 4));
+        QCOMPARE(col.isCollapsed(), true);
+
+        // Same column inside the (now hidden) content area: no toggle.
+        sendMousePress(col, QPoint(5, 6));
+        QCOMPARE(col.isCollapsed(), true);
     }
 };
 

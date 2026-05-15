@@ -277,7 +277,7 @@ private slots:
 
                 // Write the unicode character to the back buffer
                 Cell &cell = buffer.backCell(0, 0);
-                cell.character = unicodeChar;
+                cell.setChar(char32_t(codePoint));
                 cell.foreground = Color(255, 255, 255);
                 cell.background = Color(0, 0, 0);
 

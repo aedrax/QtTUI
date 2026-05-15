@@ -9,6 +9,7 @@ QTuiScrollBar::QTuiScrollBar(Qt::Orientation orientation, QTuiWidget *parent)
     : QTuiWidget(parent)
     , m_orientation(orientation)
 {
+    setFocusPolicy(Qt::StrongFocus);
 }
 
 int QTuiScrollBar::value() const
@@ -33,10 +34,13 @@ int QTuiScrollBar::minimum() const
 
 void QTuiScrollBar::setMinimum(int min)
 {
+    if (m_minimum == min)
+        return;
     m_minimum = min;
     if (m_maximum < m_minimum)
         m_maximum = m_minimum;
     setValue(m_value);
+    markDirty();
 }
 
 int QTuiScrollBar::maximum() const
@@ -46,17 +50,24 @@ int QTuiScrollBar::maximum() const
 
 void QTuiScrollBar::setMaximum(int max)
 {
+    if (m_maximum == max)
+        return;
     m_maximum = max;
     if (m_minimum > m_maximum)
         m_minimum = m_maximum;
     setValue(m_value);
+    markDirty();
 }
 
 void QTuiScrollBar::setRange(int min, int max)
 {
+    max = qMax(min, max);
+    if (m_minimum == min && m_maximum == max)
+        return;
     m_minimum = min;
-    m_maximum = qMax(min, max);
+    m_maximum = max;
     setValue(m_value);
+    markDirty();
 }
 
 int QTuiScrollBar::singleStep() const
@@ -77,8 +88,10 @@ int QTuiScrollBar::pageStep() const
 
 void QTuiScrollBar::setPageStep(int step)
 {
-    if (step > 0)
+    if (step > 0 && m_pageStep != step) {
         m_pageStep = step;
+        markDirty();
+    }
 }
 
 Qt::Orientation QTuiScrollBar::orientation() const
@@ -151,9 +164,9 @@ void QTuiScrollBar::paintEvent(ScreenBuffer &buffer)
             cell.underline = false;
 
             if (row >= thumbPos && row < thumbPos + thumbSize) {
-                cell.character = QChar(0x2588); // █ thumb
+                cell.setChar(0x2588); // █ thumb
             } else {
-                cell.character = QChar(0x2502); // │ track
+                cell.setChar(0x2502); // │ track
             }
         }
     } else {
@@ -192,9 +205,9 @@ void QTuiScrollBar::paintEvent(ScreenBuffer &buffer)
             cell.underline = false;
 
             if (col >= thumbPos && col < thumbPos + thumbSize) {
-                cell.character = QChar(0x2588); // █ thumb
+                cell.setChar(0x2588); // █ thumb
             } else {
-                cell.character = QChar(0x2500); // ─ track
+                cell.setChar(0x2500); // ─ track
             }
         }
     }

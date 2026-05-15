@@ -46,11 +46,12 @@ void QTuiToolButton::paintEvent(ScreenBuffer &buffer)
     const int geoW = geo.width();
     const int geoH = geo.height();
 
-    // Determine colors based on state
+    // Determine colors based on state (a disabled ancestor also disables us)
+    const bool enabled = isEffectivelyEnabled();
     Color fg = theme.foreground;
     Color bg = theme.background;
 
-    if (!isEnabled()) {
+    if (!enabled) {
         fg = theme.disabledForeground;
         bg = theme.disabledBackground;
     } else if (hasFocus()) {
@@ -59,7 +60,7 @@ void QTuiToolButton::paintEvent(ScreenBuffer &buffer)
     }
 
     // If checked, use inverse colors
-    if (isCheckable() && isChecked() && isEnabled()) {
+    if (isCheckable() && isChecked() && enabled) {
         std::swap(fg, bg);
     }
 
@@ -70,7 +71,7 @@ void QTuiToolButton::paintEvent(ScreenBuffer &buffer)
             int py = geoY + row;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = theme.bold;
@@ -101,10 +102,10 @@ void QTuiToolButton::paintEvent(ScreenBuffer &buffer)
         int py = contentRow;
         if (px < buffer.width() && py < buffer.height()) {
             Cell &cell = buffer.backCell(px, py);
-            cell.character = content.at(i);
+            cell.setChar(content.at(i).unicode());
             cell.foreground = fg;
             cell.background = bg;
-            cell.bold = theme.bold || (isEnabled() && hasFocus());
+            cell.bold = theme.bold || (enabled && hasFocus());
             cell.italic = theme.italic;
             cell.underline = theme.underline;
         }

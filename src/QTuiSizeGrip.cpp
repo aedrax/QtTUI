@@ -9,6 +9,7 @@ namespace QtTUI {
 QTuiSizeGrip::QTuiSizeGrip(QTuiWidget *parent)
     : QTuiWidget(parent)
 {
+    setFocusPolicy(Qt::StrongFocus);
     // Default size: 3x3 for the diagonal grip pattern
     setGeometry(QRect(0, 0, 3, 3));
 }
@@ -43,10 +44,10 @@ void QTuiSizeGrip::paintEvent(ScreenBuffer &buffer)
     const Color fg = hasFocus() ? theme.focusForeground : theme.foreground;
     const Color bg = hasFocus() ? theme.focusBackground : theme.background;
 
-    auto setCell = [&](int x, int y, QChar ch) {
+    auto setCell = [&](int x, int y, char32_t ch) {
         if (x >= 0 && x < buffer.width() && y >= 0 && y < buffer.height()) {
             Cell &cell = buffer.backCell(x, y);
-            cell.character = ch;
+            cell.setChar(ch);
             cell.foreground = fg;
             cell.background = bg;
             cell.bold = theme.bold;
@@ -66,14 +67,14 @@ void QTuiSizeGrip::paintEvent(ScreenBuffer &buffer)
     // Fill background
     for (int row = 0; row < h; ++row) {
         for (int col = 0; col < w; ++col) {
-            setCell(x0 + col, y0 + row, QLatin1Char(' '));
+            setCell(x0 + col, y0 + row, U' ');
         }
     }
 
     // Draw diagonal lines from bottom-left to top-right
     const int diag = qMin(w, h);
     for (int i = 0; i < diag; ++i) {
-        setCell(x0 + w - 1 - i, y0 + h - 1 - i, QChar(0x2571)); // ╱
+        setCell(x0 + w - 1 - i, y0 + h - 1 - i, char32_t(0x2571)); // ╱
     }
 }
 

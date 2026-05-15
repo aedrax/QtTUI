@@ -159,8 +159,8 @@ private slots:
 
         // Text "OK" should appear in the middle row (row 1), centered
         // Inner width = 10 - 2 = 8, text len = 2, start = 1 + (8-2)/2 = 4
-        QCOMPARE(buffer.backCell(4, 1).character, QChar('O'));
-        QCOMPARE(buffer.backCell(5, 1).character, QChar('K'));
+        QCOMPARE(buffer.backCell(4, 1).ch, U'O');
+        QCOMPARE(buffer.backCell(5, 1).ch, U'K');
     }
 
     void pushButton_paintDisabledStyle()
@@ -307,9 +307,9 @@ private slots:
             ScreenBuffer buffer(10, 1);
             cb.paintEvent(buffer);
 
-            QCOMPARE(buffer.backCell(0, 0).character, QChar('['));
-            QCOMPARE(buffer.backCell(1, 0).character, QChar('x'));
-            QCOMPARE(buffer.backCell(2, 0).character, QChar(']'));
+            QCOMPARE(buffer.backCell(0, 0).ch, U'[');
+            QCOMPARE(buffer.backCell(1, 0).ch, U'x');
+            QCOMPARE(buffer.backCell(2, 0).ch, U']');
         }
 
         // Test [ ] for Unchecked
@@ -321,9 +321,9 @@ private slots:
             ScreenBuffer buffer(10, 1);
             cb.paintEvent(buffer);
 
-            QCOMPARE(buffer.backCell(0, 0).character, QChar('['));
-            QCOMPARE(buffer.backCell(1, 0).character, QChar(' '));
-            QCOMPARE(buffer.backCell(2, 0).character, QChar(']'));
+            QCOMPARE(buffer.backCell(0, 0).ch, U'[');
+            QCOMPARE(buffer.backCell(1, 0).ch, U' ');
+            QCOMPARE(buffer.backCell(2, 0).ch, U']');
         }
 
         // Test [-] for PartiallyChecked
@@ -336,9 +336,9 @@ private slots:
             ScreenBuffer buffer(10, 1);
             cb.paintEvent(buffer);
 
-            QCOMPARE(buffer.backCell(0, 0).character, QChar('['));
-            QCOMPARE(buffer.backCell(1, 0).character, QChar('-'));
-            QCOMPARE(buffer.backCell(2, 0).character, QChar(']'));
+            QCOMPARE(buffer.backCell(0, 0).ch, U'[');
+            QCOMPARE(buffer.backCell(1, 0).ch, U'-');
+            QCOMPARE(buffer.backCell(2, 0).ch, U']');
         }
     }
 
@@ -393,9 +393,9 @@ private slots:
             ScreenBuffer buffer(10, 1);
             rb.paintEvent(buffer);
 
-            QCOMPARE(buffer.backCell(0, 0).character, QChar('('));
-            QCOMPARE(buffer.backCell(1, 0).character, QChar('*'));
-            QCOMPARE(buffer.backCell(2, 0).character, QChar(')'));
+            QCOMPARE(buffer.backCell(0, 0).ch, U'(');
+            QCOMPARE(buffer.backCell(1, 0).ch, U'*');
+            QCOMPARE(buffer.backCell(2, 0).ch, U')');
         }
 
         // Test ( ) for unchecked
@@ -406,9 +406,9 @@ private slots:
             ScreenBuffer buffer(10, 1);
             rb.paintEvent(buffer);
 
-            QCOMPARE(buffer.backCell(0, 0).character, QChar('('));
-            QCOMPARE(buffer.backCell(1, 0).character, QChar(' '));
-            QCOMPARE(buffer.backCell(2, 0).character, QChar(')'));
+            QCOMPARE(buffer.backCell(0, 0).ch, U'(');
+            QCOMPARE(buffer.backCell(1, 0).ch, U' ');
+            QCOMPARE(buffer.backCell(2, 0).ch, U')');
         }
     }
 

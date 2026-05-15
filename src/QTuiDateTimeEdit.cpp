@@ -9,12 +9,14 @@ QTuiDateTimeEdit::QTuiDateTimeEdit(QTuiWidget *parent)
     : QTuiWidget(parent)
     , m_dateTime(QDateTime::currentDateTime())
 {
+    setFocusPolicy(Qt::StrongFocus);
 }
 
 QTuiDateTimeEdit::QTuiDateTimeEdit(const QDateTime &dateTime, QTuiWidget *parent)
     : QTuiWidget(parent)
     , m_dateTime(dateTime.isValid() ? dateTime : QDateTime::currentDateTime())
 {
+    setFocusPolicy(Qt::StrongFocus);
 }
 
 QDateTime QTuiDateTimeEdit::dateTime() const
@@ -36,6 +38,7 @@ void QTuiDateTimeEdit::setDateTime(const QDateTime &dateTime)
     if (m_dateTime != clamped) {
         m_dateTime = clamped;
         emit dateTimeChanged(m_dateTime);
+        markDirty();
     }
 }
 
@@ -68,8 +71,10 @@ QString QTuiDateTimeEdit::displayFormat() const
 
 void QTuiDateTimeEdit::setDisplayFormat(const QString &format)
 {
-    if (!format.isEmpty())
+    if (!format.isEmpty() && m_displayFormat != format) {
         m_displayFormat = format;
+        markDirty();
+    }
 }
 
 void QTuiDateTimeEdit::setMinimumDateTime(const QDateTime &min)
@@ -228,14 +233,18 @@ void QTuiDateTimeEdit::stepSection(int delta)
 void QTuiDateTimeEdit::nextSection()
 {
     const auto sections = displaySections();
-    if (m_currentSection < sections.size() - 1)
+    if (m_currentSection < sections.size() - 1) {
         ++m_currentSection;
+        markDirty();
+    }
 }
 
 void QTuiDateTimeEdit::prevSection()
 {
-    if (m_currentSection > 0)
+    if (m_currentSection > 0) {
         --m_currentSection;
+        markDirty();
+    }
 }
 
 QSize QTuiDateTimeEdit::minimumSize() const
@@ -275,7 +284,7 @@ void QTuiDateTimeEdit::paintEvent(ScreenBuffer &buffer)
             int py = geoY + row;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = theme.bold;
@@ -293,11 +302,11 @@ void QTuiDateTimeEdit::paintEvent(ScreenBuffer &buffer)
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
                 if (col == 0)
-                    cell.character = border.topLeft;
+                    cell.setChar(border.topLeft);
                 else if (col == geoW - 1)
-                    cell.character = border.topRight;
+                    cell.setChar(border.topRight);
                 else
-                    cell.character = border.horizontal;
+                    cell.setChar(border.horizontal);
                 cell.foreground = fg;
                 cell.background = bg;
             }
@@ -312,11 +321,11 @@ void QTuiDateTimeEdit::paintEvent(ScreenBuffer &buffer)
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
                 if (col == 0)
-                    cell.character = border.bottomLeft;
+                    cell.setChar(border.bottomLeft);
                 else if (col == geoW - 1)
-                    cell.character = border.bottomRight;
+                    cell.setChar(border.bottomRight);
                 else
-                    cell.character = border.horizontal;
+                    cell.setChar(border.horizontal);
                 cell.foreground = fg;
                 cell.background = bg;
             }
@@ -330,14 +339,14 @@ void QTuiDateTimeEdit::paintEvent(ScreenBuffer &buffer)
             int pxLeft = geoX;
             if (pxLeft < buffer.width()) {
                 Cell &cell = buffer.backCell(pxLeft, py);
-                cell.character = border.vertical;
+                cell.setChar(border.vertical);
                 cell.foreground = fg;
                 cell.background = bg;
             }
             int pxRight = geoX + geoW - 1;
             if (pxRight < buffer.width()) {
                 Cell &cell = buffer.backCell(pxRight, py);
-                cell.character = border.vertical;
+                cell.setChar(border.vertical);
                 cell.foreground = fg;
                 cell.background = bg;
             }
@@ -371,7 +380,7 @@ void QTuiDateTimeEdit::paintEvent(ScreenBuffer &buffer)
             int py = contentRow;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = formatted.at(i);
+                cell.setChar(formatted.at(i).unicode());
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = theme.bold;

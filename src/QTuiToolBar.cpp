@@ -10,6 +10,7 @@ QTuiToolBar::QTuiToolBar(const QString &title, QTuiWidget *parent)
     : QTuiWidget(parent)
     , m_title(title)
 {
+    setFocusPolicy(Qt::StrongFocus);
 }
 
 void QTuiToolBar::addAction(QTuiAction *action)
@@ -19,6 +20,7 @@ void QTuiToolBar::addAction(QTuiAction *action)
     ToolBarItem item;
     item.action = action;
     m_items.append(item);
+    markDirty();
 }
 
 void QTuiToolBar::addSeparator()
@@ -26,6 +28,7 @@ void QTuiToolBar::addSeparator()
     ToolBarItem item;
     item.isSeparator = true;
     m_items.append(item);
+    markDirty();
 }
 
 void QTuiToolBar::addWidget(QTuiWidget *widget)
@@ -35,6 +38,7 @@ void QTuiToolBar::addWidget(QTuiWidget *widget)
     ToolBarItem item;
     item.widget = widget;
     m_items.append(item);
+    markDirty();
 }
 
 bool QTuiToolBar::isMovable() const
@@ -83,7 +87,7 @@ void QTuiToolBar::paintEvent(ScreenBuffer &buffer)
         int py = geo.y();
         if (py < buffer.height()) {
             Cell &cell = buffer.backCell(px, py);
-            cell.character = QLatin1Char(' ');
+            cell.setChar(U' ');
             cell.foreground = fg;
             cell.background = bg;
             cell.bold = false;
@@ -108,7 +112,7 @@ void QTuiToolBar::paintEvent(ScreenBuffer &buffer)
             for (int c = 0; c < sep.length(); ++c) {
                 if (xPos < buffer.width()) {
                     Cell &cell = buffer.backCell(xPos, py);
-                    cell.character = sep.at(c);
+                    cell.setChar(sep.at(c).unicode());
                     cell.foreground = fg;
                     cell.background = bg;
                 }
@@ -122,7 +126,7 @@ void QTuiToolBar::paintEvent(ScreenBuffer &buffer)
             // Leading space
             if (xPos < buffer.width()) {
                 Cell &cell = buffer.backCell(xPos, py);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = itemFg;
                 cell.background = itemBg;
             }
@@ -133,7 +137,7 @@ void QTuiToolBar::paintEvent(ScreenBuffer &buffer)
             for (int c = 0; c < text.length(); ++c) {
                 if (xPos < buffer.width()) {
                     Cell &cell = buffer.backCell(xPos, py);
-                    cell.character = text.at(c);
+                    cell.setChar(text.at(c).unicode());
                     cell.foreground = itemFg;
                     cell.background = itemBg;
                     cell.bold = isFocused;
@@ -144,7 +148,7 @@ void QTuiToolBar::paintEvent(ScreenBuffer &buffer)
             // Trailing space
             if (xPos < buffer.width()) {
                 Cell &cell = buffer.backCell(xPos, py);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = itemFg;
                 cell.background = itemBg;
             }
@@ -179,10 +183,12 @@ void QTuiToolBar::keyPressEvent(TuiKeyEvent *event)
         m_focusedItem--;
         if (m_focusedItem < 0)
             m_focusedItem = navigableCount - 1;
+        markDirty();
     } else if (key == Qt::Key_Right) {
         m_focusedItem++;
         if (m_focusedItem >= navigableCount)
             m_focusedItem = 0;
+        markDirty();
     } else if (key == Qt::Key_Return || key == Qt::Key_Enter) {
         // Trigger the focused action
         int navIdx = 0;
@@ -227,6 +233,7 @@ void QTuiToolBar::mousePressEvent(TuiMouseEvent *event)
         if (clickX >= xPos && clickX < xPos + itemWidth) {
             if (!item.isSeparator) {
                 m_focusedItem = navigableIndex;
+                markDirty();
                 if (item.action)
                     item.action->trigger();
             }

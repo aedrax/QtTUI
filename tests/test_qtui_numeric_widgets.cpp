@@ -15,6 +15,18 @@ static void sendKey(QTuiWidget &w, int key, Qt::KeyboardModifiers mods = Qt::NoM
     QCoreApplication::sendEvent(&w, &ev);
 }
 
+static void sendMousePress(QTuiWidget &w, const QPoint &pos)
+{
+    TuiMouseEvent ev(TuiMouseEvent::Press, Qt::LeftButton, pos);
+    QCoreApplication::sendEvent(&w, &ev);
+}
+
+static void sendWheel(QTuiWidget &w, const QPoint &pos, int delta)
+{
+    TuiMouseEvent ev(TuiMouseEvent::Wheel, Qt::NoButton, pos, Qt::NoModifier, delta);
+    QCoreApplication::sendEvent(&w, &ev);
+}
+
 class TestQTuiNumericWidgets : public QObject {
     Q_OBJECT
 private slots:
@@ -204,6 +216,81 @@ private slots:
         QCOMPARE(sb.singleStep(), 3);
     }
 
+    // Painted layout for geometry (0,0,11,3), value 5:
+    // content "▲ 5 ▼" (5 chars) centered on middle row 1 within the
+    // 9-cell inner area -> starts at column 3. ▲ at (3,1), ▼ at (7,1).
+
+    void spinBox_mouseClickUpArrowIncrements()
+    {
+        QTuiSpinBox sb;
+        sb.setValue(5);
+        sb.setGeometry(QRect(0, 0, 11, 3));
+
+        QSignalSpy spy(&sb, &QTuiSpinBox::valueChanged);
+        sendMousePress(sb, QPoint(3, 1)); // ▲ glyph cell
+        QCOMPARE(sb.value(), 6);
+        QCOMPARE(spy.count(), 1);
+    }
+
+    void spinBox_mouseClickDownArrowDecrements()
+    {
+        QTuiSpinBox sb;
+        sb.setValue(5);
+        sb.setGeometry(QRect(0, 0, 11, 3));
+
+        QSignalSpy spy(&sb, &QTuiSpinBox::valueChanged);
+        sendMousePress(sb, QPoint(7, 1)); // ▼ glyph cell
+        QCOMPARE(sb.value(), 4);
+        QCOMPARE(spy.count(), 1);
+    }
+
+    void spinBox_mouseClickOffArrowsDoesNothing()
+    {
+        QTuiSpinBox sb;
+        sb.setValue(5);
+        sb.setGeometry(QRect(0, 0, 11, 3));
+
+        QSignalSpy spy(&sb, &QTuiSpinBox::valueChanged);
+        sendMousePress(sb, QPoint(5, 1));  // the value digit between the arrows
+        sendMousePress(sb, QPoint(1, 1));  // padding left of the content
+        sendMousePress(sb, QPoint(9, 1));  // padding right of the content
+        sendMousePress(sb, QPoint(3, 0));  // top border row, above ▲
+        sendMousePress(sb, QPoint(7, 2));  // bottom border row, below ▼
+        QCOMPARE(sb.value(), 5);
+        QCOMPARE(spy.count(), 0);
+    }
+
+    void spinBox_mouseClickUsesAbsoluteCoordinates()
+    {
+        // Geometry offset from origin: ▲ at (8,3), ▼ at (12,3).
+        QTuiSpinBox sb;
+        sb.setValue(5);
+        sb.setGeometry(QRect(5, 2, 11, 3));
+
+        sendMousePress(sb, QPoint(12, 3)); // ▼
+        QCOMPARE(sb.value(), 4);
+
+        sendMousePress(sb, QPoint(8, 3)); // ▲
+        QCOMPARE(sb.value(), 5);
+    }
+
+    void spinBox_wheelStepsValue()
+    {
+        QTuiSpinBox sb;
+        sb.setValue(5);
+        sb.setGeometry(QRect(0, 0, 11, 3));
+
+        QSignalSpy spy(&sb, &QTuiSpinBox::valueChanged);
+
+        sendWheel(sb, QPoint(5, 1), 120); // wheel up = stepUp
+        QCOMPARE(sb.value(), 6);
+
+        sendWheel(sb, QPoint(5, 1), -120); // wheel down = stepDown
+        QCOMPARE(sb.value(), 5);
+
+        QCOMPARE(spy.count(), 2);
+    }
+
     // ---------------------------------------------------------------
     // QTuiDoubleSpinBox tests
     // ---------------------------------------------------------------
@@ -278,6 +365,74 @@ private slots:
         dsb.setSuffix(" EUR");
         QCOMPARE(dsb.prefix(), QStringLiteral("€"));
         QCOMPARE(dsb.suffix(), QStringLiteral(" EUR"));
+    }
+
+    // Painted layout for geometry (0,0,13,3), value 10.00 (decimals 2):
+    // content "▲ 10.00 ▼" (9 chars) centered on middle row 1 within the
+    // 11-cell inner area -> starts at column 2. ▲ at (2,1), ▼ at (10,1).
+
+    void doubleSpinBox_mouseClickUpArrowIncrements()
+    {
+        QTuiDoubleSpinBox dsb;
+        dsb.setRange(0.0, 100.0);
+        dsb.setSingleStep(0.5);
+        dsb.setValue(10.0);
+        dsb.setGeometry(QRect(0, 0, 13, 3));
+
+        QSignalSpy spy(&dsb, &QTuiDoubleSpinBox::valueChanged);
+        sendMousePress(dsb, QPoint(2, 1)); // ▲ glyph cell
+        QCOMPARE(dsb.value(), 10.5);
+        QCOMPARE(spy.count(), 1);
+    }
+
+    void doubleSpinBox_mouseClickDownArrowDecrements()
+    {
+        QTuiDoubleSpinBox dsb;
+        dsb.setRange(0.0, 100.0);
+        dsb.setSingleStep(0.5);
+        dsb.setValue(10.0);
+        dsb.setGeometry(QRect(0, 0, 13, 3));
+
+        QSignalSpy spy(&dsb, &QTuiDoubleSpinBox::valueChanged);
+        sendMousePress(dsb, QPoint(10, 1)); // ▼ glyph cell
+        QCOMPARE(dsb.value(), 9.5);
+        QCOMPARE(spy.count(), 1);
+    }
+
+    void doubleSpinBox_mouseClickOffArrowsDoesNothing()
+    {
+        QTuiDoubleSpinBox dsb;
+        dsb.setRange(0.0, 100.0);
+        dsb.setValue(10.0);
+        dsb.setGeometry(QRect(0, 0, 13, 3));
+
+        QSignalSpy spy(&dsb, &QTuiDoubleSpinBox::valueChanged);
+        sendMousePress(dsb, QPoint(5, 1));  // inside the value text
+        sendMousePress(dsb, QPoint(1, 1));  // padding left of the content
+        sendMousePress(dsb, QPoint(11, 1)); // padding right of the content
+        sendMousePress(dsb, QPoint(2, 0));  // top border row, above ▲
+        sendMousePress(dsb, QPoint(10, 2)); // bottom border row, below ▼
+        QCOMPARE(dsb.value(), 10.0);
+        QCOMPARE(spy.count(), 0);
+    }
+
+    void doubleSpinBox_wheelStepsValue()
+    {
+        QTuiDoubleSpinBox dsb;
+        dsb.setRange(0.0, 100.0);
+        dsb.setSingleStep(0.5);
+        dsb.setValue(10.0);
+        dsb.setGeometry(QRect(0, 0, 13, 3));
+
+        QSignalSpy spy(&dsb, &QTuiDoubleSpinBox::valueChanged);
+
+        sendWheel(dsb, QPoint(6, 1), 120); // wheel up = stepUp
+        QCOMPARE(dsb.value(), 10.5);
+
+        sendWheel(dsb, QPoint(6, 1), -120); // wheel down = stepDown
+        QCOMPARE(dsb.value(), 10.0);
+
+        QCOMPARE(spy.count(), 2);
     }
 
     // ---------------------------------------------------------------

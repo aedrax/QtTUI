@@ -13,12 +13,15 @@ QTuiScrollArea::QTuiScrollArea(QTuiWidget *parent)
     , m_verticalScrollBar(new QTuiScrollBar(Qt::Vertical, this))
     , m_horizontalScrollBar(new QTuiScrollBar(Qt::Horizontal, this))
 {
+    setFocusPolicy(Qt::StrongFocus);
     // Connect scroll bar value changes to update scroll offsets
     connect(m_verticalScrollBar, &QTuiScrollBar::valueChanged, this, [this](int value) {
         m_scrollY = value;
+        markDirty();
     });
     connect(m_horizontalScrollBar, &QTuiScrollBar::valueChanged, this, [this](int value) {
         m_scrollX = value;
+        markDirty();
     });
 
     // Hide scroll bars initially
@@ -38,6 +41,7 @@ void QTuiScrollArea::setWidget(QTuiWidget *widget)
     m_scrollX = 0;
     m_scrollY = 0;
     updateScrollBars();
+    markDirty();
 }
 
 QTuiWidget *QTuiScrollArea::widget() const
@@ -215,7 +219,7 @@ void QTuiScrollArea::paintEvent(ScreenBuffer &buffer)
             if (px >= buffer.width() || py >= buffer.height())
                 continue;
             Cell &cell = buffer.backCell(px, py);
-            cell.character = QLatin1Char(' ');
+            cell.setChar(U' ');
             cell.foreground = fg;
             cell.background = bg;
             cell.bold = false;
@@ -275,7 +279,7 @@ void QTuiScrollArea::paintEvent(ScreenBuffer &buffer)
         int topY = geo.y();
         if (indicatorX < buffer.width() && topY < buffer.height() && m_scrollY > 0) {
             Cell &cell = buffer.backCell(indicatorX, topY);
-            cell.character = QChar(0x25B2); // ▲
+            cell.setChar(0x25B2); // ▲
             cell.foreground = fg;
             cell.background = bg;
         }
@@ -285,7 +289,7 @@ void QTuiScrollArea::paintEvent(ScreenBuffer &buffer)
         if (indicatorX < buffer.width() && bottomY < buffer.height()
             && m_scrollY < qMax(0, childH - viewportH)) {
             Cell &cell = buffer.backCell(indicatorX, bottomY);
-            cell.character = QChar(0x25BC); // ▼
+            cell.setChar(0x25BC); // ▼
             cell.foreground = fg;
             cell.background = bg;
         }
@@ -296,7 +300,7 @@ void QTuiScrollArea::paintEvent(ScreenBuffer &buffer)
         int leftX = geo.x();
         if (leftX < buffer.width() && indicatorY < buffer.height() && m_scrollX > 0) {
             Cell &cell = buffer.backCell(leftX, indicatorY);
-            cell.character = QChar(0x25C4); // ◄
+            cell.setChar(0x25C4); // ◄
             cell.foreground = fg;
             cell.background = bg;
         }
@@ -306,7 +310,7 @@ void QTuiScrollArea::paintEvent(ScreenBuffer &buffer)
         if (rightX < buffer.width() && indicatorY < buffer.height()
             && m_scrollX < qMax(0, childW - viewportW)) {
             Cell &cell = buffer.backCell(rightX, indicatorY);
-            cell.character = QChar(0x25BA); // ►
+            cell.setChar(0x25BA); // ►
             cell.foreground = fg;
             cell.background = bg;
         }
@@ -318,7 +322,7 @@ void QTuiScrollArea::paintEvent(ScreenBuffer &buffer)
         int cy = geo.y() + geo.height() - 1;
         if (cx < buffer.width() && cy < buffer.height()) {
             Cell &corner = buffer.backCell(cx, cy);
-            corner.character = QLatin1Char(' ');
+            corner.setChar(U' ');
             corner.foreground = fg;
             corner.background = bg;
         }

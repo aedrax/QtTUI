@@ -25,7 +25,7 @@ public:
                 int px = geo.x() + col;
                 int py = geo.y() + row;
                 if (px < buffer.width() && py < buffer.height())
-                    buffer.backCell(px, py).character = QLatin1Char('X');
+                    buffer.backCell(px, py).setChar(U'X');
             }
         }
     }
@@ -410,7 +410,7 @@ private slots:
 
         // The handle cell should contain the │ character
         const Cell &cell = buffer.backCell(hGeo.x(), hGeo.y());
-        QCOMPARE(cell.character, QChar(0x2502));
+        QCOMPARE(cell.ch, char32_t(0x2502));
     }
 
     void splitter_threeWidgets()

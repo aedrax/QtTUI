@@ -9,6 +9,7 @@ QTuiSlider::QTuiSlider(Qt::Orientation orientation, QTuiWidget *parent)
     : QTuiWidget(parent)
     , m_orientation(orientation)
 {
+    setFocusPolicy(Qt::StrongFocus);
 }
 
 int QTuiSlider::value() const
@@ -33,10 +34,13 @@ int QTuiSlider::minimum() const
 
 void QTuiSlider::setMinimum(int min)
 {
+    if (m_minimum == min)
+        return;
     m_minimum = min;
     if (m_maximum < m_minimum)
         m_maximum = m_minimum;
     setValue(m_value);
+    markDirty();
 }
 
 int QTuiSlider::maximum() const
@@ -46,17 +50,23 @@ int QTuiSlider::maximum() const
 
 void QTuiSlider::setMaximum(int max)
 {
+    if (m_maximum == max)
+        return;
     m_maximum = max;
     if (m_minimum > m_maximum)
         m_minimum = m_maximum;
     setValue(m_value);
+    markDirty();
 }
 
 void QTuiSlider::setRange(int min, int max)
 {
+    if (m_minimum == min && m_maximum == qMax(min, max))
+        return;
     m_minimum = min;
     m_maximum = qMax(min, max);
     setValue(m_value);
+    markDirty();
 }
 
 int QTuiSlider::singleStep() const
@@ -77,7 +87,10 @@ Qt::Orientation QTuiSlider::orientation() const
 
 void QTuiSlider::setOrientation(Qt::Orientation orientation)
 {
+    if (m_orientation == orientation)
+        return;
     m_orientation = orientation;
+    markDirty();
 }
 
 int QTuiSlider::tickInterval() const
@@ -87,7 +100,11 @@ int QTuiSlider::tickInterval() const
 
 void QTuiSlider::setTickInterval(int interval)
 {
-    m_tickInterval = (interval >= 0) ? interval : 0;
+    int clamped = (interval >= 0) ? interval : 0;
+    if (m_tickInterval == clamped)
+        return;
+    m_tickInterval = clamped;
+    markDirty();
 }
 
 QSize QTuiSlider::minimumSize() const
@@ -129,7 +146,7 @@ void QTuiSlider::paintEvent(ScreenBuffer &buffer)
             int py = geoY + row;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = false;
@@ -175,7 +192,7 @@ void QTuiSlider::paintEvent(ScreenBuffer &buffer)
 
                 if (isTick) {
                     Cell &cell = buffer.backCell(px, py);
-                    cell.character = QLatin1Char('|');
+                    cell.setChar(U'|');
                     cell.foreground = fg;
                     cell.background = bg;
                 }
@@ -192,10 +209,10 @@ void QTuiSlider::paintEvent(ScreenBuffer &buffer)
 
                 Cell &cell = buffer.backCell(px, py);
                 if (col == indicatorPos) {
-                    cell.character = QChar(0x25CF); // ●
+                    cell.setChar(0x25CF); // ●
                     cell.bold = true;
                 } else {
-                    cell.character = QChar(0x2500); // ─
+                    cell.setChar(0x2500); // ─
                 }
                 cell.foreground = fg;
                 cell.background = bg;
@@ -222,10 +239,10 @@ void QTuiSlider::paintEvent(ScreenBuffer &buffer)
 
             Cell &cell = buffer.backCell(px, py);
             if (row == indicatorPos) {
-                cell.character = QChar(0x25CF); // ●
+                cell.setChar(0x25CF); // ●
                 cell.bold = true;
             } else {
-                cell.character = QChar(0x2502); // │
+                cell.setChar(0x2502); // │
             }
             cell.foreground = fg;
             cell.background = bg;
@@ -253,7 +270,7 @@ void QTuiSlider::paintEvent(ScreenBuffer &buffer)
 
                 if (isTick) {
                     Cell &cell = buffer.backCell(px, py);
-                    cell.character = QChar(0x2500); // ─
+                    cell.setChar(0x2500); // ─
                     cell.foreground = fg;
                     cell.background = bg;
                 }

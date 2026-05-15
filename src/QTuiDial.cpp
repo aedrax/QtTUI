@@ -8,6 +8,7 @@ namespace QtTUI {
 QTuiDial::QTuiDial(QTuiWidget *parent)
     : QTuiWidget(parent)
 {
+    setFocusPolicy(Qt::StrongFocus);
 }
 
 int QTuiDial::value() const
@@ -32,10 +33,13 @@ int QTuiDial::minimum() const
 
 void QTuiDial::setMinimum(int min)
 {
+    if (m_minimum == min)
+        return;
     m_minimum = min;
     if (m_maximum < m_minimum)
         m_maximum = m_minimum;
     setValue(m_value);
+    markDirty();
 }
 
 int QTuiDial::maximum() const
@@ -45,17 +49,23 @@ int QTuiDial::maximum() const
 
 void QTuiDial::setMaximum(int max)
 {
+    if (m_maximum == max)
+        return;
     m_maximum = max;
     if (m_minimum > m_maximum)
         m_minimum = m_maximum;
     setValue(m_value);
+    markDirty();
 }
 
 void QTuiDial::setRange(int min, int max)
 {
+    if (m_minimum == min && m_maximum == qMax(min, max))
+        return;
     m_minimum = min;
     m_maximum = qMax(min, max);
     setValue(m_value);
+    markDirty();
 }
 
 int QTuiDial::singleStep() const
@@ -136,7 +146,7 @@ void QTuiDial::paintEvent(ScreenBuffer &buffer)
             int py = geoY + row;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = false;
@@ -168,12 +178,12 @@ void QTuiDial::paintEvent(ScreenBuffer &buffer)
     int innerW = dialW - 2; // excluding │ on each side
 
     // Helper to write a character at a position
-    auto writeChar = [&](int col, int row, QChar ch, bool bold = false) {
+    auto writeChar = [&](int col, int row, char32_t ch, bool bold = false) {
         int px = geoX + offX + col;
         int py = geoY + offY + row;
         if (px >= 0 && px < buffer.width() && py >= 0 && py < buffer.height()) {
             Cell &cell = buffer.backCell(px, py);
-            cell.character = ch;
+            cell.setChar(ch);
             cell.foreground = fg;
             cell.background = bg;
             cell.bold = bold;
@@ -184,38 +194,38 @@ void QTuiDial::paintEvent(ScreenBuffer &buffer)
     if (dialH >= 1) {
         int arcStart = 2;
         int arcEnd = dialW - 3;
-        if (arcStart < dialW) writeChar(arcStart, 0, QChar(0x256D)); // ╭
+        if (arcStart < dialW) writeChar(arcStart, 0, char32_t(0x256D)); // ╭
         for (int c = arcStart + 1; c <= arcEnd - 1 && c < dialW; ++c)
-            writeChar(c, 0, QChar(0x2500)); // ─
-        if (arcEnd < dialW) writeChar(arcEnd, 0, QChar(0x256E)); // ╮
+            writeChar(c, 0, char32_t(0x2500)); // ─
+        if (arcEnd < dialW) writeChar(arcEnd, 0, char32_t(0x256E)); // ╮
     }
 
     // Row 1: upper sides " ╱     ╲ "
     if (dialH >= 2) {
-        writeChar(1, 1, QChar(0x2571)); // ╱
-        writeChar(dialW - 2, 1, QChar(0x2572)); // ╲
+        writeChar(1, 1, char32_t(0x2571)); // ╱
+        writeChar(dialW - 2, 1, char32_t(0x2572)); // ╲
     }
 
     // Row 2 (middle): value display "│  val  │"
     if (dialH >= 3) {
         int midRow = dialH / 2;
-        writeChar(0, midRow, QChar(0x2502)); // │
-        writeChar(dialW - 1, midRow, QChar(0x2502)); // │
+        writeChar(0, midRow, char32_t(0x2502)); // │
+        writeChar(dialW - 1, midRow, char32_t(0x2502)); // │
 
         // Render value centered in the inner area
         QString valueStr = QString::number(m_value);
         int textLen = qMin(static_cast<int>(valueStr.length()), innerW);
         int textStart = 1 + (innerW - textLen) / 2;
         for (int i = 0; i < textLen; ++i) {
-            writeChar(textStart + i, midRow, valueStr.at(i), true);
+            writeChar(textStart + i, midRow, valueStr.at(i).unicode(), true);
         }
     }
 
     // Row 3: lower sides " ╲     ╱ "
     if (dialH >= 4) {
         int lowerRow = dialH - 2;
-        writeChar(1, lowerRow, QChar(0x2572)); // ╲
-        writeChar(dialW - 2, lowerRow, QChar(0x2571)); // ╱
+        writeChar(1, lowerRow, char32_t(0x2572)); // ╲
+        writeChar(dialW - 2, lowerRow, char32_t(0x2571)); // ╱
     }
 
     // Row 4: bottom arc "  ╰───╯  "
@@ -223,10 +233,10 @@ void QTuiDial::paintEvent(ScreenBuffer &buffer)
         int botRow = dialH - 1;
         int arcStart = 2;
         int arcEnd = dialW - 3;
-        if (arcStart < dialW) writeChar(arcStart, botRow, QChar(0x2570)); // ╰
+        if (arcStart < dialW) writeChar(arcStart, botRow, char32_t(0x2570)); // ╰
         for (int c = arcStart + 1; c <= arcEnd - 1 && c < dialW; ++c)
-            writeChar(c, botRow, QChar(0x2500)); // ─
-        if (arcEnd < dialW) writeChar(arcEnd, botRow, QChar(0x256F)); // ╯
+            writeChar(c, botRow, char32_t(0x2500)); // ─
+        if (arcEnd < dialW) writeChar(arcEnd, botRow, char32_t(0x256F)); // ╯
     }
 
     // Position indicator on the arc based on value
@@ -249,7 +259,7 @@ void QTuiDial::paintEvent(ScreenBuffer &buffer)
         if (arcLen > 0) {
             int indicatorCol = arcStart + 1 + static_cast<int>(norm * (arcLen - 1) + 0.5);
             indicatorCol = qBound(arcStart + 1, indicatorCol, arcEnd - 1);
-            writeChar(indicatorCol, 0, QChar(0x25CF), true); // ● indicator on top arc
+            writeChar(indicatorCol, 0, char32_t(0x25CF), true); // ● indicator on top arc
         }
     }
 }

@@ -8,6 +8,7 @@ namespace QtTUI {
 QTuiTabBar::QTuiTabBar(QTuiWidget *parent)
     : QTuiWidget(parent)
 {
+    setFocusPolicy(Qt::StrongFocus);
 }
 
 int QTuiTabBar::addTab(const QString &label)
@@ -16,6 +17,7 @@ int QTuiTabBar::addTab(const QString &label)
     int idx = m_tabs.size() - 1;
     if (m_currentIndex < 0)
         setCurrentIndex(0);
+    markDirty();
     return idx;
 }
 
@@ -41,6 +43,7 @@ void QTuiTabBar::removeTab(int index)
         // Re-emit for same index since the tab content changed
         emit currentChanged(m_currentIndex);
     }
+    markDirty();
 }
 
 int QTuiTabBar::count() const
@@ -59,7 +62,10 @@ void QTuiTabBar::setTabText(int index, const QString &text)
 {
     if (index < 0 || index >= m_tabs.size())
         return;
+    if (m_tabs.at(index) == text)
+        return;
     m_tabs[index] = text;
+    markDirty();
 }
 
 int QTuiTabBar::currentIndex() const
@@ -75,6 +81,7 @@ void QTuiTabBar::setCurrentIndex(int index)
         return;
     m_currentIndex = index;
     emit currentChanged(m_currentIndex);
+    markDirty();
 }
 
 QTuiTabBar::TabPosition QTuiTabBar::tabPosition() const
@@ -140,9 +147,9 @@ void QTuiTabBar::paintEvent(ScreenBuffer &buffer)
         Cell &cell = buffer.backCell(px, y0);
 
         if (col < line.length())
-            cell.character = line.at(col);
+            cell.setChar(line.at(col).unicode());
         else
-            cell.character = QLatin1Char(' ');
+            cell.setChar(U' ');
 
         // Determine if this column falls within the current tab's label
         bool isCurrentTab = false;

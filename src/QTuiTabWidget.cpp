@@ -185,7 +185,7 @@ void QTuiTabWidget::paintEvent(ScreenBuffer &buffer)
             int py = y0 + row;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = false;
@@ -201,7 +201,7 @@ void QTuiTabWidget::paintEvent(ScreenBuffer &buffer)
                 int px = x0 + col;
                 if (px < buffer.width()) {
                     Cell &cell = buffer.backCell(px, sepY);
-                    cell.character = border.horizontal;
+                    cell.setChar(border.horizontal);
                     cell.foreground = fg;
                     cell.background = bg;
                     cell.bold = theme.bold;

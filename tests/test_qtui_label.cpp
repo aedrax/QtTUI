@@ -91,10 +91,10 @@ private slots:
         ScreenBuffer buffer(10, 1);
         label.paintEvent(buffer);
 
-        QCOMPARE(buffer.backCell(0, 0).character, QChar('H'));
-        QCOMPARE(buffer.backCell(1, 0).character, QChar('i'));
+        QCOMPARE(buffer.backCell(0, 0).ch, U'H');
+        QCOMPARE(buffer.backCell(1, 0).ch, U'i');
         // Rest should be spaces
-        QCOMPARE(buffer.backCell(2, 0).character, QChar(' '));
+        QCOMPARE(buffer.backCell(2, 0).ch, U' ');
     }
 
     void paintRightAligned()
@@ -107,9 +107,9 @@ private slots:
         label.paintEvent(buffer);
 
         // "Hi" is 2 chars, right-aligned in 10 cols => starts at col 8
-        QCOMPARE(buffer.backCell(8, 0).character, QChar('H'));
-        QCOMPARE(buffer.backCell(9, 0).character, QChar('i'));
-        QCOMPARE(buffer.backCell(7, 0).character, QChar(' '));
+        QCOMPARE(buffer.backCell(8, 0).ch, U'H');
+        QCOMPARE(buffer.backCell(9, 0).ch, U'i');
+        QCOMPARE(buffer.backCell(7, 0).ch, U' ');
     }
 
     void paintCenterAligned()
@@ -122,8 +122,8 @@ private slots:
         label.paintEvent(buffer);
 
         // "Hi" is 2 chars, center in 10 => starts at col 4
-        QCOMPARE(buffer.backCell(4, 0).character, QChar('H'));
-        QCOMPARE(buffer.backCell(5, 0).character, QChar('i'));
+        QCOMPARE(buffer.backCell(4, 0).ch, U'H');
+        QCOMPARE(buffer.backCell(5, 0).ch, U'i');
     }
 
     void paintVerticalTop()
@@ -135,9 +135,9 @@ private slots:
         ScreenBuffer buffer(5, 5);
         label.paintEvent(buffer);
 
-        QCOMPARE(buffer.backCell(0, 0).character, QChar('X'));
+        QCOMPARE(buffer.backCell(0, 0).ch, U'X');
         // Row 1 should be blank
-        QCOMPARE(buffer.backCell(0, 1).character, QChar(' '));
+        QCOMPARE(buffer.backCell(0, 1).ch, U' ');
     }
 
     void paintVerticalBottom()
@@ -150,8 +150,8 @@ private slots:
         label.paintEvent(buffer);
 
         // Single line, bottom-aligned in 5 rows => row 4
-        QCOMPARE(buffer.backCell(0, 4).character, QChar('X'));
-        QCOMPARE(buffer.backCell(0, 0).character, QChar(' '));
+        QCOMPARE(buffer.backCell(0, 4).ch, U'X');
+        QCOMPARE(buffer.backCell(0, 0).ch, U' ');
     }
 
     void paintVerticalCenter()
@@ -164,7 +164,7 @@ private slots:
         label.paintEvent(buffer);
 
         // Single line, vcenter in 5 rows => row 2
-        QCOMPARE(buffer.backCell(0, 2).character, QChar('X'));
+        QCOMPARE(buffer.backCell(0, 2).ch, U'X');
     }
 
     // ---------------------------------------------------------------
@@ -197,10 +197,10 @@ private slots:
         label.paintEvent(buffer);
 
         // "Hello" on row 0, "World" on row 1
-        QCOMPARE(buffer.backCell(0, 0).character, QChar('H'));
-        QCOMPARE(buffer.backCell(4, 0).character, QChar('o'));
-        QCOMPARE(buffer.backCell(0, 1).character, QChar('W'));
-        QCOMPARE(buffer.backCell(4, 1).character, QChar('d'));
+        QCOMPARE(buffer.backCell(0, 0).ch, U'H');
+        QCOMPARE(buffer.backCell(4, 0).ch, U'o');
+        QCOMPARE(buffer.backCell(0, 1).ch, U'W');
+        QCOMPARE(buffer.backCell(4, 1).ch, U'd');
     }
 
     void noWrapTruncatesText()
@@ -214,8 +214,8 @@ private slots:
         label.paintEvent(buffer);
 
         // Without wrap, only first 6 chars rendered
-        QCOMPARE(buffer.backCell(0, 0).character, QChar('H'));
-        QCOMPARE(buffer.backCell(5, 0).character, QChar(' '));
+        QCOMPARE(buffer.backCell(0, 0).ch, U'H');
+        QCOMPARE(buffer.backCell(5, 0).ch, U' ');
     }
 
     // ---------------------------------------------------------------
@@ -352,7 +352,7 @@ private slots:
                 for (int row = 0; row < height; ++row) {
                     int lastNonSpace = -1;
                     for (int col = 0; col < width; ++col) {
-                        if (buffer.backCell(col, row).character != QChar(' '))
+                        if (buffer.backCell(col, row).ch != U' ')
                             lastNonSpace = col;
                     }
                     RC_ASSERT(lastNonSpace < width);

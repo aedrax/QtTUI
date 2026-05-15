@@ -9,6 +9,7 @@ QTuiCollapsible::QTuiCollapsible(const QString &title, QTuiWidget *parent)
     : QTuiWidget(parent)
     , m_title(title)
 {
+    setFocusPolicy(Qt::StrongFocus);
 }
 
 QString QTuiCollapsible::title() const
@@ -18,7 +19,10 @@ QString QTuiCollapsible::title() const
 
 void QTuiCollapsible::setTitle(const QString &title)
 {
+    if (m_title == title)
+        return;
     m_title = title;
+    markDirty();
 }
 
 bool QTuiCollapsible::isCollapsed() const
@@ -33,6 +37,7 @@ void QTuiCollapsible::setCollapsed(bool collapsed)
     m_collapsed = collapsed;
     updateChildrenVisibility();
     emit toggled(!m_collapsed); // signal emits expanded state
+    markDirty();
 }
 
 bool QTuiCollapsible::isExpanded() const
@@ -88,9 +93,9 @@ void QTuiCollapsible::paintEvent(ScreenBuffer &buffer)
             continue;
         Cell &cell = buffer.backCell(px, y0);
         if (col < titleLine.length())
-            cell.character = titleLine.at(col);
+            cell.setChar(titleLine.at(col).unicode());
         else
-            cell.character = QLatin1Char(' ');
+            cell.setChar(U' ');
         cell.foreground = focusFg;
         cell.background = focusBg;
         cell.bold = theme.bold;
@@ -109,7 +114,7 @@ void QTuiCollapsible::paintEvent(ScreenBuffer &buffer)
             int py = y0 + row;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = false;
@@ -138,6 +143,12 @@ void QTuiCollapsible::mousePressEvent(TuiMouseEvent *event)
 {
     if (event->mouseType() != TuiMouseEvent::Press)
         return;
+
+    // Only clicks on the header row toggle collapse. Mirror paintEvent: the
+    // title bar occupies the entire top row (row geo.y(), full width).
+    if (event->y() != geometry().y())
+        return;
+
     setCollapsed(!m_collapsed);
 }
 

@@ -36,6 +36,7 @@ void QTuiLCDNumber::display(int value)
 
     if (checkOverflow(value))
         emit overflow();
+    markDirty();
 }
 
 void QTuiLCDNumber::display(double value)
@@ -58,6 +59,7 @@ void QTuiLCDNumber::display(double value)
 
     if (checkOverflow(value))
         emit overflow();
+    markDirty();
 }
 
 void QTuiLCDNumber::display(const QString &text)
@@ -76,6 +78,7 @@ void QTuiLCDNumber::display(const QString &text)
 
     if (effectiveLen > m_digitCount)
         emit overflow();
+    markDirty();
 }
 
 int QTuiLCDNumber::digitCount() const
@@ -85,7 +88,11 @@ int QTuiLCDNumber::digitCount() const
 
 void QTuiLCDNumber::setDigitCount(int count)
 {
-    m_digitCount = qMax(1, count);
+    count = qMax(1, count);
+    if (m_digitCount == count)
+        return;
+    m_digitCount = count;
+    markDirty();
 }
 
 QTuiLCDNumber::Mode QTuiLCDNumber::mode() const
@@ -95,8 +102,10 @@ QTuiLCDNumber::Mode QTuiLCDNumber::mode() const
 
 void QTuiLCDNumber::setMode(Mode mode)
 {
+    if (m_mode == mode)
+        return;
     m_mode = mode;
-    // Re-display with new mode
+    // Re-display with new mode (marks dirty)
     display(m_intValue);
 }
 
@@ -207,7 +216,7 @@ void QTuiLCDNumber::paintEvent(ScreenBuffer &buffer)
             int py = geoY + row;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = theme.bold;
@@ -225,11 +234,11 @@ void QTuiLCDNumber::paintEvent(ScreenBuffer &buffer)
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
                 if (col == 0)
-                    cell.character = border.topLeft;
+                    cell.setChar(border.topLeft);
                 else if (col == geoW - 1)
-                    cell.character = border.topRight;
+                    cell.setChar(border.topRight);
                 else
-                    cell.character = border.horizontal;
+                    cell.setChar(border.horizontal);
                 cell.foreground = fg;
                 cell.background = bg;
             }
@@ -244,11 +253,11 @@ void QTuiLCDNumber::paintEvent(ScreenBuffer &buffer)
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
                 if (col == 0)
-                    cell.character = border.bottomLeft;
+                    cell.setChar(border.bottomLeft);
                 else if (col == geoW - 1)
-                    cell.character = border.bottomRight;
+                    cell.setChar(border.bottomRight);
                 else
-                    cell.character = border.horizontal;
+                    cell.setChar(border.horizontal);
                 cell.foreground = fg;
                 cell.background = bg;
             }
@@ -262,14 +271,14 @@ void QTuiLCDNumber::paintEvent(ScreenBuffer &buffer)
             int pxL = geoX;
             if (pxL < buffer.width()) {
                 Cell &cell = buffer.backCell(pxL, py);
-                cell.character = border.vertical;
+                cell.setChar(border.vertical);
                 cell.foreground = fg;
                 cell.background = bg;
             }
             int pxR = geoX + geoW - 1;
             if (pxR < buffer.width()) {
                 Cell &cell = buffer.backCell(pxR, py);
-                cell.character = border.vertical;
+                cell.setChar(border.vertical);
                 cell.foreground = fg;
                 cell.background = bg;
             }
@@ -313,7 +322,7 @@ void QTuiLCDNumber::paintEvent(ScreenBuffer &buffer)
                 int py = geoY + 1 + line;
                 if (px < buffer.width() && py < buffer.height() && (col + c) < geoW - 1) {
                     Cell &cell = buffer.backCell(px, py);
-                    cell.character = artLine.at(c);
+                    cell.setChar(artLine.at(c).unicode());
                     cell.foreground = fg;
                     cell.background = bg;
                     cell.bold = true;

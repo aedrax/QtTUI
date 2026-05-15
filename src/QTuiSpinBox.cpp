@@ -8,6 +8,7 @@ namespace QtTUI {
 QTuiSpinBox::QTuiSpinBox(QTuiWidget *parent)
     : QTuiWidget(parent)
 {
+    setFocusPolicy(Qt::StrongFocus);
 }
 
 int QTuiSpinBox::value() const
@@ -86,7 +87,10 @@ QString QTuiSpinBox::prefix() const
 
 void QTuiSpinBox::setPrefix(const QString &prefix)
 {
+    if (m_prefix == prefix)
+        return;
     m_prefix = prefix;
+    markDirty();
 }
 
 QString QTuiSpinBox::suffix() const
@@ -96,7 +100,10 @@ QString QTuiSpinBox::suffix() const
 
 void QTuiSpinBox::setSuffix(const QString &suffix)
 {
+    if (m_suffix == suffix)
+        return;
     m_suffix = suffix;
+    markDirty();
 }
 
 void QTuiSpinBox::stepUp()
@@ -166,7 +173,7 @@ void QTuiSpinBox::paintEvent(ScreenBuffer &buffer)
             int py = geoY + row;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = theme.bold;
@@ -184,11 +191,11 @@ void QTuiSpinBox::paintEvent(ScreenBuffer &buffer)
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
                 if (col == 0)
-                    cell.character = border.topLeft;
+                    cell.setChar(border.topLeft);
                 else if (col == geoW - 1)
-                    cell.character = border.topRight;
+                    cell.setChar(border.topRight);
                 else
-                    cell.character = border.horizontal;
+                    cell.setChar(border.horizontal);
                 cell.foreground = fg;
                 cell.background = bg;
             }
@@ -203,11 +210,11 @@ void QTuiSpinBox::paintEvent(ScreenBuffer &buffer)
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
                 if (col == 0)
-                    cell.character = border.bottomLeft;
+                    cell.setChar(border.bottomLeft);
                 else if (col == geoW - 1)
-                    cell.character = border.bottomRight;
+                    cell.setChar(border.bottomRight);
                 else
-                    cell.character = border.horizontal;
+                    cell.setChar(border.horizontal);
                 cell.foreground = fg;
                 cell.background = bg;
             }
@@ -221,14 +228,14 @@ void QTuiSpinBox::paintEvent(ScreenBuffer &buffer)
             int pxLeft = geoX;
             if (pxLeft < buffer.width()) {
                 Cell &cell = buffer.backCell(pxLeft, py);
-                cell.character = border.vertical;
+                cell.setChar(border.vertical);
                 cell.foreground = fg;
                 cell.background = bg;
             }
             int pxRight = geoX + geoW - 1;
             if (pxRight < buffer.width()) {
                 Cell &cell = buffer.backCell(pxRight, py);
-                cell.character = border.vertical;
+                cell.setChar(border.vertical);
                 cell.foreground = fg;
                 cell.background = bg;
             }
@@ -251,7 +258,7 @@ void QTuiSpinBox::paintEvent(ScreenBuffer &buffer)
             int py = contentRow;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = content.at(i);
+                cell.setChar(content.at(i).unicode());
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = theme.bold || hasFocus();
@@ -274,14 +281,40 @@ void QTuiSpinBox::keyPressEvent(TuiKeyEvent *event)
 
 void QTuiSpinBox::mousePressEvent(TuiMouseEvent *event)
 {
+    if (event->mouseType() == TuiMouseEvent::Wheel) {
+        if (event->wheelDelta() > 0)
+            stepUp();
+        else if (event->wheelDelta() < 0)
+            stepDown();
+        return;
+    }
+
     if (event->mouseType() != TuiMouseEvent::Press)
         return;
 
     const QRect geo = geometry();
-    int midX = geo.x() + geo.width() / 2;
-    if (event->x() >= midX)
+    // Mirror paintEvent: the content "▲ <prefix><value><suffix> ▼" is centered
+    // on the middle row, only when the widget is at least 3x3.
+    if (geo.height() < 3 || geo.width() < 3)
+        return;
+
+    const QString content = QStringLiteral("\u25B2 ") + m_prefix + QString::number(m_value)
+                            + m_suffix + QStringLiteral(" \u25BC");
+    const int contentRow = geo.y() + geo.height() / 2;
+    const int innerWidth = geo.width() - 2; // exclude left/right borders
+    const int textLen = qMin(static_cast<int>(content.length()), innerWidth);
+    const int startX = geo.x() + 1 + (innerWidth - textLen) / 2;
+
+    if (event->y() != contentRow)
+        return;
+    const int idx = event->x() - startX;
+    if (idx < 0 || idx >= textLen)
+        return;
+
+    // Step only when the click lands exactly on a painted arrow glyph.
+    if (content.at(idx) == QChar(0x25B2)) // ▲
         stepUp();
-    else
+    else if (content.at(idx) == QChar(0x25BC)) // ▼
         stepDown();
 }
 

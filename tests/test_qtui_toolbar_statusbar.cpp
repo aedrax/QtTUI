@@ -193,7 +193,7 @@ private slots:
         // Verify action text appears in the buffer
         QString row;
         for (int col = 0; col < 30; ++col)
-            row += buffer.backCell(col, 0).character;
+            row += buffer.backCell(col, 0).text();
         QVERIFY(row.contains(QStringLiteral("Run")));
     }
 
@@ -290,7 +290,7 @@ private slots:
         // Verify message text appears in the buffer
         QString row;
         for (int col = 0; col < 40; ++col)
-            row += buffer.backCell(col, 0).character;
+            row += buffer.backCell(col, 0).text();
         QVERIFY(row.contains(QStringLiteral("Status message")));
     }
 

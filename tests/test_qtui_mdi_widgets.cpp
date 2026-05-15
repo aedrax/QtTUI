@@ -388,7 +388,7 @@ private slots:
         // Extract the title bar row
         QString titleRow;
         for (int col = 0; col < 20; ++col)
-            titleRow += buffer.backCell(col, 0).character;
+            titleRow += buffer.backCell(col, 0).text();
 
         QVERIFY(titleRow.contains(QStringLiteral("Doc")));
         QVERIFY(titleRow.contains(QStringLiteral("[X]")));

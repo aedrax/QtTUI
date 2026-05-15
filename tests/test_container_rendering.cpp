@@ -36,7 +36,7 @@ public:
             for (int col = geo.x(); col < geo.x() + geo.width(); ++col) {
                 if (col >= 0 && col < buffer.width() && row >= 0 && row < buffer.height()) {
                     Cell &cell = buffer.backCell(col, row);
-                    cell.character = QLatin1Char('C');
+                    cell.setChar(U'C');
                 }
             }
         }
@@ -445,7 +445,7 @@ private slots:
                 for (int row = 0; row < buf->height(); ++row) {
                     for (int col = 0; col < buf->width(); ++col) {
                         const Cell &cell = buf->backCell(col, row);
-                        if (cell.character == QLatin1Char('C')) {
+                        if (cell.ch == U'C') {
                             RC_ASSERT(viewport.contains(col, row));
                         }
                     }

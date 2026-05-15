@@ -33,11 +33,14 @@ int QTuiProgressBar::minimum() const
 
 void QTuiProgressBar::setMinimum(int min)
 {
+    if (m_minimum == min)
+        return;
     m_minimum = min;
     if (m_maximum < m_minimum)
         m_maximum = m_minimum;
     if (!isIndeterminate())
         setValue(m_value);
+    markDirty();
 }
 
 int QTuiProgressBar::maximum() const
@@ -47,19 +50,25 @@ int QTuiProgressBar::maximum() const
 
 void QTuiProgressBar::setMaximum(int max)
 {
+    if (m_maximum == max)
+        return;
     m_maximum = max;
     if (m_minimum > m_maximum)
         m_minimum = m_maximum;
     if (!isIndeterminate())
         setValue(m_value);
+    markDirty();
 }
 
 void QTuiProgressBar::setRange(int min, int max)
 {
+    if (m_minimum == min && m_maximum == qMax(min, max))
+        return;
     m_minimum = min;
     m_maximum = qMax(min, max);
     if (!isIndeterminate())
         setValue(m_value);
+    markDirty();
 }
 
 Qt::Orientation QTuiProgressBar::orientation() const
@@ -69,7 +78,10 @@ Qt::Orientation QTuiProgressBar::orientation() const
 
 void QTuiProgressBar::setOrientation(Qt::Orientation orientation)
 {
+    if (m_orientation == orientation)
+        return;
     m_orientation = orientation;
+    markDirty();
 }
 
 QString QTuiProgressBar::format() const
@@ -79,7 +91,10 @@ QString QTuiProgressBar::format() const
 
 void QTuiProgressBar::setFormat(const QString &format)
 {
+    if (m_format == format)
+        return;
     m_format = format;
+    markDirty();
 }
 
 QChar QTuiProgressBar::fillChar() const
@@ -89,7 +104,10 @@ QChar QTuiProgressBar::fillChar() const
 
 void QTuiProgressBar::setFillChar(const QChar &ch)
 {
+    if (m_fillChar == ch)
+        return;
     m_fillChar = ch;
+    markDirty();
 }
 
 QChar QTuiProgressBar::emptyChar() const
@@ -99,7 +117,10 @@ QChar QTuiProgressBar::emptyChar() const
 
 void QTuiProgressBar::setEmptyChar(const QChar &ch)
 {
+    if (m_emptyChar == ch)
+        return;
     m_emptyChar = ch;
+    markDirty();
 }
 
 bool QTuiProgressBar::isIndeterminate() const
@@ -146,7 +167,7 @@ void QTuiProgressBar::paintEvent(ScreenBuffer &buffer)
             int py = geoY + row;
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
-                cell.character = QLatin1Char(' ');
+                cell.setChar(U' ');
                 cell.foreground = fg;
                 cell.background = bg;
                 cell.bold = theme.bold;
@@ -164,11 +185,11 @@ void QTuiProgressBar::paintEvent(ScreenBuffer &buffer)
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
                 if (col == 0)
-                    cell.character = border.topLeft;
+                    cell.setChar(border.topLeft);
                 else if (col == geoW - 1)
-                    cell.character = border.topRight;
+                    cell.setChar(border.topRight);
                 else
-                    cell.character = border.horizontal;
+                    cell.setChar(border.horizontal);
                 cell.foreground = fg;
                 cell.background = bg;
             }
@@ -183,11 +204,11 @@ void QTuiProgressBar::paintEvent(ScreenBuffer &buffer)
             if (px < buffer.width() && py < buffer.height()) {
                 Cell &cell = buffer.backCell(px, py);
                 if (col == 0)
-                    cell.character = border.bottomLeft;
+                    cell.setChar(border.bottomLeft);
                 else if (col == geoW - 1)
-                    cell.character = border.bottomRight;
+                    cell.setChar(border.bottomRight);
                 else
-                    cell.character = border.horizontal;
+                    cell.setChar(border.horizontal);
                 cell.foreground = fg;
                 cell.background = bg;
             }
@@ -201,14 +222,14 @@ void QTuiProgressBar::paintEvent(ScreenBuffer &buffer)
             int pxLeft = geoX;
             if (pxLeft < buffer.width()) {
                 Cell &cell = buffer.backCell(pxLeft, py);
-                cell.character = border.vertical;
+                cell.setChar(border.vertical);
                 cell.foreground = fg;
                 cell.background = bg;
             }
             int pxRight = geoX + geoW - 1;
             if (pxRight < buffer.width()) {
                 Cell &cell = buffer.backCell(pxRight, py);
-                cell.character = border.vertical;
+                cell.setChar(border.vertical);
                 cell.foreground = fg;
                 cell.background = bg;
             }
@@ -245,7 +266,7 @@ void QTuiProgressBar::paintEvent(ScreenBuffer &buffer)
                 if (px >= buffer.width() || contentRow >= buffer.height())
                     continue;
                 Cell &cell = buffer.backCell(px, contentRow);
-                cell.character = (col >= blockStart && col < blockStart + blockSize) ? m_fillChar : m_emptyChar;
+                cell.setChar(((col >= blockStart && col < blockStart + blockSize) ? m_fillChar : m_emptyChar).unicode());
                 cell.foreground = fg;
                 cell.background = bg;
             }
@@ -258,7 +279,7 @@ void QTuiProgressBar::paintEvent(ScreenBuffer &buffer)
                 Cell &cell = buffer.backCell(contentCol, py);
                 // Vertical fills bottom-up, so invert
                 int invertedRow = innerH - 1 - row;
-                cell.character = (invertedRow >= blockStart && invertedRow < blockStart + blockSize) ? m_fillChar : m_emptyChar;
+                cell.setChar(((invertedRow >= blockStart && invertedRow < blockStart + blockSize) ? m_fillChar : m_emptyChar).unicode());
                 cell.foreground = fg;
                 cell.background = bg;
             }
@@ -291,7 +312,7 @@ void QTuiProgressBar::paintEvent(ScreenBuffer &buffer)
             if (px >= buffer.width() || contentRow >= buffer.height())
                 continue;
             Cell &cell = buffer.backCell(px, contentRow);
-            cell.character = (col < filledCols) ? m_fillChar : m_emptyChar;
+            cell.setChar(((col < filledCols) ? m_fillChar : m_emptyChar).unicode());
             cell.foreground = fg;
             cell.background = bg;
         }
@@ -305,7 +326,7 @@ void QTuiProgressBar::paintEvent(ScreenBuffer &buffer)
                 if (px >= buffer.width() || contentRow >= buffer.height())
                     continue;
                 Cell &cell = buffer.backCell(px, contentRow);
-                cell.character = formatText.at(i);
+                cell.setChar(formatText.at(i).unicode());
                 cell.bold = true;
             }
         }
@@ -322,7 +343,7 @@ void QTuiProgressBar::paintEvent(ScreenBuffer &buffer)
             Cell &cell = buffer.backCell(contentCol, py);
             // Bottom-up: the bottom `filledRows` rows are filled
             bool filled = (row >= innerH - filledRows);
-            cell.character = filled ? m_fillChar : m_emptyChar;
+            cell.setChar((filled ? m_fillChar : m_emptyChar).unicode());
             cell.foreground = fg;
             cell.background = bg;
         }
@@ -336,7 +357,7 @@ void QTuiProgressBar::paintEvent(ScreenBuffer &buffer)
                 if (contentCol >= buffer.width() || py >= buffer.height())
                     continue;
                 Cell &cell = buffer.backCell(contentCol, py);
-                cell.character = formatText.at(i);
+                cell.setChar(formatText.at(i).unicode());
                 cell.bold = true;
             }
         }
