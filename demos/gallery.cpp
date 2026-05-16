@@ -7,26 +7,36 @@
 using namespace QtTUI;
 
 // ---------------------------------------------------------------------------
-// TabPage: lightweight container widget with a vertical box layout.
-// Used as the page widget for each category tab.
+// TabPage: lightweight container widget with a box layout.
+// A vertical TabPage is the page widget for each category tab.
+// A horizontal TabPage is a row of widgets inside a page.
 // ---------------------------------------------------------------------------
 class TabPage : public QTuiWidget {
     Q_OBJECT
 public:
-    explicit TabPage(QTuiWidget *parent = nullptr)
+    explicit TabPage(QTuiWidget *parent = nullptr,
+                     QTuiBoxLayout::Direction direction = QTuiBoxLayout::TopToBottom)
         : QTuiWidget(parent)
-        , m_layout(new QTuiBoxLayout(QTuiBoxLayout::TopToBottom, this))
-    {}
+        , m_layout(new QTuiBoxLayout(direction, this))
+    {
+        if (direction == QTuiBoxLayout::TopToBottom)
+            m_layout->setContentsMargins(2, 0, 2, 0);
+    }
 
     QTuiBoxLayout *layout() const { return m_layout; }
 
     void addWidget(QTuiWidget *w, int stretch = 0) { m_layout->addWidget(w, stretch); }
 
-    QSize minimumSize() const override { return QSize(0, 1); }
+    QSize minimumSize() const override {
+        if (m_layout->direction() == QTuiBoxLayout::LeftToRight)
+            return m_layout->minimumSize();
+        return QSize(0, 1);
+    }
 
     void paintEvent(ScreenBuffer &buffer) override {
         if (!isVisible() || geometry().isEmpty())
             return;
+        clearBackground(buffer, geometry());
         m_layout->apply(geometry());
         for (auto *child : childWidgets()) {
             if (child->isVisible())
@@ -39,13 +49,74 @@ private:
 };
 
 // ---------------------------------------------------------------------------
-// Section label helper: produces a QTuiLabel styled as a section header
-// showing the widget class name (e.g. "── QTuiPushButton ──").
+// Gallery palette: a dark background with one accent color.
+// Focus uses an inverted accent block, so focus stays visible without color.
+// ---------------------------------------------------------------------------
+namespace Palette {
+const Color Background(26, 27, 38);
+const Color Surface(36, 40, 59);
+const Color Text(192, 202, 245);
+const Color Muted(86, 95, 137);
+const Color Accent(122, 162, 247);
+}
+
+static void applyGalleryTheme()
+{
+    ThemeProperties base;
+    base.foreground = Palette::Text;
+    base.background = Palette::Background;
+    base.focusForeground = Palette::Background;
+    base.focusBackground = Palette::Accent;
+    base.disabledForeground = Palette::Muted;
+    base.disabledBackground = Palette::Background;
+
+    ThemeProperties bar = base;
+    bar.background = Palette::Surface;
+
+    QHash<QString, ThemeProperties> theme;
+    theme.insert(QStringLiteral("default"), base);
+    theme.insert(QStringLiteral("QTuiMenuBar"), bar);
+    theme.insert(QStringLiteral("QTuiStatusBar"), bar);
+
+    auto *engine = Theme_Engine::instance();
+    engine->registerTheme(QStringLiteral("gallery"), theme);
+    engine->setActiveTheme(QStringLiteral("gallery"));
+}
+
+// ---------------------------------------------------------------------------
+// Section label helper: produces a bold accent QTuiLabel as a section header
+// that shows the widget class name (e.g. "▍ QTuiPushButton").
+// The first section on a page gets no blank line above it.
 // ---------------------------------------------------------------------------
 static QTuiLabel *sectionLabel(const QString &className, QTuiWidget *parent)
 {
-    auto *label = new QTuiLabel(QStringLiteral("── %1 ──").arg(className), parent);
+    auto *page = qobject_cast<TabPage *>(parent);
+    if (page && page->layout()->count() > 0)
+        page->addWidget(new QTuiLabel(QString(), parent));
+
+    auto *label = new QTuiLabel(QStringLiteral("▍ %1").arg(className), parent);
+    ThemeProperties header = Theme_Engine::instance()->properties(QStringLiteral("default"));
+    header.foreground = Palette::Accent;
+    header.bold = true;
+    Theme_Engine::instance()->setWidgetOverride(label, header);
     return label;
+}
+
+// ---------------------------------------------------------------------------
+// Row helper: puts widgets side by side at their minimum width, with a
+// one-cell gap between them. A stretch filler takes the remaining width.
+// ---------------------------------------------------------------------------
+static TabPage *row(TabPage *page, const QList<QTuiWidget *> &widgets)
+{
+    auto *r = new TabPage(page, QTuiBoxLayout::LeftToRight);
+    for (int i = 0; i < widgets.size(); ++i) {
+        if (i > 0)
+            r->addWidget(new QTuiLabel(QStringLiteral(" "), r));
+        widgets[i]->setParent(r);
+        r->addWidget(widgets[i]);
+    }
+    r->addWidget(new QTuiLabel(QString(), r), 1);
+    return r;
 }
 
 // ---------------------------------------------------------------------------
@@ -65,13 +136,12 @@ static QTuiWidget *createButtonsTab(QTuiWidget *parent, QTuiStatusBar *statusBar
     QObject::connect(btn2, &QTuiPushButton::clicked, [statusBar, btn2]() {
         statusBar->showMessage(btn2->text());
     });
-    page->addWidget(btn1);
-    page->addWidget(btn2);
+    page->addWidget(row(page, {btn1, btn2}));
 
     // -- QTuiToolButton section --
     page->addWidget(sectionLabel("QTuiToolButton", page));
     auto *toolBtn = new QTuiToolButton("Tool", page);
-    page->addWidget(toolBtn);
+    page->addWidget(row(page, {toolBtn}));
 
     // -- QTuiCheckBox section --
     page->addWidget(sectionLabel("QTuiCheckBox", page));
@@ -431,6 +501,16 @@ static QTuiWidget *createContainersTab(QTuiWidget *parent, QTuiStatusBar *status
     stacked->setCurrentIndex(0);
     page->addWidget(stacked);
 
+    return page;
+}
+
+// ---------------------------------------------------------------------------
+// Tab builder: Panes
+// ---------------------------------------------------------------------------
+static QTuiWidget *createPanesTab(QTuiWidget *parent)
+{
+    auto *page = new TabPage(parent);
+
     // -- QTuiSplitter section --
     page->addWidget(sectionLabel("QTuiSplitter", page));
     auto *splitter = new QTuiSplitter(Qt::Horizontal, page);
@@ -445,8 +525,10 @@ static QTuiWidget *createContainersTab(QTuiWidget *parent, QTuiStatusBar *status
         "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n"
         "Line 6\nLine 7\nLine 8\nLine 9\nLine 10",
         scrollArea);
+    // The scroll area does not size its content, so set the size here
+    scrollContent->setGeometry(QRect(QPoint(0, 0), scrollContent->minimumSize()));
     scrollArea->setWidget(scrollContent);
-    page->addWidget(scrollArea);
+    page->addWidget(scrollArea, 1);
 
     // -- QTuiMdiArea section --
     page->addWidget(sectionLabel("QTuiMdiArea", page));
@@ -455,7 +537,7 @@ static QTuiWidget *createContainersTab(QTuiWidget *parent, QTuiStatusBar *status
     sub1->setWindowTitle("Window 1");
     auto *sub2 = mdiArea->addSubWindow(new QTuiLabel("Sub-window 2", mdiArea));
     sub2->setWindowTitle("Window 2");
-    page->addWidget(mdiArea);
+    page->addWidget(mdiArea, 2);
 
     // -- QTuiDockWidget section --
     page->addWidget(sectionLabel("QTuiDockWidget", page));
@@ -530,7 +612,7 @@ static QTuiWidget *createSpecializedTab(QTuiWidget *parent, QTuiStatusBar *statu
     undoStack->push(new SampleCommand("Add item"));
     undoStack->push(new SampleCommand("Change color"));
     auto *undoView = new QTuiUndoView(undoStack, page);
-    page->addWidget(undoView);
+    page->addWidget(undoView, 1);
 
     // -- QTuiFocusFrame section --
     page->addWidget(sectionLabel("QTuiFocusFrame", page));
@@ -568,6 +650,7 @@ public:
 int main(int argc, char *argv[])
 {
     QTuiApplication app(argc, argv);
+    applyGalleryTheme();
 
     QTuiMainWindow window;
     app.setMainWindow(&window);
@@ -581,23 +664,25 @@ int main(int argc, char *argv[])
 
     // Status bar
     auto *statusBar = new QTuiStatusBar(&window);
-    statusBar->showMessage("Widget Gallery - Use Tab/Shift+Tab to navigate");
+    const QString keyHints = QStringLiteral(" ←/→ category · Tab/Shift+Tab focus · Ctrl+Q quit");
+    statusBar->showMessage(keyHints);
     window.setStatusBar(statusBar);
 
-    // Central tab widget with 8 category tabs
+    // Central tab widget with 9 category tabs
     auto *tabs = new QTuiTabWidget(&window);
-    tabs->addTab(createButtonsTab(&window, statusBar),         "Buttons & Toggles");
-    tabs->addTab(createTextInputTab(&window, statusBar),        "Text Input");
-    tabs->addTab(createNumericInputTab(&window, statusBar),    "Numeric Input");
-    tabs->addTab(createSelectionTab(&window, statusBar),         "Selection & Display");
-    tabs->addTab(createModelViewTab(&window, statusBar),        "Model/View");
-    tabs->addTab(createContainersTab(&window, statusBar),        "Containers");
-    tabs->addTab(createMainWindowPartsTab(&window, statusBar), "Main Window Parts");
-    tabs->addTab(createSpecializedTab(&window, statusBar),      "Specialized");
+    tabs->addTab(createButtonsTab(&window, statusBar),         "Buttons");
+    tabs->addTab(createTextInputTab(&window, statusBar),       "Text");
+    tabs->addTab(createNumericInputTab(&window, statusBar),    "Numeric");
+    tabs->addTab(createSelectionTab(&window, statusBar),       "Select");
+    tabs->addTab(createModelViewTab(&window, statusBar),       "Views");
+    tabs->addTab(createContainersTab(&window, statusBar),      "Containers");
+    tabs->addTab(createPanesTab(&window),                      "Panes");
+    tabs->addTab(createMainWindowPartsTab(&window, statusBar), "Window");
+    tabs->addTab(createSpecializedTab(&window, statusBar),     "Misc");
 
-    // Update status bar when switching tabs
-    QObject::connect(tabs, &QTuiTabWidget::currentChanged, [statusBar, tabs](int idx) {
-        statusBar->showMessage(QStringLiteral("Tab: %1").arg(tabs->tabBar()->tabText(idx)));
+    // Show the key hints again when the user switches tabs
+    QObject::connect(tabs, &QTuiTabWidget::currentChanged, [statusBar, keyHints](int) {
+        statusBar->showMessage(keyHints);
     });
 
     window.setCentralWidget(tabs);
