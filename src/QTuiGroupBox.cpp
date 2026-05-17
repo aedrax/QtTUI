@@ -72,7 +72,11 @@ QSize QTuiGroupBox::minimumSize() const
     int titleWidth = m_title.isEmpty() ? 0 : m_title.length() + 2; // space padding
     if (m_checkable)
         titleWidth += 4; // "[x] " prefix
-    return QSize(qMax(4, titleWidth + 2), 3);
+    QSize size(qMax(4, titleWidth + 2), 3);
+    // The layout goes inside the border, so add 2 cells on each axis
+    if (m_layout)
+        size = size.expandedTo(m_layout->minimumSize() + QSize(2, 2));
+    return size;
 }
 
 QRect QTuiGroupBox::contentArea() const

@@ -198,6 +198,19 @@ private slots:
         QVERIFY(ms.height() >= 3);
     }
 
+    void groupBox_minimumSizeIncludesLayout()
+    {
+        // Two 3x1 children in a vertical layout need 2 rows inside the
+        // border, so the group box needs 4 rows, not the 3-row default
+        QTuiGroupBox gb(QStringLiteral("G"));
+        auto *layout = new QTuiBoxLayout(QTuiBoxLayout::TopToBottom);
+        layout->addWidget(new ContainerTestWidget(&gb));
+        layout->addWidget(new ContainerTestWidget(&gb));
+        gb.setLayout(layout);
+        QCOMPARE(gb.minimumSize().height(), 4);
+        QVERIFY(gb.minimumSize().width() >= 5);
+    }
+
     void groupBox_minimumSizeCheckable()
     {
         QTuiGroupBox gb(QStringLiteral("Test"));
