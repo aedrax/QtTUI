@@ -549,6 +549,66 @@ static QTuiWidget *createPanesTab(QTuiWidget *parent)
 }
 
 // ---------------------------------------------------------------------------
+// Tab builder: Layouts. Each QTuiGroupBox applies one layout type.
+// ---------------------------------------------------------------------------
+static QTuiWidget *createLayoutsTab(QTuiWidget *parent, QTuiStatusBar *statusBar)
+{
+    auto *page = new TabPage(parent);
+
+    // -- QTuiFormLayout section: label and field rows --
+    page->addWidget(sectionLabel("QTuiFormLayout", page));
+    auto *formBox = new QTuiGroupBox("Account", page);
+    auto *form = new QTuiFormLayout;
+    auto *nameEdit = new QTuiLineEdit(formBox);
+    nameEdit->setText("Ada Lovelace");
+    auto *emailEdit = new QTuiLineEdit(formBox);
+    emailEdit->setText("ada@example.com");
+    // QTuiFormLayout has no spacing setting, so the labels end with a space
+    form->addRow("Name: ", nameEdit);
+    form->addRow("Email: ", emailEdit);
+    form->addRow("Admin: ", new QTuiCheckBox("Can change settings", formBox));
+    formBox->setLayout(form);
+    page->addWidget(formBox);
+
+    // -- QTuiGridLayout section: a 3x3 keypad with stretched columns --
+    page->addWidget(sectionLabel("QTuiGridLayout", page));
+    auto *gridBox = new QTuiGroupBox("Keypad", page);
+    auto *grid = new QTuiGridLayout;
+    for (int i = 0; i < 9; ++i) {
+        const QString digit = QString::number(9 - i);
+        auto *key = new QTuiToolButton(digit, gridBox);
+        QObject::connect(key, &QTuiToolButton::clicked, [statusBar, digit]() {
+            statusBar->showMessage(QStringLiteral("Keypad: %1").arg(digit));
+        });
+        // Rows 7 8 9 / 4 5 6 / 1 2 3, as on a calculator keypad
+        grid->addWidget(key, i / 3, 2 - i % 3);
+    }
+    for (int column = 0; column < 3; ++column)
+        grid->setColumnStretch(column, 1);
+    gridBox->setLayout(grid);
+    page->addWidget(gridBox);
+
+    // -- QTuiStackedLayout section: one page at a time --
+    page->addWidget(sectionLabel("QTuiStackedLayout", page));
+    auto *nextPage = new QTuiToolButton("Next page", page);
+    page->addWidget(row(page, {nextPage}));
+    auto *stackBox = new QTuiGroupBox("Pages", page);
+    auto *stack = new QTuiStackedLayout;
+    stack->addWidget(new QTuiLabel("Page 1 of 3: only the current page is visible", stackBox));
+    stack->addWidget(new QTuiLabel("Page 2 of 3: the other pages are hidden", stackBox));
+    stack->addWidget(new QTuiLabel("Page 3 of 3: Next page goes back to page 1", stackBox));
+    stack->setCurrentIndex(0);
+    stackBox->setLayout(stack);
+    QObject::connect(nextPage, &QTuiToolButton::clicked, [stack, stackBox]() {
+        stack->setCurrentIndex((stack->currentIndex() + 1) % stack->count());
+        stackBox->markDirty();
+    });
+    page->addWidget(stackBox);
+
+    return page;
+}
+
+// ---------------------------------------------------------------------------
 // Tab builder: Main Window Parts
 // ---------------------------------------------------------------------------
 static QTuiWidget *createMainWindowPartsTab(QTuiWidget *parent, QTuiStatusBar *statusBar)
@@ -668,16 +728,17 @@ int main(int argc, char *argv[])
     statusBar->showMessage(keyHints);
     window.setStatusBar(statusBar);
 
-    // Central tab widget with 9 category tabs
+    // Central tab widget with 10 category tabs
     auto *tabs = new QTuiTabWidget(&window);
     tabs->addTab(createButtonsTab(&window, statusBar),         "Buttons");
     tabs->addTab(createTextInputTab(&window, statusBar),       "Text");
-    tabs->addTab(createNumericInputTab(&window, statusBar),    "Numeric");
+    tabs->addTab(createNumericInputTab(&window, statusBar),    "Number");
     tabs->addTab(createSelectionTab(&window, statusBar),       "Select");
     tabs->addTab(createModelViewTab(&window, statusBar),       "Views");
-    tabs->addTab(createContainersTab(&window, statusBar),      "Containers");
+    tabs->addTab(createContainersTab(&window, statusBar),      "Boxes");
     tabs->addTab(createPanesTab(&window),                      "Panes");
-    tabs->addTab(createMainWindowPartsTab(&window, statusBar), "Window");
+    tabs->addTab(createLayoutsTab(&window, statusBar),         "Layout");
+    tabs->addTab(createMainWindowPartsTab(&window, statusBar), "Bars");
     tabs->addTab(createSpecializedTab(&window, statusBar),     "Misc");
 
     // Show the key hints again when the user switches tabs
