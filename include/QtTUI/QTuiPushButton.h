@@ -5,6 +5,8 @@
 #include <QtTUI/QTuiWidget.h>
 #include <QString>
 
+class QTimer;
+
 namespace QtTUI {
 
 class QTuiPushButton : public QTuiWidget {
@@ -30,6 +32,15 @@ public:
     bool isChecked() const;
     void setChecked(bool checked);
 
+    // Pressed look. Terminals do not report key releases, so a click shows
+    // the pressed look for a short time (see animateClick()).
+    bool isDown() const;
+    void setDown(bool down);
+
+    // Shows the pressed look, emits clicked() (and toggles a checkable
+    // button), then releases the button after a short time.
+    void animateClick();
+
     QSize minimumSize() const override;
     void paintEvent(ScreenBuffer &buffer) override;
 
@@ -47,6 +58,8 @@ private:
     QString m_icon;
     bool m_checkable = false;
     bool m_checked = false;
+    bool m_down = false;
+    QTimer *m_releaseTimer;
 };
 
 } // namespace QtTUI

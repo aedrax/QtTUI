@@ -2,14 +2,22 @@
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
+#include <QTimer>
 
 namespace QtTUI {
+
+// Time that the pressed look stays visible after a click
+static constexpr int kPressedLookMs = 150;
 
 QTuiPushButton::QTuiPushButton(const QString &text, QTuiWidget *parent)
     : QTuiWidget(parent)
     , m_text(text)
+    , m_releaseTimer(new QTimer(this))
 {
     setFocusPolicy(Qt::StrongFocus);
+    m_releaseTimer->setSingleShot(true);
+    m_releaseTimer->setInterval(kPressedLookMs);
+    connect(m_releaseTimer, &QTimer::timeout, this, [this]() { setDown(false); });
 }
 
 QString QTuiPushButton::text() const
@@ -66,6 +74,29 @@ void QTuiPushButton::setChecked(bool checked)
     }
 }
 
+bool QTuiPushButton::isDown() const
+{
+    return m_down;
+}
+
+void QTuiPushButton::setDown(bool down)
+{
+    if (m_down == down)
+        return;
+    m_down = down;
+    markDirty();
+}
+
+void QTuiPushButton::animateClick()
+{
+    setDown(true);
+    m_releaseTimer->start();
+
+    emit clicked();
+    if (m_checkable)
+        setChecked(!m_checked);
+}
+
 QSize QTuiPushButton::minimumSize() const
 {
     // Content: icon + space + text, surrounded by border (1 char each side)
@@ -109,6 +140,12 @@ void QTuiPushButton::paintEvent(ScreenBuffer &buffer)
     if (m_checkable && m_checked && enabled) {
         std::swap(fg, bg);
     }
+
+    // Pressed: invert again and move the label 1 cell right, so the button
+    // looks pushed in
+    const bool pressed = m_down && enabled;
+    if (pressed)
+        std::swap(fg, bg);
 
     // Clear the entire button area with background
     for (int row = 0; row < geoH; ++row) {
@@ -202,6 +239,8 @@ void QTuiPushButton::paintEvent(ScreenBuffer &buffer)
         int innerWidth = geoW - 2;        // Exclude left/right borders
         int textLen = qMin(static_cast<int>(content.length()), innerWidth);
         int startCol = 1 + (innerWidth - textLen) / 2; // Center within inner area
+        if (pressed && startCol + textLen < geoW - 1)
+            ++startCol;
 
         for (int i = 0; i < textLen; ++i) {
             int px = geoX + startCol + i;
@@ -227,13 +266,8 @@ void QTuiPushButton::keyPressEvent(TuiKeyEvent *event)
         return;
 
     const int key = event->key();
-    if (key == Qt::Key_Return || key == Qt::Key_Enter || key == Qt::Key_Space) {
-        emit clicked();
-
-        if (m_checkable) {
-            setChecked(!m_checked);
-        }
-    }
+    if (key == Qt::Key_Return || key == Qt::Key_Enter || key == Qt::Key_Space)
+        animateClick();
 }
 
 void QTuiPushButton::mousePressEvent(TuiMouseEvent *event)
@@ -244,11 +278,7 @@ void QTuiPushButton::mousePressEvent(TuiMouseEvent *event)
     if (event->mouseType() != TuiMouseEvent::Press)
         return;
 
-    emit clicked();
-
-    if (m_checkable) {
-        setChecked(!m_checked);
-    }
+    animateClick();
 }
 
 } // namespace QtTUI

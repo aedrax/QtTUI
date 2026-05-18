@@ -64,6 +64,11 @@ void QTuiToolButton::paintEvent(ScreenBuffer &buffer)
         std::swap(fg, bg);
     }
 
+    // Pressed: invert again and move the label 1 cell right
+    const bool pressed = isDown() && enabled;
+    if (pressed)
+        std::swap(fg, bg);
+
     // Clear the entire area with background (no border)
     for (int row = 0; row < geoH; ++row) {
         for (int col = 0; col < geoW; ++col) {
@@ -96,6 +101,8 @@ void QTuiToolButton::paintEvent(ScreenBuffer &buffer)
     int availWidth = geoW - 2; // 1 char padding each side
     int textLen = qMin(static_cast<int>(content.length()), availWidth);
     int startCol = geoX + 1; // 1 char left padding
+    if (pressed && textLen < availWidth)
+        ++startCol;
 
     for (int i = 0; i < textLen; ++i) {
         int px = startCol + i;

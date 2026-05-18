@@ -163,6 +163,46 @@ private slots:
         QCOMPARE(buffer.backCell(5, 1).ch, U'K');
     }
 
+    void pushButton_clickShowsPressedLookThenReleases()
+    {
+        QTuiPushButton btn(QStringLiteral("OK"));
+        btn.setGeometry(QRect(0, 0, 10, 3));
+        QSignalSpy spy(&btn, &QTuiPushButton::clicked);
+
+        ScreenBuffer normal(10, 3);
+        btn.paintEvent(normal);
+
+        TuiKeyEvent ev(Qt::Key_Return, Qt::NoModifier);
+        QCoreApplication::sendEvent(&btn, &ev);
+        QCOMPARE(spy.count(), 1);
+        QVERIFY(btn.isDown());
+
+        // Pressed look: inverted colors and the label moves 1 cell right
+        ScreenBuffer pressed(10, 3);
+        btn.paintEvent(pressed);
+        QCOMPARE(normal.backCell(4, 1).ch, U'O');
+        QCOMPARE(pressed.backCell(5, 1).ch, U'O');
+        QCOMPARE(pressed.backCell(5, 1).background, normal.backCell(4, 1).foreground);
+        QCOMPARE(pressed.backCell(5, 1).foreground, normal.backCell(4, 1).background);
+
+        // The button releases by itself
+        QTRY_VERIFY(!btn.isDown());
+    }
+
+    void toolButton_mouseClickShowsPressedLook()
+    {
+        QTuiToolButton btn(QStringLiteral("Go"));
+        btn.setGeometry(QRect(0, 0, 6, 1));
+        TuiMouseEvent ev(TuiMouseEvent::Press, Qt::LeftButton, QPoint(1, 0));
+        QCoreApplication::sendEvent(&btn, &ev);
+        QVERIFY(btn.isDown());
+
+        ScreenBuffer buf(6, 1);
+        btn.paintEvent(buf);
+        QCOMPARE(buf.backCell(2, 0).ch, U'G');
+        QTRY_VERIFY(!btn.isDown());
+    }
+
     void pushButton_paintDisabledStyle()
     {
         QTuiPushButton btn(QStringLiteral("X"));
