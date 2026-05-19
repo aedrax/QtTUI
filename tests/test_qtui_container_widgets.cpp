@@ -440,6 +440,24 @@ private slots:
         QCOMPARE(child2->isVisible(), true);
     }
 
+    void collapsible_expandedChildrenGetRowsBelowTitle()
+    {
+        QTuiCollapsible col(QStringLiteral("Section"));
+        auto *child1 = new ContainerTestWidget(&col);
+        auto *child2 = new ContainerTestWidget(&col);
+        // Title row + 2 children of 1 row each
+        QCOMPARE(col.minimumSize().height(), 3);
+
+        col.setGeometry(QRect(2, 5, 20, 3));
+        ScreenBuffer buf(30, 10);
+        col.paintEvent(buf);
+
+        QCOMPARE(child1->geometry(), QRect(2, 6, 20, 1));
+        QCOMPARE(child2->geometry(), QRect(2, 7, 20, 1));
+        QCOMPARE(buf.backCell(2, 6).ch, U'X');
+        QCOMPARE(buf.backCell(2, 7).ch, U'X');
+    }
+
     void collapsible_expandCollapseChangesMinimumHeight()
     {
         QTuiCollapsible col(QStringLiteral("Section"));

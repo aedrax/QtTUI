@@ -57,9 +57,15 @@ QSize QTuiCollapsible::minimumSize() const
         int titleWidth = 2 + m_title.length(); // "▶ " or "▼ " prefix
         return QSize(qMax(4, titleWidth), 1);
     }
-    // Expanded: title bar + at least 1 row for content
-    int titleWidth = 2 + m_title.length();
-    return QSize(qMax(4, titleWidth), 2);
+    // Expanded: title bar + the children stacked in rows (at least 1 row)
+    int width = qMax(4, 2 + int(m_title.length()));
+    int contentHeight = 0;
+    for (auto *child : childWidgets()) {
+        const QSize ms = child->minimumSize();
+        width = qMax(width, ms.width());
+        contentHeight += ms.height();
+    }
+    return QSize(width, 1 + qMax(1, contentHeight));
 }
 
 void QTuiCollapsible::paintEvent(ScreenBuffer &buffer)
@@ -122,8 +128,22 @@ void QTuiCollapsible::paintEvent(ScreenBuffer &buffer)
         }
     }
 
-    // Paint visible child widgets
+    // Stack the visible children in rows below the title bar, each at its
+    // minimum height; the last child gets the remaining rows
     const auto children = childWidgets();
+    int y = y0 + 1;
+    const int bottom = y0 + h;
+    for (int i = 0; i < children.size(); ++i) {
+        QTuiWidget *child = children.at(i);
+        if (!child->isVisible())
+            continue;
+        const bool last = (i == children.size() - 1);
+        const int rows = last ? bottom - y
+                              : qMin(child->minimumSize().height(), bottom - y);
+        child->setGeometry(QRect(x0, y, w, qMax(0, rows)));
+        y += qMax(0, rows);
+    }
+
     for (auto *child : children) {
         if (child->isVisible())
             child->paintEvent(buffer);
