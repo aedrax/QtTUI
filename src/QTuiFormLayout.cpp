@@ -128,6 +128,20 @@ void QTuiFormLayout::watchRowWidgets(const FormRow &row)
     }
 }
 
+int QTuiFormLayout::horizontalSpacing() const
+{
+    return m_horizontalSpacing;
+}
+
+void QTuiFormLayout::setHorizontalSpacing(int spacing)
+{
+    spacing = std::max(0, spacing);
+    if (m_horizontalSpacing == spacing)
+        return;
+    m_horizontalSpacing = spacing;
+    invalidate();
+}
+
 QSize QTuiFormLayout::minimumSize() const
 {
     int maxLabelWidth = 0;
@@ -142,7 +156,7 @@ QSize QTuiFormLayout::minimumSize() const
         totalHeight += std::max({1, labelMin.height(), fieldMin.height()});
     }
 
-    return QSize(maxLabelWidth + maxFieldWidth, totalHeight)
+    return QSize(maxLabelWidth + m_horizontalSpacing + maxFieldWidth, totalHeight)
            + QSize(m_marginLeft + m_marginRight, m_marginTop + m_marginBottom);
 }
 
@@ -178,12 +192,13 @@ void QTuiFormLayout::apply(const QRect &availableArea)
 
     // Ensure at least 1 column for fields
     const int totalWidth = rect.width();
-    if (maxLabelWidth >= totalWidth)
-        maxLabelWidth = totalWidth - 1;
+    const int gap = std::min(m_horizontalSpacing, std::max(0, totalWidth - 1));
+    if (maxLabelWidth >= totalWidth - gap)
+        maxLabelWidth = totalWidth - gap - 1;
     if (maxLabelWidth < 0)
         maxLabelWidth = 0;
 
-    const int fieldWidth = totalWidth - maxLabelWidth;
+    const int fieldWidth = totalWidth - maxLabelWidth - gap;
     const int x = rect.x();
     int currentY = rect.y();
 
@@ -197,7 +212,7 @@ void QTuiFormLayout::apply(const QRect &availableArea)
             row.label->setGeometry(QRect(x, currentY, maxLabelWidth, rowHeight));
 
         if (row.field)
-            row.field->setGeometry(QRect(x + maxLabelWidth, currentY, fieldWidth, rowHeight));
+            row.field->setGeometry(QRect(x + maxLabelWidth + gap, currentY, fieldWidth, rowHeight));
 
         currentY += rowHeight;
     }

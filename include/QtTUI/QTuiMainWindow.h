@@ -23,8 +23,8 @@ public:
     void setCentralWidget(QTuiWidget *widget);
     QTuiWidget *centralWidget() const;
 
-    void setLayout(QTuiLayout *layout);
-    QTuiLayout *layout() const;
+    void setLayout(QTuiLayout *layout) override;
+    QTuiLayout *layout() const override;
 
     // Menu bar
     void setMenuBar(QTuiMenuBar *menuBar);

@@ -511,6 +511,40 @@ private slots:
         delete w1;
         delete w2;
     }
+
+    void plainWidgetAppliesItsLayout()
+    {
+        // A plain QTuiWidget is a container: it owns the layout, reports
+        // the layout's minimum size, and lays out on each geometry change
+        QTuiWidget container;
+        auto *a = new LayoutTestWidget(QSize(4, 1), &container);
+        auto *b = new LayoutTestWidget(QSize(4, 2), &container);
+        auto *layout = new QTuiBoxLayout(QTuiBoxLayout::TopToBottom);
+        layout->addWidget(a);
+        layout->addWidget(b);
+        container.setLayout(layout);
+
+        QCOMPARE(container.layout(), layout);
+        QCOMPARE(layout->parent(), &container);
+        QCOMPARE(container.minimumSize(), QSize(4, 3));
+
+        container.setGeometry(QRect(10, 5, 20, 3));
+        QCOMPARE(a->geometry(), QRect(10, 5, 20, 1));
+        QCOMPARE(b->geometry(), QRect(10, 6, 20, 2));
+
+        container.setGeometry(QRect(0, 0, 8, 3));
+        QCOMPARE(b->geometry(), QRect(0, 1, 8, 2));
+    }
+
+    void plainWidgetPaintClearsBackground()
+    {
+        QTuiWidget w;
+        w.setGeometry(QRect(1, 1, 3, 2));
+        ScreenBuffer buf(5, 4);
+        buf.backCell(2, 2).setChar(U'Z');
+        w.paintEvent(buf);
+        QCOMPARE(buf.backCell(2, 2).ch, U' ');
+    }
 };
 
 QTEST_MAIN(TestQTuiLayoutBase)

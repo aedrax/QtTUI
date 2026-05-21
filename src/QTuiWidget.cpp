@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiWidget.h>
+#include <QtTUI/QTuiLayout.h>
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/RenderScheduler.h>
 #include <QtTUI/Theme_Engine.h>
@@ -244,7 +245,39 @@ QList<QTuiWidget *> QTuiWidget::childWidgets() const
 
 QSize QTuiWidget::minimumSize() const
 {
-    return QSize(0, 0);
+    return m_layout ? m_layout->minimumSize() : QSize(0, 0);
+}
+
+void QTuiWidget::paintEvent(ScreenBuffer &buffer)
+{
+    if (!isVisible() || geometry().isEmpty())
+        return;
+    clearBackground(buffer, geometry());
+}
+
+void QTuiWidget::setLayout(QTuiLayout *layout)
+{
+    if (m_layout == layout)
+        return;
+    if (m_layout)
+        disconnect(this, &QTuiWidget::geometryChanged, m_layout, nullptr);
+
+    m_layout = layout;
+    if (!m_layout)
+        return;
+
+    m_layout->setParent(this);
+    connect(this, &QTuiWidget::geometryChanged, m_layout, [this](const QRect &geo) {
+        m_layout->apply(geo);
+    });
+    if (!geometry().isEmpty())
+        m_layout->apply(geometry());
+    markDirty();
+}
+
+QTuiLayout *QTuiWidget::layout() const
+{
+    return m_layout;
 }
 
 ThemeProperties QTuiWidget::themeProperties() const

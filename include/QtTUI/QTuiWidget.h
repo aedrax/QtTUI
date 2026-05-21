@@ -12,6 +12,7 @@
 namespace QtTUI {
 
 struct ThemeProperties;
+class QTuiLayout;
 class ScreenBuffer;
 class TuiKeyEvent;
 class TuiMouseEvent;
@@ -90,8 +91,19 @@ public:
     QTuiWidget *parentWidget() const;
     QList<QTuiWidget *> childWidgets() const;
 
+    // The default minimum size is the layout's minimum size, or 0x0 if the
+    // widget has no layout.
     virtual QSize minimumSize() const;
-    virtual void paintEvent(ScreenBuffer &buffer) = 0;
+
+    // The default paintEvent() clears the background, so a plain QTuiWidget
+    // works as a container. The render pass paints the children.
+    virtual void paintEvent(ScreenBuffer &buffer);
+
+    // The widget takes ownership of the layout and applies it to its
+    // geometry each time the geometry changes. QTuiGroupBox and
+    // QTuiMainWindow apply the layout to their content area instead.
+    virtual void setLayout(QTuiLayout *layout);
+    virtual QTuiLayout *layout() const;
 
     // Clears the widget's geometry with theme background color and space character.
     // Should be called at the start of paintEvent() implementations.
@@ -127,6 +139,7 @@ private:
     bool m_hasFocus = false;
     bool m_isPopup = false;
     bool m_paintedByParent = false;
+    QPointer<QTuiLayout> m_layout;
     Qt::FocusPolicy m_focusPolicy = Qt::NoFocus;
 
     // Widget focused before this popup became visible; restored when it hides

@@ -273,6 +273,19 @@ private slots:
         label.setText(QStringLiteral("Test"));
         QCOMPARE(spy.count(), 1);
     }
+
+    void horizontalSpacingSeparatesColumns()
+    {
+        QTuiFormLayout form;
+        FormTestWidget label(QSize(4, 1)), field(QSize(5, 1));
+        form.addRow(&label, &field);
+        form.setHorizontalSpacing(2);
+        QCOMPARE(form.minimumSize(), QSize(11, 1));
+
+        form.apply(QRect(0, 0, 20, 1));
+        QCOMPARE(label.geometry(), QRect(0, 0, 4, 1));
+        QCOMPARE(field.geometry(), QRect(6, 0, 14, 1));
+    }
 };
 
 QTEST_MAIN(TestQTuiFormLayout)

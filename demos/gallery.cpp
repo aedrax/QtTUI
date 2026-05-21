@@ -23,7 +23,7 @@ public:
             m_layout->setContentsMargins(2, 0, 2, 0);
     }
 
-    QTuiBoxLayout *layout() const { return m_layout; }
+    QTuiBoxLayout *layout() const override { return m_layout; }
 
     void addWidget(QTuiWidget *w, int stretch = 0) { m_layout->addWidget(w, stretch); }
 
@@ -104,18 +104,17 @@ static QTuiLabel *sectionLabel(const QString &className, QTuiWidget *parent)
 
 // ---------------------------------------------------------------------------
 // Row helper: puts widgets side by side at their minimum width, with a
-// one-cell gap between them. A stretch filler takes the remaining width.
+// one-cell gap between them. A stretch takes the remaining width.
 // ---------------------------------------------------------------------------
 static TabPage *row(TabPage *page, const QList<QTuiWidget *> &widgets)
 {
     auto *r = new TabPage(page, QTuiBoxLayout::LeftToRight);
-    for (int i = 0; i < widgets.size(); ++i) {
-        if (i > 0)
-            r->addWidget(new QTuiLabel(QStringLiteral(" "), r));
-        widgets[i]->setParent(r);
-        r->addWidget(widgets[i]);
+    r->layout()->setSpacing(1);
+    for (auto *w : widgets) {
+        w->setParent(r);
+        r->addWidget(w);
     }
-    r->addWidget(new QTuiLabel(QString(), r), 1);
+    r->layout()->addStretch();
     return r;
 }
 
@@ -563,10 +562,10 @@ static QTuiWidget *createLayoutsTab(QTuiWidget *parent, QTuiStatusBar *statusBar
     nameEdit->setText("Ada Lovelace");
     auto *emailEdit = new QTuiLineEdit(formBox);
     emailEdit->setText("ada@example.com");
-    // QTuiFormLayout has no spacing setting, so the labels end with a space
-    form->addRow("Name: ", nameEdit);
-    form->addRow("Email: ", emailEdit);
-    form->addRow("Admin: ", new QTuiCheckBox("Can change settings", formBox));
+    form->setHorizontalSpacing(1);
+    form->addRow("Name:", nameEdit);
+    form->addRow("Email:", emailEdit);
+    form->addRow("Admin:", new QTuiCheckBox("Can change settings", formBox));
     formBox->setLayout(form);
     page->addWidget(formBox);
 

@@ -23,6 +23,10 @@ public:
 
     int rowCount() const;
 
+    // Cells between the label column and the field column (default 0)
+    int horizontalSpacing() const;
+    void setHorizontalSpacing(int spacing);
+
     int count() const override;
     QSize minimumSize() const override;
 
@@ -38,6 +42,7 @@ private:
     void watchRowWidgets(const FormRow &row);
 
     QList<FormRow> m_rows;
+    int m_horizontalSpacing = 0;
 };
 
 } // namespace QtTUI

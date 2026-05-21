@@ -25,8 +25,8 @@ public:
     bool isChecked() const;
     void setChecked(bool checked);
 
-    void setLayout(QTuiLayout *layout);
-    QTuiLayout *layout() const;
+    void setLayout(QTuiLayout *layout) override;
+    QTuiLayout *layout() const override;
 
     QRect contentArea() const;
 

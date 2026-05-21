@@ -352,6 +352,47 @@ private slots:
         delete b;
         delete c;
     }
+
+    void spacingGoesBetweenItems()
+    {
+        QTuiBoxLayout layout(QTuiBoxLayout::LeftToRight);
+        LayoutTestWidget a(QSize(3, 1)), b(QSize(4, 1));
+        layout.addWidget(&a);
+        layout.addWidget(&b);
+        layout.setSpacing(2);
+        QCOMPARE(layout.minimumSize(), QSize(9, 1));
+
+        layout.apply(QRect(0, 0, 20, 1));
+        QCOMPARE(a.geometry(), QRect(0, 0, 3, 1));
+        QCOMPARE(b.geometry(), QRect(5, 0, 4, 1));
+    }
+
+    void addSpacingAddsFixedCells()
+    {
+        QTuiBoxLayout layout(QTuiBoxLayout::TopToBottom);
+        LayoutTestWidget a(QSize(1, 2)), b(QSize(1, 2));
+        layout.addWidget(&a);
+        layout.addSpacing(3);
+        layout.addWidget(&b);
+        QCOMPARE(layout.minimumSize().height(), 7);
+
+        layout.apply(QRect(0, 0, 10, 20));
+        QCOMPARE(b.geometry().y(), 5);
+    }
+
+    void addStretchPushesItemsApart()
+    {
+        // [a][stretch][b]: b goes to the far end, a keeps its minimum
+        QTuiBoxLayout layout(QTuiBoxLayout::LeftToRight);
+        LayoutTestWidget a(QSize(3, 1)), b(QSize(4, 1));
+        layout.addWidget(&a);
+        layout.addStretch();
+        layout.addWidget(&b);
+
+        layout.apply(QRect(0, 0, 20, 1));
+        QCOMPARE(a.geometry(), QRect(0, 0, 3, 1));
+        QCOMPARE(b.geometry(), QRect(16, 0, 4, 1));
+    }
 };
 
 QTEST_MAIN(TestQTuiBoxLayout)

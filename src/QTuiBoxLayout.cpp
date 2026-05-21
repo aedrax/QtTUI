@@ -99,9 +99,46 @@ const QList<QTuiBoxLayout::Item> &QTuiBoxLayout::items() const
 // A widget participates in measurement/distribution unless the USER hid it.
 // Widgets this layout hid itself (overflow) remain candidates so they can be
 // re-shown when space returns.
-bool QTuiBoxLayout::participatesInLayout(QTuiWidget *widget) const
+bool QTuiBoxLayout::participatesInLayout(const Item &item) const
 {
-    return widget && (widget->isVisible() || m_layoutHidden.contains(widget));
+    if (!item.widget)
+        return true; // spacing or stretch
+    return item.widget->isVisible() || m_layoutHidden.contains(item.widget);
+}
+
+int QTuiBoxLayout::itemMinimum(const Item &item, bool vertical) const
+{
+    if (!item.widget)
+        return item.spacerSize;
+    const QSize minSz = item.widget->minimumSize();
+    return vertical ? minSz.height() : minSz.width();
+}
+
+void QTuiBoxLayout::addSpacing(int size)
+{
+    m_boxItems.append({nullptr, 0, qMax(0, size)});
+    invalidate();
+}
+
+void QTuiBoxLayout::addStretch(int stretch)
+{
+    // A stretch of 0 still takes free space, as in Qt
+    m_boxItems.append({nullptr, qMax(1, stretch), 0});
+    invalidate();
+}
+
+int QTuiBoxLayout::spacing() const
+{
+    return m_spacing;
+}
+
+void QTuiBoxLayout::setSpacing(int spacing)
+{
+    spacing = qMax(0, spacing);
+    if (m_spacing == spacing)
+        return;
+    m_spacing = spacing;
+    invalidate();
 }
 
 QSize QTuiBoxLayout::minimumSize() const
@@ -109,18 +146,19 @@ QSize QTuiBoxLayout::minimumSize() const
     const bool vertical = (m_direction == TopToBottom);
     int along = 0;
     int across = 0;
+    int counted = 0;
     for (const auto &item : m_boxItems) {
-        if (!participatesInLayout(item.widget))
+        if (!participatesInLayout(item))
             continue;
-        const QSize minSz = item.widget->minimumSize();
-        if (vertical) {
-            along += minSz.height();
-            across = std::max(across, minSz.width());
-        } else {
-            along += minSz.width();
-            across = std::max(across, minSz.height());
+        along += itemMinimum(item, vertical);
+        if (item.widget) {
+            const QSize minSz = item.widget->minimumSize();
+            across = std::max(across, vertical ? minSz.width() : minSz.height());
         }
+        ++counted;
     }
+    if (counted > 1)
+        along += m_spacing * (counted - 1);
     const QSize content = vertical ? QSize(across, along) : QSize(along, across);
     return content + QSize(m_marginLeft + m_marginRight,
                            m_marginTop + m_marginBottom);
@@ -136,8 +174,12 @@ void QTuiBoxLayout::apply(const QRect &availableArea)
     // Eligibility: user-hidden widgets are skipped entirely — no space, no
     // geometry, and they must never be force-shown by the layout.
     QVector<bool> eligible(m_boxItems.size());
-    for (int i = 0; i < m_boxItems.size(); ++i)
-        eligible[i] = participatesInLayout(m_boxItems[i].widget);
+    int eligibleCount = 0;
+    for (int i = 0; i < m_boxItems.size(); ++i) {
+        eligible[i] = participatesInLayout(m_boxItems[i]);
+        if (eligible[i])
+            ++eligibleCount;
+    }
 
     // Subtract margins (using inherited margin members from QTuiLayout)
     const int contentX = availableArea.x() + m_marginLeft;
@@ -147,42 +189,31 @@ void QTuiBoxLayout::apply(const QRect &availableArea)
 
     const bool vertical = (m_direction == TopToBottom);
     const int totalSpace = vertical ? contentH : contentW;
+    const int totalSpacing = eligibleCount > 1 ? m_spacing * (eligibleCount - 1) : 0;
 
-    // Phase 1: Allocate minimum sizes for stretch=0 widgets, compute stretch totals
+    // Phase 1: stretch=0 items get their minimum size and are locked;
+    // ineligible items get nothing
+    QVector<int> allocations(m_boxItems.size(), 0);
+    QVector<bool> locked(m_boxItems.size(), false);
     int fixedSpace = 0;
     int totalStretch = 0;
 
     for (int i = 0; i < m_boxItems.size(); ++i) {
-        if (!eligible[i])
-            continue;
-        if (m_boxItems[i].stretch == 0) {
-            const QSize minSz = m_boxItems[i].widget->minimumSize();
-            fixedSpace += vertical ? minSz.height() : minSz.width();
+        if (!eligible[i]) {
+            locked[i] = true;
+        } else if (m_boxItems[i].stretch == 0) {
+            allocations[i] = itemMinimum(m_boxItems[i], vertical);
+            fixedSpace += allocations[i];
+            locked[i] = true;
         } else {
             totalStretch += m_boxItems[i].stretch;
         }
     }
 
-    int flexSpace = std::max(0, totalSpace - fixedSpace);
+    int flexSpace = std::max(0, totalSpace - fixedSpace - totalSpacing);
 
-    // Phase 2: Check if any stretch widget needs more than its proportional share
-    // due to minimum size constraints. If so, give it the minimum and reduce flex space.
-    // We iterate until stable.
-    QVector<int> allocations(m_boxItems.size(), 0);
-    QVector<bool> locked(m_boxItems.size(), false);
-
-    // Initial allocation for stretch=0 widgets; ineligible widgets get nothing
-    for (int i = 0; i < m_boxItems.size(); ++i) {
-        if (!eligible[i]) {
-            locked[i] = true;
-        } else if (m_boxItems[i].stretch == 0) {
-            const QSize minSz = m_boxItems[i].widget->minimumSize();
-            allocations[i] = vertical ? minSz.height() : minSz.width();
-            locked[i] = true;
-        }
-    }
-
-    // Iteratively resolve minimum size constraints for stretch widgets
+    // Phase 2: a stretch item whose proportional share is below its minimum
+    // gets the minimum instead; iterate until stable
     bool changed = true;
     while (changed) {
         changed = false;
@@ -190,16 +221,12 @@ void QTuiBoxLayout::apply(const QRect &availableArea)
             if (locked[i])
                 continue;
 
-            const QSize minSz = m_boxItems[i].widget->minimumSize();
-            const int minDim = vertical ? minSz.height() : minSz.width();
-
-            // Proportional allocation
+            const int minDim = itemMinimum(m_boxItems[i], vertical);
             int proportional = 0;
             if (totalStretch > 0)
                 proportional = (flexSpace * m_boxItems[i].stretch) / totalStretch;
 
             if (proportional < minDim) {
-                // Lock this widget at its minimum size
                 allocations[i] = minDim;
                 locked[i] = true;
                 flexSpace = std::max(0, flexSpace - minDim);
@@ -209,7 +236,7 @@ void QTuiBoxLayout::apply(const QRect &availableArea)
         }
     }
 
-    // Phase 3: Distribute remaining flex space proportionally among unlocked stretch widgets
+    // Phase 3: distribute the remaining flex space among unlocked items
     if (totalStretch > 0) {
         int distributed = 0;
         int lastUnlocked = -1;
@@ -223,7 +250,7 @@ void QTuiBoxLayout::apply(const QRect &availableArea)
                 continue;
 
             if (i == lastUnlocked) {
-                // Last unlocked widget gets the remainder to avoid rounding gaps
+                // Last unlocked item gets the remainder to avoid rounding gaps
                 allocations[i] = flexSpace - distributed;
             } else {
                 allocations[i] = (flexSpace * m_boxItems[i].stretch) / totalStretch;
@@ -232,23 +259,31 @@ void QTuiBoxLayout::apply(const QRect &availableArea)
         }
     }
 
-    // Phase 4: Check if total exceeds available space; hide overflow widgets
-    int totalAllocated = 0;
-    for (int i = 0; i < m_boxItems.size(); ++i)
-        totalAllocated += allocations[i];
-
-    // Phase 5: Assign geometries
+    // Phase 4: assign geometries; hide widgets that do not fit
     int pos = vertical ? contentY : contentX;
     int consumed = 0;
+    int placed = 0;
 
     for (int i = 0; i < m_boxItems.size(); ++i) {
-        QTuiWidget *widget = m_boxItems[i].widget;
-
         // User-hidden widget: leave it alone (no geometry, never force-shown)
         if (!eligible[i])
             continue;
 
+        if (placed > 0) {
+            pos += m_spacing;
+            consumed += m_spacing;
+        }
+        ++placed;
+
         int alloc = allocations[i];
+        QTuiWidget *widget = m_boxItems[i].widget;
+
+        // Spacing or stretch: only advances the position
+        if (!widget) {
+            pos += alloc;
+            consumed += alloc;
+            continue;
+        }
 
         // If this widget would exceed available space, hide it (and remember
         // that WE hid it, so it stays a candidate for when space returns)
