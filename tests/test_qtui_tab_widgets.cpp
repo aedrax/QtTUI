@@ -263,6 +263,38 @@ private slots:
         QCOMPARE(tw.minimumSize().height(), 3);
     }
 
+    void tabBar_scrollsToShowCurrentTab()
+    {
+        // "Alpha | Bravo | Charlie" is 23 columns; the bar is 12 wide
+        QTuiTabBar bar;
+        bar.addTab(QStringLiteral("Alpha"));
+        bar.addTab(QStringLiteral("Bravo"));
+        bar.addTab(QStringLiteral("Charlie"));
+        bar.setGeometry(QRect(0, 0, 12, 1));
+
+        auto rowText = [&bar]() {
+            ScreenBuffer buf(12, 1);
+            bar.paintEvent(buf);
+            QString text;
+            for (int col = 0; col < 12; ++col)
+                text += QChar(char16_t(buf.backCell(col, 0).ch));
+            return text;
+        };
+
+        bar.setCurrentIndex(0);
+        QCOMPARE(rowText(), QStringLiteral("Alpha | Bra›"));
+
+        bar.setCurrentIndex(2);
+        const QString row = rowText();
+        QVERIFY(row.startsWith(QChar(0x2039)));
+        QVERIFY(row.contains(QStringLiteral("Charlie")));
+
+        // A click on the left indicator moves to the previous tab
+        TuiMouseEvent click(TuiMouseEvent::Press, Qt::LeftButton, QPoint(0, 0));
+        QCoreApplication::sendEvent(&bar, &click);
+        QCOMPARE(bar.currentIndex(), 1);
+    }
+
     void tabBar_paintEvent()
     {
         QTuiTabBar bar;

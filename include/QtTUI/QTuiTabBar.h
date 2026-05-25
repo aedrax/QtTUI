@@ -38,6 +38,13 @@ protected:
     void mousePressEvent(TuiMouseEvent *event) override;
 
 private:
+    // The full tab row "Tab1 | Tab2 | Tab3", with the start column and
+    // length of each tab label in it
+    QString tabLine(QList<QPair<int, int>> *ranges) const;
+    // First column of the tab row that shows at the left edge. If the row
+    // is wider than the bar, the offset keeps the current tab visible.
+    int scrollOffset(const QList<QPair<int, int>> &ranges, int lineLength, int width) const;
+
     QStringList m_tabs;
     int m_currentIndex = -1;
     TabPosition m_tabPosition = North;

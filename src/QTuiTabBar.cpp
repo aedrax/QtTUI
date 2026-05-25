@@ -109,6 +109,34 @@ QSize QTuiTabBar::minimumSize() const
     return QSize(qMax(1, totalWidth), 1);
 }
 
+QString QTuiTabBar::tabLine(QList<QPair<int, int>> *ranges) const
+{
+    QString line;
+    for (int i = 0; i < m_tabs.size(); ++i) {
+        if (i > 0)
+            line += QStringLiteral(" | ");
+        ranges->append({int(line.length()), int(m_tabs.at(i).length())});
+        line += m_tabs.at(i);
+    }
+    return line;
+}
+
+int QTuiTabBar::scrollOffset(const QList<QPair<int, int>> &ranges, int lineLength, int width) const
+{
+    if (lineLength <= width || m_currentIndex < 0 || m_currentIndex >= ranges.size())
+        return 0;
+
+    // Keep 1 column at each edge free for the scroll indicators
+    const int tabStart = ranges.at(m_currentIndex).first;
+    const int tabEnd = tabStart + ranges.at(m_currentIndex).second;
+    int offset = 0;
+    if (tabEnd > width - 1)
+        offset = tabEnd - (width - 1);
+    if (offset > 0 && tabStart < offset + 1)
+        offset = qMax(0, tabStart - 1);
+    return qMin(offset, qMax(0, lineLength - width));
+}
+
 void QTuiTabBar::paintEvent(ScreenBuffer &buffer)
 {
     const QRect geo = geometry();
@@ -125,18 +153,11 @@ void QTuiTabBar::paintEvent(ScreenBuffer &buffer)
     const int y0 = geo.y();
     const int w = geo.width();
 
-    // Build the tab label string and track positions of each tab
-    // Format: "Tab1 | Tab2 | Tab3"
-    QString line;
-    QList<QPair<int, int>> tabRanges; // start, length for each tab
-
-    for (int i = 0; i < m_tabs.size(); ++i) {
-        if (i > 0)
-            line += QStringLiteral(" | ");
-        int start = line.length();
-        line += m_tabs.at(i);
-        tabRanges.append({start, m_tabs.at(i).length()});
-    }
+    QList<QPair<int, int>> tabRanges;
+    const QString line = tabLine(&tabRanges);
+    const int offset = scrollOffset(tabRanges, line.length(), w);
+    const bool moreLeft = offset > 0;
+    const bool moreRight = line.length() - offset > w;
 
     // Render the row
     for (int col = 0; col < w; ++col) {
@@ -145,9 +166,14 @@ void QTuiTabBar::paintEvent(ScreenBuffer &buffer)
             continue;
 
         Cell &cell = buffer.backCell(px, y0);
+        const int lineCol = col + offset;
 
-        if (col < line.length())
-            cell.setChar(line.at(col).unicode());
+        if (col == 0 && moreLeft)
+            cell.setChar(U'‹'); // single left angle quotation mark
+        else if (col == w - 1 && moreRight)
+            cell.setChar(U'›'); // single right angle quotation mark
+        else if (lineCol < line.length())
+            cell.setChar(line.at(lineCol).unicode());
         else
             cell.setChar(U' ');
 
@@ -156,7 +182,7 @@ void QTuiTabBar::paintEvent(ScreenBuffer &buffer)
         if (m_currentIndex >= 0 && m_currentIndex < tabRanges.size()) {
             int tabStart = tabRanges.at(m_currentIndex).first;
             int tabLen = tabRanges.at(m_currentIndex).second;
-            if (col >= tabStart && col < tabStart + tabLen)
+            if (lineCol >= tabStart && lineCol < tabStart + tabLen)
                 isCurrentTab = true;
         }
 
@@ -209,19 +235,29 @@ void QTuiTabBar::mousePressEvent(TuiMouseEvent *event)
         return;
 
     const QRect geo = geometry();
-    // Convert click position to column offset within the tab bar
-    int col = event->x() - geo.x();
+    QList<QPair<int, int>> tabRanges;
+    const QString line = tabLine(&tabRanges);
+    const int offset = scrollOffset(tabRanges, line.length(), geo.width());
+    const int col = event->x() - geo.x();
 
-    // Walk through tabs using the same layout as paintEvent:
-    // "Tab1 | Tab2 | Tab3" — each separator is " | " (3 chars)
-    int offset = 0;
-    for (int i = 0; i < m_tabs.size(); ++i) {
-        int tabLen = m_tabs.at(i).length();
-        if (col >= offset && col < offset + tabLen) {
+    // A click on a scroll indicator moves to the previous or next tab
+    if (offset > 0 && col == 0) {
+        setCurrentIndex(qMax(0, m_currentIndex - 1));
+        return;
+    }
+    if (line.length() - offset > geo.width() && col == geo.width() - 1) {
+        setCurrentIndex(qMin(int(m_tabs.size()) - 1, m_currentIndex + 1));
+        return;
+    }
+
+    // Convert click position to a column in the full tab row
+    const int lineCol = col + offset;
+    for (int i = 0; i < tabRanges.size(); ++i) {
+        if (lineCol >= tabRanges.at(i).first
+            && lineCol < tabRanges.at(i).first + tabRanges.at(i).second) {
             setCurrentIndex(i);
             return;
         }
-        offset += tabLen + 3; // tab text + " | "
     }
 }
 

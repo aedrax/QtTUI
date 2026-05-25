@@ -731,14 +731,14 @@ int main(int argc, char *argv[])
     auto *tabs = new QTuiTabWidget(&window);
     tabs->addTab(createButtonsTab(&window, statusBar),         "Buttons");
     tabs->addTab(createTextInputTab(&window, statusBar),       "Text");
-    tabs->addTab(createNumericInputTab(&window, statusBar),    "Number");
-    tabs->addTab(createSelectionTab(&window, statusBar),       "Select");
-    tabs->addTab(createModelViewTab(&window, statusBar),       "Views");
-    tabs->addTab(createContainersTab(&window, statusBar),      "Boxes");
+    tabs->addTab(createNumericInputTab(&window, statusBar),    "Numeric");
+    tabs->addTab(createSelectionTab(&window, statusBar),       "Selection");
+    tabs->addTab(createModelViewTab(&window, statusBar),       "Model/View");
+    tabs->addTab(createContainersTab(&window, statusBar),      "Containers");
     tabs->addTab(createPanesTab(&window),                      "Panes");
-    tabs->addTab(createLayoutsTab(&window, statusBar),         "Layout");
-    tabs->addTab(createMainWindowPartsTab(&window, statusBar), "Bars");
-    tabs->addTab(createSpecializedTab(&window, statusBar),     "Misc");
+    tabs->addTab(createLayoutsTab(&window, statusBar),         "Layouts");
+    tabs->addTab(createMainWindowPartsTab(&window, statusBar), "Main Window");
+    tabs->addTab(createSpecializedTab(&window, statusBar),     "Specialized");
 
     // Show the key hints again when the user switches tabs
     QObject::connect(tabs, &QTuiTabWidget::currentChanged, [statusBar, keyHints](int) {
