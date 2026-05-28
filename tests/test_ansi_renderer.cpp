@@ -568,6 +568,78 @@ private slots:
         const QByteArray reset = AnsiRenderer::resetAttributes();
         QVERIFY(out.endsWith(QByteArray(" ") + reset));
     }
+
+    void colorMode_palette256()
+    {
+        AnsiRenderer::setColorMode(AnsiRenderer::Palette256);
+        Cell cell;
+        cell.foreground = Color(255, 0, 0);    // cube red = 196
+        cell.background = Color(128, 128, 128); // gray ramp = 244
+        const QByteArray seq = AnsiRenderer::sgrSequence(cell);
+        AnsiRenderer::setColorMode(AnsiRenderer::TrueColor);
+        QVERIFY2(seq.contains(";38;5;196"), seq.constData());
+        QVERIFY2(seq.contains(";48;5;244"), seq.constData());
+        QVERIFY(!seq.contains("38;2"));
+    }
+
+    void colorMode_palette16()
+    {
+        AnsiRenderer::setColorMode(AnsiRenderer::Palette16);
+        Cell cell;
+        cell.foreground = Color(255, 255, 255); // bright white = 97
+        cell.background = Color(0, 0, 230);     // blue = 44
+        const QByteArray seq = AnsiRenderer::sgrSequence(cell);
+        AnsiRenderer::setColorMode(AnsiRenderer::TrueColor);
+        QVERIFY2(seq.contains(";97"), seq.constData());
+        QVERIFY2(seq.contains(";44"), seq.constData());
+    }
+
+    void colorMode_noColorUsesReverseForLightBackground()
+    {
+        AnsiRenderer::setColorMode(AnsiRenderer::NoColor);
+        Cell normal;
+        normal.foreground = Color(200, 200, 200);
+        normal.background = Color(20, 20, 20);
+        Cell focused;
+        focused.foreground = Color(20, 20, 20);
+        focused.background = Color(122, 162, 247);
+        const QByteArray normalSeq = AnsiRenderer::sgrSequence(normal);
+        const QByteArray focusedSeq = AnsiRenderer::sgrSequence(focused);
+        AnsiRenderer::setColorMode(AnsiRenderer::TrueColor);
+        QCOMPARE(normalSeq, QByteArray("\x1b[0m"));
+        QCOMPARE(focusedSeq, QByteArray("\x1b[0;7m"));
+    }
+
+    void detectColorMode_environment()
+    {
+        const QByteArray saved[4] = {qgetenv("QTTUI_COLOR"), qgetenv("NO_COLOR"),
+                                     qgetenv("COLORTERM"), qgetenv("TERM")};
+        qunsetenv("QTTUI_COLOR");
+        qunsetenv("NO_COLOR");
+        qunsetenv("COLORTERM");
+
+        qputenv("TERM", "xterm-256color");
+        QCOMPARE(AnsiRenderer::detectColorMode(), AnsiRenderer::Palette256);
+        qputenv("COLORTERM", "truecolor");
+        QCOMPARE(AnsiRenderer::detectColorMode(), AnsiRenderer::TrueColor);
+        qputenv("NO_COLOR", "1");
+        QCOMPARE(AnsiRenderer::detectColorMode(), AnsiRenderer::NoColor);
+        qputenv("QTTUI_COLOR", "16");
+        QCOMPARE(AnsiRenderer::detectColorMode(), AnsiRenderer::Palette16);
+        qunsetenv("QTTUI_COLOR");
+        qunsetenv("NO_COLOR");
+        qunsetenv("COLORTERM");
+        qputenv("TERM", "xterm");
+        QCOMPARE(AnsiRenderer::detectColorMode(), AnsiRenderer::Palette16);
+
+        const char *names[4] = {"QTTUI_COLOR", "NO_COLOR", "COLORTERM", "TERM"};
+        for (int i = 0; i < 4; ++i) {
+            if (saved[i].isNull())
+                qunsetenv(names[i]);
+            else
+                qputenv(names[i], saved[i]);
+        }
+    }
 };
 
 QTEST_MAIN(TestAnsiRenderer)

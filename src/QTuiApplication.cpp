@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiApplication.h>
+#include <QtTUI/AnsiRenderer.h>
 #include <QtTUI/QTuiMainWindow.h>
 #include <QtTUI/RenderScheduler.h>
 
@@ -96,6 +97,10 @@ QTuiApplication::QTuiApplication(int &argc, char **argv)
     : QCoreApplication(argc, argv)
 {
     s_instance = this;
+
+    // Pick the color depth from the environment. The application can call
+    // AnsiRenderer::setColorMode() after this to override it.
+    AnsiRenderer::setColorMode(AnsiRenderer::detectColorMode());
 
     // Create subsystems. The QObject-based ones are parented to this
     // application object and deleted through QObject ownership.

@@ -1,4 +1,5 @@
 #include <QtTUI/AnsiRenderer.h>
+#include <climits>
 #include <QDebug>
 #include <algorithm>
 
@@ -148,6 +149,125 @@ QByteArray AnsiRenderer::render(const ScreenBuffer &buffer)
     return output;
 }
 
+static AnsiRenderer::ColorMode s_colorMode = AnsiRenderer::TrueColor;
+
+AnsiRenderer::ColorMode AnsiRenderer::colorMode()
+{
+    return s_colorMode;
+}
+
+void AnsiRenderer::setColorMode(ColorMode mode)
+{
+    s_colorMode = mode;
+}
+
+AnsiRenderer::ColorMode AnsiRenderer::detectColorMode()
+{
+    const QByteArray forced = qgetenv("QTTUI_COLOR").toLower();
+    if (forced == "truecolor" || forced == "24bit")
+        return TrueColor;
+    if (forced == "256")
+        return Palette256;
+    if (forced == "16")
+        return Palette16;
+    if (forced == "none")
+        return NoColor;
+
+    // https://no-color.org: a non-empty NO_COLOR disables color
+    if (!qgetenv("NO_COLOR").isEmpty())
+        return NoColor;
+
+    const QByteArray colorTerm = qgetenv("COLORTERM").toLower();
+    if (colorTerm == "truecolor" || colorTerm == "24bit")
+        return TrueColor;
+
+    const QByteArray term = qgetenv("TERM");
+    if (term == "dumb")
+        return NoColor;
+    if (term.contains("256color"))
+        return Palette256;
+    return Palette16;
+}
+
+// Nearest index in the xterm 256-color palette: the 6x6x6 cube (16-231)
+// or the gray ramp (232-255), whichever is closer
+static int nearestPalette256(const Color &c)
+{
+    static const int levels[6] = {0, 95, 135, 175, 215, 255};
+    auto cubeIndex = [](int v) {
+        return v < 48 ? 0 : v < 115 ? 1 : (v - 35) / 40;
+    };
+    const int ri = cubeIndex(c.r), gi = cubeIndex(c.g), bi = cubeIndex(c.b);
+    const int cubeDist = (c.r - levels[ri]) * (c.r - levels[ri])
+        + (c.g - levels[gi]) * (c.g - levels[gi])
+        + (c.b - levels[bi]) * (c.b - levels[bi]);
+
+    const int avg = (c.r + c.g + c.b) / 3;
+    const int grayIndex = avg > 238 ? 23 : qMax(0, (avg - 3) / 10);
+    const int gray = 8 + grayIndex * 10;
+    const int grayDist = (c.r - gray) * (c.r - gray) + (c.g - gray) * (c.g - gray)
+        + (c.b - gray) * (c.b - gray);
+
+    if (grayDist < cubeDist)
+        return 232 + grayIndex;
+    return 16 + 36 * ri + 6 * gi + bi;
+}
+
+// Nearest of the 16 ANSI colors (xterm default values). Returns 0-15.
+static int nearestPalette16(const Color &c)
+{
+    static const int ansi[16][3] = {
+        {0, 0, 0}, {205, 0, 0}, {0, 205, 0}, {205, 205, 0},
+        {0, 0, 238}, {205, 0, 205}, {0, 205, 205}, {229, 229, 229},
+        {127, 127, 127}, {255, 0, 0}, {0, 255, 0}, {255, 255, 0},
+        {92, 92, 255}, {255, 0, 255}, {0, 255, 255}, {255, 255, 255}};
+    int best = 0;
+    int bestDist = INT_MAX;
+    for (int i = 0; i < 16; ++i) {
+        const int dr = c.r - ansi[i][0], dg = c.g - ansi[i][1], db = c.b - ansi[i][2];
+        const int dist = dr * dr + dg * dg + db * db;
+        if (dist < bestDist) {
+            bestDist = dist;
+            best = i;
+        }
+    }
+    return best;
+}
+
+static int luminance(const Color &c)
+{
+    return 299 * c.r + 587 * c.g + 114 * c.b;
+}
+
+// Appends ";38;..." (foreground) or ";48;..." (background) for the mode
+static void appendColor(QByteArray &seq, const Color &c, bool background)
+{
+    switch (s_colorMode) {
+    case AnsiRenderer::TrueColor:
+        seq.append(background ? ";48;2;" : ";38;2;");
+        seq.append(QByteArray::number(c.r));
+        seq.append(';');
+        seq.append(QByteArray::number(c.g));
+        seq.append(';');
+        seq.append(QByteArray::number(c.b));
+        break;
+    case AnsiRenderer::Palette256:
+        seq.append(background ? ";48;5;" : ";38;5;");
+        seq.append(QByteArray::number(nearestPalette256(c)));
+        break;
+    case AnsiRenderer::Palette16: {
+        // 30-37 / 90-97 foreground, 40-47 / 100-107 background
+        const int index = nearestPalette16(c);
+        const int base = (index < 8 ? 30 : 90) + (background ? 10 : 0);
+        seq.append(';');
+        seq.append(QByteArray::number(base + index % 8));
+        break;
+    }
+    case AnsiRenderer::NoColor:
+        break;
+    }
+}
+
 QByteArray AnsiRenderer::sgrSequence(const Cell &cell)
 {
     QByteArray seq;
@@ -164,24 +284,15 @@ QByteArray AnsiRenderer::sgrSequence(const Cell &cell)
         seq.append(";4");
     if (cell.strikethrough)
         seq.append(";9");
-    if (cell.inverse)
+    // Without color, a cell with a background lighter than its foreground
+    // (focus, selection, a pressed button) uses reverse video instead
+    const bool lightBackground = s_colorMode == NoColor
+        && luminance(cell.background) > luminance(cell.foreground);
+    if (cell.inverse != lightBackground)
         seq.append(";7");
 
-    // Foreground: 24-bit TrueColor \e[38;2;R;G;Bm
-    seq.append(";38;2;");
-    seq.append(QByteArray::number(cell.foreground.r));
-    seq.append(';');
-    seq.append(QByteArray::number(cell.foreground.g));
-    seq.append(';');
-    seq.append(QByteArray::number(cell.foreground.b));
-
-    // Background: 24-bit TrueColor \e[48;2;R;G;Bm
-    seq.append(";48;2;");
-    seq.append(QByteArray::number(cell.background.r));
-    seq.append(';');
-    seq.append(QByteArray::number(cell.background.g));
-    seq.append(';');
-    seq.append(QByteArray::number(cell.background.b));
+    appendColor(seq, cell.foreground, false);
+    appendColor(seq, cell.background, true);
 
     seq.append('m');
 
