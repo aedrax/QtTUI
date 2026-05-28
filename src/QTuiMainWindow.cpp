@@ -333,6 +333,14 @@ bool QTuiMainWindow::dispatchShortcut(TuiKeyEvent *event)
     return false;
 }
 
+void QTuiMainWindow::pasteEvent(TuiPasteEvent *event)
+{
+    // Pasted text goes to the focused widget, as typed keys do
+    QTuiWidget *focused = findFocusedWidget(this);
+    if (focused && focused != this)
+        QCoreApplication::sendEvent(focused, event);
+}
+
 void QTuiMainWindow::keyPressEvent(TuiKeyEvent *event)
 {
     if (dispatchShortcut(event))

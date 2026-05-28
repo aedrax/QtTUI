@@ -225,7 +225,8 @@ bool QTuiApplication::event(QEvent *event)
     if (m_mainWindow) {
         if (event->type() == TuiEventTypes::keyEventType()
             || event->type() == TuiEventTypes::mouseEventType()
-            || event->type() == TuiEventTypes::resizeEventType()) {
+            || event->type() == TuiEventTypes::resizeEventType()
+            || event->type() == TuiEventTypes::pasteEventType()) {
             return QCoreApplication::sendEvent(m_mainWindow, event);
         }
     }

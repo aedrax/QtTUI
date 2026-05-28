@@ -138,6 +138,27 @@ void QTuiLineEdit::keyPressEvent(TuiKeyEvent *event)
     markDirty();
 }
 
+void QTuiLineEdit::pasteEvent(TuiPasteEvent *event)
+{
+    // One line only: a line break or tab becomes a space, and other
+    // control characters are removed. A paste never emits returnPressed().
+    QString text;
+    for (const QChar ch : event->text()) {
+        if (ch == QLatin1Char('\n') || ch == QLatin1Char('\t'))
+            text += QLatin1Char(' ');
+        else if (!ch.isNull() && ch.category() != QChar::Other_Control)
+            text += ch;
+    }
+    if (text.isEmpty())
+        return;
+
+    m_text.insert(m_cursorPos, text);
+    m_cursorPos += text.length();
+    emit textChanged(m_text);
+    adjustScrollToCursor();
+    markDirty();
+}
+
 void QTuiLineEdit::mousePressEvent(TuiMouseEvent *event)
 {
     if (event->mouseType() != TuiMouseEvent::Press)

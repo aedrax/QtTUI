@@ -343,6 +343,20 @@ private slots:
         QCOMPARE(le.text(), QStringLiteral("a"));
         QCOMPARE(le.cursorPosition(), 1);
     }
+
+    void pasteInsertsOneLineWithoutReturnPressed()
+    {
+        QTuiLineEdit le;
+        le.setText(QStringLiteral("ab"));
+        QSignalSpy returnSpy(&le, &QTuiLineEdit::returnPressed);
+
+        TuiPasteEvent paste(QStringLiteral("x\ny\tz\n"));
+        QCoreApplication::sendEvent(&le, &paste);
+
+        QCOMPARE(le.text(), QStringLiteral("abx y z "));
+        QCOMPARE(le.cursorPosition(), 8);
+        QCOMPARE(returnSpy.count(), 0);
+    }
 };
 
 QTEST_MAIN(TestQTuiLineEdit)

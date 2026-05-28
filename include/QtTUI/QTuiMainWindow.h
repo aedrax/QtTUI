@@ -50,6 +50,7 @@ public:
 protected:
     void resizeEvent(TuiResizeEvent *event) override;
     void keyPressEvent(TuiKeyEvent *event) override;
+    void pasteEvent(TuiPasteEvent *event) override;
     void mousePressEvent(TuiMouseEvent *event) override;
 
 private:

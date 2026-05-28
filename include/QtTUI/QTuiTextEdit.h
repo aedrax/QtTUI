@@ -38,6 +38,7 @@ signals:
 protected:
     void keyPressEvent(TuiKeyEvent *event) override;
     void mousePressEvent(TuiMouseEvent *event) override;
+    void pasteEvent(TuiPasteEvent *event) override;
 
 private:
     void insertText(const QString &text);

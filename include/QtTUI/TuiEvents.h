@@ -16,6 +16,7 @@ public:
     static QEvent::Type keyEventType();
     static QEvent::Type mouseEventType();
     static QEvent::Type resizeEventType();
+    static QEvent::Type pasteEventType();
 };
 
 // Lightweight key event for TUI (no Qt::Gui dependency)
@@ -88,6 +89,23 @@ public:
 private:
     QSize m_size;
     QSize m_oldSize;
+};
+
+// Text pasted into the terminal, received as one block through bracketed
+// paste mode. Line endings are "\n". A pasted newline is text, not an
+// Enter key, so a paste cannot submit or activate anything.
+class TuiPasteEvent : public QEvent {
+public:
+    explicit TuiPasteEvent(const QString &text)
+        : QEvent(TuiEventTypes::pasteEventType())
+        , m_text(text)
+    {
+    }
+
+    QString text() const { return m_text; }
+
+private:
+    QString m_text;
 };
 
 } // namespace QtTUI

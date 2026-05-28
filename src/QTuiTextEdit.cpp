@@ -134,6 +134,37 @@ void QTuiTextEdit::insertText(const QString &text)
     emit textChanged();
 }
 
+void QTuiTextEdit::pasteEvent(TuiPasteEvent *event)
+{
+    if (m_readOnly)
+        return;
+
+    // Keep line breaks and tabs; remove other control characters
+    QString text;
+    for (const QChar ch : event->text()) {
+        if (ch == QLatin1Char('\n') || ch == QLatin1Char('\t')
+            || (!ch.isNull() && ch.category() != QChar::Other_Control))
+            text += ch;
+    }
+    if (text.isEmpty())
+        return;
+
+    if (hasSelection())
+        deleteSelection(); // a paste replaces the selection
+    else
+        clearSelection();
+
+    const QStringList lines = text.split(QLatin1Char('\n'));
+    for (int i = 0; i < lines.size(); ++i) {
+        if (i > 0)
+            insertNewLine();
+        insertText(lines.at(i));
+    }
+    m_desiredCol = QtTuiUnicode::columnOfIndex(m_lines.at(m_cursorRow), m_cursorCol);
+    scrollToVisible();
+    markDirty();
+}
+
 void QTuiTextEdit::insertNewLine()
 {
     if (m_readOnly)

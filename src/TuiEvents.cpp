@@ -20,4 +20,10 @@ QEvent::Type TuiEventTypes::resizeEventType()
     return type;
 }
 
+QEvent::Type TuiEventTypes::pasteEventType()
+{
+    static const QEvent::Type type = static_cast<QEvent::Type>(QEvent::registerEventType());
+    return type;
+}
+
 } // namespace QtTUI

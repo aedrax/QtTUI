@@ -17,6 +17,7 @@ class ScreenBuffer;
 class TuiKeyEvent;
 class TuiMouseEvent;
 class TuiResizeEvent;
+class TuiPasteEvent;
 
 class QTuiWidget : public QObject {
     Q_OBJECT
@@ -128,6 +129,8 @@ protected:
     virtual void keyPressEvent(TuiKeyEvent *event);
     virtual void mousePressEvent(TuiMouseEvent *event);
     virtual void resizeEvent(TuiResizeEvent *event);
+    // Pasted text for the focus widget. The default ignores it.
+    virtual void pasteEvent(TuiPasteEvent *event);
 
 private:
     static void setFocusWidget(QTuiWidget *widget);

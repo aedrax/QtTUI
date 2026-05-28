@@ -37,7 +37,7 @@ void restoreTerminalFromSignal()
 {
     if (g_rawModeActive) {
         // Mirror exitRawMode(): disable SGR mouse reporting, re-show the cursor
-        static const char disableMouse[] = "\x1b[?1006l\x1b[?1000l\x1b[?25h";
+        static const char disableMouse[] = "\x1b[?2004l\x1b[?1006l\x1b[?1000l\x1b[?25h";
         ssize_t r = ::write(STDOUT_FILENO, disableMouse, sizeof(disableMouse) - 1);
         (void)r;
     }
@@ -120,8 +120,9 @@ bool PosixBackend::applyRawTermios()
         return false;
     }
 
-    // Enable SGR mouse reporting (button events + SGR encoding)
-    const QByteArray enableMouse("\x1b[?1000h\x1b[?1006h");
+    // Enable SGR mouse reporting (button events + SGR encoding) and
+    // bracketed paste
+    const QByteArray enableMouse("\x1b[?1000h\x1b[?1006h\x1b[?2004h");
     ::write(STDOUT_FILENO, enableMouse.constData(), enableMouse.size());
 
     return true;
@@ -136,7 +137,7 @@ bool PosixBackend::exitRawMode()
 
     // Disable SGR mouse reporting and re-show the cursor (the render pass
     // hides it while frames are written)
-    const QByteArray disableMouse("\x1b[?1006l\x1b[?1000l\x1b[?25h");
+    const QByteArray disableMouse("\x1b[?2004l\x1b[?1006l\x1b[?1000l\x1b[?25h");
     ::write(STDOUT_FILENO, disableMouse.constData(), disableMouse.size());
 
     g_rawModeActive = 0;

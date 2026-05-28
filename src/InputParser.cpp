@@ -62,6 +62,7 @@ void InputParser::processOneByte(char byte)
     case State::CSIParam:handleCSIParam(byte);  break;
     case State::SGRMouse:handleSGRMouse(byte);  break;
     case State::Utf8:    handleUtf8(byte);      break;
+    case State::Paste:   handlePaste(byte);     break;
     }
 }
 
@@ -250,9 +251,10 @@ void InputParser::handleCSIParam(char byte)
 {
     // Final bytes: 0x40-0x7E
     if (byte >= 0x40 && byte <= 0x7E) {
+        // Set Ground first: finishCSI() can move to the Paste state
+        m_state = State::Ground;
         finishCSI(byte);
         m_buffer.clear();
-        m_state = State::Ground;
         return;
     }
 
@@ -331,6 +333,12 @@ void InputParser::finishCSI(char finalByte)
     // Tilde-terminated sequences
     case '~': {
         int code = params.isEmpty() ? 0 : params.first();
+        if (code == 200) {
+            // Bracketed paste starts: collect bytes until "ESC [ 201 ~"
+            m_paste.clear();
+            m_state = State::Paste;
+            break;
+        }
         switch (code) {
         case 1:  postKeyEvent(Qt::Key_Home, mods); break;
         case 2:  postKeyEvent(Qt::Key_Insert, mods); break;
@@ -426,6 +434,27 @@ void InputParser::discardBuffer()
     qDebug() << "InputParser: discarding incomplete sequence:" << m_buffer.toHex();
     m_buffer.clear();
     m_state = State::Ground;
+}
+
+void InputParser::handlePaste(char byte)
+{
+    static const QByteArray endMarker("\x1b[201~");
+    m_paste.append(byte);
+    if (!m_paste.endsWith(endMarker))
+        return;
+
+    m_paste.chop(endMarker.size());
+    QString text = QString::fromUtf8(m_paste);
+    m_paste.clear();
+    m_state = State::Ground;
+
+    // Terminals send "\r" for a line break
+    text.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+    text.replace(QLatin1Char('\r'), QLatin1Char('\n'));
+
+    if (m_eventTarget)
+        QCoreApplication::postEvent(m_eventTarget, new TuiPasteEvent(text));
+    emit pasteEventParsed(text);
 }
 
 void InputParser::postKeyEvent(int key, Qt::KeyboardModifiers modifiers, const QString &text)

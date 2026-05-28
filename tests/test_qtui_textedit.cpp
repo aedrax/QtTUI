@@ -1102,6 +1102,31 @@ private slots:
                 RC_ASSERT(te.toPlainText() == text);
             });
     }
+
+    void pasteInsertsLinesAtCursor()
+    {
+        QTuiTextEdit te;
+        te.setPlainText(QStringLiteral("AB"));
+        // Cursor after "A"
+        TuiKeyEvent home(Qt::Key_Home, Qt::NoModifier);
+        QCoreApplication::sendEvent(&te, &home);
+        TuiKeyEvent right(Qt::Key_Right, Qt::NoModifier);
+        QCoreApplication::sendEvent(&te, &right);
+
+        TuiPasteEvent paste(QStringLiteral("1\n2\n3"));
+        QCoreApplication::sendEvent(&te, &paste);
+        QCOMPARE(te.toPlainText(), QStringLiteral("A1\n2\n3B"));
+    }
+
+    void pasteIgnoredWhenReadOnly()
+    {
+        QTuiTextEdit te;
+        te.setPlainText(QStringLiteral("keep"));
+        te.setReadOnly(true);
+        TuiPasteEvent paste(QStringLiteral("x"));
+        QCoreApplication::sendEvent(&te, &paste);
+        QCOMPARE(te.toPlainText(), QStringLiteral("keep"));
+    }
 };
 
 QTEST_MAIN(TestQTuiTextEdit)

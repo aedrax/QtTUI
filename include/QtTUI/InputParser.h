@@ -28,9 +28,10 @@ signals:
     void keyEventParsed(int key, Qt::KeyboardModifiers modifiers, const QString &text);
     void mouseEventParsed(int button, int x, int y, int eventType);
     void resizeEventParsed(int cols, int rows);
+    void pasteEventParsed(const QString &text);
 
 private:
-    enum class State { Ground, Escape, CSI, CSIParam, SGRMouse, Utf8 };
+    enum class State { Ground, Escape, CSI, CSIParam, SGRMouse, Utf8, Paste };
 
     void processOneByte(char byte);
     void handleGround(char byte);
@@ -39,6 +40,7 @@ private:
     void handleCSIParam(char byte);
     void handleSGRMouse(char byte);
     void handleUtf8(char byte);
+    void handlePaste(char byte);
 
     void finishCSI(char finalByte);
     void finishSGRMouse(char finalByte);
@@ -57,6 +59,7 @@ private:
     QObject *m_eventTarget;
     State m_state = State::Ground;
     QByteArray m_buffer;
+    QByteArray m_paste; // bytes between "ESC [ 200 ~" and "ESC [ 201 ~"
     QSize m_terminalSize = QSize(80, 24);
     int m_escapeTimeout = 50;
     int m_utf8Expected = 0;

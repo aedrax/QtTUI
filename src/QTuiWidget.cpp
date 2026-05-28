@@ -364,7 +364,8 @@ bool QTuiWidget::event(QEvent *event)
     // Effectively-disabled widgets are inert: key and mouse events are
     // consumed without reaching the handlers (resize events still apply).
     const bool interactive = event->type() == TuiEventTypes::keyEventType()
-        || event->type() == TuiEventTypes::mouseEventType();
+        || event->type() == TuiEventTypes::mouseEventType()
+        || event->type() == TuiEventTypes::pasteEventType();
     if (interactive && !isEffectivelyEnabled())
         return true;
 
@@ -380,12 +381,18 @@ bool QTuiWidget::event(QEvent *event)
         resizeEvent(static_cast<TuiResizeEvent *>(event));
         return true;
     }
+    if (event->type() == TuiEventTypes::pasteEventType()) {
+        pasteEvent(static_cast<TuiPasteEvent *>(event));
+        return true;
+    }
     return QObject::event(event);
 }
 
 void QTuiWidget::keyPressEvent(TuiKeyEvent * /*event*/) {}
 void QTuiWidget::mousePressEvent(TuiMouseEvent * /*event*/) {}
 void QTuiWidget::resizeEvent(TuiResizeEvent * /*event*/) {}
+
+void QTuiWidget::pasteEvent(TuiPasteEvent * /*event*/) {}
 
 bool QTuiWidget::hasDirtyRegions() const
 {

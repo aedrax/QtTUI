@@ -84,6 +84,7 @@ private slots:
     void testMouseWheel();
     void testMouseModifiers();
     void testNonBmpUtf8();
+    void testBracketedPaste();
 };
 
 // Helper: captures posted TuiMouseEvents (fields the signal doesn't carry)
@@ -531,6 +532,30 @@ void TestInputParser::testNonBmpUtf8()
     QCOMPARE(collector.keys.size(), 1);
     QCOMPARE(collector.keys.first().key, 0x1F600);
     QCOMPARE(collector.keys.first().text, QString::fromUtf8("\xF0\x9F\x98\x80"));
+}
+
+void TestInputParser::testBracketedPaste()
+{
+    InputParser parser(nullptr);
+    EventCollector collector;
+    collector.connectTo(&parser);
+    QStringList pastes;
+    connect(&parser, &InputParser::pasteEventParsed,
+            [&pastes](const QString &text) { pastes.append(text); });
+
+    // Everything between the markers is one paste: "\r" becomes "\n",
+    // and an ESC or arrow sequence inside is text, not a key.
+    // The end marker arrives split across two reads.
+    parser.processInput(QByteArray("\x1b[200~one\rtwo \x1b[A x"));
+    parser.processInput(QByteArray("\x1b[20"));
+    QVERIFY(pastes.isEmpty());
+    parser.processInput(QByteArray("1~q"));
+
+    QCOMPARE(pastes.size(), 1);
+    QCOMPARE(pastes.first(), QStringLiteral("one\ntwo \x1b[A x"));
+    // Only the key after the paste
+    QCOMPARE(collector.keys.size(), 1);
+    QCOMPARE(collector.keys.first().text, QStringLiteral("q"));
 }
 
 QTEST_GUILESS_MAIN(TestInputParser)
