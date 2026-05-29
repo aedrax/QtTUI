@@ -20,6 +20,7 @@ public:
     bool exitRawMode() override;
     bool enterAlternateScreen() override;
     bool exitAlternateScreen() override;
+    bool suspend() override;
 
     QSize terminalSize() const override;
 

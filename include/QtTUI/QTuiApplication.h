@@ -41,6 +41,12 @@ public:
 
     void triggerRender();
 
+    // Gives the terminal back to the shell and stops the process, as Ctrl+Z
+    // does in a normal program. The main window calls this for Ctrl+Z
+    // unless an action uses Ctrl+Z as its shortcut. On resume ("fg"), the
+    // terminal modes are set again and the screen is drawn again.
+    void suspend();
+
 protected:
     bool event(QEvent *event) override;
 

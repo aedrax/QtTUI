@@ -26,6 +26,12 @@ public:
 
     virtual QSize terminalSize() const = 0;
 
+    // Gives the terminal back to the shell and stops the process (job
+    // control, as Ctrl+Z does in a normal program). Returns after the
+    // process continues, with the terminal modes set again. The default
+    // does nothing and returns false.
+    virtual bool suspend() { return false; }
+
     virtual qint64 write(const QByteArray &data) = 0;
     virtual QByteArray read() = 0;
 

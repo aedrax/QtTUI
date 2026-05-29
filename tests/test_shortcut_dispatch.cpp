@@ -327,6 +327,18 @@ private slots:
         QCOMPARE(spy.count(), 0);
         QCOMPARE(edit.text(), QStringLiteral("a"));
     }
+
+    void ctrlZActionWinsOverSuspend()
+    {
+        // Ctrl+Z suspends only when no action uses it: an undo action
+        // bound to Ctrl+Z must still fire
+        Env env;
+        QTuiAction undo(QStringLiteral("Undo"), QStringLiteral("Ctrl+Z"), &env.window);
+        QSignalSpy spy(&undo, &QTuiAction::triggered);
+
+        env.sendKey(Qt::Key_Z, Qt::ControlModifier);
+        QCOMPARE(spy.count(), 1);
+    }
 };
 
 QTEST_APPLESS_MAIN(TestShortcutDispatch)

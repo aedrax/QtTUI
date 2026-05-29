@@ -361,6 +361,30 @@ void PosixBackend::onSignalPipeReadable()
         emit resized(terminalSize());
 }
 
+bool PosixBackend::suspend()
+{
+    if (!m_rawMode && !m_alternateScreen)
+        return false;
+
+    // Undo the terminal modes, but keep m_rawMode and m_alternateScreen:
+    // reestablishAfterContinue() uses them to set the modes again
+    static const char restore[] = "\x1b[?2004l\x1b[?1006l\x1b[?1000l\x1b[?25h\x1b[?1049l";
+    ::write(STDOUT_FILENO, restore, sizeof(restore) - 1);
+    ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &m_originalTermios);
+    g_rawModeActive = 0;
+    g_altScreenActive = 0;
+
+    // Stop the process group, as the terminal driver does for Ctrl+Z.
+    // kill() returns after SIGCONT.
+    ::kill(0, SIGTSTP);
+
+    // If SIGTSTP is ignored, no SIGCONT arrives, so set the modes again
+    // here. The SIGCONT path does the same work again, which is harmless.
+    g_altScreenActive = m_alternateScreen ? 1 : 0;
+    reestablishAfterContinue();
+    return true;
+}
+
 void PosixBackend::reestablishAfterContinue()
 {
     // The shell usually resets the terminal while we are stopped; re-apply

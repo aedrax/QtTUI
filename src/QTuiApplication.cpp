@@ -219,6 +219,12 @@ void QTuiApplication::triggerRender()
     m_scheduler->renderNow();
 }
 
+void QTuiApplication::suspend()
+{
+    if (m_backend)
+        m_backend->suspend();
+}
+
 bool QTuiApplication::event(QEvent *event)
 {
     // Forward TUI events to the main window

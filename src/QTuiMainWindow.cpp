@@ -346,6 +346,13 @@ void QTuiMainWindow::keyPressEvent(TuiKeyEvent *event)
     if (dispatchShortcut(event))
         return;
 
+    // Ctrl+Z suspends the program, unless an action took it above
+    if (event->key() == Qt::Key_Z && event->modifiers() == Qt::ControlModifier) {
+        if (auto *app = QTuiApplication::instance())
+            app->suspend();
+        return;
+    }
+
     // Find the focused widget anywhere in the tree
     QTuiWidget *focused = findFocusedWidget(this);
 
