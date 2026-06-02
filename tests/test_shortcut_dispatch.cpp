@@ -328,6 +328,33 @@ private slots:
         QCOMPARE(edit.text(), QStringLiteral("a"));
     }
 
+    void hiddenOwnerDisablesShortcut()
+    {
+        // An action on a hidden widget (for example a page of a tab that
+        // is not current) must not take the key; a menu action works
+        // while its menu is closed, if the menu bar is visible
+        Env env;
+        auto *bar = new QTuiMenuBar;
+        env.window.setMenuBar(bar);
+        QTuiAction *quit = bar->addMenu(QStringLiteral("File"))
+                               ->addAction(QStringLiteral("Quit"), QStringLiteral("Ctrl+Q"));
+        QSignalSpy quitSpy(quit, &QTuiAction::triggered);
+
+        QTuiPushButton hiddenPage(QString(), &env.window);
+        hiddenPage.setVisible(false);
+        QTuiAction copy(QStringLiteral("Copy"), QStringLiteral("Ctrl+C"), &hiddenPage);
+        QSignalSpy copySpy(&copy, &QTuiAction::triggered);
+
+        env.sendKey(Qt::Key_C, Qt::ControlModifier);
+        QCOMPARE(copySpy.count(), 0);
+        hiddenPage.setVisible(true);
+        env.sendKey(Qt::Key_C, Qt::ControlModifier);
+        QCOMPARE(copySpy.count(), 1);
+
+        env.sendKey(Qt::Key_Q, Qt::ControlModifier);
+        QCOMPARE(quitSpy.count(), 1);
+    }
+
     void ctrlZActionWinsOverSuspend()
     {
         // Ctrl+Z suspends only when no action uses it: an undo action
