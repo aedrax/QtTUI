@@ -15,6 +15,7 @@ class QSocketNotifier;
 
 namespace QtTUI {
 
+class QTuiClipboard;
 class QTuiMainWindow;
 class RenderScheduler;
 
@@ -40,6 +41,9 @@ public:
     QTuiMainWindow *mainWindow() const;
 
     void triggerRender();
+
+    // The application clipboard (created on first use)
+    static QTuiClipboard *clipboard();
 
     // Gives the terminal back to the shell and stops the process, as Ctrl+Z
     // does in a normal program. The main window calls this for Ctrl+Z

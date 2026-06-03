@@ -1,11 +1,13 @@
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/AnsiRenderer.h>
+#include <QtTUI/QTuiClipboard.h>
 #include <QtTUI/QTuiMainWindow.h>
 #include <QtTUI/RenderScheduler.h>
 
 #include <QtTUI/TuiEvents.h>
 
 #include <QDateTime>
+#include <QPointer>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -217,6 +219,15 @@ QTuiMainWindow *QTuiApplication::mainWindow() const
 void QTuiApplication::triggerRender()
 {
     m_scheduler->renderNow();
+}
+
+QTuiClipboard *QTuiApplication::clipboard()
+{
+    // Parented to the application when one exists, so it is deleted with it
+    static QPointer<QTuiClipboard> s_clipboard;
+    if (!s_clipboard)
+        s_clipboard = new QTuiClipboard(instance());
+    return s_clipboard;
 }
 
 void QTuiApplication::suspend()

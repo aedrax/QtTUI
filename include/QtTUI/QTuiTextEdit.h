@@ -42,6 +42,7 @@ protected:
 
 private:
     void insertText(const QString &text);
+    void insertPastedText(const QString &text);
     void insertNewLine();
     void deleteBackward();
     void deleteForward();

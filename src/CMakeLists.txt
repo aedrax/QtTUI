@@ -25,6 +25,7 @@ set(QTTUI_SOURCES
     QTuiPushButton.cpp
     QTuiToolButton.cpp
     QTuiCheckBox.cpp
+    QTuiClipboard.cpp
     QTuiRadioButton.cpp
     QTuiButtonGroup.cpp
     QTuiSpinBox.cpp
@@ -112,6 +113,7 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiPushButton.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiToolButton.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiCheckBox.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiClipboard.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiRadioButton.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiButtonGroup.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiSpinBox.h

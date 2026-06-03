@@ -3,6 +3,8 @@
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
+#include <QtTUI/QTuiApplication.h>
+#include <QtTUI/QTuiClipboard.h>
 
 namespace QtTUI {
 
@@ -136,12 +138,17 @@ void QTuiTextEdit::insertText(const QString &text)
 
 void QTuiTextEdit::pasteEvent(TuiPasteEvent *event)
 {
+    insertPastedText(event->text());
+}
+
+void QTuiTextEdit::insertPastedText(const QString &pasted)
+{
     if (m_readOnly)
         return;
 
     // Keep line breaks and tabs; remove other control characters
     QString text;
-    for (const QChar ch : event->text()) {
+    for (const QChar ch : pasted) {
         if (ch == QLatin1Char('\n') || ch == QLatin1Char('\t')
             || (!ch.isNull() && ch.category() != QChar::Other_Control))
             text += ch;
@@ -309,6 +316,24 @@ void QTuiTextEdit::keyPressEvent(TuiKeyEvent *event)
     const int key = event->key();
     const Qt::KeyboardModifiers mods = event->modifiers();
     const bool shift = mods & Qt::ShiftModifier;
+
+    // Clipboard: Ctrl+C copies the selection, Ctrl+X cuts it, Ctrl+V pastes
+    if (mods == Qt::ControlModifier
+        && (key == Qt::Key_C || key == Qt::Key_X || key == Qt::Key_V)) {
+        if (key == Qt::Key_V) {
+            insertPastedText(QTuiApplication::clipboard()->text());
+            return; // insertPastedText() repaints
+        }
+        if (!hasSelection())
+            return;
+        QTuiApplication::clipboard()->setText(selectedText());
+        if (key == Qt::Key_X && !m_readOnly) {
+            deleteSelection();
+            scrollToVisible();
+            markDirty();
+        }
+        return;
+    }
 
     switch (key) {
     case Qt::Key_Left:

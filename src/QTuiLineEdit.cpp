@@ -3,6 +3,8 @@
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
+#include <QtTUI/QTuiApplication.h>
+#include <QtTUI/QTuiClipboard.h>
 
 namespace QtTUI {
 
@@ -88,6 +90,12 @@ void QTuiLineEdit::keyPressEvent(TuiKeyEvent *event)
     const int key = event->key();
     const QString eventText = event->text();
 
+    // Ctrl+V pastes the application clipboard
+    if (key == Qt::Key_V && event->modifiers() == Qt::ControlModifier) {
+        insertPastedText(QTuiApplication::clipboard()->text());
+        return;
+    }
+
     switch (key) {
     case Qt::Key_Left:
         m_cursorPos = QtTuiUnicode::prevClusterIndex(m_text, m_cursorPos);
@@ -140,10 +148,15 @@ void QTuiLineEdit::keyPressEvent(TuiKeyEvent *event)
 
 void QTuiLineEdit::pasteEvent(TuiPasteEvent *event)
 {
+    insertPastedText(event->text());
+}
+
+void QTuiLineEdit::insertPastedText(const QString &pasted)
+{
     // One line only: a line break or tab becomes a space, and other
     // control characters are removed. A paste never emits returnPressed().
     QString text;
-    for (const QChar ch : event->text()) {
+    for (const QChar ch : pasted) {
         if (ch == QLatin1Char('\n') || ch == QLatin1Char('\t'))
             text += QLatin1Char(' ');
         else if (!ch.isNull() && ch.category() != QChar::Other_Control)

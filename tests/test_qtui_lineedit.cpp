@@ -3,6 +3,8 @@
 #include <QtTUI/QTuiLineEdit.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
+#include <QtTUI/QTuiApplication.h>
+#include <QtTUI/QTuiClipboard.h>
 
 using namespace QtTUI;
 
@@ -356,6 +358,15 @@ private slots:
         QCOMPARE(le.text(), QStringLiteral("abx y z "));
         QCOMPARE(le.cursorPosition(), 8);
         QCOMPARE(returnSpy.count(), 0);
+    }
+
+    void ctrlVPastesClipboard()
+    {
+        QTuiApplication::clipboard()->setText(QStringLiteral("two\nlines"));
+        QTuiLineEdit le;
+        TuiKeyEvent ev(Qt::Key_V, Qt::ControlModifier);
+        QCoreApplication::sendEvent(&le, &ev);
+        QCOMPARE(le.text(), QStringLiteral("two lines"));
     }
 };
 

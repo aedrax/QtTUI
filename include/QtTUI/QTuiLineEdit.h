@@ -36,6 +36,7 @@ protected:
 
 private:
     void adjustScrollToCursor();
+    void insertPastedText(const QString &text);
 
     QString m_text;
     int m_cursorPos = 0;     // code-unit index into m_text (cluster boundary)

@@ -5,6 +5,8 @@
 #include <QtTUI/QTuiTextEdit.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
+#include <QtTUI/QTuiApplication.h>
+#include <QtTUI/QTuiClipboard.h>
 
 using namespace QtTUI;
 
@@ -1126,6 +1128,40 @@ private slots:
         TuiPasteEvent paste(QStringLiteral("x"));
         QCoreApplication::sendEvent(&te, &paste);
         QCOMPARE(te.toPlainText(), QStringLiteral("keep"));
+    }
+
+    void clipboardCopyCutPaste()
+    {
+        QTuiApplication::clipboard()->clear();
+        QTuiTextEdit te;
+        te.setPlainText(QStringLiteral("hello world"));
+        auto send = [&te](int key, Qt::KeyboardModifiers mods) {
+            TuiKeyEvent ev(key, mods);
+            QCoreApplication::sendEvent(&te, &ev);
+        };
+
+        // Select "hello" with Shift+Right from the line start
+        send(Qt::Key_Home, Qt::NoModifier);
+        for (int i = 0; i < 5; ++i)
+            send(Qt::Key_Right, Qt::ShiftModifier);
+
+        send(Qt::Key_C, Qt::ControlModifier);
+        QCOMPARE(QTuiApplication::clipboard()->text(), QStringLiteral("hello"));
+        QCOMPARE(te.toPlainText(), QStringLiteral("hello world"));
+
+        send(Qt::Key_X, Qt::ControlModifier);
+        QCOMPARE(te.toPlainText(), QStringLiteral(" world"));
+
+        send(Qt::Key_End, Qt::NoModifier);
+        send(Qt::Key_V, Qt::ControlModifier);
+        QCOMPARE(te.toPlainText(), QStringLiteral(" worldhello"));
+    }
+
+    void clipboardOsc52Sequence()
+    {
+        // "hi" in base64 is "aGk="
+        QCOMPARE(QTuiClipboard::osc52Sequence(QStringLiteral("hi")),
+                 QByteArray("\x1b]52;c;aGk=\a"));
     }
 };
 
