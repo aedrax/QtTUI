@@ -7,6 +7,7 @@
 #include <QPointer>
 #include <QRect>
 #include <QSize>
+#include <QString>
 #include <QList>
 
 namespace QtTUI {
@@ -74,6 +75,10 @@ public:
     // skip it, because its geometry is not a screen position.
     bool isPaintedByParent() const;
     void setPaintedByParent(bool paintedByParent);
+
+    // Text that QTuiToolTip shows when the widget gets focus
+    QString toolTip() const;
+    void setToolTip(const QString &toolTip);
 
     // Called on each visible popup when a mouse press lands outside every
     // visible popup (see QTuiMainWindow::mousePressEvent). The default
@@ -143,6 +148,7 @@ private:
     bool m_isPopup = false;
     bool m_paintedByParent = false;
     QPointer<QTuiLayout> m_layout;
+    QString m_toolTip;
     Qt::FocusPolicy m_focusPolicy = Qt::NoFocus;
 
     // Widget focused before this popup became visible; restored when it hides

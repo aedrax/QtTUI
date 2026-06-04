@@ -129,6 +129,8 @@ static QTuiWidget *createButtonsTab(QTuiWidget *parent, QTuiStatusBar *statusBar
     page->addWidget(sectionLabel("QTuiPushButton", page));
     auto *btn1 = new QTuiPushButton("Click Me", page);
     auto *btn2 = new QTuiPushButton("Another Button", page);
+    btn1->setToolTip("Shows its text in the status bar");
+    btn2->setToolTip("Also shows its text in the status bar");
     QObject::connect(btn1, &QTuiPushButton::clicked, [statusBar, btn1]() {
         statusBar->showMessage(btn1->text());
     });
@@ -140,6 +142,7 @@ static QTuiWidget *createButtonsTab(QTuiWidget *parent, QTuiStatusBar *statusBar
     // -- QTuiToolButton section --
     page->addWidget(sectionLabel("QTuiToolButton", page));
     auto *toolBtn = new QTuiToolButton("Tool", page);
+    toolBtn->setToolTip("A compact button without a border");
     page->addWidget(row(page, {toolBtn}));
 
     // -- QTuiCheckBox section --
@@ -180,6 +183,7 @@ static QTuiWidget *createTextInputTab(QTuiWidget *parent, QTuiStatusBar *statusB
     page->addWidget(sectionLabel("QTuiLineEdit", page));
     auto *lineEdit = new QTuiLineEdit(page);
     lineEdit->setText("Type here...");
+    lineEdit->setToolTip("The status bar shows the text length");
     QObject::connect(lineEdit, &QTuiLineEdit::textChanged, [statusBar](const QString &text) {
         statusBar->showMessage(QStringLiteral("Text length: %1").arg(text.length()));
     });

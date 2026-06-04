@@ -194,6 +194,16 @@ void QTuiWidget::setPaintedByParent(bool paintedByParent)
     m_paintedByParent = paintedByParent;
 }
 
+QString QTuiWidget::toolTip() const
+{
+    return m_toolTip;
+}
+
+void QTuiWidget::setToolTip(const QString &toolTip)
+{
+    m_toolTip = toolTip;
+}
+
 void QTuiWidget::popupOutsideClick()
 {
     setVisible(false);

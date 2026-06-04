@@ -16,6 +16,8 @@
 #include <QtTUI/QTuiMainWindow.h>
 #include <QtTUI/QTuiMenu.h>
 #include <QtTUI/QTuiMenuBar.h>
+#include <QtTUI/QTuiPushButton.h>
+#include <QtTUI/QTuiToolTip.h>
 #include <QtTUI/QTuiWidget.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/Theme_Engine.h>
@@ -441,6 +443,43 @@ private slots:
         QCOMPARE(spy.count(), 1);
         QVERIFY(!fileMenu->isVisible());
         QTest::qWait(20);
+    }
+
+    // Tooltips: Tab shows the focused widget's tooltip below it, in the
+    // popup layer; the next key hides it and the content underneath returns
+    void toolTipShowsOnFocusAndHidesOnKey()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 40, 10));
+        app.setMainWindow(&mainWindow);
+
+        auto *central = new FillWidget(QLatin1Char('C'));
+        mainWindow.setCentralWidget(central);
+        auto *button = new QTuiPushButton(QStringLiteral("OK"), central);
+        button->setGeometry(QRect(2, 2, 6, 3));
+        button->setToolTip(QStringLiteral("Save the file"));
+        mainWindow.show();
+        app.triggerRender();
+
+        sendKey(mainWindow, Qt::Key_Tab);
+        QVERIFY(button->hasFocus());
+        QVERIFY(QTuiToolTip::isVisible());
+        QCOMPARE(QTuiToolTip::text(), QStringLiteral("Save the file"));
+
+        app.triggerRender();
+        ScreenBuffer *buf = app.screenBuffer();
+        // Row below the button, with 1 cell of padding
+        QCOMPARE(rowText(buf, 5, 2, 15), QStringLiteral(" Save the file "));
+
+        sendKey(mainWindow, Qt::Key_Escape);
+        QVERIFY(!QTuiToolTip::isVisible());
+        app.triggerRender();
+        QCOMPARE(buf->backCell(5, 5).ch, U'C');
     }
 };
 

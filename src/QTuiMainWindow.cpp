@@ -9,6 +9,7 @@
 #include <QtTUI/QTuiDockWidget.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
+#include <QtTUI/QTuiToolTip.h>
 #include <QCoreApplication>
 #include <QDebug>
 
@@ -359,6 +360,8 @@ void QTuiMainWindow::pasteEvent(TuiPasteEvent *event)
 
 void QTuiMainWindow::keyPressEvent(TuiKeyEvent *event)
 {
+    QTuiToolTip::hideText();
+
     if (dispatchShortcut(event))
         return;
 
@@ -400,6 +403,11 @@ void QTuiMainWindow::keyPressEvent(TuiKeyEvent *event)
 
 void QTuiMainWindow::mousePressEvent(TuiMouseEvent *event)
 {
+    // Hide the tooltip first: it is a popup, and a click outside a visible
+    // popup is swallowed
+    if (event->mouseType() == TuiMouseEvent::Press)
+        QTuiToolTip::hideText();
+
     // Popups float above everything, so hit-test them first; the topmost
     // (deepest / most recently opened, i.e. last collected) popup wins.
     QList<QTuiWidget *> popups;
@@ -433,8 +441,10 @@ void QTuiMainWindow::mousePressEvent(TuiMouseEvent *event)
         // base event handler).
         if (event->mouseType() == TuiMouseEvent::Press
             && (target->focusPolicy() & Qt::ClickFocus)
-            && target->isEffectivelyEnabled())
+            && target->isEffectivelyEnabled()) {
             target->setFocus();
+            QTuiToolTip::showFor(target);
+        }
         QCoreApplication::sendEvent(target, event);
     }
 }
@@ -593,6 +603,7 @@ void QTuiMainWindow::advanceFocus(bool forward)
     }
 
     m_focusChain[nextIdx]->setFocus();
+    QTuiToolTip::showFor(m_focusChain[nextIdx]);
 }
 
 void QTuiMainWindow::rebuildFocusChain()

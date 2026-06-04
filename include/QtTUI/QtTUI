@@ -21,6 +21,7 @@
 #include <QtTUI/QTuiWidget.h>
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiClipboard.h>
+#include <QtTUI/QTuiToolTip.h>
 
 // Layout classes
 #include <QtTUI/QTuiSizePolicy.h>
