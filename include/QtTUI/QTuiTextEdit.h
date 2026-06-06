@@ -40,6 +40,13 @@ protected:
     void mousePressEvent(TuiMouseEvent *event) override;
     void pasteEvent(TuiPasteEvent *event) override;
 
+    // Adds text as new lines at the end, then removes lines from the top
+    // while there are more than maxLines (0: no limit). If the cursor is on
+    // the last line, it moves to the new end, so the view follows new text;
+    // otherwise the view stays where the user scrolled.
+    void appendLines(const QString &text, int maxLines);
+    int lineCount() const;
+
 private:
     void insertText(const QString &text);
     void insertPastedText(const QString &text);

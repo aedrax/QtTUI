@@ -7,6 +7,7 @@
 #include <QtTUI/TuiEvents.h>
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiClipboard.h>
+#include <QtTUI/QTuiPlainTextEdit.h>
 
 using namespace QtTUI;
 
@@ -1162,6 +1163,39 @@ private slots:
         // "hi" in base64 is "aGk="
         QCOMPARE(QTuiClipboard::osc52Sequence(QStringLiteral("hi")),
                  QByteArray("\x1b]52;c;aGk=\a"));
+    }
+
+    void plainTextEditAppendAndLimit()
+    {
+        QTuiPlainTextEdit log;
+        log.setReadOnly(true);
+        log.setMaximumBlockCount(3);
+        for (int i = 1; i <= 5; ++i)
+            log.appendPlainText(QStringLiteral("line %1").arg(i));
+        QCOMPARE(log.blockCount(), 3);
+        QCOMPARE(log.toPlainText(), QStringLiteral("line 3\nline 4\nline 5"));
+
+        log.setMaximumBlockCount(2);
+        QCOMPARE(log.toPlainText(), QStringLiteral("line 4\nline 5"));
+    }
+
+    void plainTextEditFollowsTailOnlyAtTheEnd()
+    {
+        QTuiPlainTextEdit log;
+        log.setGeometry(QRect(0, 0, 20, 3));
+        for (int i = 1; i <= 10; ++i)
+            log.appendPlainText(QStringLiteral("line %1").arg(i));
+        // The cursor follows the last line, so the view shows the tail
+        QCOMPARE(log.cursorRow(), 9);
+        ScreenBuffer buf(20, 3);
+        log.paintEvent(buf);
+        QCOMPARE(buf.backCell(5, 2).ch, U'1'); // "line 10"
+
+        // After the user moves up, new lines do not move the view
+        TuiKeyEvent up(Qt::Key_Up, Qt::NoModifier);
+        QCoreApplication::sendEvent(&log, &up);
+        log.appendPlainText(QStringLiteral("line 11"));
+        QCOMPARE(log.cursorRow(), 8);
     }
 };
 

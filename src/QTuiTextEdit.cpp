@@ -172,6 +172,45 @@ void QTuiTextEdit::insertPastedText(const QString &pasted)
     markDirty();
 }
 
+void QTuiTextEdit::appendLines(const QString &text, int maxLines)
+{
+    const bool follow = m_cursorRow == m_lines.size() - 1;
+
+    if (!text.isNull()) {
+        const QStringList newLines = text.split(QLatin1Char('\n'));
+        // The first append into an empty document replaces its empty line
+        if (m_lines.size() == 1 && m_lines.first().isEmpty())
+            m_lines = newLines;
+        else
+            m_lines += newLines;
+    }
+
+    // Remove lines from the top and keep the cursor and view on the same text
+    const int excess = maxLines > 0 ? int(m_lines.size()) - maxLines : 0;
+    if (excess > 0) {
+        m_lines.erase(m_lines.begin(), m_lines.begin() + excess);
+        m_cursorRow = qMax(0, m_cursorRow - excess);
+        m_scrollRow = qMax(0, m_scrollRow - excess);
+        clearSelection();
+    }
+
+    if (follow) {
+        m_cursorRow = m_lines.size() - 1;
+        m_cursorCol = m_lines.last().length();
+        scrollToVisible();
+    } else {
+        m_cursorCol = qMin(m_cursorCol, int(m_lines.at(m_cursorRow).length()));
+    }
+
+    emit textChanged();
+    markDirty();
+}
+
+int QTuiTextEdit::lineCount() const
+{
+    return m_lines.size();
+}
+
 void QTuiTextEdit::insertNewLine()
 {
     if (m_readOnly)

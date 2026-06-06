@@ -3,6 +3,7 @@
 
 #include <QtTUI/QtTUI>
 #include <QStringListModel>
+#include <QTimer>
 
 using namespace QtTUI;
 
@@ -199,6 +200,22 @@ static QTuiWidget *createTextInputTab(QTuiWidget *parent, QTuiStatusBar *statusB
     auto *textEdit = new QTuiTextEdit(page);
     textEdit->setPlainText("This is a multi-line text editor.\nEdit this sample text freely.");
     page->addWidget(textEdit, 1);
+
+    // -- QTuiPlainTextEdit section: a log that follows new lines --
+    page->addWidget(sectionLabel("QTuiPlainTextEdit", page));
+    auto *log = new QTuiPlainTextEdit(page);
+    log->setReadOnly(true);
+    log->setMaximumBlockCount(100);
+    log->appendPlainText("Log: a line every second; move up to stop following");
+    auto *logTimer = new QTimer(log);
+    QObject::connect(logTimer, &QTimer::timeout, log, [log]() {
+        static int count = 0;
+        log->appendPlainText(QStringLiteral("Event %1 at %2")
+                                 .arg(++count)
+                                 .arg(QTime::currentTime().toString(Qt::ISODate)));
+    });
+    logTimer->start(1000);
+    page->addWidget(log, 1);
 
     // -- QTuiDateTimeEdit section --
     page->addWidget(sectionLabel("QTuiDateTimeEdit", page));

@@ -22,6 +22,7 @@ set(QTTUI_SOURCES
     QTuiStackedLayout.cpp
     Theme_Engine.cpp
     UI_Loader.cpp
+    QTuiPlainTextEdit.cpp
     QTuiPushButton.cpp
     QTuiToolButton.cpp
     QTuiToolTip.cpp
@@ -112,6 +113,7 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiStackedLayout.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/Theme_Engine.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/UI_Loader.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiPlainTextEdit.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiPushButton.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiToolButton.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiToolTip.h
