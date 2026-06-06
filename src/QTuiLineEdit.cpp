@@ -5,6 +5,7 @@
 #include <QtTUI/TuiEvents.h>
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiClipboard.h>
+#include <QtTUI/QTuiCompleter.h>
 
 namespace QtTUI {
 
@@ -18,6 +19,23 @@ QTuiLineEdit::QTuiLineEdit(QTuiWidget *parent)
     : QTuiWidget(parent)
 {
     setFocusPolicy(Qt::StrongFocus);
+    // The completion popup closes when the line edit loses focus
+    connect(this, &QTuiWidget::focusLost, this, [this]() {
+        if (m_completer)
+            m_completer->hidePopup();
+    });
+}
+
+QTuiCompleter *QTuiLineEdit::completer() const
+{
+    return m_completer;
+}
+
+void QTuiLineEdit::setCompleter(QTuiCompleter *completer)
+{
+    if (m_completer)
+        m_completer->hidePopup();
+    m_completer = completer;
 }
 
 QSize QTuiLineEdit::minimumSize() const
@@ -90,6 +108,11 @@ void QTuiLineEdit::keyPressEvent(TuiKeyEvent *event)
     const int key = event->key();
     const QString eventText = event->text();
 
+    // An open completion popup takes Up, Down, Enter and Escape
+    if (m_completer && m_completer->handleKey(key))
+        return;
+    const QString oldText = m_text;
+
     // Ctrl+V pastes the application clipboard
     if (key == Qt::Key_V && event->modifiers() == Qt::ControlModifier) {
         insertPastedText(QTuiApplication::clipboard()->text());
@@ -144,6 +167,10 @@ void QTuiLineEdit::keyPressEvent(TuiKeyEvent *event)
 
     adjustScrollToCursor();
     markDirty();
+
+    // Typing updates the completions; cursor movement does not
+    if (m_completer && m_text != oldText)
+        m_completer->updateForText(this, m_text);
 }
 
 void QTuiLineEdit::pasteEvent(TuiPasteEvent *event)
@@ -170,6 +197,8 @@ void QTuiLineEdit::insertPastedText(const QString &pasted)
     emit textChanged(m_text);
     adjustScrollToCursor();
     markDirty();
+    if (m_completer)
+        m_completer->updateForText(this, m_text);
 }
 
 void QTuiLineEdit::mousePressEvent(TuiMouseEvent *event)

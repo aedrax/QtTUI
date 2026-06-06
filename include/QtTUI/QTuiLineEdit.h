@@ -2,9 +2,12 @@
 #define QTTUI_QTUILINEEDIT_H
 
 #include <QtTUI/QTuiWidget.h>
+#include <QPointer>
 #include <QString>
 
 namespace QtTUI {
+
+class QTuiCompleter;
 
 class QTuiLineEdit : public QTuiWidget {
     Q_OBJECT
@@ -17,6 +20,10 @@ public:
 
     int cursorPosition() const;
     void setCursorPosition(int pos);
+
+    // The line edit does not take ownership of the completer
+    QTuiCompleter *completer() const;
+    void setCompleter(QTuiCompleter *completer);
 
     void paintEvent(ScreenBuffer &buffer) override;
 
@@ -41,6 +48,7 @@ private:
     QString m_text;
     int m_cursorPos = 0;     // code-unit index into m_text (cluster boundary)
     int m_scrollOffset = 0;  // display columns scrolled off the left edge
+    QPointer<QTuiCompleter> m_completer;
 };
 
 } // namespace QtTUI

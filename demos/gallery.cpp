@@ -182,8 +182,13 @@ static QTuiWidget *createTextInputTab(QTuiWidget *parent, QTuiStatusBar *statusB
     // -- QTuiLineEdit section --
     page->addWidget(sectionLabel("QTuiLineEdit", page));
     auto *lineEdit = new QTuiLineEdit(page);
-    lineEdit->setText("Type here...");
-    lineEdit->setToolTip("The status bar shows the text length");
+    lineEdit->setText(QString());
+    lineEdit->setToolTip("Type a color: completions show below");
+    auto *completer = new QTuiCompleter({"Amber", "Aqua", "Azure", "Beige", "Black", "Blue",
+                                         "Coral", "Crimson", "Cyan", "Gold", "Gray", "Green"},
+                                        lineEdit);
+    completer->setCaseSensitivity(Qt::CaseInsensitive);
+    lineEdit->setCompleter(completer);
     QObject::connect(lineEdit, &QTuiLineEdit::textChanged, [statusBar](const QString &text) {
         statusBar->showMessage(QStringLiteral("Text length: %1").arg(text.length()));
     });
