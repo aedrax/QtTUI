@@ -10,6 +10,7 @@
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
 #include <QtTUI/QTuiToolTip.h>
+#include <QtTUI/QTuiDialog.h>
 #include <QCoreApplication>
 #include <QDebug>
 
@@ -321,6 +322,8 @@ static bool actionReachable(const QTuiAction *action)
 bool QTuiMainWindow::dispatchShortcut(TuiKeyEvent *event)
 {
     QTuiWidget *focused = QTuiWidget::focusWidget();
+    // A modal dialog blocks the shortcuts of all other widgets
+    QTuiDialog *modal = activeModalDialog();
 
     const auto actions = QTuiAction::registeredActions();
     for (QTuiAction *action : actions) {
@@ -333,13 +336,18 @@ bool QTuiMainWindow::dispatchShortcut(TuiKeyEvent *event)
             continue;
         if (!actionReachable(action))
             continue;
+        if (modal) {
+            auto *owner = qobject_cast<QTuiWidget *>(action->parent());
+            if (!owner || (owner != modal && !modal->isAncestorOf(owner)))
+                continue;
+        }
         action->trigger();
         return true;
     }
 
     // Menu bar Alt+mnemonics work globally, not only while the bar has focus:
     // Alt+letter (no Ctrl) opens the matching menu.
-    if (m_menuBar && m_menuBar->isVisible()
+    if (!modal && m_menuBar && m_menuBar->isVisible()
         && (event->modifiers() & Qt::AltModifier)
         && !(event->modifiers() & Qt::ControlModifier)
         && !event->text().isEmpty()) {
@@ -376,9 +384,31 @@ void QTuiMainWindow::keyPressEvent(TuiKeyEvent *event)
     QTuiWidget *focused = findFocusedWidget(this);
 
     // While focus is inside an open popup, the popup is modal for keys: Tab
-    // must not walk the window focus chain out from under it. The popup itself
-    // receives the key (menus ignore Tab).
+    // must not walk the window focus chain out from under it. A dialog
+    // moves focus between its own widgets; a menu has one Tab stop.
     const bool popupHasFocus = focused && insideVisiblePopup(focused);
+
+    if (QTuiDialog *dialog = activeModalDialog()) {
+        if (event->key() == Qt::Key_Tab || event->key() == Qt::Key_Backtab) {
+            const bool forward = event->key() == Qt::Key_Tab
+                && !(event->modifiers() & Qt::ShiftModifier);
+            advanceFocus(forward, dialog);
+            return;
+        }
+        // Escape rejects the dialog, unless a popup inside it (a completer
+        // or a dropdown) is open: that popup closes first
+        if (event->key() == Qt::Key_Escape) {
+            QList<QTuiWidget *> inner;
+            collectVisiblePopupsIn(dialog, inner);
+            if (inner.isEmpty()) {
+                dialog->reject();
+                return;
+            }
+        }
+        // Keys reach only the dialog
+        if (!focused || !dialog->isAncestorOf(focused))
+            return;
+    }
 
     if (!popupHasFocus) {
         // Tab forward
@@ -430,8 +460,15 @@ void QTuiMainWindow::mousePressEvent(TuiMouseEvent *event)
         return;
     }
 
-    if (!target)
+    // A modal dialog takes no part in events outside it: a release, move
+    // or wheel there must not reach the widgets behind the dialog
+    if (!target) {
+        if (QTuiDialog *dialog = activeModalDialog()) {
+            if (!dialog->geometry().contains(event->pos()))
+                return;
+        }
         target = findWidgetAt(this, event->pos());
+    }
 
     if (target && target != this) {
         // Only an actual press moves focus, and only onto widgets whose
@@ -578,9 +615,26 @@ void QTuiMainWindow::relayoutChildren()
     }
 }
 
-void QTuiMainWindow::advanceFocus(bool forward)
+QTuiDialog *QTuiMainWindow::activeModalDialog() const
 {
-    rebuildFocusChain();
+    QList<QTuiWidget *> popups;
+    collectVisiblePopupsIn(const_cast<QTuiMainWindow *>(this), popups);
+    for (int i = popups.size() - 1; i >= 0; --i) {
+        if (auto *dialog = qobject_cast<QTuiDialog *>(popups.at(i)))
+            return dialog;
+    }
+    return nullptr;
+}
+
+void QTuiMainWindow::advanceFocus(bool forward, QTuiWidget *root)
+{
+    // With a root (a popup that holds focus), Tab moves only inside it
+    if (root) {
+        m_focusChain.clear();
+        collectFocusableWidgets(root, m_focusChain);
+    } else {
+        rebuildFocusChain();
+    }
 
     if (m_focusChain.isEmpty())
         return;

@@ -10,6 +10,7 @@
 namespace QtTUI {
 
 class QTuiLayout;
+class QTuiDialog;
 class QTuiMenuBar;
 class QTuiToolBar;
 class QTuiStatusBar;
@@ -57,8 +58,10 @@ private:
     void relayoutChildren();
     void relayout();
     bool dispatchShortcut(TuiKeyEvent *event);
-    void advanceFocus(bool forward);
+    void advanceFocus(bool forward, QTuiWidget *root = nullptr);
     void rebuildFocusChain();
+    // The topmost visible dialog, or nullptr; it makes the window modal
+    QTuiDialog *activeModalDialog() const;
     void collectFocusableWidgets(QTuiWidget *widget, QList<QTuiWidget *> &chain);
     static QTuiWidget *findFocusedWidget(QTuiWidget *root);
     static QTuiWidget *findWidgetAt(QTuiWidget *root, const QPoint &pos);

@@ -11,7 +11,13 @@
 // the previous focus; a mouse press outside every popup dismisses them all.
 #include <QtTest/QtTest>
 #include <QSignalSpy>
+#include <QTimer>
 #include <QtTUI/QTuiApplication.h>
+#include <QtTUI/QTuiCompleter.h>
+#include <QtTUI/QTuiLineEdit.h>
+#include <QtTUI/QTuiAction.h>
+#include <QtTUI/QTuiBoxLayout.h>
+#include <QtTUI/QTuiDialog.h>
 #include <QtTUI/QTuiComboBox.h>
 #include <QtTUI/QTuiMainWindow.h>
 #include <QtTUI/QTuiMenu.h>
@@ -480,6 +486,129 @@ private slots:
         QVERIFY(!QTuiToolTip::isVisible());
         app.triggerRender();
         QCOMPARE(buf->backCell(5, 5).ch, U'C');
+    }
+
+    // A dialog is modal: Tab cycles inside it, Escape rejects it, an
+    // outside click and other shortcuts do nothing, and focus returns
+    // to the previous widget when it closes
+    void dialogIsModal()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 60, 20));
+        app.setMainWindow(&mainWindow);
+        auto *central = new FillWidget(QLatin1Char('C'));
+        mainWindow.setCentralWidget(central);
+        auto *before = new QTuiPushButton(QStringLiteral("Before"), central);
+        before->setGeometry(QRect(0, 0, 10, 3));
+        QTuiAction quit(QStringLiteral("Quit"), QStringLiteral("Ctrl+Q"), &mainWindow);
+        QSignalSpy quitSpy(&quit, &QTuiAction::triggered);
+        mainWindow.show();
+        before->setFocus();
+
+        QTuiDialog dialog;
+        dialog.setWindowTitle(QStringLiteral("Confirm"));
+        auto *row = new QTuiBoxLayout(QTuiBoxLayout::LeftToRight);
+        auto *ok = new QTuiPushButton(QStringLiteral("OK"), &dialog);
+        auto *cancel = new QTuiPushButton(QStringLiteral("Cancel"), &dialog);
+        row->addWidget(ok);
+        row->addWidget(cancel);
+        dialog.setLayout(row);
+        QSignalSpy finished(&dialog, &QTuiDialog::finished);
+
+        dialog.open();
+        QVERIFY(dialog.isVisible());
+        QVERIFY(ok->hasFocus());
+        // Centered in the main window
+        QVERIFY(QRect(0, 0, 60, 20).contains(dialog.geometry()));
+        QVERIFY(dialog.geometry().x() > 0 && dialog.geometry().y() > 0);
+
+        sendKey(mainWindow, Qt::Key_Tab);
+        QVERIFY(cancel->hasFocus());
+        sendKey(mainWindow, Qt::Key_Tab);
+        QVERIFY(ok->hasFocus()); // wraps inside the dialog
+
+        sendKey(mainWindow, Qt::Key_Q, Qt::ControlModifier);
+        QCOMPARE(quitSpy.count(), 0);
+
+        sendClick(mainWindow, QPoint(1, 1)); // on "Before", outside the dialog
+        QVERIFY(dialog.isVisible());
+        QVERIFY(!before->hasFocus());
+
+        app.triggerRender();
+        ScreenBuffer *buf = app.screenBuffer();
+        QVERIFY(rowText(buf, dialog.geometry().y(), dialog.geometry().x(), 12)
+                    .contains(QStringLiteral("Confirm")));
+
+        sendKey(mainWindow, Qt::Key_Escape);
+        QVERIFY(!dialog.isVisible());
+        QCOMPARE(finished.count(), 1);
+        QCOMPARE(dialog.result(), int(QTuiDialog::Rejected));
+        QVERIFY(before->hasFocus());
+
+        // The window works normally again
+        sendKey(mainWindow, Qt::Key_Q, Qt::ControlModifier);
+        QCOMPARE(quitSpy.count(), 1);
+    }
+
+    void dialogExecReturnsResult()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 60, 20));
+        app.setMainWindow(&mainWindow);
+        mainWindow.show();
+
+        QTuiDialog dialog;
+        auto *row = new QTuiBoxLayout(QTuiBoxLayout::LeftToRight);
+        auto *ok = new QTuiPushButton(QStringLiteral("OK"), &dialog);
+        row->addWidget(ok);
+        dialog.setLayout(row);
+        QObject::connect(ok, &QTuiPushButton::clicked, &dialog, &QTuiDialog::accept);
+
+        // Enter on the focused OK button, sent from inside the dialog's loop
+        QTimer::singleShot(0, [&mainWindow]() { sendKey(mainWindow, Qt::Key_Return); });
+        QCOMPARE(dialog.exec(), int(QTuiDialog::Accepted));
+        QVERIFY(!dialog.isVisible());
+    }
+
+    void dialogEscapeClosesInnerPopupFirst()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 60, 20));
+        app.setMainWindow(&mainWindow);
+        mainWindow.show();
+
+        QTuiDialog dialog;
+        auto *col = new QTuiBoxLayout(QTuiBoxLayout::TopToBottom);
+        auto *edit = new QTuiLineEdit(&dialog);
+        col->addWidget(edit);
+        dialog.setLayout(col);
+        QTuiCompleter completer({QStringLiteral("alpha"), QStringLiteral("alps")});
+        edit->setCompleter(&completer);
+        dialog.open();
+        QVERIFY(edit->hasFocus());
+
+        sendKey(mainWindow, Qt::Key_A, Qt::NoModifier, QStringLiteral("a"));
+        QVERIFY(completer.isPopupVisible());
+
+        sendKey(mainWindow, Qt::Key_Escape);
+        QVERIFY(!completer.isPopupVisible());
+        QVERIFY(dialog.isVisible());
+
+        sendKey(mainWindow, Qt::Key_Escape);
+        QVERIFY(!dialog.isVisible());
     }
 };
 

@@ -34,6 +34,7 @@ set(QTTUI_SOURCES
     QTuiDoubleSpinBox.cpp
     QTuiSlider.cpp
     QTuiDial.cpp
+    QTuiDialog.cpp
     QTuiComboBox.cpp
     QTuiCompleter.cpp
     QTuiProgressBar.cpp
@@ -125,6 +126,7 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiDoubleSpinBox.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiSlider.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiDial.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiDialog.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiComboBox.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiCompleter.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiProgressBar.h

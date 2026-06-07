@@ -81,6 +81,12 @@ void QTuiToolTip::showText(const QPoint &pos, const QString &text)
     const int x = qBound(screen.x(), pos.x(), screen.right() + 1 - width);
     const int y = qBound(screen.y(), pos.y(), screen.bottom());
 
+    // Move to the end of the child list so the tooltip paints above a
+    // dialog that was opened after it was created
+    QTuiWidget *window = tip->parentWidget();
+    tip->setParent(nullptr);
+    tip->setParent(window);
+
     tip->text = text;
     tip->setGeometry(QRect(x, y, width, 1));
     tip->setVisible(true);
