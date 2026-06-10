@@ -18,6 +18,7 @@
 #include <QtTUI/QTuiAction.h>
 #include <QtTUI/QTuiBoxLayout.h>
 #include <QtTUI/QTuiDialog.h>
+#include <QtTUI/QTuiLabel.h>
 #include <QtTUI/QTuiComboBox.h>
 #include <QtTUI/QTuiMainWindow.h>
 #include <QtTUI/QTuiMenu.h>
@@ -610,6 +611,45 @@ private slots:
         sendKey(mainWindow, Qt::Key_Escape);
         QVERIFY(!dialog.isVisible());
     }
+
+    // A parent repainted because it overlaps a small damaged child paints
+    // its whole area; a popup above that area must repaint on top of it.
+    // Original bug: a button release under an open dialog made the page
+    // repaint over the dialog.
+    void popupSurvivesParentRepaintOutsideDamage()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 60, 20));
+        app.setMainWindow(&mainWindow);
+        auto *central = new FillWidget(QLatin1Char('C'));
+        mainWindow.setCentralWidget(central);
+        auto *small = new FillWidget(QLatin1Char('s'), central);
+        small->setGeometry(QRect(0, 0, 4, 1)); // far from the dialog
+        mainWindow.show();
+
+        QTuiDialog dialog;
+        dialog.setWindowTitle(QStringLiteral("Stay"));
+        auto *col = new QTuiBoxLayout(QTuiBoxLayout::TopToBottom);
+        col->addWidget(new QTuiLabel(QStringLiteral("content"), &dialog));
+        dialog.setLayout(col);
+        dialog.open();
+        app.triggerRender();
+        ScreenBuffer *buf = app.screenBuffer();
+        const QRect geo = dialog.geometry();
+        QVERIFY(rowText(buf, geo.y(), geo.x(), geo.width()).contains(QStringLiteral("Stay")));
+
+        // An incremental pass, as in the real event loop (triggerRender()
+        // always repaints everything and would hide the bug)
+        small->markDirty();
+        QCoreApplication::processEvents();
+        QVERIFY(rowText(buf, geo.y(), geo.x(), geo.width()).contains(QStringLiteral("Stay")));
+        QVERIFY(rowText(buf, geo.y() + 1, geo.x(), geo.width()).contains(QStringLiteral("content")));
+    }
+
 };
 
 QTEST_APPLESS_MAIN(TestPopupRendering)

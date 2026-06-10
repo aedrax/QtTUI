@@ -134,6 +134,15 @@ void RenderScheduler::executeRenderPass()
     buffer->swapBuffers();
 }
 
+bool RenderScheduler::intersectsPassRectsFully(const QRect &rect) const
+{
+    for (const QRect &damage : m_passRects) {
+        if (damage.contains(rect))
+            return true;
+    }
+    return false;
+}
+
 bool RenderScheduler::intersectsPassRects(const QRect &rect) const
 {
     for (const QRect &damage : m_passRects) {
@@ -193,6 +202,13 @@ void RenderScheduler::paintTree(QTuiWidget *widget, const QRect &parentClipRect)
             widget->paintEvent(*buffer);
         }
         widget->clearDirtyRegions();
+
+        // A widget paints its whole geometry, which can be more than the
+        // damage that caused the repaint. Record the painted area, so that
+        // its children and any popup above it repaint on top of it. The
+        // main window paints nothing itself.
+        if (widget != m_app->mainWindow() && !intersectsPassRectsFully(widget->geometry()))
+            m_passRects.append(widget->geometry());
     }
 
     // Recurse into visible children, passing the computed clip rect. Popup

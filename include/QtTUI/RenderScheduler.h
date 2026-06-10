@@ -32,6 +32,8 @@ private:
     void markAllVisibleWidgetsDirty(QTuiWidget *widget);
     void clearVacatedRegion(QTuiWidget *parent, const QRect &region);
     bool intersectsPassRects(const QRect &rect) const;
+    // True if one pass damage rect already contains all of rect
+    bool intersectsPassRectsFully(const QRect &rect) const;
 
     QTuiApplication *m_app;
     bool m_pending = false;
