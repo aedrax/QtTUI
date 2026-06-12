@@ -69,6 +69,7 @@ set(QTTUI_SOURCES
     QTuiTreeWidgetItem.cpp
     QTuiTreeWidgetItemIterator.cpp
     QTuiTreeWidget.cpp
+    QTuiAbstractButton.cpp
     QTuiAction.cpp
     QTuiKeySequence.cpp
     QTuiMenu.cpp
@@ -163,6 +164,7 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTreeWidgetItem.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTreeWidgetItemIterator.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTreeWidget.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiAbstractButton.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiAction.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiKeySequence.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiMenu.h

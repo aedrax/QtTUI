@@ -39,6 +39,7 @@
 #include <QtTUI/QTuiLabel.h>
 
 // Button and toggle widgets
+#include <QtTUI/QTuiAbstractButton.h>
 #include <QtTUI/QTuiPushButton.h>
 #include <QtTUI/QTuiToolButton.h>
 #include <QtTUI/QTuiCheckBox.h>

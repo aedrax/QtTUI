@@ -6,43 +6,21 @@
 namespace QtTUI {
 
 QTuiRadioButton::QTuiRadioButton(const QString &text, QTuiWidget *parent)
-    : QTuiWidget(parent)
-    , m_text(text)
+    : QTuiAbstractButton(parent)
 {
-    setFocusPolicy(Qt::StrongFocus);
+    setText(text);
+    setCheckable(true);
 }
 
-QString QTuiRadioButton::text() const
+void QTuiRadioButton::nextCheckState()
 {
-    return m_text;
-}
-
-void QTuiRadioButton::setText(const QString &text)
-{
-    if (m_text == text)
-        return;
-    m_text = text;
-    markDirty();
-}
-
-bool QTuiRadioButton::isChecked() const
-{
-    return m_checked;
-}
-
-void QTuiRadioButton::setChecked(bool checked)
-{
-    if (m_checked != checked) {
-        m_checked = checked;
-        emit toggled(m_checked);
-        markDirty();
-    }
+    setChecked(true);
 }
 
 QSize QTuiRadioButton::minimumSize() const
 {
     // "(*) " = 4 chars + text length
-    return QSize(4 + m_text.length(), 1);
+    return QSize(4 + text().length(), 1);
 }
 
 void QTuiRadioButton::paintEvent(ScreenBuffer &buffer)
@@ -83,8 +61,8 @@ void QTuiRadioButton::paintEvent(ScreenBuffer &buffer)
     }
 
     // Build the display string: indicator + space + text
-    QString indicator = m_checked ? QStringLiteral("(*)") : QStringLiteral("( )");
-    QString content = indicator + QLatin1Char(' ') + m_text;
+    QString indicator = isChecked() ? QStringLiteral("(*)") : QStringLiteral("( )");
+    QString content = indicator + QLatin1Char(' ') + text();
     int textLen = qMin(static_cast<int>(content.length()), geoW);
 
     // Render on the first row
@@ -95,34 +73,16 @@ void QTuiRadioButton::paintEvent(ScreenBuffer &buffer)
             if (px < buffer.width()) {
                 Cell &cell = buffer.backCell(px, py);
                 cell.setChar(content.at(i).unicode());
-                cell.foreground = fg;
-                cell.background = bg;
+                // Pressed look: the 3-cell indicator inverts
+                const bool pressedCell = i < 3 && isDown() && isEffectivelyEnabled();
+                cell.foreground = pressedCell ? bg : fg;
+                cell.background = pressedCell ? fg : bg;
                 cell.bold = theme.bold;
                 cell.italic = theme.italic;
                 cell.underline = theme.underline;
             }
         }
     }
-}
-
-void QTuiRadioButton::keyPressEvent(TuiKeyEvent *event)
-{
-    const int key = event->key();
-    if (key == Qt::Key_Return || key == Qt::Key_Enter || key == Qt::Key_Space) {
-        // Radio buttons only set themselves to checked
-        // Unchecking others is handled by QTuiButtonGroup
-        setChecked(true);
-    }
-}
-
-void QTuiRadioButton::mousePressEvent(TuiMouseEvent *event)
-{
-    if (event->mouseType() != TuiMouseEvent::Press)
-        return;
-
-    // Radio buttons only set themselves to checked
-    // Unchecking others is handled by QTuiButtonGroup
-    setChecked(true);
 }
 
 } // namespace QtTUI

@@ -1,5 +1,6 @@
 #include <QtTest/QtTest>
 #include <rapidcheck.h>
+#include <QtTUI/QTuiAbstractButton.h>
 #include <QtTUI/QTuiPushButton.h>
 #include <QtTUI/QTuiToolButton.h>
 #include <QtTUI/QTuiCheckBox.h>
@@ -613,6 +614,76 @@ private slots:
                     RC_ASSERT(spy.at(0).at(0).toInt() == expected);
                 }
             });
+    }
+
+    void abstractButton_sharedBehavior()
+    {
+        // Every button type is a QTuiAbstractButton with one click path
+        QTuiPushButton push(QStringLiteral("P"));
+        QTuiCheckBox check(QStringLiteral("C"));
+        QTuiRadioButton radio(QStringLiteral("R"));
+        for (QTuiAbstractButton *b : QList<QTuiAbstractButton *>{&push, &check, &radio}) {
+            QSignalSpy clicked(b, &QTuiAbstractButton::clicked);
+            sendKey(*b, Qt::Key_Space);
+            QCOMPARE(clicked.count(), 1);
+            QVERIFY(b->isDown());
+        }
+        // The check box and radio button paint the pressed look: the
+        // indicator inverts while the button is down
+        for (QTuiAbstractButton *b : QList<QTuiAbstractButton *>{&check, &radio}) {
+            b->setGeometry(QRect(0, 0, 6, 1));
+            ScreenBuffer down(6, 1);
+            b->paintEvent(down);
+            b->setDown(false);
+            ScreenBuffer up(6, 1);
+            b->paintEvent(up);
+            QCOMPARE(down.backCell(1, 0).background, up.backCell(1, 0).foreground);
+            QCOMPARE(down.backCell(4, 0).background, up.backCell(4, 0).background);
+        }
+        QVERIFY(!push.isChecked());   // not checkable
+        QVERIFY(check.isChecked());
+        QVERIFY(radio.isChecked());
+
+        // A radio click only checks; toggle() through the base works
+        radio.click();
+        QVERIFY(radio.isChecked());
+        check.toggle();
+        QCOMPARE(check.checkState(), int(QTuiCheckBox::Unchecked));
+    }
+
+    void checkBox_setCheckedThroughBaseKeepsState()
+    {
+        QTuiCheckBox check(QStringLiteral("C"));
+        check.setTristate(true);
+        QSignalSpy states(&check, &QTuiCheckBox::stateChanged);
+
+        QTuiAbstractButton *base = &check;
+        base->setChecked(true);
+        QCOMPARE(check.checkState(), int(QTuiCheckBox::Checked));
+
+        // A partial state is "not checked" and survives setChecked(false)
+        check.setCheckState(QTuiCheckBox::PartiallyChecked);
+        QVERIFY(!check.isChecked());
+        base->setChecked(false);
+        QCOMPARE(check.checkState(), int(QTuiCheckBox::PartiallyChecked));
+        QCOMPARE(states.count(), 2);
+    }
+
+    void buttonGroup_exclusiveCheckBoxes()
+    {
+        QTuiCheckBox a(QStringLiteral("A")), b(QStringLiteral("B"));
+        QTuiButtonGroup group;
+        group.addButton(&a, 1);
+        group.addButton(&b, 2);
+        QSignalSpy toggled(&group, &QTuiButtonGroup::buttonToggled);
+
+        a.setChecked(true);
+        b.setChecked(true);
+        QVERIFY(!a.isChecked());
+        QCOMPARE(a.checkState(), int(QTuiCheckBox::Unchecked));
+        QCOMPARE(group.checkedId(), 2);
+        // a on, b on, a off: one signal per change
+        QCOMPARE(toggled.count(), 3);
     }
 };
 

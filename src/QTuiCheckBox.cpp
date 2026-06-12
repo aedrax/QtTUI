@@ -6,23 +6,10 @@
 namespace QtTUI {
 
 QTuiCheckBox::QTuiCheckBox(const QString &text, QTuiWidget *parent)
-    : QTuiWidget(parent)
-    , m_text(text)
+    : QTuiAbstractButton(parent)
 {
-    setFocusPolicy(Qt::StrongFocus);
-}
-
-QString QTuiCheckBox::text() const
-{
-    return m_text;
-}
-
-void QTuiCheckBox::setText(const QString &text)
-{
-    if (m_text == text)
-        return;
-    m_text = text;
-    markDirty();
+    setText(text);
+    setCheckable(true);
 }
 
 int QTuiCheckBox::checkState() const
@@ -34,21 +21,29 @@ void QTuiCheckBox::setCheckState(int state)
 {
     // Clamp to valid range
     state = qBound(0, state, 2);
-    if (m_checkState != state) {
-        m_checkState = state;
-        emit stateChanged(m_checkState);
-        markDirty();
-    }
+    if (m_checkState == state)
+        return;
+    m_checkState = state;
+    emit stateChanged(m_checkState);
+    markDirty();
+    // Keep the base checked state (Checked only) in sync
+    QTuiAbstractButton::setChecked(m_checkState == Checked);
 }
 
-bool QTuiCheckBox::isChecked() const
+void QTuiCheckBox::nextCheckState()
 {
-    return m_checkState == Checked;
+    if (m_tristate)
+        setCheckState((m_checkState + 1) % 3); // Unchecked, Partially, Checked
+    else
+        setCheckState(m_checkState == Checked ? Unchecked : Checked);
 }
 
-void QTuiCheckBox::setChecked(bool checked)
+void QTuiCheckBox::checkStateSet()
 {
-    setCheckState(checked ? Checked : Unchecked);
+    // setChecked() through the base class: follow it, but keep a partial
+    // state that already matches "not checked"
+    if ((m_checkState == Checked) != isChecked())
+        setCheckState(isChecked() ? Checked : Unchecked);
 }
 
 bool QTuiCheckBox::isTristate() const
@@ -64,7 +59,7 @@ void QTuiCheckBox::setTristate(bool tristate)
 QSize QTuiCheckBox::minimumSize() const
 {
     // "[x] " = 4 chars + text length
-    return QSize(4 + m_text.length(), 1);
+    return QSize(4 + text().length(), 1);
 }
 
 void QTuiCheckBox::paintEvent(ScreenBuffer &buffer)
@@ -112,7 +107,7 @@ void QTuiCheckBox::paintEvent(ScreenBuffer &buffer)
     default:               indicator = QStringLiteral("[ ]"); break;
     }
 
-    QString content = indicator + QLatin1Char(' ') + m_text;
+    QString content = indicator + QLatin1Char(' ') + text();
     int textLen = qMin(static_cast<int>(content.length()), geoW);
 
     // Render on the first row
@@ -123,39 +118,15 @@ void QTuiCheckBox::paintEvent(ScreenBuffer &buffer)
             if (px < buffer.width()) {
                 Cell &cell = buffer.backCell(px, py);
                 cell.setChar(content.at(i).unicode());
-                cell.foreground = fg;
-                cell.background = bg;
+                // Pressed look: the 3-cell indicator inverts
+                const bool pressedCell = i < 3 && isDown() && isEffectivelyEnabled();
+                cell.foreground = pressedCell ? bg : fg;
+                cell.background = pressedCell ? fg : bg;
                 cell.bold = theme.bold;
                 cell.italic = theme.italic;
                 cell.underline = theme.underline;
             }
         }
-    }
-}
-
-void QTuiCheckBox::keyPressEvent(TuiKeyEvent *event)
-{
-    const int key = event->key();
-    if (key == Qt::Key_Return || key == Qt::Key_Enter || key == Qt::Key_Space) {
-        if (m_tristate) {
-            // Cycle: Unchecked → PartiallyChecked → Checked → Unchecked
-            setCheckState((m_checkState + 1) % 3);
-        } else {
-            // Toggle: Unchecked ↔ Checked
-            setCheckState(m_checkState == Checked ? Unchecked : Checked);
-        }
-    }
-}
-
-void QTuiCheckBox::mousePressEvent(TuiMouseEvent *event)
-{
-    if (event->mouseType() != TuiMouseEvent::Press)
-        return;
-
-    if (m_tristate) {
-        setCheckState((m_checkState + 1) % 3);
-    } else {
-        setCheckState(m_checkState == Checked ? Unchecked : Checked);
     }
 }
 

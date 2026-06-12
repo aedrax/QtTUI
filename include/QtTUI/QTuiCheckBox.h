@@ -2,14 +2,13 @@
 #define QTTUI_QTUICHECKBOX_H
 
 #include <QtTUI/QtTUIGlobal.h>
-#include <QtTUI/QTuiWidget.h>
+#include <QtTUI/QTuiAbstractButton.h>
 #include <QString>
 
 namespace QtTUI {
 
-class QTuiCheckBox : public QTuiWidget {
+class QTuiCheckBox : public QTuiAbstractButton {
     Q_OBJECT
-    Q_PROPERTY(QString text READ text WRITE setText)
     Q_PROPERTY(int checkState READ checkState WRITE setCheckState NOTIFY stateChanged)
     Q_PROPERTY(bool tristate READ isTristate WRITE setTristate)
 public:
@@ -17,14 +16,8 @@ public:
 
     explicit QTuiCheckBox(const QString &text = QString(), QTuiWidget *parent = nullptr);
 
-    QString text() const;
-    void setText(const QString &text);
-
     int checkState() const;
     void setCheckState(int state);
-
-    bool isChecked() const;
-    void setChecked(bool checked);
 
     bool isTristate() const;
     void setTristate(bool tristate);
@@ -36,11 +29,12 @@ signals:
     void stateChanged(int state);
 
 protected:
-    void keyPressEvent(TuiKeyEvent *event) override;
-    void mousePressEvent(TuiMouseEvent *event) override;
+    // A click cycles Unchecked, PartiallyChecked, Checked if tristate
+    void nextCheckState() override;
+    // setChecked() through the base class updates the check state
+    void checkStateSet() override;
 
 private:
-    QString m_text;
     int m_checkState = Unchecked;
     bool m_tristate = false;
 };

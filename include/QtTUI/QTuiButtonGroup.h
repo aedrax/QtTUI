@@ -34,7 +34,6 @@ signals:
 private slots:
     void onButtonToggled(bool checked);
     void onButtonClicked();
-    void onCheckBoxStateChanged(int state);
 
 private:
     struct ButtonEntry {

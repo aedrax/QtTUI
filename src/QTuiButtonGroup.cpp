@@ -1,4 +1,6 @@
 #include <QtTUI/QTuiButtonGroup.h>
+#include <QtTUI/QTuiAbstractButton.h>
+#include <QDebug>
 #include <QtTUI/QTuiWidget.h>
 #include <QMetaObject>
 #include <QMetaMethod>
@@ -24,28 +26,15 @@ void QTuiButtonGroup::addButton(QTuiWidget *button, int id)
     if (id == -1)
         id = m_nextId--;
 
+    auto *abstractButton = qobject_cast<QTuiAbstractButton *>(button);
+    if (!abstractButton) {
+        qWarning() << "QTuiButtonGroup::addButton: not a QTuiAbstractButton, ignored";
+        return;
+    }
+
     m_buttons.append({button, id});
-
-    // Dynamically connect to available signals using the meta-object system.
-    // QTuiPushButton and QTuiRadioButton have toggled(bool).
-    // QTuiCheckBox has stateChanged(int).
-    // QTuiPushButton has clicked().
-    const QMetaObject *meta = button->metaObject();
-
-    int toggledIdx = meta->indexOfSignal(QMetaObject::normalizedSignature("toggled(bool)").constData());
-    if (toggledIdx >= 0) {
-        connect(button, SIGNAL(toggled(bool)), this, SLOT(onButtonToggled(bool)));
-    }
-
-    int stateChangedIdx = meta->indexOfSignal(QMetaObject::normalizedSignature("stateChanged(int)").constData());
-    if (stateChangedIdx >= 0) {
-        connect(button, SIGNAL(stateChanged(int)), this, SLOT(onCheckBoxStateChanged(int)));
-    }
-
-    int clickedIdx = meta->indexOfSignal(QMetaObject::normalizedSignature("clicked()").constData());
-    if (clickedIdx >= 0) {
-        connect(button, SIGNAL(clicked()), this, SLOT(onButtonClicked()));
-    }
+    connect(abstractButton, &QTuiAbstractButton::toggled, this, &QTuiButtonGroup::onButtonToggled);
+    connect(abstractButton, &QTuiAbstractButton::clicked, this, &QTuiButtonGroup::onButtonClicked);
 }
 
 void QTuiButtonGroup::removeButton(QTuiWidget *button)
@@ -92,14 +81,8 @@ QTuiWidget *QTuiButtonGroup::button(int id) const
 QTuiWidget *QTuiButtonGroup::checkedButton() const
 {
     for (const auto &entry : m_buttons) {
-        // Try "checked" property (QTuiPushButton, QTuiRadioButton)
-        QVariant checked = entry.button->property("checked");
-        if (checked.isValid() && checked.toBool())
-            return entry.button;
-
-        // Try "checkState" property (QTuiCheckBox)
-        QVariant checkState = entry.button->property("checkState");
-        if (checkState.isValid() && checkState.toInt() == 2) // Checked == 2
+        auto *button = qobject_cast<QTuiAbstractButton *>(entry.button);
+        if (button && button->isChecked())
             return entry.button;
     }
     return nullptr;
@@ -144,11 +127,8 @@ void QTuiButtonGroup::handleToggle(QTuiWidget *button, bool checked)
         // Uncheck all other buttons
         for (const auto &entry : m_buttons) {
             if (entry.button != button) {
-                // Use property system to uncheck generically.
-                // "checked" works for QTuiPushButton and QTuiRadioButton.
-                // "checkState" works for QTuiCheckBox.
-                entry.button->setProperty("checked", false);
-                entry.button->setProperty("checkState", 0);
+                if (auto *other = qobject_cast<QTuiAbstractButton *>(entry.button))
+                    other->setChecked(false);
             }
         }
     }
@@ -176,14 +156,5 @@ void QTuiButtonGroup::onButtonClicked()
     emit buttonClicked(buttonId);
 }
 
-void QTuiButtonGroup::onCheckBoxStateChanged(int state)
-{
-    auto *button = qobject_cast<QTuiWidget *>(sender());
-    if (!button)
-        return;
-
-    // state == 2 means Checked, anything else is not checked
-    handleToggle(button, state == 2);
-}
 
 } // namespace QtTUI

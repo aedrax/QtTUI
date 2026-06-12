@@ -2,36 +2,13 @@
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
-#include <QTimer>
 
 namespace QtTUI {
 
-// Time that the pressed look stays visible after a click
-static constexpr int kPressedLookMs = 150;
-
 QTuiPushButton::QTuiPushButton(const QString &text, QTuiWidget *parent)
-    : QTuiWidget(parent)
-    , m_text(text)
-    , m_releaseTimer(new QTimer(this))
+    : QTuiAbstractButton(parent)
 {
-    setFocusPolicy(Qt::StrongFocus);
-    m_releaseTimer->setSingleShot(true);
-    m_releaseTimer->setInterval(kPressedLookMs);
-    connect(m_releaseTimer, &QTimer::timeout, this, [this]() { setDown(false); });
-}
-
-QString QTuiPushButton::text() const
-{
-    return m_text;
-}
-
-void QTuiPushButton::setText(const QString &text)
-{
-    if (m_text != text) {
-        m_text = text;
-        emit textChanged(m_text);
-        markDirty();
-    }
+    setText(text);
 }
 
 QString QTuiPushButton::icon() const
@@ -47,60 +24,10 @@ void QTuiPushButton::setIcon(const QString &icon)
     markDirty();
 }
 
-bool QTuiPushButton::isCheckable() const
-{
-    return m_checkable;
-}
-
-void QTuiPushButton::setCheckable(bool checkable)
-{
-    if (m_checkable == checkable)
-        return;
-    m_checkable = checkable;
-    markDirty();
-}
-
-bool QTuiPushButton::isChecked() const
-{
-    return m_checked;
-}
-
-void QTuiPushButton::setChecked(bool checked)
-{
-    if (m_checked != checked) {
-        m_checked = checked;
-        emit toggled(m_checked);
-        markDirty();
-    }
-}
-
-bool QTuiPushButton::isDown() const
-{
-    return m_down;
-}
-
-void QTuiPushButton::setDown(bool down)
-{
-    if (m_down == down)
-        return;
-    m_down = down;
-    markDirty();
-}
-
-void QTuiPushButton::animateClick()
-{
-    setDown(true);
-    m_releaseTimer->start();
-
-    emit clicked();
-    if (m_checkable)
-        setChecked(!m_checked);
-}
-
 QSize QTuiPushButton::minimumSize() const
 {
     // Content: icon + space + text, surrounded by border (1 char each side)
-    int contentWidth = m_text.length();
+    int contentWidth = text().length();
     if (!m_icon.isEmpty())
         contentWidth += m_icon.length() + 1; // icon + space
 
@@ -137,13 +64,13 @@ void QTuiPushButton::paintEvent(ScreenBuffer &buffer)
     }
 
     // If checked, use inverse colors as visual indicator
-    if (m_checkable && m_checked && enabled) {
+    if (isCheckable() && isChecked() && enabled) {
         std::swap(fg, bg);
     }
 
     // Pressed: invert again and move the label 1 cell right, so the button
     // looks pushed in
-    const bool pressed = m_down && enabled;
+    const bool pressed = isDown() && enabled;
     if (pressed)
         std::swap(fg, bg);
 
@@ -228,9 +155,9 @@ void QTuiPushButton::paintEvent(ScreenBuffer &buffer)
     // Build content string: icon + text
     QString content;
     if (!m_icon.isEmpty()) {
-        content = m_icon + QLatin1Char(' ') + m_text;
+        content = m_icon + QLatin1Char(' ') + text();
     } else {
-        content = m_text;
+        content = text();
     }
 
     // Render content centered in the middle row(s)
@@ -256,29 +183,6 @@ void QTuiPushButton::paintEvent(ScreenBuffer &buffer)
             }
         }
     }
-}
-
-void QTuiPushButton::keyPressEvent(TuiKeyEvent *event)
-{
-    // The base event() already drops events for disabled widgets; this guard
-    // covers direct handler invocation (subclasses, tests).
-    if (!isEffectivelyEnabled())
-        return;
-
-    const int key = event->key();
-    if (key == Qt::Key_Return || key == Qt::Key_Enter || key == Qt::Key_Space)
-        animateClick();
-}
-
-void QTuiPushButton::mousePressEvent(TuiMouseEvent *event)
-{
-    if (!isEffectivelyEnabled())
-        return;
-
-    if (event->mouseType() != TuiMouseEvent::Press)
-        return;
-
-    animateClick();
 }
 
 } // namespace QtTUI
