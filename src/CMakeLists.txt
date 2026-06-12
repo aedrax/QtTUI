@@ -72,6 +72,7 @@ set(QTTUI_SOURCES
     QTuiKeySequence.cpp
     QTuiMenu.cpp
     QTuiMenuBar.cpp
+    QTuiMessageBox.cpp
     QTuiToolBar.cpp
     QTuiStatusBar.cpp
     QTuiWidgetAction.cpp
@@ -164,6 +165,7 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiKeySequence.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiMenu.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiMenuBar.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiMessageBox.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiToolBar.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiStatusBar.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiWidgetAction.h

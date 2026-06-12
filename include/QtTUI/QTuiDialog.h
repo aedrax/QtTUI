@@ -58,6 +58,11 @@ signals:
     void accepted();
     void rejected();
 
+protected:
+    // The widget that gets focus when the dialog opens. The default is the
+    // first widget that takes Tab focus.
+    virtual QTuiWidget *initialFocusWidget() const;
+
 private:
     void placeInMainWindow();
     void applyLayout();

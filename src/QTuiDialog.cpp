@@ -100,8 +100,15 @@ void QTuiDialog::open()
     setVisible(true);
     markDirty();
 
-    // Focus the first widget that takes Tab focus
-    std::function<QTuiWidget *(QTuiWidget *)> firstFocusable = [&](QTuiWidget *w) -> QTuiWidget * {
+    if (QTuiWidget *first = initialFocusWidget())
+        first->setFocus();
+}
+
+QTuiWidget *QTuiDialog::initialFocusWidget() const
+{
+    // The first widget that takes Tab focus, depth first
+    std::function<QTuiWidget *(const QTuiWidget *)> firstFocusable =
+        [&](const QTuiWidget *w) -> QTuiWidget * {
         for (QTuiWidget *child : w->childWidgets()) {
             if (!child->isVisible() || child->isPopup())
                 continue;
@@ -112,8 +119,7 @@ void QTuiDialog::open()
         }
         return nullptr;
     };
-    if (QTuiWidget *first = firstFocusable(this))
-        first->setFocus();
+    return firstFocusable(this);
 }
 
 int QTuiDialog::exec()

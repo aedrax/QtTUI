@@ -131,12 +131,20 @@ static QTuiWidget *createButtonsTab(QTuiWidget *parent, QTuiStatusBar *statusBar
     auto *btn1 = new QTuiPushButton("Click Me", page);
     auto *btn2 = new QTuiPushButton("Another Button", page);
     btn1->setToolTip("Shows its text in the status bar");
-    btn2->setToolTip("Also shows its text in the status bar");
+    btn2->setToolTip("Opens a QTuiMessageBox");
     QObject::connect(btn1, &QTuiPushButton::clicked, [statusBar, btn1]() {
         statusBar->showMessage(btn1->text());
     });
-    QObject::connect(btn2, &QTuiPushButton::clicked, [statusBar, btn2]() {
-        statusBar->showMessage(btn2->text());
+    QObject::connect(btn2, &QTuiPushButton::clicked, [statusBar]() {
+        const auto answer = QTuiMessageBox::question(
+            nullptr, "QTuiMessageBox",
+            "Do you like the modal dialog? Tab moves between the buttons, "
+            "Enter chooses, and Escape cancels.",
+            QTuiMessageBox::Yes | QTuiMessageBox::No | QTuiMessageBox::Cancel,
+            QTuiMessageBox::Yes);
+        const char *name = answer == QTuiMessageBox::Yes ? "Yes"
+            : answer == QTuiMessageBox::No ? "No" : "Cancel";
+        statusBar->showMessage(QStringLiteral("Message box answer: %1").arg(name));
     });
     page->addWidget(row(page, {btn1, btn2}));
 

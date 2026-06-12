@@ -19,6 +19,7 @@
 #include <QtTUI/QTuiBoxLayout.h>
 #include <QtTUI/QTuiDialog.h>
 #include <QtTUI/QTuiLabel.h>
+#include <QtTUI/QTuiMessageBox.h>
 #include <QtTUI/QTuiComboBox.h>
 #include <QtTUI/QTuiMainWindow.h>
 #include <QtTUI/QTuiMenu.h>
@@ -612,6 +613,52 @@ private slots:
         QVERIFY(!dialog.isVisible());
     }
 
+    void messageBoxReturnsChosenButton()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 60, 20));
+        app.setMainWindow(&mainWindow);
+        mainWindow.show();
+
+        // Default button No has focus; Tab wraps No -> Yes; Enter picks Yes
+        QTimer::singleShot(0, [&mainWindow]() {
+            sendKey(mainWindow, Qt::Key_Tab);
+            sendKey(mainWindow, Qt::Key_Return);
+        });
+        QCOMPARE(QTuiMessageBox::question(nullptr, QStringLiteral("Quit"),
+                                          QStringLiteral("Discard the changes?"),
+                                          QTuiMessageBox::Yes | QTuiMessageBox::No,
+                                          QTuiMessageBox::No),
+                 QTuiMessageBox::Yes);
+
+        // Escape returns the escape button: Cancel
+        QTimer::singleShot(0, [&mainWindow]() { sendKey(mainWindow, Qt::Key_Escape); });
+        QCOMPARE(QTuiMessageBox::warning(nullptr, QStringLiteral("Save"), QStringLiteral("Save?"),
+                                         QTuiMessageBox::Ok | QTuiMessageBox::Cancel),
+                 QTuiMessageBox::Cancel);
+
+        // The box shows its text and buttons
+        QTuiMessageBox box(QTuiMessageBox::Information, QStringLiteral("Done"),
+                           QStringLiteral("Saved."));
+        box.open();
+        app.triggerRender();
+        ScreenBuffer *buf = app.screenBuffer();
+        const QRect geo = box.geometry();
+        bool hasText = false, hasOk = false;
+        for (int y = geo.y(); y <= geo.bottom(); ++y) {
+            const QString line = rowText(buf, y, geo.x(), geo.width());
+            hasText = hasText || line.contains(QStringLiteral("Saved."));
+            hasOk = hasOk || line.contains(QStringLiteral(" OK "));
+        }
+        QVERIFY(hasText);
+        QVERIFY(hasOk);
+        box.accept();
+    }
+
     // A parent repainted because it overlaps a small damaged child paints
     // its whole area; a popup above that area must repaint on top of it.
     // Original bug: a button release under an open dialog made the page
@@ -650,6 +697,43 @@ private slots:
         QVERIFY(rowText(buf, geo.y() + 1, geo.x(), geo.width()).contains(QStringLiteral("content")));
     }
 
+    // The real flow: Enter on a button whose clicked() runs exec(). The
+    // button releases 150 ms later inside the dialog's event loop; the
+    // dialog must still be on the screen after that repaint.
+    void dialogSurvivesButtonRelease()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 60, 20));
+        app.setMainWindow(&mainWindow);
+        auto *central = new FillWidget(QLatin1Char('C'));
+        mainWindow.setCentralWidget(central);
+        auto *button = new QTuiPushButton(QStringLiteral("Open"), central);
+        button->setGeometry(QRect(1, 1, 10, 3));
+        mainWindow.show();
+        button->setFocus();
+
+        bool titleAfterRelease = false;
+        QObject::connect(button, &QTuiPushButton::clicked, [&]() {
+            QTimer::singleShot(400, [&]() {
+                // The release repaint already ran in the dialog's loop; check
+                // its result (triggerRender() would repaint everything)
+                QVERIFY(!button->isDown());
+                ScreenBuffer *buf = app.screenBuffer();
+                for (int y = 0; y < 20; ++y)
+                    titleAfterRelease = titleAfterRelease
+                        || rowText(buf, y, 0, 60).contains(QStringLiteral("Title"));
+                sendKey(mainWindow, Qt::Key_Escape);
+            });
+            QTuiMessageBox::information(nullptr, QStringLiteral("Title"), QStringLiteral("Text"));
+        });
+
+        sendKey(mainWindow, Qt::Key_Return);
+        QVERIFY(titleAfterRelease);
+    }
 };
 
 QTEST_APPLESS_MAIN(TestPopupRendering)
