@@ -24,6 +24,7 @@
 #include <QtTUI/QTuiToolTip.h>
 #include <QtTUI/QTuiDialog.h>
 #include <QtTUI/QTuiMessageBox.h>
+#include <QtTUI/QTuiInputDialog.h>
 
 // Layout classes
 #include <QtTUI/QTuiSizePolicy.h>

@@ -20,6 +20,7 @@
 #include <QtTUI/QTuiDialog.h>
 #include <QtTUI/QTuiLabel.h>
 #include <QtTUI/QTuiMessageBox.h>
+#include <QtTUI/QTuiInputDialog.h>
 #include <QtTUI/QTuiComboBox.h>
 #include <QtTUI/QTuiMainWindow.h>
 #include <QtTUI/QTuiMenu.h>
@@ -733,6 +734,58 @@ private slots:
 
         sendKey(mainWindow, Qt::Key_Return);
         QVERIFY(titleAfterRelease);
+    }
+
+    void inputDialogStaticFunctions()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 80, 24));
+        app.setMainWindow(&mainWindow);
+        mainWindow.show();
+
+        // Text: type into the focused line edit, Enter accepts
+        bool ok = false;
+        QTimer::singleShot(0, [&mainWindow]() {
+            sendKey(mainWindow, Qt::Key_X, Qt::NoModifier, QStringLiteral("x"));
+            sendKey(mainWindow, Qt::Key_Return);
+        });
+        QCOMPARE(QTuiInputDialog::getText(nullptr, QStringLiteral("Name"), QStringLiteral("Name:"),
+                                          QStringLiteral("ab"), &ok),
+                 QStringLiteral("abx"));
+        QVERIFY(ok);
+
+        // Int: Up steps the spin box; Escape cancels and returns the start value
+        QTimer::singleShot(0, [&mainWindow]() {
+            sendKey(mainWindow, Qt::Key_Up);
+            sendKey(mainWindow, Qt::Key_Escape);
+        });
+        QCOMPARE(QTuiInputDialog::getInt(nullptr, QStringLiteral("Count"), QStringLiteral("Count:"),
+                                         5, 0, 10, 1, &ok), 5);
+        QVERIFY(!ok);
+
+        // Int: Up, then Tab to OK and Enter
+        QTimer::singleShot(0, [&mainWindow]() {
+            sendKey(mainWindow, Qt::Key_Up);
+            sendKey(mainWindow, Qt::Key_Tab);
+            sendKey(mainWindow, Qt::Key_Return);
+        });
+        QCOMPARE(QTuiInputDialog::getInt(nullptr, QStringLiteral("Count"), QStringLiteral("Count:"),
+                                         5, 0, 10, 1, &ok), 6);
+        QVERIFY(ok);
+
+        // Item: the current item is preselected; Tab to OK and Enter
+        QTimer::singleShot(0, [&mainWindow]() {
+            sendKey(mainWindow, Qt::Key_Tab);
+            sendKey(mainWindow, Qt::Key_Return);
+        });
+        QCOMPARE(QTuiInputDialog::getItem(nullptr, QStringLiteral("Color"), QStringLiteral("Color:"),
+                                          {QStringLiteral("Red"), QStringLiteral("Green")}, 1, &ok),
+                 QStringLiteral("Green"));
+        QVERIFY(ok);
     }
 };
 

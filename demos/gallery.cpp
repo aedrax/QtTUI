@@ -151,7 +151,14 @@ static QTuiWidget *createButtonsTab(QTuiWidget *parent, QTuiStatusBar *statusBar
     // -- QTuiToolButton section --
     page->addWidget(sectionLabel("QTuiToolButton", page));
     auto *toolBtn = new QTuiToolButton("Tool", page);
-    toolBtn->setToolTip("A compact button without a border");
+    toolBtn->setToolTip("Opens a QTuiInputDialog");
+    QObject::connect(toolBtn, &QTuiToolButton::clicked, [statusBar]() {
+        bool ok = false;
+        const QString name = QTuiInputDialog::getText(nullptr, "QTuiInputDialog",
+                                                      "Your name:", "Ada", &ok);
+        statusBar->showMessage(ok ? QStringLiteral("Hello, %1").arg(name)
+                                  : QStringLiteral("Input canceled"));
+    });
     page->addWidget(row(page, {toolBtn}));
 
     // -- QTuiCheckBox section --
