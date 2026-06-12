@@ -114,6 +114,30 @@ int QTuiBoxLayout::itemMinimum(const Item &item, bool vertical) const
     return vertical ? minSz.height() : minSz.width();
 }
 
+int QTuiBoxLayout::itemHint(const Item &item, bool vertical) const
+{
+    if (!item.widget)
+        return item.spacerSize;
+    const QSize hint = item.widget->sizeHint().expandedTo(item.widget->minimumSize());
+    return vertical ? hint.height() : hint.width();
+}
+
+// The stretch factor used for distribution: a Fixed widget never grows,
+// and an Expanding widget without a stretch factor takes free space
+int QTuiBoxLayout::effectiveStretch(const Item &item, bool vertical) const
+{
+    if (!item.widget)
+        return item.stretch;
+    const QTuiSizePolicy policy = item.widget->sizePolicy();
+    const auto along = vertical ? policy.verticalPolicy() : policy.horizontalPolicy();
+    if (along == QTuiSizePolicy::Fixed)
+        return 0;
+    if (item.stretch == 0
+        && (along == QTuiSizePolicy::Expanding || along == QTuiSizePolicy::MinimumExpanding))
+        return 1;
+    return item.stretch;
+}
+
 void QTuiBoxLayout::addSpacing(int size)
 {
     m_boxItems.append({nullptr, 0, qMax(0, size)});
@@ -198,15 +222,29 @@ void QTuiBoxLayout::apply(const QRect &availableArea)
     int fixedSpace = 0;
     int totalStretch = 0;
 
+    // Items without stretch get their size hint if all hints fit, else
+    // their minimum size
+    QVector<int> stretch(m_boxItems.size(), 0);
+    int hintTotal = 0;
+    for (int i = 0; i < m_boxItems.size(); ++i) {
+        if (!eligible[i])
+            continue;
+        stretch[i] = effectiveStretch(m_boxItems[i], vertical);
+        if (stretch[i] == 0)
+            hintTotal += itemHint(m_boxItems[i], vertical);
+    }
+    const bool hintsFit = hintTotal + totalSpacing <= totalSpace;
+
     for (int i = 0; i < m_boxItems.size(); ++i) {
         if (!eligible[i]) {
             locked[i] = true;
-        } else if (m_boxItems[i].stretch == 0) {
-            allocations[i] = itemMinimum(m_boxItems[i], vertical);
+        } else if (stretch[i] == 0) {
+            allocations[i] = hintsFit ? itemHint(m_boxItems[i], vertical)
+                                      : itemMinimum(m_boxItems[i], vertical);
             fixedSpace += allocations[i];
             locked[i] = true;
         } else {
-            totalStretch += m_boxItems[i].stretch;
+            totalStretch += stretch[i];
         }
     }
 
@@ -224,13 +262,13 @@ void QTuiBoxLayout::apply(const QRect &availableArea)
             const int minDim = itemMinimum(m_boxItems[i], vertical);
             int proportional = 0;
             if (totalStretch > 0)
-                proportional = (flexSpace * m_boxItems[i].stretch) / totalStretch;
+                proportional = (flexSpace * stretch[i]) / totalStretch;
 
             if (proportional < minDim) {
                 allocations[i] = minDim;
                 locked[i] = true;
                 flexSpace = std::max(0, flexSpace - minDim);
-                totalStretch -= m_boxItems[i].stretch;
+                totalStretch -= stretch[i];
                 changed = true;
             }
         }
@@ -253,7 +291,7 @@ void QTuiBoxLayout::apply(const QRect &availableArea)
                 // Last unlocked item gets the remainder to avoid rounding gaps
                 allocations[i] = flexSpace - distributed;
             } else {
-                allocations[i] = (flexSpace * m_boxItems[i].stretch) / totalStretch;
+                allocations[i] = (flexSpace * stretch[i]) / totalStretch;
                 distributed += allocations[i];
             }
         }
@@ -298,11 +336,21 @@ void QTuiBoxLayout::apply(const QRect &availableArea)
             }
         }
 
+        // Cross axis: a Fixed or Maximum widget gets its size hint (at least
+        // its minimum); all others fill the space
+        const QTuiSizePolicy policy = widget->sizePolicy();
+        const auto across = vertical ? policy.horizontalPolicy() : policy.verticalPolicy();
+        int cross = vertical ? contentW : contentH;
+        if (across == QTuiSizePolicy::Fixed || across == QTuiSizePolicy::Maximum) {
+            const QSize hint = widget->sizeHint().expandedTo(widget->minimumSize());
+            cross = std::min(cross, vertical ? hint.width() : hint.height());
+        }
+
         QRect geom;
         if (vertical) {
-            geom = QRect(contentX, pos, contentW, alloc);
+            geom = QRect(contentX, pos, cross, alloc);
         } else {
-            geom = QRect(pos, contentY, alloc, contentH);
+            geom = QRect(pos, contentY, alloc, cross);
         }
 
         widget->setGeometry(geom);

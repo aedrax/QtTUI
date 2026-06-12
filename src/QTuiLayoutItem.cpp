@@ -27,7 +27,7 @@ QSize QTuiWidgetItem::sizeHint() const
 {
     if (!m_widget)
         return QSize(0, 0);
-    return m_widget->minimumSize();
+    return m_widget->sizeHint().expandedTo(m_widget->minimumSize());
 }
 
 QSize QTuiWidgetItem::minimumSize() const

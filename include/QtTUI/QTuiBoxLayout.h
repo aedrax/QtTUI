@@ -47,6 +47,8 @@ public:
 private:
     bool participatesInLayout(const Item &item) const;
     int itemMinimum(const Item &item, bool vertical) const;
+    int itemHint(const Item &item, bool vertical) const;
+    int effectiveStretch(const Item &item, bool vertical) const;
 
     Direction m_direction;
     QList<Item> m_boxItems;

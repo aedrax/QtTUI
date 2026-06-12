@@ -258,6 +258,28 @@ QSize QTuiWidget::minimumSize() const
     return m_layout ? m_layout->minimumSize() : QSize(0, 0);
 }
 
+QSize QTuiWidget::sizeHint() const
+{
+    return minimumSize();
+}
+
+QTuiSizePolicy QTuiWidget::sizePolicy() const
+{
+    return m_sizePolicy;
+}
+
+void QTuiWidget::setSizePolicy(const QTuiSizePolicy &policy)
+{
+    m_sizePolicy = policy;
+    if (auto *parent = parentWidget(); parent && parent->layout())
+        parent->layout()->invalidate();
+}
+
+void QTuiWidget::setSizePolicy(QTuiSizePolicy::Policy horizontal, QTuiSizePolicy::Policy vertical)
+{
+    setSizePolicy(QTuiSizePolicy(horizontal, vertical));
+}
+
 void QTuiWidget::paintEvent(ScreenBuffer &buffer)
 {
     if (!isVisible() || geometry().isEmpty())

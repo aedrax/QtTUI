@@ -19,6 +19,18 @@ private:
     QSize m_minSize;
 };
 
+// Widget with a size hint larger than its minimum size
+class HintWidget : public QTuiWidget {
+    Q_OBJECT
+public:
+    HintWidget(QSize minSize, QSize hint) : m_min(minSize), m_hint(hint) {}
+    void paintEvent(ScreenBuffer &) override {}
+    QSize minimumSize() const override { return m_min; }
+    QSize sizeHint() const override { return m_hint; }
+private:
+    QSize m_min, m_hint;
+};
+
 class TestQTuiBoxLayout : public QObject {
     Q_OBJECT
 private slots:
@@ -392,6 +404,55 @@ private slots:
         layout.apply(QRect(0, 0, 20, 1));
         QCOMPARE(a.geometry(), QRect(0, 0, 3, 1));
         QCOMPARE(b.geometry(), QRect(16, 0, 4, 1));
+    }
+
+    void fixedPolicyUsesHintOnCrossAxis()
+    {
+        QTuiBoxLayout layout(QTuiBoxLayout::TopToBottom);
+        HintWidget fixed(QSize(4, 1), QSize(8, 1));
+        HintWidget fill(QSize(4, 1), QSize(8, 1));
+        fixed.setSizePolicy(QTuiSizePolicy::Fixed, QTuiSizePolicy::Fixed);
+        layout.addWidget(&fixed);
+        layout.addWidget(&fill);
+
+        layout.apply(QRect(0, 0, 30, 10));
+        QCOMPARE(fixed.geometry().width(), 8);  // size hint, not 30
+        QCOMPARE(fill.geometry().width(), 30);   // Preferred fills
+    }
+
+    void hintUsedWhenItFitsElseMinimum()
+    {
+        QTuiBoxLayout layout(QTuiBoxLayout::LeftToRight);
+        HintWidget a(QSize(3, 1), QSize(10, 1));
+        HintWidget b(QSize(3, 1), QSize(10, 1));
+        layout.addWidget(&a);
+        layout.addWidget(&b);
+
+        layout.apply(QRect(0, 0, 25, 1));
+        QCOMPARE(a.geometry().width(), 10);
+        QCOMPARE(b.geometry().width(), 10);
+
+        layout.apply(QRect(0, 0, 15, 1)); // hints (20) do not fit
+        QCOMPARE(a.geometry().width(), 3);
+        QCOMPARE(b.geometry().width(), 3);
+    }
+
+    void expandingTakesFreeSpaceAndFixedNeverGrows()
+    {
+        QTuiBoxLayout layout(QTuiBoxLayout::LeftToRight);
+        LayoutTestWidget plain(QSize(4, 1));
+        LayoutTestWidget expanding(QSize(4, 1));
+        LayoutTestWidget fixed(QSize(4, 1));
+        expanding.setSizePolicy(QTuiSizePolicy::Expanding, QTuiSizePolicy::Preferred);
+        fixed.setSizePolicy(QTuiSizePolicy::Fixed, QTuiSizePolicy::Preferred);
+        layout.addWidget(&plain);
+        layout.addWidget(&expanding);
+        layout.addWidget(&fixed, 3); // stretch is ignored for Fixed
+
+        layout.apply(QRect(0, 0, 30, 1));
+        QCOMPARE(plain.geometry().width(), 4);
+        QCOMPARE(fixed.geometry().width(), 4);
+        QCOMPARE(expanding.geometry().width(), 22);
     }
 };
 

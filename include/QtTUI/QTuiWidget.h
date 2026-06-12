@@ -2,6 +2,7 @@
 #define QTTUI_QTUIWIDGET_H
 
 #include <QtTUI/QtTUIGlobal.h>
+#include <QtTUI/QTuiSizePolicy.h>
 #include <QObject>
 #include <QPoint>
 #include <QPointer>
@@ -101,6 +102,18 @@ public:
     // widget has no layout.
     virtual QSize minimumSize() const;
 
+    // The size the widget prefers; a box layout gives it this size if
+    // there is space. The default is minimumSize().
+    virtual QSize sizeHint() const;
+
+    // How a box layout sizes the widget. On the axis of the layout, a Fixed
+    // widget never grows and an Expanding widget without a stretch factor
+    // takes free space. On the other axis, a Fixed or Maximum widget gets
+    // its size hint; all others fill the space. Default: Preferred.
+    QTuiSizePolicy sizePolicy() const;
+    void setSizePolicy(const QTuiSizePolicy &policy);
+    void setSizePolicy(QTuiSizePolicy::Policy horizontal, QTuiSizePolicy::Policy vertical);
+
     // The default paintEvent() clears the background, so a plain QTuiWidget
     // works as a container. The render pass paints the children.
     virtual void paintEvent(ScreenBuffer &buffer);
@@ -149,6 +162,7 @@ private:
     bool m_paintedByParent = false;
     QPointer<QTuiLayout> m_layout;
     QString m_toolTip;
+    QTuiSizePolicy m_sizePolicy;
     Qt::FocusPolicy m_focusPolicy = Qt::NoFocus;
 
     // Widget focused before this popup became visible; restored when it hides
