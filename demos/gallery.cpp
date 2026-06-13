@@ -728,25 +728,6 @@ static QTuiWidget *createSpecializedTab(QTuiWidget *parent, QTuiStatusBar *statu
     return page;
 }
 
-// ---------------------------------------------------------------------------
-// Global event filter for Ctrl+Q quit shortcut.
-// ---------------------------------------------------------------------------
-struct GalleryFilter : public QObject {
-    Q_OBJECT
-public:
-    using QObject::QObject;
-    bool eventFilter(QObject *, QEvent *ev) override {
-        if (ev->type() != TuiEventTypes::keyEventType())
-            return false;
-        auto *ke = static_cast<TuiKeyEvent *>(ev);
-        if (ke->key() == Qt::Key_Q && (ke->modifiers() & Qt::ControlModifier)) {
-            QCoreApplication::quit();
-            return true;
-        }
-        return false;
-    }
-};
-
 int main(int argc, char *argv[])
 {
     QTuiApplication app(argc, argv);
@@ -791,10 +772,6 @@ int main(int argc, char *argv[])
     // Give the tab bar initial focus so arrow keys switch tabs
     tabs->tabBar()->setFocus();
 
-    // Install global Ctrl+Q filter
-    auto *filter = new GalleryFilter;
-    filter->setParent(&app);
-    app.installEventFilter(filter);
 
     window.show();
     app.triggerRender();
