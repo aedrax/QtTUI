@@ -12,8 +12,19 @@ class QTuiCompleter;
 class QTuiLineEdit : public QTuiWidget {
     Q_OBJECT
     Q_PROPERTY(QString text READ text WRITE setText NOTIFY textChanged)
+    Q_PROPERTY(EchoMode echoMode READ echoMode WRITE setEchoMode)
 public:
+    // How the text shows, as in QLineEdit. Password shows one "•" per
+    // character; NoEcho shows nothing and keeps the cursor at the start.
+    enum EchoMode { Normal, NoEcho, Password };
+    Q_ENUM(EchoMode)
+
     explicit QTuiLineEdit(QTuiWidget *parent = nullptr);
+
+    EchoMode echoMode() const;
+    void setEchoMode(EchoMode mode);
+    // The text as it shows on the screen
+    QString displayText() const;
 
     QString text() const;
     void setText(const QString &text);
@@ -43,11 +54,15 @@ protected:
 
 private:
     void adjustScrollToCursor();
+    // Maps a cursor index between m_text and displayText()
+    int displayIndex(int textIndex) const;
+    int textIndex(int displayIndex) const;
     void insertPastedText(const QString &text);
 
     QString m_text;
     int m_cursorPos = 0;     // code-unit index into m_text (cluster boundary)
     int m_scrollOffset = 0;  // display columns scrolled off the left edge
+    EchoMode m_echoMode = Normal;
     QPointer<QTuiCompleter> m_completer;
 };
 

@@ -368,6 +368,34 @@ private slots:
         QCoreApplication::sendEvent(&le, &ev);
         QCOMPARE(le.text(), QStringLiteral("two lines"));
     }
+
+    void echoModePasswordAndNoEcho()
+    {
+        QTuiLineEdit le;
+        le.setGeometry(QRect(0, 0, 10, 1));
+        le.setEchoMode(QTuiLineEdit::Password);
+        le.setText(QString::fromUtf8("ab\xF0\x9F\x98\x80")); // a, b, an emoji
+        QCOMPARE(le.text(), QString::fromUtf8("ab\xF0\x9F\x98\x80"));
+        // One mask character per character, also for the 2-cell emoji
+        QCOMPARE(le.displayText(), QString(3, QChar(0x2022)));
+
+        ScreenBuffer buf(10, 1);
+        le.paintEvent(buf);
+        QCOMPARE(buf.backCell(0, 0).ch, U'\u2022');
+        QCOMPARE(buf.backCell(2, 0).ch, U'\u2022');
+        QCOMPARE(buf.backCell(3, 0).ch, U' ');
+
+        // Editing works on the real text
+        TuiKeyEvent back(Qt::Key_Backspace, Qt::NoModifier);
+        QCoreApplication::sendEvent(&le, &back);
+        QCOMPARE(le.text(), QStringLiteral("ab"));
+
+        le.setEchoMode(QTuiLineEdit::NoEcho);
+        QVERIFY(le.displayText().isEmpty());
+        ScreenBuffer none(10, 1);
+        le.paintEvent(none);
+        QCOMPARE(none.backCell(0, 0).ch, U' ');
+    }
 };
 
 QTEST_MAIN(TestQTuiLineEdit)

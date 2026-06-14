@@ -606,6 +606,10 @@ static QTuiWidget *createLayoutsTab(QTuiWidget *parent, QTuiStatusBar *statusBar
     form->setHorizontalSpacing(1);
     form->addRow("Name:", nameEdit);
     form->addRow("Email:", emailEdit);
+    auto *passwordEdit = new QTuiLineEdit(formBox);
+    passwordEdit->setEchoMode(QTuiLineEdit::Password);
+    passwordEdit->setText("secret");
+    form->addRow("Password:", passwordEdit);
     form->addRow("Admin:", new QTuiCheckBox("Can change settings", formBox));
     formBox->setLayout(form);
     page->addWidget(formBox);

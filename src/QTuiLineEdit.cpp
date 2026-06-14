@@ -38,6 +38,72 @@ void QTuiLineEdit::setCompleter(QTuiCompleter *completer)
     m_completer = completer;
 }
 
+// The character that stands for each character in Password mode
+static constexpr char16_t kPasswordChar = u'\u2022'; // •
+
+QTuiLineEdit::EchoMode QTuiLineEdit::echoMode() const
+{
+    return m_echoMode;
+}
+
+void QTuiLineEdit::setEchoMode(EchoMode mode)
+{
+    if (m_echoMode == mode)
+        return;
+    m_echoMode = mode;
+    m_scrollOffset = 0;
+    adjustScrollToCursor();
+    markDirty();
+}
+
+QString QTuiLineEdit::displayText() const
+{
+    switch (m_echoMode) {
+    case Normal:
+        return m_text;
+    case NoEcho:
+        return QString();
+    case Password:
+        return QString(displayIndex(m_text.length()), QChar(kPasswordChar));
+    }
+    return m_text;
+}
+
+int QTuiLineEdit::displayIndex(int textIndex) const
+{
+    switch (m_echoMode) {
+    case Normal:
+        return textIndex;
+    case NoEcho:
+        return 0;
+    case Password: {
+        // One mask character per cluster before textIndex
+        int count = 0;
+        for (int i = 0; i < textIndex; i = QtTuiUnicode::nextClusterIndex(m_text, i))
+            ++count;
+        return count;
+    }
+    }
+    return textIndex;
+}
+
+int QTuiLineEdit::textIndex(int displayIndex) const
+{
+    switch (m_echoMode) {
+    case Normal:
+        return displayIndex;
+    case NoEcho:
+        return m_text.length();
+    case Password: {
+        int i = 0;
+        for (int n = 0; n < displayIndex && i < m_text.length(); ++n)
+            i = QtTuiUnicode::nextClusterIndex(m_text, i);
+        return i;
+    }
+    }
+    return displayIndex;
+}
+
 QSize QTuiLineEdit::minimumSize() const
 {
     return QSize(1, 1);
@@ -56,12 +122,14 @@ void QTuiLineEdit::adjustScrollToCursor()
     if (visibleWidth <= 0)
         return;
 
-    const int cursorCol = QtTuiUnicode::columnOfIndex(m_text, m_cursorPos);
+    const QString shown = displayText();
+    const int cursor = displayIndex(m_cursorPos);
+    const int cursorCol = QtTuiUnicode::columnOfIndex(shown, cursor);
     int cursorWidth = 1;
-    if (m_cursorPos < m_text.length()) {
-        int i = m_cursorPos;
+    if (cursor < shown.length()) {
+        int i = cursor;
         QtTuiUnicode::Cluster c;
-        if (QtTuiUnicode::nextCluster(m_text, i, c))
+        if (QtTuiUnicode::nextCluster(shown, i, c))
             cursorWidth = c.width;
     }
 
@@ -208,7 +276,8 @@ void QTuiLineEdit::mousePressEvent(TuiMouseEvent *event)
 
     const QRect geo = geometry();
     const int clickCol = event->x() - geo.x() + m_scrollOffset;
-    m_cursorPos = (clickCol <= 0) ? 0 : QtTuiUnicode::indexOfColumn(m_text, clickCol);
+    const int shownIndex = clickCol <= 0 ? 0 : QtTuiUnicode::indexOfColumn(displayText(), clickCol);
+    m_cursorPos = textIndex(shownIndex);
     markDirty();
 }
 
@@ -218,7 +287,8 @@ QPoint QTuiLineEdit::terminalCursorPos() const
     if (geo.width() <= 0 || geo.height() <= 0)
         return QPoint(-1, -1);
 
-    const int col = QtTuiUnicode::columnOfIndex(m_text, m_cursorPos) - m_scrollOffset;
+    const int col = QtTuiUnicode::columnOfIndex(displayText(), displayIndex(m_cursorPos))
+        - m_scrollOffset;
     if (col < 0 || col >= geo.width())
         return QPoint(-1, -1);
     return QPoint(geo.x() + col, geo.y());
@@ -235,6 +305,8 @@ void QTuiLineEdit::paintEvent(ScreenBuffer &buffer)
     const int visibleWidth = geo.width();
     const int y = geo.y();
     const int xStart = geo.x();
+    const QString shown = displayText();
+    const int cursor = displayIndex(m_cursorPos);
 
     // Base style from the theme and focus state
     Cell base;
@@ -253,14 +325,14 @@ void QTuiLineEdit::paintEvent(ScreenBuffer &buffer)
     int col = -m_scrollOffset;
     int i = 0;
     QtTuiUnicode::Cluster c;
-    while (col < visibleWidth && QtTuiUnicode::nextCluster(m_text, i, c)) {
+    while (col < visibleWidth && QtTuiUnicode::nextCluster(shown, i, c)) {
         const int nextCol = col + c.width;
         if (nextCol <= 0) {
             col = nextCol;
             continue;
         }
         Cell style = base;
-        if (focused && c.index == m_cursorPos)
+        if (focused && c.index == cursor)
             style.inverse = true;
         if (col >= 0 && nextCol <= visibleWidth) {
             buffer.putChar(xStart + col, y, c.base, c.combining, style);
@@ -274,8 +346,8 @@ void QTuiLineEdit::paintEvent(ScreenBuffer &buffer)
     }
 
     // Cursor sitting at the end of the text highlights the empty cell there
-    if (focused && m_cursorPos == m_text.length()) {
-        const int cursorCol = QtTuiUnicode::columnOfIndex(m_text, m_cursorPos)
+    if (focused && cursor == shown.length()) {
+        const int cursorCol = QtTuiUnicode::columnOfIndex(shown, cursor)
             - m_scrollOffset;
         if (cursorCol >= 0 && cursorCol < visibleWidth)
             buffer.backCell(xStart + cursorCol, y).inverse = true;
