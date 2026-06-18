@@ -119,6 +119,28 @@ void QTuiLineEdit::setPlaceholderText(const QString &text)
         markDirty();
 }
 
+bool QTuiLineEdit::isReadOnly() const
+{
+    return m_readOnly;
+}
+
+void QTuiLineEdit::setReadOnly(bool readOnly)
+{
+    m_readOnly = readOnly;
+}
+
+bool QTuiLineEdit::replaceRange(int start, int end, const QString &text)
+{
+    if (m_readOnly)
+        return false;
+    if (start == end && text.isEmpty())
+        return false;
+    m_text.replace(start, end - start, text);
+    m_cursorPos = start + text.length();
+    emit textChanged(m_text);
+    return true;
+}
+
 QSize QTuiLineEdit::minimumSize() const
 {
     return QSize(1, 1);
@@ -216,20 +238,13 @@ void QTuiLineEdit::keyPressEvent(TuiKeyEvent *event)
         m_cursorPos = m_text.length();
         break;
     case Qt::Key_Backspace:
-        if (m_cursorPos > 0) {
-            // Remove the whole preceding cluster (surrogate pair + marks)
-            const int prev = QtTuiUnicode::prevClusterIndex(m_text, m_cursorPos);
-            m_text.remove(prev, m_cursorPos - prev);
-            m_cursorPos = prev;
-            emit textChanged(m_text);
-        }
+        // Remove the whole preceding cluster (surrogate pair + marks)
+        if (m_cursorPos > 0)
+            replaceRange(QtTuiUnicode::prevClusterIndex(m_text, m_cursorPos), m_cursorPos, QString());
         break;
     case Qt::Key_Delete:
-        if (m_cursorPos < m_text.length()) {
-            const int next = QtTuiUnicode::nextClusterIndex(m_text, m_cursorPos);
-            m_text.remove(m_cursorPos, next - m_cursorPos);
-            emit textChanged(m_text);
-        }
+        if (m_cursorPos < m_text.length())
+            replaceRange(m_cursorPos, QtTuiUnicode::nextClusterIndex(m_text, m_cursorPos), QString());
         break;
     case Qt::Key_Return:
     case Qt::Key_Enter:
@@ -241,9 +256,7 @@ void QTuiLineEdit::keyPressEvent(TuiKeyEvent *event)
         if (!eventText.isEmpty()
             && (eventText.at(0).isPrint() || eventText.at(0).isHighSurrogate())) {
             // Insert the whole string so surrogate pairs stay together
-            m_text.insert(m_cursorPos, eventText);
-            m_cursorPos += eventText.length();
-            emit textChanged(m_text);
+            replaceRange(m_cursorPos, m_cursorPos, eventText);
         }
         break;
     }
@@ -272,12 +285,8 @@ void QTuiLineEdit::insertPastedText(const QString &pasted)
         else if (!ch.isNull() && ch.category() != QChar::Other_Control)
             text += ch;
     }
-    if (text.isEmpty())
+    if (!replaceRange(m_cursorPos, m_cursorPos, text))
         return;
-
-    m_text.insert(m_cursorPos, text);
-    m_cursorPos += text.length();
-    emit textChanged(m_text);
     adjustScrollToCursor();
     markDirty();
     if (m_completer)

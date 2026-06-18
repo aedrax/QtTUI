@@ -414,6 +414,35 @@ private slots:
         QCOMPARE(typed.backCell(0, 0).ch, U'x');
         QCOMPARE(typed.backCell(1, 0).ch, U' ');
     }
+
+    void readOnlyBlocksEditsOnly()
+    {
+        QTuiLineEdit le;
+        le.setText(QStringLiteral("abc"));
+        le.setReadOnly(true);
+        QSignalSpy changed(&le, &QTuiLineEdit::textChanged);
+        QSignalSpy returned(&le, &QTuiLineEdit::returnPressed);
+        auto send = [&le](int key, const QString &text = QString()) {
+            TuiKeyEvent ev(key, Qt::NoModifier, text);
+            QCoreApplication::sendEvent(&le, &ev);
+        };
+
+        send(Qt::Key_X, QStringLiteral("x"));
+        send(Qt::Key_Backspace);
+        send(Qt::Key_Home);
+        send(Qt::Key_Delete);
+        TuiPasteEvent paste(QStringLiteral("p"));
+        QCoreApplication::sendEvent(&le, &paste);
+        QCOMPARE(le.text(), QStringLiteral("abc"));
+        QCOMPARE(changed.count(), 0);
+        QCOMPARE(le.cursorPosition(), 0); // movement still works
+
+        send(Qt::Key_Return);
+        QCOMPARE(returned.count(), 1);
+
+        le.setText(QStringLiteral("set")); // programmatic change still works
+        QCOMPARE(le.text(), QStringLiteral("set"));
+    }
 };
 
 QTEST_MAIN(TestQTuiLineEdit)

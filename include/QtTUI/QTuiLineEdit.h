@@ -14,6 +14,7 @@ class QTuiLineEdit : public QTuiWidget {
     Q_PROPERTY(QString text READ text WRITE setText NOTIFY textChanged)
     Q_PROPERTY(EchoMode echoMode READ echoMode WRITE setEchoMode)
     Q_PROPERTY(QString placeholderText READ placeholderText WRITE setPlaceholderText)
+    Q_PROPERTY(bool readOnly READ isReadOnly WRITE setReadOnly)
 public:
     // How the text shows, as in QLineEdit. Password shows one "•" per
     // character; NoEcho shows nothing and keeps the cursor at the start.
@@ -30,6 +31,11 @@ public:
     // Muted hint text that shows while the line edit is empty
     QString placeholderText() const;
     void setPlaceholderText(const QString &text);
+
+    // A read-only line edit moves the cursor and emits returnPressed(), but
+    // the user cannot change the text. setText() still works.
+    bool isReadOnly() const;
+    void setReadOnly(bool readOnly);
 
     QString text() const;
     void setText(const QString &text);
@@ -63,12 +69,17 @@ private:
     int displayIndex(int textIndex) const;
     int textIndex(int displayIndex) const;
     void insertPastedText(const QString &text);
+    // Every user edit goes through here: replaces [start, end) with text,
+    // puts the cursor after it, and emits textChanged(). Returns false and
+    // changes nothing if the edit is not allowed (read-only).
+    bool replaceRange(int start, int end, const QString &text);
 
     QString m_text;
     int m_cursorPos = 0;     // code-unit index into m_text (cluster boundary)
     int m_scrollOffset = 0;  // display columns scrolled off the left edge
     EchoMode m_echoMode = Normal;
     QString m_placeholderText;
+    bool m_readOnly = false;
     QPointer<QTuiCompleter> m_completer;
 };
 
