@@ -200,6 +200,7 @@ static QTuiWidget *createTextInputTab(QTuiWidget *parent, QTuiStatusBar *statusB
     auto *lineEdit = new QTuiLineEdit(page);
     lineEdit->setText(QString());
     lineEdit->setToolTip("Type a color: completions show below");
+    lineEdit->setPlaceholderText("Type a color, for example Blue");
     auto *completer = new QTuiCompleter({"Amber", "Aqua", "Azure", "Beige", "Black", "Blue",
                                          "Coral", "Crimson", "Cyan", "Gold", "Gray", "Green"},
                                         lineEdit);

@@ -396,6 +396,24 @@ private slots:
         le.paintEvent(none);
         QCOMPARE(none.backCell(0, 0).ch, U' ');
     }
+
+    void placeholderShowsOnlyWhileEmpty()
+    {
+        QTuiLineEdit le;
+        le.setGeometry(QRect(0, 0, 12, 1));
+        le.setPlaceholderText(QStringLiteral("Search"));
+        ScreenBuffer empty(12, 1);
+        le.paintEvent(empty);
+        QCOMPARE(empty.backCell(0, 0).ch, U'S');
+        QCOMPARE(empty.backCell(5, 0).ch, U'h');
+        QVERIFY(le.text().isEmpty());
+
+        le.setText(QStringLiteral("x"));
+        ScreenBuffer typed(12, 1);
+        le.paintEvent(typed);
+        QCOMPARE(typed.backCell(0, 0).ch, U'x');
+        QCOMPARE(typed.backCell(1, 0).ch, U' ');
+    }
 };
 
 QTEST_MAIN(TestQTuiLineEdit)

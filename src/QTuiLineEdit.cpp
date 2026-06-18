@@ -2,6 +2,7 @@
 #include <QtTUI/QtTuiUnicode.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/TuiEvents.h>
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiClipboard.h>
@@ -102,6 +103,20 @@ int QTuiLineEdit::textIndex(int displayIndex) const
     }
     }
     return displayIndex;
+}
+
+QString QTuiLineEdit::placeholderText() const
+{
+    return m_placeholderText;
+}
+
+void QTuiLineEdit::setPlaceholderText(const QString &text)
+{
+    if (m_placeholderText == text)
+        return;
+    m_placeholderText = text;
+    if (m_text.isEmpty())
+        markDirty();
 }
 
 QSize QTuiLineEdit::minimumSize() const
@@ -320,6 +335,22 @@ void QTuiLineEdit::paintEvent(ScreenBuffer &buffer)
     // Fill the whole line first (also resets stale wide/continuation cells)
     for (int i = 0; i < visibleWidth; ++i)
         buffer.backCell(xStart + i, y) = base;
+
+    // An empty line edit shows the placeholder in the muted color, with
+    // the cursor on its first cell
+    if (m_text.isEmpty() && !m_placeholderText.isEmpty()) {
+        // On the focus colors the muted color has too little contrast, so
+        // a focused placeholder uses the text color in italics
+        Cell hint = base;
+        if (focused)
+            hint.italic = true;
+        else
+            hint.foreground = theme.disabledForeground;
+        renderTextTruncated(buffer, xStart, y, m_placeholderText, visibleWidth, hint);
+        if (focused)
+            buffer.backCell(xStart, y).inverse = true;
+        return;
+    }
 
     // Draw the visible clusters at their display columns
     int col = -m_scrollOffset;
