@@ -611,6 +611,10 @@ static QTuiWidget *createLayoutsTab(QTuiWidget *parent, QTuiStatusBar *statusBar
     passwordEdit->setEchoMode(QTuiLineEdit::Password);
     passwordEdit->setText("secret");
     form->addRow("Password:", passwordEdit);
+    auto *ageEdit = new QTuiLineEdit(formBox);
+    ageEdit->setValidator(new QTuiIntValidator(0, 150, ageEdit));
+    ageEdit->setPlaceholderText("0 to 150");
+    form->addRow("Age:", ageEdit);
     form->addRow("Admin:", new QTuiCheckBox("Can change settings", formBox));
     formBox->setLayout(form);
     page->addWidget(formBox);

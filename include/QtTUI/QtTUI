@@ -57,6 +57,7 @@
 #include <QtTUI/QTuiProgressBar.h>
 #include <QtTUI/QTuiLineEdit.h>
 #include <QtTUI/QTuiCompleter.h>
+#include <QtTUI/QTuiValidator.h>
 
 // Text and specialized editing
 #include <QtTUI/QTuiTextEdit.h>

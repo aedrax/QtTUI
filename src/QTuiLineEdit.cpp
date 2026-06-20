@@ -7,6 +7,7 @@
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiClipboard.h>
 #include <QtTUI/QTuiCompleter.h>
+#include <QtTUI/QTuiValidator.h>
 
 namespace QtTUI {
 
@@ -129,14 +130,66 @@ void QTuiLineEdit::setReadOnly(bool readOnly)
     m_readOnly = readOnly;
 }
 
+int QTuiLineEdit::maxLength() const
+{
+    return m_maxLength;
+}
+
+void QTuiLineEdit::setMaxLength(int length)
+{
+    m_maxLength = qMax(0, length);
+    if (m_text.length() > m_maxLength)
+        setText(m_text.left(m_maxLength));
+}
+
+const QTuiValidator *QTuiLineEdit::validator() const
+{
+    return m_validator;
+}
+
+void QTuiLineEdit::setValidator(const QTuiValidator *validator)
+{
+    m_validator = validator;
+}
+
+bool QTuiLineEdit::hasAcceptableInput() const
+{
+    if (!m_validator)
+        return true;
+    QString text = m_text;
+    int pos = m_cursorPos;
+    return m_validator->validate(text, pos) == QTuiValidator::Acceptable;
+}
+
 bool QTuiLineEdit::replaceRange(int start, int end, const QString &text)
 {
     if (m_readOnly)
         return false;
-    if (start == end && text.isEmpty())
+
+    // Cut the inserted text to the length limit, at a cluster boundary
+    QString inserted = text;
+    const int room = m_maxLength - (m_text.length() - (end - start));
+    if (inserted.length() > room) {
+        int cut = 0;
+        while (cut < inserted.length()) {
+            const int next = QtTuiUnicode::nextClusterIndex(inserted, cut);
+            if (next > room)
+                break;
+            cut = next;
+        }
+        inserted.truncate(qMax(0, cut));
+    }
+    if (start == end && inserted.isEmpty())
         return false;
-    m_text.replace(start, end - start, text);
-    m_cursorPos = start + text.length();
+
+    QString candidate = m_text;
+    candidate.replace(start, end - start, inserted);
+    int pos = start + inserted.length();
+    if (m_validator && m_validator->validate(candidate, pos) == QTuiValidator::Invalid)
+        return false;
+
+    m_text = candidate;
+    m_cursorPos = qBound(0, pos, int(m_text.length()));
     emit textChanged(m_text);
     return true;
 }
@@ -176,8 +229,9 @@ void QTuiLineEdit::adjustScrollToCursor()
         m_scrollOffset = cursorCol + cursorWidth - visibleWidth;
 }
 
-void QTuiLineEdit::setText(const QString &text)
+void QTuiLineEdit::setText(const QString &newText)
 {
+    const QString text = newText.left(m_maxLength);
     if (m_text == text)
         return;
     m_text = text;
@@ -248,7 +302,18 @@ void QTuiLineEdit::keyPressEvent(TuiKeyEvent *event)
         break;
     case Qt::Key_Return:
     case Qt::Key_Enter:
-        emit returnPressed();
+        // As in QLineEdit: only acceptable input (after fixup) is returned
+        if (m_validator && !hasAcceptableInput()) {
+            QString fixed = m_text;
+            m_validator->fixup(fixed);
+            if (fixed != m_text) {
+                m_text = fixed;
+                m_cursorPos = qMin(m_cursorPos, int(m_text.length()));
+                emit textChanged(m_text);
+            }
+        }
+        if (hasAcceptableInput())
+            emit returnPressed();
         break;
     default:
         // Accept printable characters; a leading high surrogate means the

@@ -61,6 +61,7 @@ set(QTTUI_SOURCES
     QTuiColumnView.cpp
     QTuiUndoStack.cpp
     QTuiUndoView.cpp
+    QTuiValidator.cpp
     QTuiDataWidgetMapper.cpp
     QTuiListWidgetItem.cpp
     QTuiListWidget.cpp
@@ -156,6 +157,7 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiColumnView.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiUndoStack.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiUndoView.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiValidator.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiDataWidgetMapper.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiListWidgetItem.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiListWidget.h

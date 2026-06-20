@@ -8,6 +8,7 @@
 namespace QtTUI {
 
 class QTuiCompleter;
+class QTuiValidator;
 
 class QTuiLineEdit : public QTuiWidget {
     Q_OBJECT
@@ -15,6 +16,7 @@ class QTuiLineEdit : public QTuiWidget {
     Q_PROPERTY(EchoMode echoMode READ echoMode WRITE setEchoMode)
     Q_PROPERTY(QString placeholderText READ placeholderText WRITE setPlaceholderText)
     Q_PROPERTY(bool readOnly READ isReadOnly WRITE setReadOnly)
+    Q_PROPERTY(int maxLength READ maxLength WRITE setMaxLength)
 public:
     // How the text shows, as in QLineEdit. Password shows one "•" per
     // character; NoEcho shows nothing and keeps the cursor at the start.
@@ -36,6 +38,18 @@ public:
     // the user cannot change the text. setText() still works.
     bool isReadOnly() const;
     void setReadOnly(bool readOnly);
+
+    // Maximum text length in UTF-16 code units (default 32767). Longer
+    // typed or pasted text is cut; setText() also cuts.
+    int maxLength() const;
+    void setMaxLength(int length);
+
+    // Rejects edits that make the text Invalid. The line edit does not take
+    // ownership of the validator.
+    const QTuiValidator *validator() const;
+    void setValidator(const QTuiValidator *validator);
+    // True if there is no validator or it says Acceptable
+    bool hasAcceptableInput() const;
 
     QString text() const;
     void setText(const QString &text);
@@ -80,6 +94,8 @@ private:
     EchoMode m_echoMode = Normal;
     QString m_placeholderText;
     bool m_readOnly = false;
+    int m_maxLength = 32767;
+    QPointer<const QTuiValidator> m_validator;
     QPointer<QTuiCompleter> m_completer;
 };
 

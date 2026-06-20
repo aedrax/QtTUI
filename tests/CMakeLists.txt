@@ -65,6 +65,9 @@ qttui_add_test(test_qtui_lineedit test_qtui_lineedit.cpp)
 # QTuiCompleter matching and line edit popup flow
 qttui_add_test(test_qtui_completer test_qtui_completer.cpp)
 
+# QTuiValidator classes and QTuiLineEdit maxLength / validator rules
+qttui_add_test(test_qtui_validator test_qtui_validator.cpp)
+
 # QTuiTableView property tests (Properties 17-21)
 qttui_add_test(test_qtui_tableview test_qtui_tableview.cpp)
 
