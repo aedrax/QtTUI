@@ -161,6 +161,76 @@ bool QTuiLineEdit::hasAcceptableInput() const
     return m_validator->validate(text, pos) == QTuiValidator::Acceptable;
 }
 
+bool QTuiLineEdit::hasSelectedText() const
+{
+    return m_selAnchor >= 0 && m_selAnchor != m_cursorPos;
+}
+
+QString QTuiLineEdit::selectedText() const
+{
+    if (!hasSelectedText())
+        return QString();
+    const int start = qMin(m_selAnchor, m_cursorPos);
+    return m_text.mid(start, qAbs(m_cursorPos - m_selAnchor));
+}
+
+int QTuiLineEdit::selectionStart() const
+{
+    return hasSelectedText() ? qMin(m_selAnchor, m_cursorPos) : -1;
+}
+
+void QTuiLineEdit::setSelection(int start, int length)
+{
+    const int a = qBound(0, start, int(m_text.length()));
+    const int b = qBound(0, start + length, int(m_text.length()));
+    m_selAnchor = a;
+    m_cursorPos = b;
+    adjustScrollToCursor();
+    markDirty();
+}
+
+void QTuiLineEdit::selectAll()
+{
+    setSelection(0, m_text.length());
+}
+
+void QTuiLineEdit::deselect()
+{
+    if (m_selAnchor < 0)
+        return;
+    m_selAnchor = -1;
+    markDirty();
+}
+
+void QTuiLineEdit::copy() const
+{
+    // A hidden text must not leave the line edit
+    if (m_echoMode == Normal && hasSelectedText())
+        QTuiApplication::clipboard()->setText(selectedText());
+}
+
+void QTuiLineEdit::cut()
+{
+    if (m_echoMode != Normal || m_readOnly || !hasSelectedText())
+        return;
+    copy();
+    replaceSelection(QString());
+    adjustScrollToCursor();
+    markDirty();
+}
+
+void QTuiLineEdit::paste()
+{
+    insertPastedText(QTuiApplication::clipboard()->text());
+}
+
+bool QTuiLineEdit::replaceSelection(const QString &text)
+{
+    if (hasSelectedText())
+        return replaceRange(qMin(m_selAnchor, m_cursorPos), qMax(m_selAnchor, m_cursorPos), text);
+    return replaceRange(m_cursorPos, m_cursorPos, text);
+}
+
 bool QTuiLineEdit::replaceRange(int start, int end, const QString &text)
 {
     if (m_readOnly)
@@ -190,6 +260,7 @@ bool QTuiLineEdit::replaceRange(int start, int end, const QString &text)
 
     m_text = candidate;
     m_cursorPos = qBound(0, pos, int(m_text.length()));
+    m_selAnchor = -1;
     emit textChanged(m_text);
     return true;
 }
@@ -236,6 +307,7 @@ void QTuiLineEdit::setText(const QString &newText)
         return;
     m_text = text;
     m_cursorPos = m_text.length();
+    m_selAnchor = -1;
     adjustScrollToCursor();
     emit textChanged(m_text);
     markDirty();
@@ -255,9 +327,10 @@ void QTuiLineEdit::setCursorPosition(int pos)
         clamped = QtTuiUnicode::indexOfColumn(
             m_text, QtTuiUnicode::columnOfIndex(m_text, clamped));
     }
-    if (clamped == m_cursorPos)
+    if (clamped == m_cursorPos && m_selAnchor < 0)
         return;
     m_cursorPos = clamped;
+    m_selAnchor = -1;
     adjustScrollToCursor();
     markDirty();
 }
@@ -272,10 +345,38 @@ void QTuiLineEdit::keyPressEvent(TuiKeyEvent *event)
         return;
     const QString oldText = m_text;
 
-    // Ctrl+V pastes the application clipboard
-    if (key == Qt::Key_V && event->modifiers() == Qt::ControlModifier) {
-        insertPastedText(QTuiApplication::clipboard()->text());
-        return;
+    // Clipboard and select all
+    if (event->modifiers() == Qt::ControlModifier) {
+        switch (key) {
+        case Qt::Key_V: paste(); return;
+        case Qt::Key_C: copy(); return;
+        case Qt::Key_X: cut(); return;
+        case Qt::Key_A: selectAll(); return;
+        default: break;
+        }
+    }
+
+    // Shift+movement extends the selection; plain movement ends it
+    const bool movement = key == Qt::Key_Left || key == Qt::Key_Right
+        || key == Qt::Key_Home || key == Qt::Key_End;
+    if (movement) {
+        if (event->modifiers() & Qt::ShiftModifier) {
+            if (m_selAnchor < 0)
+                m_selAnchor = m_cursorPos;
+        } else if (hasSelectedText()) {
+            // Left/Right with a selection go to its start/end, as in Qt
+            const int start = qMin(m_selAnchor, m_cursorPos);
+            const int end = qMax(m_selAnchor, m_cursorPos);
+            m_selAnchor = -1;
+            if (key == Qt::Key_Left || key == Qt::Key_Right) {
+                m_cursorPos = key == Qt::Key_Left ? start : end;
+                adjustScrollToCursor();
+                markDirty();
+                return;
+            }
+        } else {
+            m_selAnchor = -1;
+        }
     }
 
     switch (key) {
@@ -292,12 +393,17 @@ void QTuiLineEdit::keyPressEvent(TuiKeyEvent *event)
         m_cursorPos = m_text.length();
         break;
     case Qt::Key_Backspace:
-        // Remove the whole preceding cluster (surrogate pair + marks)
-        if (m_cursorPos > 0)
+        // Remove the selection, else the whole preceding cluster
+        // (surrogate pair + marks)
+        if (hasSelectedText())
+            replaceSelection(QString());
+        else if (m_cursorPos > 0)
             replaceRange(QtTuiUnicode::prevClusterIndex(m_text, m_cursorPos), m_cursorPos, QString());
         break;
     case Qt::Key_Delete:
-        if (m_cursorPos < m_text.length())
+        if (hasSelectedText())
+            replaceSelection(QString());
+        else if (m_cursorPos < m_text.length())
             replaceRange(m_cursorPos, QtTuiUnicode::nextClusterIndex(m_text, m_cursorPos), QString());
         break;
     case Qt::Key_Return:
@@ -320,8 +426,9 @@ void QTuiLineEdit::keyPressEvent(TuiKeyEvent *event)
         // parser delivered a non-BMP character (e.g. emoji) as a full pair.
         if (!eventText.isEmpty()
             && (eventText.at(0).isPrint() || eventText.at(0).isHighSurrogate())) {
-            // Insert the whole string so surrogate pairs stay together
-            replaceRange(m_cursorPos, m_cursorPos, eventText);
+            // Insert the whole string so surrogate pairs stay together;
+            // typing replaces the selection
+            replaceSelection(eventText);
         }
         break;
     }
@@ -350,7 +457,7 @@ void QTuiLineEdit::insertPastedText(const QString &pasted)
         else if (!ch.isNull() && ch.category() != QChar::Other_Control)
             text += ch;
     }
-    if (!replaceRange(m_cursorPos, m_cursorPos, text))
+    if (!replaceSelection(text))
         return;
     adjustScrollToCursor();
     markDirty();
@@ -367,6 +474,7 @@ void QTuiLineEdit::mousePressEvent(TuiMouseEvent *event)
     const int clickCol = event->x() - geo.x() + m_scrollOffset;
     const int shownIndex = clickCol <= 0 ? 0 : QtTuiUnicode::indexOfColumn(displayText(), clickCol);
     m_cursorPos = textIndex(shownIndex);
+    m_selAnchor = -1;
     markDirty();
 }
 
@@ -396,6 +504,8 @@ void QTuiLineEdit::paintEvent(ScreenBuffer &buffer)
     const int xStart = geo.x();
     const QString shown = displayText();
     const int cursor = displayIndex(m_cursorPos);
+    const int selStart = hasSelectedText() ? displayIndex(qMin(m_selAnchor, m_cursorPos)) : -1;
+    const int selEnd = hasSelectedText() ? displayIndex(qMax(m_selAnchor, m_cursorPos)) : -1;
 
     // Base style from the theme and focus state
     Cell base;
@@ -438,6 +548,9 @@ void QTuiLineEdit::paintEvent(ScreenBuffer &buffer)
         }
         Cell style = base;
         if (focused && c.index == cursor)
+            style.inverse = true;
+        // Selected text shows in the inverted colors
+        if (c.index >= selStart && c.index < selEnd)
             style.inverse = true;
         if (col >= 0 && nextCol <= visibleWidth) {
             buffer.putChar(xStart + col, y, c.base, c.combining, style);

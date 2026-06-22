@@ -443,6 +443,59 @@ private slots:
         le.setText(QStringLiteral("set")); // programmatic change still works
         QCOMPARE(le.text(), QStringLiteral("set"));
     }
+
+    void selectionCopyCutReplace()
+    {
+        QTuiApplication::clipboard()->clear();
+        QTuiLineEdit le;
+        le.setText(QStringLiteral("hello world"));
+        auto send = [&le](int key, Qt::KeyboardModifiers mods = Qt::NoModifier,
+                          const QString &text = QString()) {
+            TuiKeyEvent ev(key, mods, text);
+            QCoreApplication::sendEvent(&le, &ev);
+        };
+
+        send(Qt::Key_Home);
+        for (int i = 0; i < 5; ++i)
+            send(Qt::Key_Right, Qt::ShiftModifier);
+        QVERIFY(le.hasSelectedText());
+        QCOMPARE(le.selectedText(), QStringLiteral("hello"));
+        QCOMPARE(le.selectionStart(), 0);
+
+        send(Qt::Key_C, Qt::ControlModifier);
+        QCOMPARE(QTuiApplication::clipboard()->text(), QStringLiteral("hello"));
+
+        // Typing replaces the selection
+        send(Qt::Key_H, Qt::NoModifier, QStringLiteral("H"));
+        QCOMPARE(le.text(), QStringLiteral("H world"));
+        QVERIFY(!le.hasSelectedText());
+
+        // Ctrl+A then Ctrl+X cuts everything
+        send(Qt::Key_A, Qt::ControlModifier);
+        send(Qt::Key_X, Qt::ControlModifier);
+        QCOMPARE(le.text(), QString());
+        QCOMPARE(QTuiApplication::clipboard()->text(), QStringLiteral("H world"));
+
+        // Left with a selection goes to its start
+        le.setText(QStringLiteral("abcd"));
+        le.setSelection(1, 2);
+        send(Qt::Key_Left);
+        QCOMPARE(le.cursorPosition(), 1);
+        QVERIFY(!le.hasSelectedText());
+    }
+
+    void passwordTextIsNotCopied()
+    {
+        QTuiApplication::clipboard()->setText(QStringLiteral("before"));
+        QTuiLineEdit le;
+        le.setEchoMode(QTuiLineEdit::Password);
+        le.setText(QStringLiteral("secret"));
+        le.selectAll();
+        le.copy();
+        le.cut();
+        QCOMPARE(QTuiApplication::clipboard()->text(), QStringLiteral("before"));
+        QCOMPARE(le.text(), QStringLiteral("secret"));
+    }
 };
 
 QTEST_MAIN(TestQTuiLineEdit)

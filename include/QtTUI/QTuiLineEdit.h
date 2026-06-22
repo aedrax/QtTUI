@@ -51,6 +51,19 @@ public:
     // True if there is no validator or it says Acceptable
     bool hasAcceptableInput() const;
 
+    // Selection, as in QLineEdit. Keys: Shift+Left/Right/Home/End select,
+    // Ctrl+A selects all; Ctrl+C copies, Ctrl+X cuts, Ctrl+V pastes. In
+    // Password and NoEcho mode, copy and cut do nothing.
+    bool hasSelectedText() const;
+    QString selectedText() const;
+    int selectionStart() const; // -1 if nothing is selected
+    void setSelection(int start, int length);
+    void selectAll();
+    void deselect();
+    void copy() const;
+    void cut();
+    void paste();
+
     QString text() const;
     void setText(const QString &text);
 
@@ -87,6 +100,8 @@ private:
     // puts the cursor after it, and emits textChanged(). Returns false and
     // changes nothing if the edit is not allowed (read-only).
     bool replaceRange(int start, int end, const QString &text);
+    // Replaces the selection (or inserts at the cursor) with text
+    bool replaceSelection(const QString &text);
 
     QString m_text;
     int m_cursorPos = 0;     // code-unit index into m_text (cluster boundary)
@@ -95,6 +110,7 @@ private:
     QString m_placeholderText;
     bool m_readOnly = false;
     int m_maxLength = 32767;
+    int m_selAnchor = -1; // the fixed end of the selection; -1 for none
     QPointer<const QTuiValidator> m_validator;
     QPointer<QTuiCompleter> m_completer;
 };
