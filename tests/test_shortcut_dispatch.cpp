@@ -366,6 +366,23 @@ private slots:
         env.sendKey(Qt::Key_Z, Qt::ControlModifier);
         QCOMPARE(spy.count(), 1);
     }
+
+    void focusedEditorTakesStandardEditKeys()
+    {
+        // As QLineEdit does: Ctrl+Z goes to a focused editor (undo), not
+        // to an application undo action and not to suspend
+        Env env;
+        QTuiAction undoAction(QStringLiteral("Undo"), QStringLiteral("Ctrl+Z"), &env.window);
+        QSignalSpy spy(&undoAction, &QTuiAction::triggered);
+        QTuiLineEdit edit(&env.window);
+        edit.setGeometry(QRect(0, 0, 20, 1));
+        edit.setFocus();
+
+        env.sendKey(Qt::Key_A, Qt::NoModifier, QStringLiteral("a"));
+        env.sendKey(Qt::Key_Z, Qt::ControlModifier);
+        QCOMPARE(spy.count(), 0);
+        QCOMPARE(edit.text(), QString());
+    }
 };
 
 QTEST_APPLESS_MAIN(TestShortcutDispatch)

@@ -64,6 +64,14 @@ public:
     void cut();
     void paste();
 
+    // Undo history, as in QLineEdit: Ctrl+Z undoes, Ctrl+Y and
+    // Ctrl+Shift+Z redo. Typed characters in a row undo as one step.
+    // setText() clears the history.
+    void undo();
+    void redo();
+    bool isUndoAvailable() const;
+    bool isRedoAvailable() const;
+
     QString text() const;
     void setText(const QString &text);
 
@@ -111,6 +119,14 @@ private:
     bool m_readOnly = false;
     int m_maxLength = 32767;
     int m_selAnchor = -1; // the fixed end of the selection; -1 for none
+
+    struct UndoState {
+        QString text;
+        int cursor;
+    };
+    QList<UndoState> m_undoStack;
+    QList<UndoState> m_redoStack;
+    int m_typingEnd = -1; // cursor after the last typed character, else -1
     QPointer<const QTuiValidator> m_validator;
     QPointer<QTuiCompleter> m_completer;
 };

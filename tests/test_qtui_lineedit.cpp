@@ -496,6 +496,35 @@ private slots:
         QCOMPARE(QTuiApplication::clipboard()->text(), QStringLiteral("before"));
         QCOMPARE(le.text(), QStringLiteral("secret"));
     }
+
+    void undoRedo()
+    {
+        QTuiLineEdit le;
+        auto send = [&le](int key, Qt::KeyboardModifiers mods = Qt::NoModifier,
+                          const QString &text = QString()) {
+            TuiKeyEvent ev(key, mods, text);
+            QCoreApplication::sendEvent(&le, &ev);
+        };
+        for (const QChar ch : QStringLiteral("abc"))
+            send(ch.toUpper().unicode(), Qt::NoModifier, QString(ch));
+        send(Qt::Key_Backspace);
+        QCOMPARE(le.text(), QStringLiteral("ab"));
+
+        send(Qt::Key_Z, Qt::ControlModifier); // undo the Backspace
+        QCOMPARE(le.text(), QStringLiteral("abc"));
+        send(Qt::Key_Z, Qt::ControlModifier); // typed "abc" is one step
+        QCOMPARE(le.text(), QString());
+        QVERIFY(!le.isUndoAvailable());
+
+        send(Qt::Key_Y, Qt::ControlModifier);
+        QCOMPARE(le.text(), QStringLiteral("abc"));
+        send(Qt::Key_Z, Qt::ControlModifier | Qt::ShiftModifier);
+        QCOMPARE(le.text(), QStringLiteral("ab"));
+        QVERIFY(!le.isRedoAvailable());
+
+        le.setText(QStringLiteral("new"));
+        QVERIFY(!le.isUndoAvailable());
+    }
 };
 
 QTEST_MAIN(TestQTuiLineEdit)

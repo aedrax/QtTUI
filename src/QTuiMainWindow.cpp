@@ -293,9 +293,22 @@ void QTuiMainWindow::resizeEvent(TuiResizeEvent *event)
 
 // True if the sequence's key would type text into the focused widget: bare
 // printable-key shortcuts (e.g. "Q") must yield to text editing.
+// The standard edit keys that a focused editor uses before any shortcut,
+// as QLineEdit does through ShortcutOverride: undo, redo, copy, cut,
+// paste and select all
+static bool isStandardEditKey(int key, Qt::KeyboardModifiers mods)
+{
+    if (mods == Qt::ControlModifier)
+        return key == Qt::Key_Z || key == Qt::Key_Y || key == Qt::Key_C
+            || key == Qt::Key_X || key == Qt::Key_V || key == Qt::Key_A;
+    return key == Qt::Key_Z && mods == (Qt::ControlModifier | Qt::ShiftModifier);
+}
+
 static bool shortcutShadowedByEditor(const QTuiKeySequence &seq, QTuiWidget *focused)
 {
-    return seq.isBareTextKey() && focused && focused->acceptsTextInput();
+    if (!focused || !focused->acceptsTextInput())
+        return false;
+    return seq.isBareTextKey() || isStandardEditKey(seq.key(), seq.modifiers());
 }
 
 // As in Qt, a shortcut works only while the widgets that own its action are
@@ -373,8 +386,11 @@ void QTuiMainWindow::keyPressEvent(TuiKeyEvent *event)
     if (dispatchShortcut(event))
         return;
 
-    // Ctrl+Z suspends the program, unless an action took it above
-    if (event->key() == Qt::Key_Z && event->modifiers() == Qt::ControlModifier) {
+    // Ctrl+Z suspends the program, unless an action took it above or a
+    // focused editor uses it for undo
+    QTuiWidget *editor = QTuiWidget::focusWidget();
+    if (event->key() == Qt::Key_Z && event->modifiers() == Qt::ControlModifier
+        && !(editor && editor->acceptsTextInput())) {
         if (auto *app = QTuiApplication::instance())
             app->suspend();
         return;

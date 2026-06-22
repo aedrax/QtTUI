@@ -38,6 +38,9 @@ void QTuiTextEdit::setPlainText(const QString &text)
     m_scrollCol = 0;
     m_desiredCol = 0;
     clearSelection();
+    m_undoStack.clear();
+    m_redoStack.clear();
+    m_typingRow = m_typingCol = -1;
     emit textChanged();
     markDirty();
 }
@@ -138,7 +141,11 @@ void QTuiTextEdit::insertText(const QString &text)
 
 void QTuiTextEdit::pasteEvent(TuiPasteEvent *event)
 {
+    const QStringList before = m_lines;
+    const int row = m_cursorRow;
+    const int col = m_cursorCol;
     insertPastedText(event->text());
+    recordEdit(before, row, col, false);
 }
 
 void QTuiTextEdit::insertPastedText(const QString &pasted)
@@ -350,7 +357,92 @@ void QTuiTextEdit::scrollToVisible()
     }
 }
 
+// Maximum number of undo steps
+static constexpr int kMaxUndo = 100;
+
 void QTuiTextEdit::keyPressEvent(TuiKeyEvent *event)
+{
+    const int key = event->key();
+    const Qt::KeyboardModifiers mods = event->modifiers();
+    if (key == Qt::Key_Z && mods == Qt::ControlModifier) {
+        undo();
+        return;
+    }
+    if ((key == Qt::Key_Y && mods == Qt::ControlModifier)
+        || (key == Qt::Key_Z && mods == (Qt::ControlModifier | Qt::ShiftModifier))) {
+        redo();
+        return;
+    }
+
+    const QStringList before = m_lines;
+    const int row = m_cursorRow;
+    const int col = m_cursorCol;
+    editKey(event);
+
+    // A typed character: printable text, no Ctrl, nothing selected before
+    const QString text = event->text();
+    const bool typing = !text.isEmpty() && !(mods & Qt::ControlModifier)
+        && (text.at(0).isPrint() || text.at(0).isHighSurrogate()) && text != QLatin1String(" ");
+    recordEdit(before, row, col, typing);
+}
+
+void QTuiTextEdit::recordEdit(const QStringList &before, int row, int col, bool typing)
+{
+    if (before == m_lines)
+        return;
+    // A typed character right after the previous one joins its step
+    if (!(typing && row == m_typingRow && col == m_typingCol)) {
+        m_undoStack.append({before, row, col});
+        if (m_undoStack.size() > kMaxUndo)
+            m_undoStack.removeFirst();
+    }
+    m_redoStack.clear();
+    m_typingRow = typing ? m_cursorRow : -1;
+    m_typingCol = typing ? m_cursorCol : -1;
+}
+
+void QTuiTextEdit::restoreState(const QStringList &lines, int row, int col)
+{
+    m_lines = lines;
+    m_cursorRow = qBound(0, row, int(m_lines.size()) - 1);
+    m_cursorCol = qBound(0, col, int(m_lines.at(m_cursorRow).length()));
+    m_typingRow = m_typingCol = -1;
+    clearSelection();
+    m_desiredCol = QtTuiUnicode::columnOfIndex(m_lines.at(m_cursorRow), m_cursorCol);
+    scrollToVisible();
+    emit textChanged();
+    markDirty();
+}
+
+void QTuiTextEdit::undo()
+{
+    if (m_undoStack.isEmpty())
+        return;
+    m_redoStack.append({m_lines, m_cursorRow, m_cursorCol});
+    const UndoState state = m_undoStack.takeLast();
+    restoreState(state.lines, state.row, state.col);
+}
+
+void QTuiTextEdit::redo()
+{
+    if (m_redoStack.isEmpty())
+        return;
+    m_undoStack.append({m_lines, m_cursorRow, m_cursorCol});
+    const UndoState state = m_redoStack.takeLast();
+    restoreState(state.lines, state.row, state.col);
+}
+
+bool QTuiTextEdit::isUndoAvailable() const
+{
+    return !m_undoStack.isEmpty();
+}
+
+bool QTuiTextEdit::isRedoAvailable() const
+{
+    return !m_redoStack.isEmpty();
+}
+
+void QTuiTextEdit::editKey(TuiKeyEvent *event)
 {
     const int key = event->key();
     const Qt::KeyboardModifiers mods = event->modifiers();

@@ -1197,6 +1197,33 @@ private slots:
         log.appendPlainText(QStringLiteral("line 11"));
         QCOMPARE(log.cursorRow(), 8);
     }
+
+    void undoRedo()
+    {
+        QTuiTextEdit te;
+        auto send = [&te](int key, Qt::KeyboardModifiers mods = Qt::NoModifier,
+                          const QString &text = QString()) {
+            TuiKeyEvent ev(key, mods, text);
+            QCoreApplication::sendEvent(&te, &ev);
+        };
+        for (const QChar ch : QStringLiteral("xy"))
+            send(ch.toUpper().unicode(), Qt::NoModifier, QString(ch));
+        send(Qt::Key_Return);
+        send(Qt::Key_Z, Qt::NoModifier, QStringLiteral("z"));
+        QCOMPARE(te.toPlainText(), QStringLiteral("xy\nz"));
+
+        send(Qt::Key_Z, Qt::ControlModifier);
+        QCOMPARE(te.toPlainText(), QStringLiteral("xy\n"));
+        send(Qt::Key_Z, Qt::ControlModifier);
+        QCOMPARE(te.toPlainText(), QStringLiteral("xy"));
+        send(Qt::Key_Z, Qt::ControlModifier);
+        QCOMPARE(te.toPlainText(), QString());
+
+        send(Qt::Key_Y, Qt::ControlModifier);
+        send(Qt::Key_Y, Qt::ControlModifier);
+        QCOMPARE(te.toPlainText(), QStringLiteral("xy\n"));
+        QCOMPARE(te.cursorRow(), 1);
+    }
 };
 
 QTEST_MAIN(TestQTuiTextEdit)

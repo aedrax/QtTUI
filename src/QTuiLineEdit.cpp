@@ -224,6 +224,49 @@ void QTuiLineEdit::paste()
     insertPastedText(QTuiApplication::clipboard()->text());
 }
 
+// Maximum number of undo steps
+static constexpr int kMaxUndo = 100;
+
+void QTuiLineEdit::undo()
+{
+    if (m_undoStack.isEmpty())
+        return;
+    m_redoStack.append({m_text, m_cursorPos});
+    const UndoState state = m_undoStack.takeLast();
+    m_text = state.text;
+    m_cursorPos = state.cursor;
+    m_selAnchor = -1;
+    m_typingEnd = -1;
+    emit textChanged(m_text);
+    adjustScrollToCursor();
+    markDirty();
+}
+
+void QTuiLineEdit::redo()
+{
+    if (m_redoStack.isEmpty())
+        return;
+    m_undoStack.append({m_text, m_cursorPos});
+    const UndoState state = m_redoStack.takeLast();
+    m_text = state.text;
+    m_cursorPos = state.cursor;
+    m_selAnchor = -1;
+    m_typingEnd = -1;
+    emit textChanged(m_text);
+    adjustScrollToCursor();
+    markDirty();
+}
+
+bool QTuiLineEdit::isUndoAvailable() const
+{
+    return !m_undoStack.isEmpty();
+}
+
+bool QTuiLineEdit::isRedoAvailable() const
+{
+    return !m_redoStack.isEmpty();
+}
+
 bool QTuiLineEdit::replaceSelection(const QString &text)
 {
     if (hasSelectedText())
@@ -258,9 +301,21 @@ bool QTuiLineEdit::replaceRange(int start, int end, const QString &text)
     if (m_validator && m_validator->validate(candidate, pos) == QTuiValidator::Invalid)
         return false;
 
+    // One undo step per edit, except that one character typed right after
+    // the previous one joins its step
+    const bool typing = start == end && QtTuiUnicode::nextClusterIndex(inserted, 0) == inserted.length()
+        && inserted != QLatin1String(" ");
+    if (!(typing && start == m_typingEnd)) {
+        m_undoStack.append({m_text, m_cursorPos});
+        if (m_undoStack.size() > kMaxUndo)
+            m_undoStack.removeFirst();
+    }
+    m_redoStack.clear();
+
     m_text = candidate;
     m_cursorPos = qBound(0, pos, int(m_text.length()));
     m_selAnchor = -1;
+    m_typingEnd = typing ? m_cursorPos : -1;
     emit textChanged(m_text);
     return true;
 }
@@ -308,6 +363,9 @@ void QTuiLineEdit::setText(const QString &newText)
     m_text = text;
     m_cursorPos = m_text.length();
     m_selAnchor = -1;
+    m_undoStack.clear();
+    m_redoStack.clear();
+    m_typingEnd = -1;
     adjustScrollToCursor();
     emit textChanged(m_text);
     markDirty();
@@ -352,8 +410,14 @@ void QTuiLineEdit::keyPressEvent(TuiKeyEvent *event)
         case Qt::Key_C: copy(); return;
         case Qt::Key_X: cut(); return;
         case Qt::Key_A: selectAll(); return;
+        case Qt::Key_Z: undo(); return;
+        case Qt::Key_Y: redo(); return;
         default: break;
         }
+    }
+    if (key == Qt::Key_Z && event->modifiers() == (Qt::ControlModifier | Qt::ShiftModifier)) {
+        redo();
+        return;
     }
 
     // Shift+movement extends the selection; plain movement ends it

@@ -26,6 +26,13 @@ public:
     bool hasSelection() const;
     QString selectedText() const;
 
+    // Undo history: Ctrl+Z undoes, Ctrl+Y and Ctrl+Shift+Z redo. Typed
+    // characters in a row undo as one step. setPlainText() clears it.
+    void undo();
+    void redo();
+    bool isUndoAvailable() const;
+    bool isRedoAvailable() const;
+
     void paintEvent(ScreenBuffer &buffer) override;
     QSize minimumSize() const override;
     // Bare printable-key shortcuts must not fire while this widget has focus
@@ -48,6 +55,11 @@ protected:
     int lineCount() const;
 
 private:
+    void editKey(TuiKeyEvent *event);
+    // Records an undo step if the text differs from before
+    void recordEdit(const QStringList &before, int row, int col, bool typing);
+    void restoreState(const QStringList &lines, int row, int col);
+
     void insertText(const QString &text);
     void insertPastedText(const QString &text);
     void insertNewLine();
@@ -72,6 +84,17 @@ private:
     int m_selStartRow = -1, m_selStartCol = -1;
     int m_selEndRow = -1, m_selEndCol = -1;
     bool m_selecting = false;
+
+    struct UndoState {
+        QStringList lines;
+        int row;
+        int col;
+    };
+    QList<UndoState> m_undoStack;
+    QList<UndoState> m_redoStack;
+    // Cursor after the last typed character; -1 if the last edit was not typing
+    int m_typingRow = -1;
+    int m_typingCol = -1;
 };
 
 } // namespace QtTUI
