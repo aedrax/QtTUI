@@ -4,6 +4,7 @@
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
 #include <QAbstractTableModel>
+#include <QSortFilterProxyModel>
 
 using namespace QtTUI;
 
@@ -306,6 +307,46 @@ private slots:
                 RC_ASSERT(emitted.row() == r);
                 RC_ASSERT(emitted.column() == c);
             });
+    }
+
+    void headerClickSortsThroughProxy()
+    {
+        SimpleTableModel source(3, 2);
+        source.setData(source.index(0, 0), QStringLiteral("b"));
+        source.setData(source.index(1, 0), QStringLiteral("c"));
+        source.setData(source.index(2, 0), QStringLiteral("a"));
+        QSortFilterProxyModel proxy;
+        proxy.setSourceModel(&source);
+
+        QTuiTableView view;
+        view.setGeometry(QRect(0, 0, 30, 5));
+        view.setModel(&proxy);
+        auto firstCell = [&proxy]() { return proxy.index(0, 0).data().toString(); };
+        auto click = [&view](int x, int y) {
+            TuiMouseEvent ev(TuiMouseEvent::Press, Qt::LeftButton, QPoint(x, y));
+            QCoreApplication::sendEvent(&view, &ev);
+        };
+
+        click(0, 0); // sorting not enabled: nothing happens
+        QCOMPARE(firstCell(), QStringLiteral("b"));
+
+        view.setSortingEnabled(true);
+        click(0, 0);
+        QCOMPARE(view.sortColumn(), 0);
+        QCOMPARE(firstCell(), QStringLiteral("a"));
+        click(0, 0); // same column: reversed
+        QCOMPARE(view.sortOrder(), Qt::DescendingOrder);
+        QCOMPARE(firstCell(), QStringLiteral("c"));
+
+        // The header of the sort column shows the indicator
+        ScreenBuffer buf(30, 5);
+        view.paintEvent(buf);
+        QString header;
+        for (int x = 0; x < 30; ++x)
+            header += QChar(char16_t(buf.backCell(x, 0).ch));
+        QVERIFY2(header.contains(QStringLiteral("H0 \u25BC")), qPrintable(header));
+        // The rows show the new order
+        QCOMPARE(buf.backCell(0, 1).ch, U'c');
     }
 };
 

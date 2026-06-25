@@ -118,7 +118,7 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
             if (xOff >= geo.x() + viewWidth)
                 break;
             int availWidth = qMin(colWidths[c], geo.x() + viewWidth - xOff);
-            QString header = m_model->headerData(c, Qt::Horizontal, Qt::DisplayRole).toString();
+            QString header = headerText(c);
             renderTextTruncated(buffer, xOff, geo.y(), header, availWidth, headerStyle);
             // Fill remaining space in column with background
             int textLen = qMin(header.length(), availWidth);
@@ -276,6 +276,48 @@ void QTuiTableView::keyPressEvent(TuiKeyEvent *event)
     markDirty();
 }
 
+bool QTuiTableView::isSortingEnabled() const
+{
+    return m_sortingEnabled;
+}
+
+void QTuiTableView::setSortingEnabled(bool enable)
+{
+    if (m_sortingEnabled == enable)
+        return;
+    m_sortingEnabled = enable;
+    invalidateColumnWidths();
+    markDirty();
+}
+
+void QTuiTableView::sortByColumn(int column, Qt::SortOrder order)
+{
+    m_sortColumn = column;
+    m_sortOrder = order;
+    if (m_model && column >= 0)
+        m_model->sort(column, order); // the model emits layoutChanged()
+    invalidateColumnWidths();
+    markDirty();
+}
+
+int QTuiTableView::sortColumn() const
+{
+    return m_sortColumn;
+}
+
+Qt::SortOrder QTuiTableView::sortOrder() const
+{
+    return m_sortOrder;
+}
+
+QString QTuiTableView::headerText(int column) const
+{
+    QString text = m_model->headerData(column, Qt::Horizontal, Qt::DisplayRole).toString();
+    if (m_sortingEnabled && column == m_sortColumn)
+        text += m_sortOrder == Qt::AscendingOrder ? QStringLiteral(" \u25B2") : QStringLiteral(" \u25BC");
+    return text;
+}
+
 void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
 {
     if (event->mouseType() != TuiMouseEvent::Press)
@@ -288,8 +330,9 @@ void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
     const int rows = m_model->rowCount();
 
     // Calculate clicked row (subtract 1 for header)
+    const bool onHeader = event->y() - geo.y() < m_headerHeight;
     int clickedRow = (event->y() - geo.y() - m_headerHeight) + m_scrollOffset;
-    if (clickedRow < 0 || clickedRow >= rows)
+    if (!onHeader && (clickedRow < 0 || clickedRow >= rows))
         return;
 
     // Same final column widths as paintEvent
@@ -314,6 +357,16 @@ void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
 
     if (clickedCol < 0)
         clickedCol = cols - 1;
+
+    // A header click sorts: a new column ascending, the same column reversed
+    if (onHeader) {
+        if (m_sortingEnabled) {
+            const Qt::SortOrder order = (clickedCol == m_sortColumn && m_sortOrder == Qt::AscendingOrder)
+                ? Qt::DescendingOrder : Qt::AscendingOrder;
+            sortByColumn(clickedCol, order);
+        }
+        return;
+    }
 
     m_currentRow = clickedRow;
     m_currentCol = clickedCol;
@@ -651,7 +704,7 @@ const QVector<int> &QTuiTableView::effectiveColumnWidths() const
     // Step 1: Natural width per column = max(header width, widest sampled cell)
     QVector<int> colWidths(cols, 0);
     for (int c = 0; c < cols; ++c) {
-        QString header = m_model->headerData(c, Qt::Horizontal, Qt::DisplayRole).toString();
+        QString header = headerText(c);
         int maxW = header.length();
         for (int r = sampleFirst; r < sampleEnd; ++r) {
             QModelIndex idx = m_model->index(r, c);

@@ -2,6 +2,7 @@
 // Navigate tabs with arrow keys, widgets with Tab/Shift+Tab. Ctrl+Q to quit.
 
 #include <QtTUI/QtTUI>
+#include <QSortFilterProxyModel>
 #include <QStringListModel>
 #include <QTimer>
 
@@ -454,9 +455,13 @@ static QTuiWidget *createModelViewTab(QTuiWidget *parent, QTuiStatusBar *statusB
 
     // -- QTuiTableView section --
     page->addWidget(sectionLabel("QTuiTableView", page));
-    auto *tableModel = new SampleTableModel(page);
+    // A sort proxy in front of the model: a header click sorts the table
+    auto *sourceModel = new SampleTableModel(page);
+    auto *tableModel = new QSortFilterProxyModel(page);
+    tableModel->setSourceModel(sourceModel);
     auto *tableView = new QTuiTableView(page);
     tableView->setModel(tableModel);
+    tableView->setSortingEnabled(true);
     QObject::connect(tableView, &QTuiTableView::activated, [statusBar, tableModel](const QModelIndex &idx) {
         if (!idx.isValid()) return;
         const QString name = tableModel->data(tableModel->index(idx.row(), 0), Qt::DisplayRole).toString();

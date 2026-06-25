@@ -22,6 +22,17 @@ public:
     int scrollOffset() const;
     int horizontalScrollOffset() const;
 
+    // Sorting, as in QTableView. With sorting enabled, a click on a column
+    // header sorts by that column; another click reverses the order. The
+    // view calls QAbstractItemModel::sort(), so the model (or a
+    // QSortFilterProxyModel in front of it) must implement sort(). The
+    // header of the sort column shows "▲" (ascending) or "▼" (descending).
+    bool isSortingEnabled() const;
+    void setSortingEnabled(bool enable);
+    void sortByColumn(int column, Qt::SortOrder order);
+    int sortColumn() const; // -1 if not sorted
+    Qt::SortOrder sortOrder() const;
+
     void paintEvent(ScreenBuffer &buffer) override;
 
 signals:
@@ -42,6 +53,8 @@ private slots:
     void onModelReset();
 
 private:
+    // Header text with the sort indicator
+    QString headerText(int column) const;
     void disconnectModel();
     void connectModel();
     void ensureCurrentVisible();
@@ -56,6 +69,9 @@ private:
     int m_scrollOffset = 0;
     int m_horizontalScrollOffset = 0;
     static constexpr int m_headerHeight = 1;
+    bool m_sortingEnabled = false;
+    int m_sortColumn = -1;
+    Qt::SortOrder m_sortOrder = Qt::AscendingOrder;
 
     // Cached final (post-scaling) column widths shared by painting, hit
     // testing and horizontal scrolling. Recomputed lazily when model content
