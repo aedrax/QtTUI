@@ -2,6 +2,7 @@
 #define QTTUI_QTUIMAINWINDOW_H
 
 #include <QtTUI/QTuiWidget.h>
+#include <QElapsedTimer>
 #include <QHash>
 #include <QList>
 #include <QSize>
@@ -69,6 +70,11 @@ private:
     QTuiWidget *m_centralWidget = nullptr;
     QTuiLayout *m_layout = nullptr;
     QList<QTuiWidget *> m_focusChain;
+
+    // Last mouse press, for double-click detection
+    QElapsedTimer m_lastPressTimer;
+    QPoint m_lastPressPos;
+    Qt::MouseButton m_lastPressButton = Qt::NoButton;
 
     // Main components
     QTuiMenuBar *m_menuBar = nullptr;

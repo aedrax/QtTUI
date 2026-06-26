@@ -33,6 +33,8 @@ public:
 
 signals:
     void activated(const QModelIndex &index);
+    // A double click on an item; activated() follows, as in Qt
+    void doubleClicked(const QModelIndex &index);
     void expanded(const QModelIndex &index);
     void collapsed(const QModelIndex &index);
 

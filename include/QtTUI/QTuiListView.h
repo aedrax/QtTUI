@@ -24,6 +24,8 @@ public:
 
 signals:
     void activated(const QModelIndex &index);
+    // A double click on an item (each click already emits activated())
+    void doubleClicked(const QModelIndex &index);
 
 protected:
     void keyPressEvent(TuiKeyEvent *event) override;

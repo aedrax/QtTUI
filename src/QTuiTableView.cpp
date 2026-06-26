@@ -320,6 +320,15 @@ QString QTuiTableView::headerText(int column) const
 
 void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
 {
+    // The Press before the DoubleClick already made the item current
+    if (event->mouseType() == TuiMouseEvent::DoubleClick) {
+        const QModelIndex index = currentIndex();
+        if (!index.isValid())
+            return;
+        emit doubleClicked(index);
+        emit activated(index);
+        return;
+    }
     if (event->mouseType() != TuiMouseEvent::Press)
         return;
     if (!m_model || m_model->rowCount() == 0 || m_model->columnCount() == 0)

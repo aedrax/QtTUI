@@ -43,7 +43,10 @@ private:
 // Lightweight mouse event for TUI (no Qt::Gui dependency)
 class TuiMouseEvent : public QEvent {
 public:
-    enum MouseEventType { Press, Release, Move, Wheel };
+    // DoubleClick follows the second Press of a double click (two presses
+    // of the same button on the same cell within 400 ms), as Qt's
+    // MouseButtonDblClick does
+    enum MouseEventType { Press, Release, Move, Wheel, DoubleClick };
 
     TuiMouseEvent(MouseEventType mouseType, Qt::MouseButton button, const QPoint &pos,
                   Qt::KeyboardModifiers modifiers = Qt::NoModifier, int wheelDelta = 0)

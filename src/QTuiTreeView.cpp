@@ -337,6 +337,18 @@ void QTuiTreeView::keyPressEvent(TuiKeyEvent *event)
 
 void QTuiTreeView::mousePressEvent(TuiMouseEvent *event)
 {
+    // The Press before the DoubleClick already made the item current
+    if (event->mouseType() == TuiMouseEvent::DoubleClick) {
+        const QModelIndex index = currentIndex();
+        if (!index.isValid())
+            return;
+        emit doubleClicked(index);
+        // A double click on an item with children expands or collapses it
+        if (m_model && m_model->hasChildren(index))
+            isExpanded(index) ? collapse(index) : expand(index);
+        emit activated(index);
+        return;
+    }
     if (event->mouseType() != TuiMouseEvent::Press)
         return;
     if (!m_model || m_flatList.isEmpty())

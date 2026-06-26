@@ -12,7 +12,9 @@
 #include <QtTest/QtTest>
 #include <QSignalSpy>
 #include <QTimer>
+#include <QStringListModel>
 #include <QtTUI/QTuiApplication.h>
+#include <QtTUI/QTuiListView.h>
 #include <QtTUI/QTuiCompleter.h>
 #include <QtTUI/QTuiLineEdit.h>
 #include <QtTUI/QTuiAction.h>
@@ -786,6 +788,40 @@ private slots:
                                           {QStringLiteral("Red"), QStringLiteral("Green")}, 1, &ok),
                  QStringLiteral("Green"));
         QVERIFY(ok);
+    }
+
+    // Two presses on the same cell within 400 ms make a double click
+    void doubleClickInViews()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 40, 10));
+        app.setMainWindow(&mainWindow);
+        auto *central = new FillWidget(QLatin1Char('C'));
+        mainWindow.setCentralWidget(central);
+        QStringListModel model({QStringLiteral("one"), QStringLiteral("two")});
+        auto *list = new QTuiListView(central);
+        list->setModel(&model);
+        list->setGeometry(QRect(0, 0, 20, 5));
+        mainWindow.show();
+        QSignalSpy doubled(list, &QTuiListView::doubleClicked);
+        QSignalSpy activated(list, &QTuiListView::activated);
+
+        sendClick(mainWindow, QPoint(1, 1));
+        QCOMPARE(doubled.count(), 0);
+        sendClick(mainWindow, QPoint(1, 1));
+        QCOMPARE(doubled.count(), 1);
+        QCOMPARE(doubled.at(0).at(0).value<QModelIndex>().row(), 1);
+        QCOMPARE(activated.count(), 2); // a list view activates on each click
+
+        // A third press starts again; a press on another cell is not a pair
+        sendClick(mainWindow, QPoint(1, 1));
+        QCOMPARE(doubled.count(), 1);
+        sendClick(mainWindow, QPoint(1, 0));
+        QCOMPARE(doubled.count(), 1);
     }
 };
 

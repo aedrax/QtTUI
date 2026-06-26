@@ -499,6 +499,25 @@ void QTuiMainWindow::mousePressEvent(TuiMouseEvent *event)
             QTuiToolTip::showFor(target);
         }
         QCoreApplication::sendEvent(target, event);
+
+        // A second press of the same button on the same cell soon after the
+        // first one is a double click; a third press starts again
+        if (event->mouseType() == TuiMouseEvent::Press) {
+            static constexpr qint64 kDoubleClickMs = 400;
+            const bool isDouble = m_lastPressTimer.isValid()
+                && m_lastPressTimer.elapsed() <= kDoubleClickMs
+                && m_lastPressPos == event->pos() && m_lastPressButton == event->button();
+            if (isDouble) {
+                m_lastPressTimer.invalidate();
+                TuiMouseEvent dbl(TuiMouseEvent::DoubleClick, event->button(), event->pos(),
+                                  event->modifiers());
+                QCoreApplication::sendEvent(target, &dbl);
+            } else {
+                m_lastPressTimer.start();
+                m_lastPressPos = event->pos();
+                m_lastPressButton = event->button();
+            }
+        }
     }
 }
 

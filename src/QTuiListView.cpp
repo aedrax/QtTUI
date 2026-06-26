@@ -162,6 +162,15 @@ void QTuiListView::keyPressEvent(TuiKeyEvent *event)
 
 void QTuiListView::mousePressEvent(TuiMouseEvent *event)
 {
+    // The Press before the DoubleClick already made the item current
+    if (event->mouseType() == TuiMouseEvent::DoubleClick) {
+        const QModelIndex index = currentIndex();
+        if (!index.isValid())
+            return;
+        // No activated() here: in a list view each click already activates
+        emit doubleClicked(index);
+        return;
+    }
     if (event->mouseType() != TuiMouseEvent::Press)
         return;
     if (!m_model || m_model->rowCount() == 0)
