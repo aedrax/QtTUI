@@ -63,6 +63,9 @@ private:
     void rebuildFocusChain();
     // The topmost visible dialog, or nullptr; it makes the window modal
     QTuiDialog *activeModalDialog() const;
+    // Asks widget (or its parents, see QTuiWidget::contextMenuPolicy) for
+    // a context menu at pos (screen cells)
+    void requestContextMenu(QTuiWidget *widget, const QPoint &pos);
     void collectFocusableWidgets(QTuiWidget *widget, QList<QTuiWidget *> &chain);
     static QTuiWidget *findFocusedWidget(QTuiWidget *root);
     static QTuiWidget *findWidgetAt(QTuiWidget *root, const QPoint &pos);

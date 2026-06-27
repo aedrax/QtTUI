@@ -823,6 +823,64 @@ private slots:
         sendClick(mainWindow, QPoint(1, 0));
         QCOMPARE(doubled.count(), 1);
     }
+
+    // Right click (or Shift+F10) asks for a context menu by policy
+    void contextMenuPolicies()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 40, 12));
+        app.setMainWindow(&mainWindow);
+        auto *central = new FillWidget(QLatin1Char('C'));
+        mainWindow.setCentralWidget(central);
+        auto *child = new FillWidget(QLatin1Char('x'), central);
+        child->setGeometry(QRect(5, 3, 10, 2));
+        mainWindow.show();
+        auto rightClick = [&mainWindow](const QPoint &pos) {
+            TuiMouseEvent ev(TuiMouseEvent::Press, Qt::RightButton, pos);
+            QCoreApplication::sendEvent(&mainWindow, &ev);
+        };
+
+        // Custom: the signal has the position inside the widget
+        central->setContextMenuPolicy(Qt::CustomContextMenu);
+        QSignalSpy requested(central, &QTuiWidget::customContextMenuRequested);
+        rightClick(QPoint(2, 1));
+        QCOMPARE(requested.count(), 1);
+        QCOMPARE(requested.at(0).at(0).toPoint(), QPoint(2, 1));
+
+        // Default on the child: its parent answers
+        rightClick(QPoint(6, 3));
+        QCOMPARE(requested.count(), 2);
+
+        // NoContextMenu on the child: nobody answers
+        child->setContextMenuPolicy(Qt::NoContextMenu);
+        rightClick(QPoint(6, 3));
+        QCOMPARE(requested.count(), 2);
+
+        // Actions: a menu with the widget actions opens at the click
+        QTuiAction copy(QStringLiteral("Copy"));
+        QSignalSpy triggered(&copy, &QTuiAction::triggered);
+        child->setContextMenuPolicy(Qt::ActionsContextMenu);
+        child->addAction(&copy);
+        rightClick(QPoint(6, 3));
+        app.triggerRender();
+        ScreenBuffer *buf = app.screenBuffer();
+        QVERIFY(rowText(buf, 3, 6, 30).contains(QStringLiteral("Copy"))
+                || rowText(buf, 4, 6, 30).contains(QStringLiteral("Copy")));
+        sendKey(mainWindow, Qt::Key_Return);
+        QCOMPARE(triggered.count(), 1);
+
+        // Shift+F10 asks for the focus widget's menu
+        child->setFocusPolicy(Qt::StrongFocus);
+        child->setFocus();
+        child->setContextMenuPolicy(Qt::CustomContextMenu);
+        QSignalSpy childRequested(child, &QTuiWidget::customContextMenuRequested);
+        sendKey(mainWindow, Qt::Key_F10, Qt::ShiftModifier);
+        QCOMPARE(childRequested.count(), 1);
+    }
 };
 
 QTEST_APPLESS_MAIN(TestPopupRendering)

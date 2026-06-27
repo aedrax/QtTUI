@@ -21,10 +21,14 @@ public:
 
     QTuiAction *addAction(const QString &text);
     QTuiAction *addAction(const QString &text, const QString &shortcut);
+    // Adds an existing action; the menu does not take ownership
+    void addAction(QTuiAction *action);
     void addSeparator();
     QTuiMenu *addMenu(const QString &title);
     void addMenu(QTuiMenu *menu);
 
+    // Shows the menu with its top-left corner at pos (screen cells), moved
+    // as necessary to stay inside the main window
     void popup(const QPoint &pos);
     void close();
 

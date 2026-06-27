@@ -476,6 +476,25 @@ static QTuiWidget *createModelViewTab(QTuiWidget *parent, QTuiStatusBar *statusB
          QStringLiteral("Delta"), QStringLiteral("Echo")}, page);
     auto *listView = new QTuiListView(page);
     listView->setModel(listModel);
+    // Right click (or Shift+F10) opens a menu with the list actions
+    listView->setContextMenuPolicy(Qt::ActionsContextMenu);
+    listView->setToolTip("Right click or Shift+F10 for a menu");
+    auto *addItem = new QTuiAction("Add item", listView);
+    QObject::connect(addItem, &QTuiAction::triggered, [listModel, statusBar]() {
+        const int row = listModel->rowCount();
+        listModel->insertRows(row, 1);
+        listModel->setData(listModel->index(row), QStringLiteral("Item %1").arg(row + 1));
+        statusBar->showMessage("Added an item");
+    });
+    auto *removeItem = new QTuiAction("Remove current item", listView);
+    QObject::connect(removeItem, &QTuiAction::triggered, [listModel, listView, statusBar]() {
+        const QModelIndex current = listView->currentIndex();
+        if (current.isValid())
+            listModel->removeRows(current.row(), 1);
+        statusBar->showMessage("Removed an item");
+    });
+    listView->addAction(addItem);
+    listView->addAction(removeItem);
     page->addWidget(listView, 1);
 
     // -- QTuiTreeView section --

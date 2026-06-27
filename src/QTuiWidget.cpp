@@ -1,5 +1,6 @@
 #include <QtTUI/QTuiWidget.h>
 #include <QtTUI/QTuiLayout.h>
+#include <QtTUI/QTuiAction.h>
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/RenderScheduler.h>
 #include <QtTUI/Theme_Engine.h>
@@ -192,6 +193,37 @@ bool QTuiWidget::isPaintedByParent() const
 void QTuiWidget::setPaintedByParent(bool paintedByParent)
 {
     m_paintedByParent = paintedByParent;
+}
+
+Qt::ContextMenuPolicy QTuiWidget::contextMenuPolicy() const
+{
+    return m_contextMenuPolicy;
+}
+
+void QTuiWidget::setContextMenuPolicy(Qt::ContextMenuPolicy policy)
+{
+    m_contextMenuPolicy = policy;
+}
+
+void QTuiWidget::addAction(QTuiAction *action)
+{
+    if (action && !m_actions.contains(action))
+        m_actions.append(action);
+}
+
+void QTuiWidget::removeAction(QTuiAction *action)
+{
+    m_actions.removeAll(action);
+}
+
+QList<QTuiAction *> QTuiWidget::actions() const
+{
+    QList<QTuiAction *> result;
+    for (const auto &action : m_actions) {
+        if (action)
+            result.append(action);
+    }
+    return result;
 }
 
 QString QTuiWidget::toolTip() const

@@ -14,6 +14,7 @@
 namespace QtTUI {
 
 struct ThemeProperties;
+class QTuiAction;
 class QTuiLayout;
 class ScreenBuffer;
 class TuiKeyEvent;
@@ -81,6 +82,21 @@ public:
     QString toolTip() const;
     void setToolTip(const QString &toolTip);
 
+    // Context menu, as in QWidget. A right click on the widget, or
+    // Shift+F10 while it has focus, asks for a context menu:
+    // - DefaultContextMenu (default): the parent widget answers instead
+    // - CustomContextMenu: emits customContextMenuRequested()
+    // - ActionsContextMenu: shows a menu with actions()
+    // - NoContextMenu: no menu, and the parent is not asked
+    Qt::ContextMenuPolicy contextMenuPolicy() const;
+    void setContextMenuPolicy(Qt::ContextMenuPolicy policy);
+
+    // Actions of the widget, for ActionsContextMenu. The widget does not
+    // take ownership.
+    void addAction(QTuiAction *action);
+    void removeAction(QTuiAction *action);
+    QList<QTuiAction *> actions() const;
+
     // Called on each visible popup when a mouse press lands outside every
     // visible popup (see QTuiMainWindow::mousePressEvent). The default
     // implementation hides the popup; subclasses override it to run their full
@@ -137,6 +153,8 @@ public:
 
 signals:
     void geometryChanged(const QRect &rect);
+    // pos is in cells, relative to the top-left corner of the widget
+    void customContextMenuRequested(const QPoint &pos);
     void visibilityChanged(bool visible);
     void enabledChanged(bool enabled);
     void focusGained();
@@ -163,6 +181,8 @@ private:
     QPointer<QTuiLayout> m_layout;
     QString m_toolTip;
     QTuiSizePolicy m_sizePolicy;
+    Qt::ContextMenuPolicy m_contextMenuPolicy = Qt::DefaultContextMenu;
+    QList<QPointer<QTuiAction>> m_actions;
     Qt::FocusPolicy m_focusPolicy = Qt::NoFocus;
 
     // Widget focused before this popup became visible; restored when it hides

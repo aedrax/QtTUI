@@ -11,6 +11,7 @@
 #include <QtTUI/TuiEvents.h>
 #include <QtTUI/QTuiToolTip.h>
 #include <QtTUI/QTuiDialog.h>
+#include <QtTUI/QTuiMenu.h>
 #include <QCoreApplication>
 #include <QDebug>
 
@@ -386,6 +387,15 @@ void QTuiMainWindow::keyPressEvent(TuiKeyEvent *event)
     if (dispatchShortcut(event))
         return;
 
+    // Shift+F10 (or the Menu key) asks for the context menu of the focus widget
+    if ((event->key() == Qt::Key_F10 && event->modifiers() == Qt::ShiftModifier)
+        || event->key() == Qt::Key_Menu) {
+        if (QTuiWidget *focus = QTuiWidget::focusWidget()) {
+            requestContextMenu(focus, focus->geometry().topLeft() + QPoint(0, 1));
+            return;
+        }
+    }
+
     // Ctrl+Z suspends the program, unless an action took it above or a
     // focused editor uses it for undo
     QTuiWidget *editor = QTuiWidget::focusWidget();
@@ -499,6 +509,10 @@ void QTuiMainWindow::mousePressEvent(TuiMouseEvent *event)
             QTuiToolTip::showFor(target);
         }
         QCoreApplication::sendEvent(target, event);
+
+        // A right press asks for a context menu
+        if (event->mouseType() == TuiMouseEvent::Press && event->button() == Qt::RightButton)
+            requestContextMenu(target, event->pos());
 
         // A second press of the same button on the same cell soon after the
         // first one is a double click; a third press starts again
@@ -646,6 +660,35 @@ void QTuiMainWindow::relayoutChildren()
                 childGeo = childGeo.intersected(bounds);
                 child->setGeometry(childGeo);
             }
+        }
+    }
+}
+
+void QTuiMainWindow::requestContextMenu(QTuiWidget *widget, const QPoint &pos)
+{
+    for (QTuiWidget *w = widget; w && w != this; w = w->parentWidget()) {
+        switch (w->contextMenuPolicy()) {
+        case Qt::NoContextMenu:
+        case Qt::PreventContextMenu:
+            return;
+        case Qt::CustomContextMenu:
+            emit w->customContextMenuRequested(pos - w->geometry().topLeft());
+            return;
+        case Qt::ActionsContextMenu: {
+            const QList<QTuiAction *> actions = w->actions();
+            if (actions.isEmpty())
+                return;
+            // A menu for this request only; it deletes itself when it closes
+            auto *menu = new QTuiMenu(QString(), w);
+            for (QTuiAction *action : actions)
+                menu->addAction(action);
+            connect(menu, &QTuiMenu::aboutToHide, menu, &QObject::deleteLater);
+            menu->popup(pos);
+            return;
+        }
+        case Qt::DefaultContextMenu:
+        default:
+            break; // ask the parent
         }
     }
 }

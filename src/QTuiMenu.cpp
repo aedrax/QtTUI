@@ -1,4 +1,6 @@
 #include <QtTUI/QTuiMenu.h>
+#include <QtTUI/QTuiMainWindow.h>
+#include <QtTUI/QTuiApplication.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
@@ -44,6 +46,26 @@ QTuiAction *QTuiMenu::addAction(const QString &text, const QString &shortcut)
     return action;
 }
 
+void QTuiMenu::addAction(QTuiAction *action)
+{
+    if (!action)
+        return;
+    MenuItem item;
+    item.action = action;
+    m_menuItems.append(item);
+    // Drop the item if the action goes away first
+    connect(action, &QObject::destroyed, this, [this, action]() {
+        for (int i = 0; i < m_menuItems.size(); ++i) {
+            if (m_menuItems.at(i).action == action) {
+                m_menuItems.removeAt(i);
+                break;
+            }
+        }
+        m_highlightedIndex = qBound(0, m_highlightedIndex, qMax(0, int(m_menuItems.size()) - 1));
+        markDirty();
+    });
+}
+
 void QTuiMenu::addSeparator()
 {
     MenuItem item;
@@ -78,7 +100,13 @@ void QTuiMenu::popup(const QPoint &pos)
     while (m_highlightedIndex < m_menuItems.size() && m_menuItems.at(m_highlightedIndex).isSeparator)
         m_highlightedIndex++;
 
-    setGeometry(QRect(pos.x(), pos.y(), minimumSize().width(), minimumSize().height()));
+    QRect geo(pos, minimumSize());
+    if (auto *app = QTuiApplication::instance(); app && app->mainWindow()) {
+        const QRect screen = app->mainWindow()->geometry();
+        geo.moveLeft(qBound(screen.left(), geo.left(), screen.right() + 1 - geo.width()));
+        geo.moveTop(qBound(screen.top(), geo.top(), screen.bottom() + 1 - geo.height()));
+    }
+    setGeometry(geo);
     setVisible(true);
     setFocus();
     emit aboutToShow();
