@@ -789,6 +789,7 @@ int main(int argc, char *argv[])
     // Menu bar with File > Quit
     auto *menuBar = new QTuiMenuBar(&window);
     auto *fileMenu = menuBar->addMenu("&File");
+    auto *openAction = fileMenu->addAction("&Open...", "Ctrl+O");
     auto *quitAction = fileMenu->addAction("&Quit", "Ctrl+Q");
     QObject::connect(quitAction, &QTuiAction::triggered, &app, &QCoreApplication::quit);
     window.setMenuBar(menuBar);
@@ -798,6 +799,12 @@ int main(int argc, char *argv[])
     const QString keyHints = QStringLiteral(" ←/→ category · Tab/Shift+Tab focus · Ctrl+Q quit");
     statusBar->showMessage(keyHints);
     window.setStatusBar(statusBar);
+
+    QObject::connect(openAction, &QTuiAction::triggered, [statusBar]() {
+        const QString path = QTuiFileDialog::getOpenFileName(nullptr, "Open a file");
+        statusBar->showMessage(path.isEmpty() ? QStringLiteral("Open canceled")
+                                              : QStringLiteral("Chosen: %1").arg(path));
+    });
 
     // Central tab widget with 10 category tabs
     auto *tabs = new QTuiTabWidget(&window);

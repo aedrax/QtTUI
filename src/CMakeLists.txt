@@ -51,6 +51,7 @@ set(QTTUI_SOURCES
     QTuiToolBox.cpp
     QTuiStackedWidget.cpp
     QTuiSplitter.cpp
+    QTuiFileDialog.cpp
     QTuiFocusFrame.cpp
     QTuiSizeGrip.cpp
     QTuiCalendarWidget.cpp
@@ -148,6 +149,7 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiToolBox.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiStackedWidget.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiSplitter.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiFileDialog.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiFocusFrame.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiSizeGrip.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiCalendarWidget.h

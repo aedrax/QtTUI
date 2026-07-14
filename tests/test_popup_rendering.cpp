@@ -12,6 +12,9 @@
 #include <QtTest/QtTest>
 #include <QSignalSpy>
 #include <QTimer>
+#include <QTemporaryDir>
+#include <QDir>
+#include <QFile>
 #include <QStringListModel>
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiListView.h>
@@ -24,6 +27,7 @@
 #include <QtTUI/QTuiMessageBox.h>
 #include <QtTUI/QTuiInputDialog.h>
 #include <QtTUI/QTuiProgressDialog.h>
+#include <QtTUI/QTuiFileDialog.h>
 #include <QtTUI/QTuiComboBox.h>
 #include <QtTUI/QTuiMainWindow.h>
 #include <QtTUI/QTuiMenu.h>
@@ -924,6 +928,51 @@ private slots:
         QVERIFY(!canceled.isVisible());
         canceled.setValue(2); // ignored after cancel
         QVERIFY(!canceled.isVisible());
+    }
+
+    void fileDialogPicksAFile()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 80, 24));
+        app.setMainWindow(&mainWindow);
+        mainWindow.show();
+
+        QTemporaryDir tmp;
+        QVERIFY(tmp.isValid());
+        QDir(tmp.path()).mkdir(QStringLiteral("sub"));
+        for (const char *name : {"a.txt", "b.png", "sub/c.txt"}) {
+            QFile f(tmp.filePath(QString::fromLatin1(name)));
+            QVERIFY(f.open(QIODevice::WriteOnly));
+        }
+
+        // Entries: "../", "sub/", "a.txt" ("b.png" is filtered out).
+        // Down, Down, Enter puts "a.txt" in the name field; Tab goes to
+        // the field; Enter accepts.
+        QTimer::singleShot(0, [&mainWindow]() {
+            sendKey(mainWindow, Qt::Key_Down);
+            sendKey(mainWindow, Qt::Key_Down);
+            sendKey(mainWindow, Qt::Key_Return);
+            sendKey(mainWindow, Qt::Key_Tab);
+            sendKey(mainWindow, Qt::Key_Return);
+        });
+        QCOMPARE(QTuiFileDialog::getOpenFileName(nullptr, QStringLiteral("Open"), tmp.path(),
+                                                 QStringLiteral("Text (*.txt)")),
+                 QDir::cleanPath(tmp.filePath(QStringLiteral("a.txt"))));
+
+        // Down, Enter on "sub/" opens it; there "../" and "c.txt"
+        QTuiFileDialog dialog(nullptr, QStringLiteral("Open"), tmp.path(), QStringLiteral("*.txt"));
+        dialog.setFileMode(QTuiFileDialog::ExistingFile);
+        dialog.open();
+        sendKey(mainWindow, Qt::Key_Down);
+        sendKey(mainWindow, Qt::Key_Return);
+        QCOMPARE(dialog.directory(), QDir::cleanPath(tmp.filePath(QStringLiteral("sub"))));
+        sendKey(mainWindow, Qt::Key_Escape);
+        QVERIFY(!dialog.isVisible());
+        QVERIFY(dialog.selectedFile().isEmpty());
     }
 };
 
