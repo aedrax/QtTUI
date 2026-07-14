@@ -25,6 +25,7 @@
 #include <QtTUI/QTuiDialog.h>
 #include <QtTUI/QTuiMessageBox.h>
 #include <QtTUI/QTuiInputDialog.h>
+#include <QtTUI/QTuiProgressDialog.h>
 
 // Layout classes
 #include <QtTUI/QTuiSizePolicy.h>

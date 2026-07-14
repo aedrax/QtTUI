@@ -131,10 +131,27 @@ static QTuiWidget *createButtonsTab(QTuiWidget *parent, QTuiStatusBar *statusBar
     page->addWidget(sectionLabel("QTuiPushButton", page));
     auto *btn1 = new QTuiPushButton("Click Me", page);
     auto *btn2 = new QTuiPushButton("Another Button", page);
-    btn1->setToolTip("Shows its text in the status bar");
+    btn1->setToolTip("Opens a QTuiProgressDialog");
     btn2->setToolTip("Opens a QTuiMessageBox");
-    QObject::connect(btn1, &QTuiPushButton::clicked, [statusBar, btn1]() {
-        statusBar->showMessage(btn1->text());
+    // A simulated copy: a timer moves a progress dialog to 50 in 5 seconds
+    QObject::connect(btn1, &QTuiPushButton::clicked, [statusBar]() {
+        auto *progress = new QTuiProgressDialog("Copying files...", "Cancel", 0, 50);
+        progress->setWindowTitle("QTuiProgressDialog");
+        progress->setMinimumDuration(0);
+        auto *timer = new QTimer(progress);
+        QObject::connect(timer, &QTimer::timeout, progress, [progress, statusBar]() {
+            progress->setValue(progress->value() + 1);
+            if (progress->value() >= progress->maximum()) {
+                statusBar->showMessage("Copy done");
+                progress->deleteLater();
+            }
+        });
+        QObject::connect(progress, &QTuiProgressDialog::canceled, progress, [progress, statusBar]() {
+            statusBar->showMessage("Copy canceled");
+            progress->deleteLater();
+        });
+        progress->setValue(0);
+        timer->start(100);
     });
     QObject::connect(btn2, &QTuiPushButton::clicked, [statusBar]() {
         const auto answer = QTuiMessageBox::question(

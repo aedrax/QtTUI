@@ -38,6 +38,7 @@ set(QTTUI_SOURCES
     QTuiComboBox.cpp
     QTuiCompleter.cpp
     QTuiProgressBar.cpp
+    QTuiProgressDialog.cpp
     QTuiTextEdit.cpp
     QTuiDateTimeEdit.cpp
     QTuiLCDNumber.cpp
@@ -134,6 +135,7 @@ set(QTTUI_HEADERS
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiComboBox.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiCompleter.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiProgressBar.h
+    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiProgressDialog.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTextEdit.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiDateTimeEdit.h
     ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiLCDNumber.h

@@ -23,6 +23,7 @@
 #include <QtTUI/QTuiLabel.h>
 #include <QtTUI/QTuiMessageBox.h>
 #include <QtTUI/QTuiInputDialog.h>
+#include <QtTUI/QTuiProgressDialog.h>
 #include <QtTUI/QTuiComboBox.h>
 #include <QtTUI/QTuiMainWindow.h>
 #include <QtTUI/QTuiMenu.h>
@@ -880,6 +881,49 @@ private slots:
         QSignalSpy childRequested(child, &QTuiWidget::customContextMenuRequested);
         sendKey(mainWindow, Qt::Key_F10, Qt::ShiftModifier);
         QCOMPARE(childRequested.count(), 1);
+    }
+
+    void progressDialogFlow()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 60, 20));
+        app.setMainWindow(&mainWindow);
+        mainWindow.show();
+
+        // A short operation (under minimumDuration) never shows the dialog
+        QTuiProgressDialog quick(QStringLiteral("Quick"), QStringLiteral("Cancel"), 0, 10);
+        quick.setValue(0);
+        quick.setValue(5);
+        QVERIFY(!quick.isVisible());
+        quick.setValue(10);
+        QVERIFY(!quick.isVisible());
+
+        // With minimumDuration 0 it shows at once and closes at the maximum
+        QTuiProgressDialog slow(QStringLiteral("Copying"), QStringLiteral("Cancel"), 0, 10);
+        slow.setMinimumDuration(0);
+        slow.setValue(3);
+        QVERIFY(slow.isVisible());
+        QCOMPARE(slow.value(), 3);
+        slow.setValue(10);
+        QVERIFY(!slow.isVisible());
+        QVERIFY(!slow.wasCanceled());
+
+        // Escape cancels
+        QTuiProgressDialog canceled(QStringLiteral("Copying"), QStringLiteral("Cancel"), 0, 10);
+        canceled.setMinimumDuration(0);
+        QSignalSpy spy(&canceled, &QTuiProgressDialog::canceled);
+        canceled.setValue(1);
+        QVERIFY(canceled.isVisible());
+        sendKey(mainWindow, Qt::Key_Escape);
+        QVERIFY(canceled.wasCanceled());
+        QCOMPARE(spy.count(), 1);
+        QVERIFY(!canceled.isVisible());
+        canceled.setValue(2); // ignored after cancel
+        QVERIFY(!canceled.isVisible());
     }
 };
 
