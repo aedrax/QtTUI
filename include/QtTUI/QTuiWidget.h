@@ -82,6 +82,9 @@ public:
     QString toolTip() const;
     void setToolTip(const QString &toolTip);
 
+    // True while the mouse is over the widget (the main window sets it)
+    bool underMouse() const;
+
     // Context menu, as in QWidget. A right click on the widget, or
     // Shift+F10 while it has focus, asks for a context menu:
     // - DefaultContextMenu (default): the parent widget answers instead
@@ -169,6 +172,9 @@ protected:
     virtual void pasteEvent(TuiPasteEvent *event);
 
 private:
+    friend class QTuiMainWindow;
+    void setUnderMouse(bool under);
+
     static void setFocusWidget(QTuiWidget *widget);
     static QTuiWidget *s_focusWidget;
 
@@ -182,6 +188,7 @@ private:
     QString m_toolTip;
     QTuiSizePolicy m_sizePolicy;
     Qt::ContextMenuPolicy m_contextMenuPolicy = Qt::DefaultContextMenu;
+    bool m_underMouse = false;
     QList<QPointer<QTuiAction>> m_actions;
     Qt::FocusPolicy m_focusPolicy = Qt::NoFocus;
 

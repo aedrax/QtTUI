@@ -3,6 +3,8 @@
 
 #include <QtTUI/QTuiWidget.h>
 #include <QElapsedTimer>
+#include <QPointer>
+#include <QTimer>
 #include <QHash>
 #include <QList>
 #include <QSize>
@@ -66,6 +68,9 @@ private:
     // Asks widget (or its parents, see QTuiWidget::contextMenuPolicy) for
     // a context menu at pos (screen cells)
     void requestContextMenu(QTuiWidget *widget, const QPoint &pos);
+    // Moves the hover to widget (nullptr: none) and restarts the hover
+    // tooltip timer
+    void setHovered(QTuiWidget *widget);
     void collectFocusableWidgets(QTuiWidget *widget, QList<QTuiWidget *> &chain);
     static QTuiWidget *findFocusedWidget(QTuiWidget *root);
     static QTuiWidget *findWidgetAt(QTuiWidget *root, const QPoint &pos);
@@ -73,6 +78,10 @@ private:
     QTuiWidget *m_centralWidget = nullptr;
     QTuiLayout *m_layout = nullptr;
     QList<QTuiWidget *> m_focusChain;
+
+    // The widget under the mouse, and the timer for its hover tooltip
+    QPointer<QTuiWidget> m_hovered;
+    QTimer *m_hoverTimer = nullptr;
 
     // Last mouse press, for double-click detection
     QElapsedTimer m_lastPressTimer;

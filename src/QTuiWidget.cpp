@@ -195,6 +195,19 @@ void QTuiWidget::setPaintedByParent(bool paintedByParent)
     m_paintedByParent = paintedByParent;
 }
 
+bool QTuiWidget::underMouse() const
+{
+    return m_underMouse;
+}
+
+void QTuiWidget::setUnderMouse(bool under)
+{
+    if (m_underMouse == under)
+        return;
+    m_underMouse = under;
+    markDirty();
+}
+
 Qt::ContextMenuPolicy QTuiWidget::contextMenuPolicy() const
 {
     return m_contextMenuPolicy;

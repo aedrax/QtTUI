@@ -71,6 +71,11 @@ void QTuiPushButton::paintEvent(ScreenBuffer &buffer)
     // Pressed: invert again and move the label 1 cell right, so the button
     // looks pushed in
     const bool pressed = isDown() && enabled;
+
+    // Under the mouse (and not focused or pressed): the accent color shows
+    // that a click goes here
+    if (underMouse() && enabled && !hasFocus() && !pressed && !(isCheckable() && isChecked()))
+        fg = theme.focusBackground;
     if (pressed)
         std::swap(fg, bg);
 

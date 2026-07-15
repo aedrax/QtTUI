@@ -12,6 +12,7 @@
 #include <QtTUI/QTuiToolTip.h>
 #include <QtTUI/QTuiDialog.h>
 #include <QtTUI/QTuiMenu.h>
+#include <QTimer>
 #include <QCoreApplication>
 #include <QDebug>
 
@@ -490,10 +491,18 @@ void QTuiMainWindow::mousePressEvent(TuiMouseEvent *event)
     // or wheel there must not reach the widgets behind the dialog
     if (!target) {
         if (QTuiDialog *dialog = activeModalDialog()) {
-            if (!dialog->geometry().contains(event->pos()))
+            if (!dialog->geometry().contains(event->pos())) {
+                setHovered(nullptr);
                 return;
+            }
         }
         target = findWidgetAt(this, event->pos());
+    }
+
+    // Motion only moves the hover; widgets do not use it
+    if (event->mouseType() == TuiMouseEvent::Move && event->button() == Qt::NoButton) {
+        setHovered(target);
+        return;
     }
 
     if (target && target != this) {
@@ -661,6 +670,36 @@ void QTuiMainWindow::relayoutChildren()
                 child->setGeometry(childGeo);
             }
         }
+    }
+}
+
+// Hover time before the tooltip of the widget under the mouse shows
+static constexpr int kHoverToolTipMs = 700;
+
+void QTuiMainWindow::setHovered(QTuiWidget *widget)
+{
+    if (widget == this)
+        widget = nullptr;
+    if (m_hovered == widget)
+        return;
+    if (m_hovered) {
+        m_hovered->setUnderMouse(false);
+        QTuiToolTip::hideText();
+    }
+    m_hovered = widget;
+    if (!m_hoverTimer) {
+        m_hoverTimer = new QTimer(this);
+        m_hoverTimer->setSingleShot(true);
+        m_hoverTimer->setInterval(kHoverToolTipMs);
+        connect(m_hoverTimer, &QTimer::timeout, this, [this]() {
+            if (m_hovered && !m_hovered->toolTip().isEmpty())
+                QTuiToolTip::showFor(m_hovered);
+        });
+    }
+    m_hoverTimer->stop();
+    if (m_hovered) {
+        m_hovered->setUnderMouse(true);
+        m_hoverTimer->start();
     }
 }
 

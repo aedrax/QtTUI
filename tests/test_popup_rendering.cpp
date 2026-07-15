@@ -1039,6 +1039,44 @@ private slots:
         QCOMPARE(finished.count(), 1);
         QCOMPARE(wizard.result(), int(QTuiDialog::Accepted));
     }
+
+    void hoverMarksWidgetAndShowsToolTip()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 40, 10));
+        app.setMainWindow(&mainWindow);
+        auto *central = new FillWidget(QLatin1Char('C'));
+        mainWindow.setCentralWidget(central);
+        auto *button = new QTuiPushButton(QStringLiteral("OK"), central);
+        button->setGeometry(QRect(2, 2, 8, 3));
+        button->setToolTip(QStringLiteral("Hover tip"));
+        mainWindow.show();
+        auto move = [&mainWindow](const QPoint &pos) {
+            TuiMouseEvent ev(TuiMouseEvent::Move, Qt::NoButton, pos);
+            QCoreApplication::sendEvent(&mainWindow, &ev);
+        };
+
+        app.triggerRender();
+        const Color normal = app.screenBuffer()->backCell(5, 3).foreground;
+
+        move(QPoint(4, 3));
+        QVERIFY(button->underMouse());
+        app.triggerRender();
+        QVERIFY(app.screenBuffer()->backCell(5, 3).foreground != normal); // accent
+
+        // The tooltip shows after the hover delay
+        QVERIFY(!QTuiToolTip::isVisible());
+        QTRY_VERIFY(QTuiToolTip::isVisible());
+        QCOMPARE(QTuiToolTip::text(), QStringLiteral("Hover tip"));
+
+        move(QPoint(30, 8));
+        QVERIFY(!button->underMouse());
+        QVERIFY(!QTuiToolTip::isVisible());
+    }
 };
 
 QTEST_APPLESS_MAIN(TestPopupRendering)
