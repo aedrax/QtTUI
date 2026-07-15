@@ -790,6 +790,7 @@ int main(int argc, char *argv[])
     auto *menuBar = new QTuiMenuBar(&window);
     auto *fileMenu = menuBar->addMenu("&File");
     auto *openAction = fileMenu->addAction("&Open...", "Ctrl+O");
+    auto *newAction = fileMenu->addAction("&New project...", "Ctrl+N");
     auto *quitAction = fileMenu->addAction("&Quit", "Ctrl+Q");
     QObject::connect(quitAction, &QTuiAction::triggered, &app, &QCoreApplication::quit);
     window.setMenuBar(menuBar);
@@ -799,6 +800,39 @@ int main(int argc, char *argv[])
     const QString keyHints = QStringLiteral(" ←/→ category · Tab/Shift+Tab focus · Ctrl+Q quit");
     statusBar->showMessage(keyHints);
     window.setStatusBar(statusBar);
+
+    // A two-step wizard; the name page is complete when the name is not empty
+    QObject::connect(newAction, &QTuiAction::triggered, [statusBar]() {
+        class NamePage : public QTuiWizardPage {
+        public:
+            NamePage()
+            {
+                setTitle("Project name");
+                edit = new QTuiLineEdit(this);
+                edit->setPlaceholderText("Type a name");
+                auto *l = new QTuiBoxLayout(QTuiBoxLayout::TopToBottom);
+                l->addWidget(new QTuiLabel("Name of the new project:", this));
+                l->addWidget(edit);
+                setLayout(l);
+                QObject::connect(edit, &QTuiLineEdit::textChanged, this, &QTuiWizardPage::completeChanged);
+            }
+            bool isComplete() const override { return !edit->text().trimmed().isEmpty(); }
+            QTuiLineEdit *edit;
+        };
+        QTuiWizard wizard;
+        wizard.setWindowTitle("QTuiWizard");
+        auto *namePage = new NamePage;
+        auto *donePage = new QTuiWizardPage;
+        donePage->setTitle("Ready");
+        auto *doneLayout = new QTuiBoxLayout(QTuiBoxLayout::TopToBottom);
+        doneLayout->addWidget(new QTuiLabel("Finish creates the project.", donePage));
+        donePage->setLayout(doneLayout);
+        wizard.addPage(namePage);
+        wizard.addPage(donePage);
+        const bool done = wizard.exec() == QTuiDialog::Accepted;
+        statusBar->showMessage(done ? QStringLiteral("Created project %1").arg(namePage->edit->text())
+                                    : QStringLiteral("New project canceled"));
+    });
 
     QObject::connect(openAction, &QTuiAction::triggered, [statusBar]() {
         const QString path = QTuiFileDialog::getOpenFileName(nullptr, "Open a file");

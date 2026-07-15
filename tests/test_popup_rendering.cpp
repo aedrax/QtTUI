@@ -28,6 +28,8 @@
 #include <QtTUI/QTuiInputDialog.h>
 #include <QtTUI/QTuiProgressDialog.h>
 #include <QtTUI/QTuiFileDialog.h>
+#include <QtTUI/QTuiWizard.h>
+#include <QtTUI/QTuiCheckBox.h>
 #include <QtTUI/QTuiComboBox.h>
 #include <QtTUI/QTuiMainWindow.h>
 #include <QtTUI/QTuiMenu.h>
@@ -973,6 +975,69 @@ private slots:
         sendKey(mainWindow, Qt::Key_Escape);
         QVERIFY(!dialog.isVisible());
         QVERIFY(dialog.selectedFile().isEmpty());
+    }
+
+    void wizardSteps()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 80, 24));
+        app.setMainWindow(&mainWindow);
+        mainWindow.show();
+
+        // The middle page is complete only after its check box is checked
+        class CheckPage : public QTuiWizardPage {
+        public:
+            CheckPage()
+            {
+                setTitle(QStringLiteral("Accept"));
+                box = new QTuiCheckBox(QStringLiteral("I agree"), this);
+                auto *l = new QTuiBoxLayout(QTuiBoxLayout::TopToBottom);
+                l->addWidget(box);
+                setLayout(l);
+                QObject::connect(box, &QTuiCheckBox::toggled, this, &QTuiWizardPage::completeChanged);
+            }
+            bool isComplete() const override { return box->isChecked(); }
+            QTuiCheckBox *box;
+        };
+
+        QTuiWizard wizard;
+        auto *first = new QTuiWizardPage;
+        first->setTitle(QStringLiteral("Welcome"));
+        auto *middle = new CheckPage;
+        auto *last = new QTuiWizardPage;
+        last->setTitle(QStringLiteral("Done"));
+        wizard.addPage(first);
+        wizard.addPage(middle);
+        wizard.addPage(last);
+        QSignalSpy finished(&wizard, &QTuiDialog::finished);
+
+        wizard.open();
+        QCOMPARE(wizard.currentId(), 0);
+        sendKey(mainWindow, Qt::Key_Return); // Next has focus
+        QCOMPARE(wizard.currentId(), 1);
+        QVERIFY(middle->box->hasFocus());
+
+        wizard.next(); // incomplete: stays
+        QCOMPARE(wizard.currentId(), 1);
+        sendKey(mainWindow, Qt::Key_Space); // check the box
+        wizard.next();
+        QCOMPARE(wizard.currentId(), 2);
+
+        app.triggerRender();
+        ScreenBuffer *buf = app.screenBuffer();
+        const QRect geo = wizard.geometry();
+        QVERIFY(rowText(buf, geo.y() + 1, geo.x(), geo.width()).contains(QStringLiteral("Step 3 of 3: Done")));
+
+        wizard.back();
+        QCOMPARE(wizard.currentId(), 1);
+        wizard.next();
+        sendKey(mainWindow, Qt::Key_Return); // Finish has focus
+        QCOMPARE(finished.count(), 1);
+        QCOMPARE(wizard.result(), int(QTuiDialog::Accepted));
     }
 };
 
