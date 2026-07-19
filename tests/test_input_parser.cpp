@@ -85,6 +85,7 @@ private slots:
     void testMouseModifiers();
     void testNonBmpUtf8();
     void testBracketedPaste();
+    void testKittyKeyboardProtocol();
 };
 
 // Helper: captures posted TuiMouseEvents (fields the signal doesn't carry)
@@ -556,6 +557,33 @@ void TestInputParser::testBracketedPaste()
     // Only the key after the paste
     QCOMPARE(collector.keys.size(), 1);
     QCOMPARE(collector.keys.first().text, QStringLiteral("q"));
+}
+
+void TestInputParser::testKittyKeyboardProtocol()
+{
+    InputParser parser(nullptr);
+    EventCollector collector;
+    collector.connectTo(&parser);
+
+    // Ctrl+I is no longer the same as Tab
+    parser.processInput(QByteArray("\x1b[105;5u"));
+    // Escape arrives at once, without the timeout
+    parser.processInput(QByteArray("\x1b[27u"));
+    // Shift+Tab, Alt+a, Ctrl+Shift+z
+    parser.processInput(QByteArray("\x1b[9;2u\x1b[97;3u\x1b[122;6u"));
+    // Caps Lock (private use code): no event
+    parser.processInput(QByteArray("\x1b[57358u"));
+
+    QCOMPARE(collector.keys.size(), 5);
+    QCOMPARE(collector.keys[0].key, int(Qt::Key_I));
+    QCOMPARE(collector.keys[0].modifiers, Qt::KeyboardModifiers(Qt::ControlModifier));
+    QVERIFY(collector.keys[0].text.isEmpty());
+    QCOMPARE(collector.keys[1].key, int(Qt::Key_Escape));
+    QCOMPARE(collector.keys[2].key, int(Qt::Key_Backtab));
+    QCOMPARE(collector.keys[3].key, int(Qt::Key_A));
+    QCOMPARE(collector.keys[3].modifiers, Qt::KeyboardModifiers(Qt::AltModifier));
+    QCOMPARE(collector.keys[4].key, int(Qt::Key_Z));
+    QCOMPARE(collector.keys[4].modifiers, Qt::ControlModifier | Qt::ShiftModifier);
 }
 
 QTEST_GUILESS_MAIN(TestInputParser)

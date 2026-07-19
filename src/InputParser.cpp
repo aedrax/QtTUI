@@ -330,6 +330,48 @@ void InputParser::finishCSI(char finalByte)
     // Backtab: CSI Z
     case 'Z': postKeyEvent(Qt::Key_Backtab, Qt::ShiftModifier); break;
 
+    // Kitty keyboard protocol: CSI keycode[:alternates] ; modifiers u
+    case 'u': {
+        // The key code is the first number of the first parameter
+        const int code = m_buffer.split(';').value(0).split(':').value(0).toInt();
+        Qt::KeyboardModifiers kmods = Qt::NoModifier;
+        const int modParam = m_buffer.split(';').value(1).split(':').value(0).toInt();
+        if (modParam > 1) {
+            const int bits = modParam - 1;
+            if (bits & 1) kmods |= Qt::ShiftModifier;
+            if (bits & 2) kmods |= Qt::AltModifier;
+            if (bits & 4) kmods |= Qt::ControlModifier;
+            if (bits & 8) kmods |= Qt::MetaModifier;
+        }
+        int key = 0;
+        QString text;
+        switch (code) {
+        case 9:   key = (kmods & Qt::ShiftModifier) ? Qt::Key_Backtab : Qt::Key_Tab; break;
+        case 13:  key = Qt::Key_Return; break;
+        case 27:  key = Qt::Key_Escape; break;
+        case 8:
+        case 127: key = Qt::Key_Backspace; break;
+        default:
+            // Unicode private use: keys such as Caps Lock; not used here
+            if (code >= 0xE000 && code <= 0xF8FF)
+                break;
+            if (code >= 'a' && code <= 'z')
+                key = Qt::Key_A + (code - 'a');
+            else if (code > 0x20)
+                key = QChar::toUpper(char32_t(code));
+            // Text only for a key without Ctrl, Alt or Meta
+            if (key && !(kmods & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier))) {
+                const char32_t ch = (kmods & Qt::ShiftModifier) ? QChar::toUpper(char32_t(code))
+                                                                : char32_t(code);
+                text = QString::fromUcs4(&ch, 1);
+            }
+            break;
+        }
+        if (key)
+            postKeyEvent(key, kmods, text);
+        break;
+    }
+
     // Tilde-terminated sequences
     case '~': {
         int code = params.isEmpty() ? 0 : params.first();
