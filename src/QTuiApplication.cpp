@@ -19,6 +19,9 @@
 
 #ifndef _WIN32
 #include <unistd.h>
+#else
+#include <QWinEventNotifier>
+#include <windows.h>
 #endif
 
 namespace QtTUI {
@@ -149,10 +152,14 @@ QTuiApplication::QTuiApplication(int &argc, char **argv)
     // Register atexit safety net for terminal restoration
     std::atexit(atexitHandler);
 
-    // Set up stdin notifier for input readiness (POSIX)
+    // Wake the event loop when input is ready: a socket notifier on stdin
+    // (POSIX), or an event notifier on the console input handle (Windows)
 #ifndef _WIN32
     m_inputNotifier = new QSocketNotifier(STDIN_FILENO, QSocketNotifier::Read, this);
     connect(m_inputNotifier, &QSocketNotifier::activated, this, &QTuiApplication::onInputReady);
+#else
+    auto *consoleNotifier = new QWinEventNotifier(GetStdHandle(STD_INPUT_HANDLE), this);
+    connect(consoleNotifier, &QWinEventNotifier::activated, this, &QTuiApplication::onInputReady);
 #endif
 
     // Connect backend resize signal

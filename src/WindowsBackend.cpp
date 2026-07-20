@@ -50,6 +50,10 @@ bool WindowsBackend::enterRawMode()
         return false;
     }
 
+    // The same terminal modes as the POSIX backend: SGR mouse reporting
+    // (buttons, any motion), bracketed paste, kitty keyboard level 1
+    write(QByteArrayLiteral("\x1b[?1000h\x1b[?1003h\x1b[?1006h\x1b[?2004h\x1b[>1u"));
+
     m_rawMode = true;
     return true;
 }
@@ -58,6 +62,8 @@ bool WindowsBackend::exitRawMode()
 {
     if (!m_rawMode)
         return true;
+
+    write(QByteArrayLiteral("\x1b[<u\x1b[?2004l\x1b[?1006l\x1b[?1003l\x1b[?1000l\x1b[?25h"));
 
     bool ok = true;
     if (!SetConsoleMode(m_hStdin, m_originalInMode)) {
@@ -136,18 +142,23 @@ QByteArray WindowsBackend::read()
     if (!ReadConsoleInput(m_hStdin, records, 128, &numRead))
         return {};
 
-    QByteArray result;
+    // With ENABLE_VIRTUAL_TERMINAL_INPUT, keys, escape sequences and mouse
+    // reports arrive as characters. UTF-16 units (a surrogate pair comes as
+    // two records) become UTF-8 for the input parser.
+    QString text;
     for (DWORD i = 0; i < numRead; ++i) {
         if (records[i].EventType == KEY_EVENT && records[i].Event.KeyEvent.bKeyDown) {
-            char ch = records[i].Event.KeyEvent.uChar.AsciiChar;
-            if (ch != 0)
-                result.append(ch);
+            const wchar_t ch = records[i].Event.KeyEvent.uChar.UnicodeChar;
+            if (ch != 0) {
+                for (WORD n = 0; n < qMax<WORD>(1, records[i].Event.KeyEvent.wRepeatCount); ++n)
+                    text.append(QChar(char16_t(ch)));
+            }
         } else if (records[i].EventType == WINDOW_BUFFER_SIZE_EVENT) {
             auto &sizeEvent = records[i].Event.WindowBufferSizeEvent;
             emit resized(QSize(sizeEvent.dwSize.X, sizeEvent.dwSize.Y));
         }
     }
-    return result;
+    return text.toUtf8();
 }
 
 } // namespace QtTUI
