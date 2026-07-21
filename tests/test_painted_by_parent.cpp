@@ -10,6 +10,10 @@
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiMainWindow.h>
 #include <QtTUI/QTuiScrollArea.h>
+#include <QtTUI/QTuiScrollBar.h>
+#include <QtTUI/QTuiLineEdit.h>
+#include <QtTUI/QTuiLabel.h>
+#include <QtTUI/QTuiBoxLayout.h>
 #include <QtTUI/QTuiWidget.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
@@ -105,6 +109,57 @@ private slots:
         area.setWidget(second);
         QVERIFY(!first->isPaintedByParent());
         QVERIFY(second->isPaintedByParent());
+    }
+
+    // A click on a line edit inside scrolled content focuses it, typing
+    // reaches it, and the scroll area repaints the change
+    void clickAndTypeIntoScrolledContent()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 40, 20));
+        app.setMainWindow(&mainWindow);
+        auto *holder = new Holder;
+        mainWindow.setCentralWidget(holder);
+
+        // Content: 6 label rows, then a line edit at content row 6
+        auto *content = new QTuiWidget(holder->scrollArea);
+        auto *column = new QTuiBoxLayout(QTuiBoxLayout::TopToBottom);
+        for (int i = 0; i < 6; ++i)
+            column->addWidget(new QTuiLabel(QStringLiteral("row %1").arg(i), content));
+        auto *edit = new QTuiLineEdit(content);
+        column->addWidget(edit);
+        content->setLayout(column);
+        content->setGeometry(QRect(0, 0, 18, 7));
+        holder->scrollArea->setWidget(content);
+
+        mainWindow.show();
+        holder->scrollArea->setGeometry(QRect(10, 5, 20, 4));
+        app.triggerRender();
+
+        // Scroll so that content rows 3-6 show; the line edit is on
+        // viewport row 3 (screen row 8)
+        holder->scrollArea->verticalScrollBar()->setValue(3);
+        QCoreApplication::processEvents();
+        ScreenBuffer *buf = app.screenBuffer();
+        QCOMPARE(buf->backCell(10, 5).ch, U'r'); // "row 3"
+        QCOMPARE(buf->backCell(14, 5).ch, U'3');
+
+        TuiMouseEvent click(TuiMouseEvent::Press, Qt::LeftButton, QPoint(11, 8));
+        QCoreApplication::sendEvent(&mainWindow, &click);
+        QVERIFY(edit->hasFocus());
+
+        TuiKeyEvent key(Qt::Key_Z, Qt::NoModifier, QStringLiteral("z"));
+        QCoreApplication::sendEvent(&mainWindow, &key);
+        QCOMPARE(edit->text(), QStringLiteral("z"));
+
+        // An incremental pass shows the new text in the viewport
+        QCoreApplication::processEvents();
+        QCOMPARE(buf->backCell(10, 8).ch, U'z');
     }
 };
 

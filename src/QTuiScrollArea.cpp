@@ -1,4 +1,6 @@
 #include <QtTUI/QTuiScrollArea.h>
+#include <QCoreApplication>
+#include <functional>
 #include <QtTUI/QTuiScrollBar.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
@@ -238,14 +240,20 @@ void QTuiScrollArea::paintEvent(ScreenBuffer &buffer)
     if (m_widget && m_widget->isVisible()) {
         const QRect childGeo = m_widget->geometry();
         if (childGeo.width() > 0 && childGeo.height() > 0) {
-            // Create a temporary buffer for the child to paint into
-            ScreenBuffer childBuffer(childGeo.width(), childGeo.height());
-
-            // Temporarily adjust child geometry to (0,0) origin for painting
-            QRect savedGeo = m_widget->geometry();
-            m_widget->setGeometry(QRect(0, 0, childGeo.width(), childGeo.height()));
-            m_widget->paintEvent(childBuffer);
-            m_widget->setGeometry(savedGeo);
+            // Paint the content and all widgets in it into a temporary buffer
+            // at their own (content) coordinates. Geometry does not change
+            // during the paint, so no repaint is scheduled from here.
+            const int left = qMax(0, childGeo.x());
+            const int top = qMax(0, childGeo.y());
+            ScreenBuffer childBuffer(left + childGeo.width(), top + childGeo.height());
+            std::function<void(QTuiWidget *)> paintSubtree = [&](QTuiWidget *w) {
+                w->paintEvent(childBuffer);
+                for (QTuiWidget *child : w->childWidgets()) {
+                    if (child->isVisible() && !child->isPopup())
+                        paintSubtree(child);
+                }
+            };
+            paintSubtree(m_widget);
 
             // Copy the visible portion (clipped by viewport) from child buffer
             for (int row = 0; row < viewportH; ++row) {
@@ -263,7 +271,7 @@ void QTuiScrollArea::paintEvent(ScreenBuffer &buffer)
                     if (px >= buffer.width() || py >= buffer.height())
                         continue;
 
-                    const Cell &src = childBuffer.backCell(childCol, childRow);
+                    const Cell &src = childBuffer.backCell(left + childCol, top + childRow);
                     Cell &dst = buffer.backCell(px, py);
                     dst = src;
                 }
@@ -399,6 +407,46 @@ void QTuiScrollArea::resizeEvent(TuiResizeEvent *event)
 {
     Q_UNUSED(event);
     updateScrollBars();
+}
+
+void QTuiScrollArea::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() == TuiMouseEvent::Wheel) {
+        // 3 lines per notch, as is usual
+        const int lines = event->wheelDelta() > 0 ? -3 : 3;
+        if (m_verticalScrollBar->isVisible())
+            m_verticalScrollBar->setValue(m_verticalScrollBar->value() + lines);
+        return;
+    }
+    if (!m_widget || !m_widget->isVisible())
+        return;
+
+    // Viewport position -> content position
+    const QPoint content = event->pos() - geometry().topLeft() + QPoint(m_scrollX, m_scrollY);
+    if (!m_widget->geometry().contains(content))
+        return;
+
+    // The deepest visible content widget at that position
+    QTuiWidget *target = m_widget;
+    for (bool found = true; found;) {
+        found = false;
+        const auto children = target->childWidgets();
+        for (auto it = children.crbegin(); it != children.crend(); ++it) {
+            QTuiWidget *child = *it;
+            if (child->isVisible() && !child->isPopup() && child->geometry().contains(content)) {
+                target = child;
+                found = true;
+                break;
+            }
+        }
+    }
+
+    if (event->mouseType() == TuiMouseEvent::Press && (target->focusPolicy() & Qt::ClickFocus)
+        && target->isEffectivelyEnabled())
+        target->setFocus();
+    TuiMouseEvent local(event->mouseType(), event->button(), content, event->modifiers(),
+                        event->wheelDelta());
+    QCoreApplication::sendEvent(target, &local);
 }
 
 } // namespace QtTUI

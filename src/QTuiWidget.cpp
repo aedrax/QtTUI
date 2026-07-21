@@ -369,6 +369,17 @@ void QTuiWidget::markDirty()
 
 void QTuiWidget::markDirty(const QRect &region)
 {
+    // Inside content that a parent paints (QTuiScrollArea), geometry is not
+    // a screen position: the painting parent repaints instead
+    for (QTuiWidget *w = this; w; w = w->parentWidget()) {
+        if (w->isPaintedByParent()) {
+            m_isDirty = true;
+            if (QTuiWidget *painter = w->parentWidget())
+                painter->markDirty();
+            return;
+        }
+    }
+
     if (m_dirtyRegion.isNull()) {
         m_dirtyRegion = region;
     } else {

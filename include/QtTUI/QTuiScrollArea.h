@@ -28,6 +28,9 @@ public:
 
 protected:
     void keyPressEvent(TuiKeyEvent *event) override;
+    // A click in the viewport goes to the content widget under it, in
+    // content coordinates; the wheel scrolls
+    void mousePressEvent(TuiMouseEvent *event) override;
     void resizeEvent(TuiResizeEvent *event) override;
 
 private:
