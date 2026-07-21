@@ -163,6 +163,10 @@ qttui_add_test(test_qtui_mainwindow_integration test_qtui_mainwindow_integration
 
 # Widget Gallery demo tests (structure, behavior, signal/slot wiring)
 qttui_add_test(test_gallery test_gallery.cpp)
+# The gallery test builds the real gallery with the demo's builder
+target_sources(test_gallery PRIVATE ${CMAKE_SOURCE_DIR}/demos/GalleryBuilder.cpp
+                                    ${CMAKE_SOURCE_DIR}/demos/GalleryBuilder.h)
+target_include_directories(test_gallery PRIVATE ${CMAKE_SOURCE_DIR}/demos)
 
 # ScreenBuffer bounds safety property tests (Property 35)
 qttui_add_test(test_screenbuffer_bounds test_screenbuffer_bounds.cpp)
