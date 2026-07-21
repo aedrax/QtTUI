@@ -117,7 +117,10 @@ void QTuiAbstractButton::keyPressEvent(TuiKeyEvent *event)
 
 void QTuiAbstractButton::mousePressEvent(TuiMouseEvent *event)
 {
-    if (!isEffectivelyEnabled() || event->mouseType() != TuiMouseEvent::Press)
+    // Only the left button clicks, as in Qt; the right button asks for a
+    // context menu
+    if (!isEffectivelyEnabled() || event->mouseType() != TuiMouseEvent::Press
+        || event->button() != Qt::LeftButton)
         return;
     animateClick();
 }

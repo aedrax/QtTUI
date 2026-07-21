@@ -179,9 +179,12 @@ void QTuiListView::mousePressEvent(TuiMouseEvent *event)
     const QRect geo = geometry();
     int clickedRow = (event->y() - geo.y()) + m_scrollOffset;
     if (clickedRow >= 0 && clickedRow < m_model->rowCount()) {
+        // Any button selects the row (a context menu then acts on it);
+        // only the left button activates it
         m_currentRow = clickedRow;
         markDirty();
-        emit activated(m_model->index(m_currentRow, 0));
+        if (event->button() == Qt::LeftButton)
+            emit activated(m_model->index(m_currentRow, 0));
     }
 }
 

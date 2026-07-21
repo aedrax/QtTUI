@@ -685,6 +685,24 @@ private slots:
         // a on, b on, a off: one signal per change
         QCOMPARE(toggled.count(), 3);
     }
+
+    void onlyLeftButtonClicks()
+    {
+        QTuiPushButton button(QStringLiteral("OK"));
+        QTuiCheckBox check(QStringLiteral("C"));
+        for (QTuiAbstractButton *b : QList<QTuiAbstractButton *>{&button, &check}) {
+            QSignalSpy clicked(b, &QTuiAbstractButton::clicked);
+            for (Qt::MouseButton other : {Qt::RightButton, Qt::MiddleButton}) {
+                TuiMouseEvent press(TuiMouseEvent::Press, other, QPoint(0, 0));
+                QCoreApplication::sendEvent(b, &press);
+            }
+            QCOMPARE(clicked.count(), 0);
+            TuiMouseEvent left(TuiMouseEvent::Press, Qt::LeftButton, QPoint(0, 0));
+            QCoreApplication::sendEvent(b, &left);
+            QCOMPARE(clicked.count(), 1);
+        }
+        QVERIFY(check.isChecked()); // only the left click toggled it
+    }
 };
 
 QTEST_MAIN(TestQTuiButtonWidgets)
