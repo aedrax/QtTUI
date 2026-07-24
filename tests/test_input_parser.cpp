@@ -573,8 +573,15 @@ void TestInputParser::testKittyKeyboardProtocol()
     parser.processInput(QByteArray("\x1b[9;2u\x1b[97;3u\x1b[122;6u"));
     // Caps Lock (private use code): no event
     parser.processInput(QByteArray("\x1b[57358u"));
+    // Keypad Enter, keypad 7, keypad Up
+    parser.processInput(QByteArray("\x1b[57414u\x1b[57406u\x1b[57419u"));
 
-    QCOMPARE(collector.keys.size(), 5);
+    QCOMPARE(collector.keys.size(), 8);
+    QCOMPARE(collector.keys[5].key, int(Qt::Key_Enter));
+    QVERIFY(collector.keys[5].modifiers & Qt::KeypadModifier);
+    QCOMPARE(collector.keys[6].key, int(Qt::Key_7));
+    QCOMPARE(collector.keys[6].text, QStringLiteral("7"));
+    QCOMPARE(collector.keys[7].key, int(Qt::Key_Up));
     QCOMPARE(collector.keys[0].key, int(Qt::Key_I));
     QCOMPARE(collector.keys[0].modifiers, Qt::KeyboardModifiers(Qt::ControlModifier));
     QVERIFY(collector.keys[0].text.isEmpty());

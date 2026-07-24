@@ -352,7 +352,28 @@ void InputParser::finishCSI(char finalByte)
         case 8:
         case 127: key = Qt::Key_Backspace; break;
         default:
-            // Unicode private use: keys such as Caps Lock; not used here
+            // Keypad keys: private-use codes 57399-57426 (kitty functional
+            // key table). Digits and operators keep their text.
+            if (code >= 57399 && code <= 57426) {
+                static const int navigation[] = {
+                    Qt::Key_Left, Qt::Key_Right, Qt::Key_Up, Qt::Key_Down, Qt::Key_PageUp,
+                    Qt::Key_PageDown, Qt::Key_Home, Qt::Key_End, Qt::Key_Insert, Qt::Key_Delete};
+                static const char symbols[] = "./*-+\0=,"; // 57409-57416; 57414 is Enter
+                kmods |= Qt::KeypadModifier;
+                if (code <= 57408) {
+                    key = Qt::Key_0 + (code - 57399);
+                } else if (code == 57414) {
+                    key = Qt::Key_Enter;
+                } else if (code <= 57416) {
+                    key = symbols[code - 57409];
+                } else {
+                    key = navigation[code - 57417];
+                }
+                if (key < 0x7F && !(kmods & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)))
+                    text = QString(QChar(key));
+                break;
+            }
+            // Other private-use codes (Caps Lock, F13 and up, ...): not used
             if (code >= 0xE000 && code <= 0xF8FF)
                 break;
             if (code >= 'a' && code <= 'z')
