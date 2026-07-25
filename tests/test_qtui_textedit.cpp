@@ -1224,6 +1224,20 @@ private slots:
         QCOMPARE(te.toPlainText(), QStringLiteral("xy\n"));
         QCOMPARE(te.cursorRow(), 1);
     }
+
+    void ctrlASelectsAll()
+    {
+        QTuiTextEdit te;
+        te.setPlainText(QStringLiteral("one\ntwo"));
+        TuiKeyEvent ctrlA(Qt::Key_A, Qt::ControlModifier);
+        QCoreApplication::sendEvent(&te, &ctrlA);
+        QVERIFY(te.hasSelection());
+        QCOMPARE(te.selectedText(), QStringLiteral("one\ntwo"));
+        // Typing replaces everything
+        TuiKeyEvent x(Qt::Key_X, Qt::NoModifier, QStringLiteral("x"));
+        QCoreApplication::sendEvent(&te, &x);
+        QCOMPARE(te.toPlainText(), QStringLiteral("x"));
+    }
 };
 
 QTEST_MAIN(TestQTuiTextEdit)

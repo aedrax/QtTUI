@@ -25,6 +25,8 @@ public:
     // Selection
     bool hasSelection() const;
     QString selectedText() const;
+    // Selects the whole text (Ctrl+A); the cursor goes to the end
+    void selectAll();
 
     // Undo history: Ctrl+Z undoes, Ctrl+Y and Ctrl+Shift+Z redo. Typed
     // characters in a row undo as one step. setPlainText() clears it.

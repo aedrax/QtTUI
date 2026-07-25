@@ -104,6 +104,20 @@ void QTuiTextEdit::clearSelection()
     m_selecting = false;
 }
 
+void QTuiTextEdit::selectAll()
+{
+    m_selStartRow = 0;
+    m_selStartCol = 0;
+    m_cursorRow = m_lines.size() - 1;
+    m_cursorCol = m_lines.last().length();
+    m_selEndRow = m_cursorRow;
+    m_selEndCol = m_cursorCol;
+    m_selecting = true;
+    m_desiredCol = QtTuiUnicode::columnOfIndex(m_lines.at(m_cursorRow), m_cursorCol);
+    scrollToVisible();
+    markDirty();
+}
+
 void QTuiTextEdit::startOrExtendSelection()
 {
     if (!m_selecting) {
@@ -366,6 +380,10 @@ void QTuiTextEdit::keyPressEvent(TuiKeyEvent *event)
     const Qt::KeyboardModifiers mods = event->modifiers();
     if (key == Qt::Key_Z && mods == Qt::ControlModifier) {
         undo();
+        return;
+    }
+    if (key == Qt::Key_A && mods == Qt::ControlModifier) {
+        selectAll();
         return;
     }
     if ((key == Qt::Key_Y && mods == Qt::ControlModifier)
