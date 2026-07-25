@@ -14,6 +14,7 @@ private slots:
     void testEnterExitAlternateScreen();
     void testReadWriteBuffers();
     void testTerminalSizeConfigurable();
+    void testMouseLevelFromEnvironment();
 };
 
 void TestTerminalBackend::property35_resizeSignalEmitsDimensions()
@@ -91,6 +92,23 @@ void TestTerminalBackend::testTerminalSizeConfigurable()
 
     backend.setTerminalSize(QSize(120, 40));
     QCOMPARE(backend.terminalSize(), QSize(120, 40));
+}
+
+void TestTerminalBackend::testMouseLevelFromEnvironment()
+{
+    const QByteArray saved = qgetenv("QTTUI_MOUSE");
+    qunsetenv("QTTUI_MOUSE");
+    QCOMPARE(mouseEnableSequence(), QByteArray("\x1b[?1003h\x1b[?1006h"));
+    qputenv("QTTUI_MOUSE", "off");
+    QVERIFY(mouseEnableSequence().isEmpty());
+    qputenv("QTTUI_MOUSE", "click");
+    QCOMPARE(mouseEnableSequence(), QByteArray("\x1b[?1000h\x1b[?1006h"));
+    qputenv("QTTUI_MOUSE", "Drag");
+    QCOMPARE(mouseEnableSequence(), QByteArray("\x1b[?1002h\x1b[?1006h"));
+    if (saved.isNull())
+        qunsetenv("QTTUI_MOUSE");
+    else
+        qputenv("QTTUI_MOUSE", saved);
 }
 
 QTEST_GUILESS_MAIN(TestTerminalBackend)

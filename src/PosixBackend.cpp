@@ -37,7 +37,7 @@ void restoreTerminalFromSignal()
 {
     if (g_rawModeActive) {
         // Mirror exitRawMode(): disable SGR mouse reporting, re-show the cursor
-        static const char disableMouse[] = "\x1b[<u\x1b[?2004l\x1b[?1006l\x1b[?1003l\x1b[?1000l\x1b[?25h";
+        static const char disableMouse[] = "\x1b[<u\x1b[?2004l\x1b[?1006l\x1b[?1003l\x1b[?1002l\x1b[?1000l\x1b[?25h";
         ssize_t r = ::write(STDOUT_FILENO, disableMouse, sizeof(disableMouse) - 1);
         (void)r;
     }
@@ -120,11 +120,11 @@ bool PosixBackend::applyRawTermios()
         return false;
     }
 
-    // Enable SGR mouse reporting (buttons, any motion for hover, SGR
-    // encoding), bracketed paste, and the kitty keyboard protocol level 1
+    // Enable SGR mouse reporting at the QTTUI_MOUSE level (default: buttons
+    // and any motion), bracketed paste, and the kitty keyboard protocol level 1
     // (CSI u for keys that are otherwise ambiguous). A terminal without
     // the protocol ignores the push, and the pop on exit.
-    const QByteArray enableMouse("\x1b[?1000h\x1b[?1003h\x1b[?1006h\x1b[?2004h\x1b[>1u");
+    const QByteArray enableMouse = mouseEnableSequence() + "\x1b[?2004h\x1b[>1u";
     ::write(STDOUT_FILENO, enableMouse.constData(), enableMouse.size());
 
     return true;
@@ -139,7 +139,7 @@ bool PosixBackend::exitRawMode()
 
     // Disable SGR mouse reporting and re-show the cursor (the render pass
     // hides it while frames are written)
-    const QByteArray disableMouse("\x1b[<u\x1b[?2004l\x1b[?1006l\x1b[?1003l\x1b[?1000l\x1b[?25h");
+    const QByteArray disableMouse("\x1b[<u\x1b[?2004l\x1b[?1006l\x1b[?1003l\x1b[?1002l\x1b[?1000l\x1b[?25h");
     ::write(STDOUT_FILENO, disableMouse.constData(), disableMouse.size());
 
     g_rawModeActive = 0;
@@ -370,7 +370,7 @@ bool PosixBackend::suspend()
 
     // Undo the terminal modes, but keep m_rawMode and m_alternateScreen:
     // reestablishAfterContinue() uses them to set the modes again
-    static const char restore[] = "\x1b[<u\x1b[?2004l\x1b[?1006l\x1b[?1003l\x1b[?1000l\x1b[?25h\x1b[?1049l";
+    static const char restore[] = "\x1b[<u\x1b[?2004l\x1b[?1006l\x1b[?1003l\x1b[?1002l\x1b[?1000l\x1b[?25h\x1b[?1049l";
     ::write(STDOUT_FILENO, restore, sizeof(restore) - 1);
     ::tcsetattr(STDIN_FILENO, TCSAFLUSH, &m_originalTermios);
     g_rawModeActive = 0;

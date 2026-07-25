@@ -39,6 +39,26 @@ signals:
     void resized(QSize newSize);
 };
 
+// The escape sequence that turns on mouse reporting at the level that the
+// QTTUI_MOUSE environment variable asks for:
+//   off   - no mouse reporting; the terminal keeps its own text selection
+//   click - presses, releases and the wheel (?1000)
+//   drag  - also motion while a button is down (?1002)
+//   all   - also motion without a button, for hover (?1003; the default)
+// The backends always turn off all mouse modes when they give the terminal
+// back, so the turn-off sequence does not depend on the level.
+inline QByteArray mouseEnableSequence()
+{
+    const QByteArray level = qgetenv("QTTUI_MOUSE").toLower();
+    if (level == "off" || level == "none" || level == "0")
+        return QByteArray();
+    if (level == "click")
+        return QByteArrayLiteral("\x1b[?1000h\x1b[?1006h");
+    if (level == "drag")
+        return QByteArrayLiteral("\x1b[?1002h\x1b[?1006h");
+    return QByteArrayLiteral("\x1b[?1003h\x1b[?1006h");
+}
+
 // Factory: creates the platform-appropriate backend at compile time
 std::unique_ptr<TerminalBackend> createTerminalBackend(QObject *parent = nullptr);
 
