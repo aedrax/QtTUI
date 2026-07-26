@@ -1,23 +1,22 @@
 #ifndef QTTUI_QTUITABLEVIEW_H
 #define QTTUI_QTUITABLEVIEW_H
 
-#include <QtTUI/QTuiAbstractScrollArea.h>
+#include <QtTUI/QTuiAbstractItemView.h>
 #include <QAbstractItemModel>
 #include <QModelIndex>
 #include <QVector>
 
 namespace QtTUI {
 
-class QTuiTableView : public QTuiAbstractScrollArea {
+class QTuiTableView : public QTuiAbstractItemView {
     Q_OBJECT
 public:
     explicit QTuiTableView(QTuiWidget *parent = nullptr);
 
-    void setModel(QAbstractItemModel *model);
-    QAbstractItemModel *model() const;
+    void setModel(QAbstractItemModel *model) override;
 
-    QModelIndex currentIndex() const;
-    void setCurrentIndex(const QModelIndex &index);
+    QModelIndex currentIndex() const override;
+    void setCurrentIndex(const QModelIndex &index) override;
 
     int horizontalScrollOffset() const;
 
@@ -35,9 +34,6 @@ public:
     void paintEvent(ScreenBuffer &buffer) override;
 
 signals:
-    void activated(const QModelIndex &index);
-    // A double click on an item; activated() follows, as in Qt
-    void doubleClicked(const QModelIndex &index);
 
 protected:
     void keyPressEvent(TuiKeyEvent *event) override;
@@ -64,7 +60,6 @@ private:
     void invalidateColumnWidths();
     const QVector<int> &effectiveColumnWidths() const;
 
-    QAbstractItemModel *m_model = nullptr;
     int m_currentRow = 0;
     int m_currentCol = 0;
     int m_horizontalScrollOffset = 0;

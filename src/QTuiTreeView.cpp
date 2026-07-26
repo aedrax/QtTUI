@@ -8,7 +8,7 @@
 namespace QtTUI {
 
 QTuiTreeView::QTuiTreeView(QTuiWidget *parent)
-    : QTuiAbstractScrollArea(parent)
+    : QTuiAbstractItemView(parent)
 {
     setFocusPolicy(Qt::StrongFocus);
     // Layouts resize views through setGeometry(); no resize events are
@@ -44,11 +44,6 @@ void QTuiTreeView::setModel(QAbstractItemModel *model)
         connectModel();
         rebuildFlatList();
     }
-}
-
-QAbstractItemModel *QTuiTreeView::model() const
-{
-    return m_model;
 }
 
 QModelIndex QTuiTreeView::currentIndex() const

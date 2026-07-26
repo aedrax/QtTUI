@@ -1,30 +1,28 @@
 #ifndef QTTUI_QTUILISTVIEW_H
 #define QTTUI_QTUILISTVIEW_H
 
-#include <QtTUI/QTuiAbstractScrollArea.h>
+#include <QtTUI/QTuiAbstractItemView.h>
 #include <QAbstractItemModel>
 #include <QModelIndex>
 
 namespace QtTUI {
 
-class QTuiListView : public QTuiAbstractScrollArea {
+// A list of model rows (column 0). Each click emits activated();
+// a double click also emits doubleClicked().
+class QTuiListView : public QTuiAbstractItemView {
     Q_OBJECT
 public:
     explicit QTuiListView(QTuiWidget *parent = nullptr);
 
-    void setModel(QAbstractItemModel *model);
-    QAbstractItemModel *model() const;
+    void setModel(QAbstractItemModel *model) override;
 
-    QModelIndex currentIndex() const;
-    void setCurrentIndex(const QModelIndex &index);
+    QModelIndex currentIndex() const override;
+    void setCurrentIndex(const QModelIndex &index) override;
 
 
     void paintEvent(ScreenBuffer &buffer) override;
 
 signals:
-    void activated(const QModelIndex &index);
-    // A double click on an item (each click already emits activated())
-    void doubleClicked(const QModelIndex &index);
 
 protected:
     void keyPressEvent(TuiKeyEvent *event) override;
@@ -43,7 +41,6 @@ private:
     void ensureCurrentVisible();
     void clampCurrentIndex();
 
-    QAbstractItemModel *m_model = nullptr;
     int m_currentRow = 0;
 };
 

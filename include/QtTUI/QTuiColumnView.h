@@ -1,23 +1,22 @@
 #ifndef QTTUI_QTUICOLUMNVIEW_H
 #define QTTUI_QTUICOLUMNVIEW_H
 
-#include <QtTUI/QTuiWidget.h>
+#include <QtTUI/QTuiAbstractItemView.h>
 #include <QAbstractItemModel>
 #include <QModelIndex>
 #include <QList>
 
 namespace QtTUI {
 
-class QTuiColumnView : public QTuiWidget {
+class QTuiColumnView : public QTuiAbstractItemView {
     Q_OBJECT
 public:
     explicit QTuiColumnView(QTuiWidget *parent = nullptr);
 
-    void setModel(QAbstractItemModel *model);
-    QAbstractItemModel *model() const;
+    void setModel(QAbstractItemModel *model) override;
 
-    QModelIndex currentIndex() const;
-    void setCurrentIndex(const QModelIndex &index);
+    QModelIndex currentIndex() const override;
+    void setCurrentIndex(const QModelIndex &index) override;
 
     int defaultColumnWidth() const;
     void setDefaultColumnWidth(int width);
@@ -29,7 +28,6 @@ public:
     QSize minimumSize() const override;
 
 signals:
-    void activated(const QModelIndex &index);
 
 protected:
     void keyPressEvent(TuiKeyEvent *event) override;
@@ -53,7 +51,6 @@ private:
     void disconnectModel();
     int columnWidth(int columnIndex) const;
 
-    QAbstractItemModel *m_model = nullptr;
     QList<Column> m_columns;
     int m_activeColumn = 0;
     int m_scrollOffset = 0;

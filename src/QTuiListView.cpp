@@ -8,7 +8,7 @@
 namespace QtTUI {
 
 QTuiListView::QTuiListView(QTuiWidget *parent)
-    : QTuiAbstractScrollArea(parent)
+    : QTuiAbstractItemView(parent)
 {
     setFocusPolicy(Qt::StrongFocus);
     // Layouts resize views through setGeometry(); no resize events are
@@ -40,11 +40,6 @@ void QTuiListView::setModel(QAbstractItemModel *model)
 
     if (m_model)
         connectModel();
-}
-
-QAbstractItemModel *QTuiListView::model() const
-{
-    return m_model;
 }
 
 QModelIndex QTuiListView::currentIndex() const

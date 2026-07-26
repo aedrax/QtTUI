@@ -1,7 +1,7 @@
 #ifndef QTTUI_QTUITREEVIEW_H
 #define QTTUI_QTUITREEVIEW_H
 
-#include <QtTUI/QTuiAbstractScrollArea.h>
+#include <QtTUI/QTuiAbstractItemView.h>
 #include <QAbstractItemModel>
 #include <QModelIndex>
 #include <QPersistentModelIndex>
@@ -11,16 +11,15 @@ namespace QtTUI {
 
 class QTuiItemDelegate;
 
-class QTuiTreeView : public QTuiAbstractScrollArea {
+class QTuiTreeView : public QTuiAbstractItemView {
     Q_OBJECT
 public:
     explicit QTuiTreeView(QTuiWidget *parent = nullptr);
 
-    void setModel(QAbstractItemModel *model);
-    QAbstractItemModel *model() const;
+    void setModel(QAbstractItemModel *model) override;
 
-    QModelIndex currentIndex() const;
-    void setCurrentIndex(const QModelIndex &index);
+    QModelIndex currentIndex() const override;
+    void setCurrentIndex(const QModelIndex &index) override;
 
     void expand(const QModelIndex &index);
     void collapse(const QModelIndex &index);
@@ -32,9 +31,6 @@ public:
     void paintEvent(ScreenBuffer &buffer) override;
 
 signals:
-    void activated(const QModelIndex &index);
-    // A double click on an item; activated() follows, as in Qt
-    void doubleClicked(const QModelIndex &index);
     void expanded(const QModelIndex &index);
     void collapsed(const QModelIndex &index);
 
@@ -65,7 +61,6 @@ private:
     int flatRowForIndex(const QModelIndex &index) const;
     void markDirtyFromRowToBottom(int flatRow);
 
-    QAbstractItemModel *m_model = nullptr;
     QTuiItemDelegate *m_delegate = nullptr;
     QList<FlattenedItem> m_flatList;
     QSet<QPersistentModelIndex> m_expandedItems;

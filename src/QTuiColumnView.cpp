@@ -6,7 +6,7 @@
 namespace QtTUI {
 
 QTuiColumnView::QTuiColumnView(QTuiWidget *parent)
-    : QTuiWidget(parent)
+    : QTuiAbstractItemView(parent)
 {
     setFocusPolicy(Qt::StrongFocus);
     // Layouts resize views through setGeometry(); no resize events are
@@ -36,11 +36,6 @@ void QTuiColumnView::setModel(QAbstractItemModel *model)
         rebuildColumns();
     }
     markDirty();
-}
-
-QAbstractItemModel *QTuiColumnView::model() const
-{
-    return m_model;
 }
 
 QModelIndex QTuiColumnView::currentIndex() const

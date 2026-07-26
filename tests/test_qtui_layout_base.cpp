@@ -6,6 +6,11 @@
 #include <QtTUI/QTuiBoxLayout.h>
 #include <QtTUI/QTuiWidget.h>
 #include <QtTUI/QTuiFrame.h>
+#include <QSignalSpy>
+#include <QStringListModel>
+#include <QtTUI/TuiEvents.h>
+#include <QtTUI/QTuiAbstractItemView.h>
+#include <QtTUI/QTuiColumnView.h>
 #include <QtTUI/QTuiTableView.h>
 #include <QtTUI/QTuiTreeView.h>
 #include <QtTUI/QTuiListView.h>
@@ -581,6 +586,27 @@ private slots:
             QCOMPARE(a->scrollOffset(), 0);
             QVERIFY(qobject_cast<QTuiFrame *>(a));
         }
+    }
+
+    void itemViewsShareTheViewBase()
+    {
+        QStringListModel model({QStringLiteral("a"), QStringLiteral("b")});
+        QTuiListView list;
+        QTuiTreeView tree;
+        QTuiTableView table;
+        QTuiColumnView column;
+        for (QTuiAbstractItemView *view : QList<QTuiAbstractItemView *>{&list, &tree, &table, &column}) {
+            QVERIFY(qobject_cast<QTuiAbstractScrollArea *>(view));
+            view->setModel(&model);
+            QCOMPARE(view->model(), &model);
+            view->setCurrentIndex(model.index(1, 0));
+            QCOMPARE(view->currentIndex().row(), 1);
+        }
+        // The signals are the base signals
+        QSignalSpy spy(&list, &QTuiAbstractItemView::activated);
+        TuiKeyEvent enter(Qt::Key_Return, Qt::NoModifier);
+        QCoreApplication::sendEvent(&list, &enter);
+        QCOMPARE(spy.count(), 1);
     }
 };
 
