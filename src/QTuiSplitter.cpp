@@ -117,7 +117,7 @@ void QTuiSplitterHandle::keyPressEvent(TuiKeyEvent *event)
 // ---------------------------------------------------------------------------
 
 QTuiSplitter::QTuiSplitter(Qt::Orientation orientation, QTuiWidget *parent)
-    : QTuiWidget(parent)
+    : QTuiFrame(parent)
     , m_orientation(orientation)
 {
     // A parent layout sets the geometry without a resize event, so lay out

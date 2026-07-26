@@ -5,6 +5,9 @@
 #include <QtTUI/QTuiLayout.h>
 #include <QtTUI/QTuiBoxLayout.h>
 #include <QtTUI/QTuiWidget.h>
+#include <QtTUI/QTuiFrame.h>
+#include <QtTUI/QTuiLCDNumber.h>
+#include <QtTUI/QTuiLabel.h>
 #include <QtTUI/ScreenBuffer.h>
 
 using namespace QtTUI;
@@ -544,6 +547,22 @@ private slots:
         buf.backCell(2, 2).setChar(U'Z');
         w.paintEvent(buf);
         QCOMPARE(buf.backCell(2, 2).ch, U' ');
+    }
+
+    void frameShapeAndContentsRect()
+    {
+        // A label is a QTuiFrame, as in Qt; NoFrame by default
+        QTuiLabel label(QStringLiteral("x"));
+        QTuiFrame *frame = &label;
+        QCOMPARE(frame->frameShape(), QTuiFrame::NoFrame);
+        label.setGeometry(QRect(2, 1, 10, 4));
+        QCOMPARE(frame->contentsRect(), QRect(2, 1, 10, 4));
+        frame->setFrameShape(QTuiFrame::Box);
+        QCOMPARE(frame->frameWidth(), 1);
+        QCOMPARE(frame->contentsRect(), QRect(3, 2, 8, 2));
+
+        QTuiLCDNumber lcd;
+        QCOMPARE(lcd.frameShape(), QTuiFrame::Box);
     }
 };
 

@@ -6,7 +6,7 @@
 namespace QtTUI {
 
 QTuiLabel::QTuiLabel(const QString &text, QTuiWidget *parent)
-    : QTuiWidget(parent)
+    : QTuiFrame(parent)
     , m_text(text)
 {
 }

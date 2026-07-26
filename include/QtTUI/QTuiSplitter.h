@@ -1,14 +1,14 @@
 #ifndef QTTUI_QTUISPLITTER_H
 #define QTTUI_QTUISPLITTER_H
 
-#include <QtTUI/QTuiWidget.h>
+#include <QtTUI/QTuiFrame.h>
 #include <QList>
 
 namespace QtTUI {
 
 class QTuiSplitterHandle;
 
-class QTuiSplitter : public QTuiWidget {
+class QTuiSplitter : public QTuiFrame {
     Q_OBJECT
     Q_PROPERTY(Qt::Orientation orientation READ orientation WRITE setOrientation)
 public:

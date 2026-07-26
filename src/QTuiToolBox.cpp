@@ -6,7 +6,7 @@
 namespace QtTUI {
 
 QTuiToolBox::QTuiToolBox(QTuiWidget *parent)
-    : QTuiWidget(parent)
+    : QTuiFrame(parent)
 {
     setFocusPolicy(Qt::StrongFocus);
 }

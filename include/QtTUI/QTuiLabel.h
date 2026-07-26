@@ -2,13 +2,13 @@
 #define QTTUI_QTUILABEL_H
 
 #include <QtTUI/QtTUIGlobal.h>
-#include <QtTUI/QTuiWidget.h>
+#include <QtTUI/QTuiFrame.h>
 #include <QString>
 #include <Qt>
 
 namespace QtTUI {
 
-class QTuiLabel : public QTuiWidget {
+class QTuiLabel : public QTuiFrame {
     Q_OBJECT
     Q_PROPERTY(QString text READ text WRITE setText NOTIFY textChanged)
     Q_PROPERTY(Qt::Alignment alignment READ alignment WRITE setAlignment)

@@ -1,13 +1,13 @@
 #ifndef QTTUI_QTUITOOLBOX_H
 #define QTTUI_QTUITOOLBOX_H
 
-#include <QtTUI/QTuiWidget.h>
+#include <QtTUI/QTuiFrame.h>
 #include <QList>
 #include <QString>
 
 namespace QtTUI {
 
-class QTuiToolBox : public QTuiWidget {
+class QTuiToolBox : public QTuiFrame {
     Q_OBJECT
     Q_PROPERTY(int currentIndex READ currentIndex WRITE setCurrentIndex NOTIFY currentChanged)
 public:

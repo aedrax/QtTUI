@@ -20,6 +20,7 @@
 // Base widget and application
 #include <QtTUI/QTuiWidget.h>
 #include <QtTUI/QTuiApplication.h>
+#include <QtTUI/QTuiFrame.h>
 #include <QtTUI/QTuiClipboard.h>
 #include <QtTUI/QTuiToolTip.h>
 #include <QtTUI/QTuiDialog.h>

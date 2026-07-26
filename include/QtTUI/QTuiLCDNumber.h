@@ -1,13 +1,13 @@
 #ifndef QTTUI_QTUILCDNUMBER_H
 #define QTTUI_QTUILCDNUMBER_H
 
-#include <QtTUI/QTuiWidget.h>
+#include <QtTUI/QTuiFrame.h>
 #include <QString>
 #include <QStringList>
 
 namespace QtTUI {
 
-class QTuiLCDNumber : public QTuiWidget {
+class QTuiLCDNumber : public QTuiFrame {
     Q_OBJECT
     Q_PROPERTY(int digitCount READ digitCount WRITE setDigitCount)
     Q_PROPERTY(int intValue READ intValue)

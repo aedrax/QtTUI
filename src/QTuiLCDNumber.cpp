@@ -5,9 +5,10 @@
 namespace QtTUI {
 
 QTuiLCDNumber::QTuiLCDNumber(int digitCount, QTuiWidget *parent)
-    : QTuiWidget(parent)
+    : QTuiFrame(parent)
     , m_digitCount(qMax(1, digitCount))
 {
+    setFrameShape(Box); // paintEvent() draws the border itself
     m_displayText = QStringLiteral("0");
 }
 
@@ -226,64 +227,8 @@ void QTuiLCDNumber::paintEvent(ScreenBuffer &buffer)
         }
     }
 
-    // Top border
-    if (geoH >= 1) {
-        int py = geoY;
-        for (int col = 0; col < geoW; ++col) {
-            int px = geoX + col;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                if (col == 0)
-                    cell.setChar(border.topLeft);
-                else if (col == geoW - 1)
-                    cell.setChar(border.topRight);
-                else
-                    cell.setChar(border.horizontal);
-                cell.foreground = fg;
-                cell.background = bg;
-            }
-        }
-    }
-
-    // Bottom border
-    if (geoH >= 2) {
-        int py = geoY + geoH - 1;
-        for (int col = 0; col < geoW; ++col) {
-            int px = geoX + col;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                if (col == 0)
-                    cell.setChar(border.bottomLeft);
-                else if (col == geoW - 1)
-                    cell.setChar(border.bottomRight);
-                else
-                    cell.setChar(border.horizontal);
-                cell.foreground = fg;
-                cell.background = bg;
-            }
-        }
-    }
-
-    // Left and right borders for middle rows
-    for (int row = 1; row < geoH - 1; ++row) {
-        int py = geoY + row;
-        if (py < buffer.height()) {
-            int pxL = geoX;
-            if (pxL < buffer.width()) {
-                Cell &cell = buffer.backCell(pxL, py);
-                cell.setChar(border.vertical);
-                cell.foreground = fg;
-                cell.background = bg;
-            }
-            int pxR = geoX + geoW - 1;
-            if (pxR < buffer.width()) {
-                Cell &cell = buffer.backCell(pxR, py);
-                cell.setChar(border.vertical);
-                cell.foreground = fg;
-                cell.background = bg;
-            }
-        }
-    }
+    // Border: the LCD number is a Box frame
+    drawBorder(buffer, geo, theme.borderStyle, fg, bg);
 
     // Render segment art for each character in display text
     // Inner area starts at (geoX+1, geoY+1), size (geoW-2, geoH-2)
