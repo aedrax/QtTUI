@@ -1,14 +1,14 @@
 #ifndef QTTUI_QTUITABLEVIEW_H
 #define QTTUI_QTUITABLEVIEW_H
 
-#include <QtTUI/QTuiWidget.h>
+#include <QtTUI/QTuiAbstractScrollArea.h>
 #include <QAbstractItemModel>
 #include <QModelIndex>
 #include <QVector>
 
 namespace QtTUI {
 
-class QTuiTableView : public QTuiWidget {
+class QTuiTableView : public QTuiAbstractScrollArea {
     Q_OBJECT
 public:
     explicit QTuiTableView(QTuiWidget *parent = nullptr);
@@ -19,7 +19,6 @@ public:
     QModelIndex currentIndex() const;
     void setCurrentIndex(const QModelIndex &index);
 
-    int scrollOffset() const;
     int horizontalScrollOffset() const;
 
     // Sorting, as in QTableView. With sorting enabled, a click on a column
@@ -68,7 +67,6 @@ private:
     QAbstractItemModel *m_model = nullptr;
     int m_currentRow = 0;
     int m_currentCol = 0;
-    int m_scrollOffset = 0;
     int m_horizontalScrollOffset = 0;
     static constexpr int m_headerHeight = 1;
     bool m_sortingEnabled = false;

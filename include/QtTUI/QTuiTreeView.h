@@ -1,7 +1,7 @@
 #ifndef QTTUI_QTUITREEVIEW_H
 #define QTTUI_QTUITREEVIEW_H
 
-#include <QtTUI/QTuiWidget.h>
+#include <QtTUI/QTuiAbstractScrollArea.h>
 #include <QAbstractItemModel>
 #include <QModelIndex>
 #include <QPersistentModelIndex>
@@ -11,7 +11,7 @@ namespace QtTUI {
 
 class QTuiItemDelegate;
 
-class QTuiTreeView : public QTuiWidget {
+class QTuiTreeView : public QTuiAbstractScrollArea {
     Q_OBJECT
 public:
     explicit QTuiTreeView(QTuiWidget *parent = nullptr);
@@ -70,7 +70,6 @@ private:
     QList<FlattenedItem> m_flatList;
     QSet<QPersistentModelIndex> m_expandedItems;
     int m_currentRow = 0;
-    int m_scrollOffset = 0;
     // Flat row affected by an in-flight removal, captured in
     // onRowsAboutToBeRemoved while the indexes are still valid.
     int m_pendingRemovalFlatRow = -1;

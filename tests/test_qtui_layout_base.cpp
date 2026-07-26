@@ -6,6 +6,10 @@
 #include <QtTUI/QTuiBoxLayout.h>
 #include <QtTUI/QTuiWidget.h>
 #include <QtTUI/QTuiFrame.h>
+#include <QtTUI/QTuiTableView.h>
+#include <QtTUI/QTuiTreeView.h>
+#include <QtTUI/QTuiListView.h>
+#include <QtTUI/QTuiScrollArea.h>
 #include <QtTUI/QTuiLCDNumber.h>
 #include <QtTUI/QTuiLabel.h>
 #include <QtTUI/ScreenBuffer.h>
@@ -563,6 +567,20 @@ private slots:
 
         QTuiLCDNumber lcd;
         QCOMPARE(lcd.frameShape(), QTuiFrame::Box);
+    }
+
+    void scrollAreasShareTheScrollBase()
+    {
+        // The scroll area and the item views are QTuiAbstractScrollAreas,
+        // which are QTuiFrames, as in Qt
+        QTuiScrollArea area;
+        QTuiListView list;
+        QTuiTreeView tree;
+        QTuiTableView table;
+        for (QTuiAbstractScrollArea *a : QList<QTuiAbstractScrollArea *>{&area, &list, &tree, &table}) {
+            QCOMPARE(a->scrollOffset(), 0);
+            QVERIFY(qobject_cast<QTuiFrame *>(a));
+        }
     }
 };
 

@@ -8,7 +8,7 @@
 namespace QtTUI {
 
 QTuiListView::QTuiListView(QTuiWidget *parent)
-    : QTuiWidget(parent)
+    : QTuiAbstractScrollArea(parent)
 {
     setFocusPolicy(Qt::StrongFocus);
     // Layouts resize views through setGeometry(); no resize events are
@@ -64,11 +64,6 @@ void QTuiListView::setCurrentIndex(const QModelIndex &index)
     m_currentRow = row;
     ensureCurrentVisible();
     markDirty();
-}
-
-int QTuiListView::scrollOffset() const
-{
-    return m_scrollOffset;
 }
 
 void QTuiListView::paintEvent(ScreenBuffer &buffer)
@@ -354,14 +349,7 @@ void QTuiListView::ensureCurrentVisible()
     if (!m_model)
         return;
 
-    int visibleRows = geometry().height();
-    if (visibleRows <= 0)
-        return;
-
-    if (m_currentRow < m_scrollOffset)
-        m_scrollOffset = m_currentRow;
-    else if (m_currentRow >= m_scrollOffset + visibleRows)
-        m_scrollOffset = m_currentRow - visibleRows + 1;
+    scrollRowIntoView(m_currentRow, geometry().height());
 }
 
 void QTuiListView::clampCurrentIndex()

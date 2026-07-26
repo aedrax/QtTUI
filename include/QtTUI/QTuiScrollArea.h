@@ -2,13 +2,13 @@
 #define QTTUI_QTUISCROLLAREA_H
 
 #include <QtTUI/QtTUIGlobal.h>
-#include <QtTUI/QTuiWidget.h>
+#include <QtTUI/QTuiAbstractScrollArea.h>
 
 namespace QtTUI {
 
 class QTuiScrollBar;
 
-class QTuiScrollArea : public QTuiWidget {
+class QTuiScrollArea : public QTuiAbstractScrollArea {
     Q_OBJECT
 public:
     explicit QTuiScrollArea(QTuiWidget *parent = nullptr);
@@ -40,7 +40,6 @@ private:
     QTuiScrollBar *m_verticalScrollBar;
     QTuiScrollBar *m_horizontalScrollBar;
     int m_scrollX = 0;
-    int m_scrollY = 0;
 };
 
 } // namespace QtTUI

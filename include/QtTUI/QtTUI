@@ -21,6 +21,7 @@
 #include <QtTUI/QTuiWidget.h>
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiFrame.h>
+#include <QtTUI/QTuiAbstractScrollArea.h>
 #include <QtTUI/QTuiClipboard.h>
 #include <QtTUI/QTuiToolTip.h>
 #include <QtTUI/QTuiDialog.h>

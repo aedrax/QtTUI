@@ -8,7 +8,7 @@
 namespace QtTUI {
 
 QTuiTreeView::QTuiTreeView(QTuiWidget *parent)
-    : QTuiWidget(parent)
+    : QTuiAbstractScrollArea(parent)
 {
     setFocusPolicy(Qt::StrongFocus);
     // Layouts resize views through setGeometry(); no resize events are
@@ -621,14 +621,7 @@ void QTuiTreeView::buildFlatListRecursive(const QModelIndex &parent, int depth)
 
 void QTuiTreeView::scrollToVisible()
 {
-    int visibleRows = geometry().height();
-    if (visibleRows <= 0)
-        return;
-
-    if (m_currentRow < m_scrollOffset)
-        m_scrollOffset = m_currentRow;
-    else if (m_currentRow >= m_scrollOffset + visibleRows)
-        m_scrollOffset = m_currentRow - visibleRows + 1;
+    scrollRowIntoView(m_currentRow, geometry().height());
 }
 
 int QTuiTreeView::flatRowForIndex(const QModelIndex &index) const

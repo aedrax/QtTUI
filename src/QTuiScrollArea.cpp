@@ -11,14 +11,14 @@
 namespace QtTUI {
 
 QTuiScrollArea::QTuiScrollArea(QTuiWidget *parent)
-    : QTuiWidget(parent)
+    : QTuiAbstractScrollArea(parent)
     , m_verticalScrollBar(new QTuiScrollBar(Qt::Vertical, this))
     , m_horizontalScrollBar(new QTuiScrollBar(Qt::Horizontal, this))
 {
     setFocusPolicy(Qt::StrongFocus);
     // Connect scroll bar value changes to update scroll offsets
     connect(m_verticalScrollBar, &QTuiScrollBar::valueChanged, this, [this](int value) {
-        m_scrollY = value;
+        m_scrollOffset = value;
         markDirty();
     });
     connect(m_horizontalScrollBar, &QTuiScrollBar::valueChanged, this, [this](int value) {
@@ -46,7 +46,7 @@ void QTuiScrollArea::setWidget(QTuiWidget *widget)
         m_widget->setVisible(true);
     }
     m_scrollX = 0;
-    m_scrollY = 0;
+    m_scrollOffset = 0;
     updateScrollBars();
     markDirty();
 }
@@ -83,17 +83,17 @@ void QTuiScrollArea::ensureVisible(int x, int y)
     }
 
     // Adjust vertical scroll so y is visible
-    if (y < m_scrollY) {
-        m_scrollY = y;
-    } else if (y >= m_scrollY + viewportH) {
-        m_scrollY = y - viewportH + 1;
+    if (y < m_scrollOffset) {
+        m_scrollOffset = y;
+    } else if (y >= m_scrollOffset + viewportH) {
+        m_scrollOffset = y - viewportH + 1;
     }
 
     m_scrollX = qMax(0, m_scrollX);
-    m_scrollY = qMax(0, m_scrollY);
+    m_scrollOffset = qMax(0, m_scrollOffset);
 
     m_horizontalScrollBar->setValue(m_scrollX);
-    m_verticalScrollBar->setValue(m_scrollY);
+    m_verticalScrollBar->setValue(m_scrollOffset);
 }
 
 QSize QTuiScrollArea::minimumSize() const
@@ -155,10 +155,10 @@ void QTuiScrollArea::updateScrollBars()
 
     // Clamp scroll offsets
     if (needsVScroll) {
-        m_scrollY = qBound(0, m_scrollY, qMax(0, childH - viewportH));
-        m_verticalScrollBar->setValue(m_scrollY);
+        m_scrollOffset = qBound(0, m_scrollOffset, qMax(0, childH - viewportH));
+        m_verticalScrollBar->setValue(m_scrollOffset);
     } else {
-        m_scrollY = 0;
+        m_scrollOffset = 0;
     }
 
     if (needsHScroll) {
@@ -257,7 +257,7 @@ void QTuiScrollArea::paintEvent(ScreenBuffer &buffer)
 
             // Copy the visible portion (clipped by viewport) from child buffer
             for (int row = 0; row < viewportH; ++row) {
-                int childRow = row + m_scrollY;
+                int childRow = row + m_scrollOffset;
                 if (childRow < 0 || childRow >= childGeo.height())
                     continue;
 
@@ -290,7 +290,7 @@ void QTuiScrollArea::paintEvent(ScreenBuffer &buffer)
         // Up arrow indicator at top-right
         int indicatorX = geo.x() + geo.width() - 1;
         int topY = geo.y();
-        if (indicatorX < buffer.width() && topY < buffer.height() && m_scrollY > 0) {
+        if (indicatorX < buffer.width() && topY < buffer.height() && m_scrollOffset > 0) {
             Cell &cell = buffer.backCell(indicatorX, topY);
             cell.setChar(0x25B2); // ▲
             cell.foreground = fg;
@@ -300,7 +300,7 @@ void QTuiScrollArea::paintEvent(ScreenBuffer &buffer)
         int bottomY = geo.y() + viewportH - 1;
         int childH = m_widget ? m_widget->geometry().height() : 0;
         if (indicatorX < buffer.width() && bottomY < buffer.height()
-            && m_scrollY < qMax(0, childH - viewportH)) {
+            && m_scrollOffset < qMax(0, childH - viewportH)) {
             Cell &cell = buffer.backCell(indicatorX, bottomY);
             cell.setChar(0x25BC); // ▼
             cell.foreground = fg;
@@ -365,11 +365,11 @@ void QTuiScrollArea::keyPressEvent(TuiKeyEvent *event)
     switch (key) {
     case Qt::Key_Up:
         if (needsVScroll)
-            m_verticalScrollBar->setValue(m_scrollY - 1);
+            m_verticalScrollBar->setValue(m_scrollOffset - 1);
         break;
     case Qt::Key_Down:
         if (needsVScroll)
-            m_verticalScrollBar->setValue(m_scrollY + 1);
+            m_verticalScrollBar->setValue(m_scrollOffset + 1);
         break;
     case Qt::Key_Left:
         if (needsHScroll)
@@ -381,11 +381,11 @@ void QTuiScrollArea::keyPressEvent(TuiKeyEvent *event)
         break;
     case Qt::Key_PageUp:
         if (needsVScroll)
-            m_verticalScrollBar->setValue(m_scrollY - viewportH);
+            m_verticalScrollBar->setValue(m_scrollOffset - viewportH);
         break;
     case Qt::Key_PageDown:
         if (needsVScroll)
-            m_verticalScrollBar->setValue(m_scrollY + viewportH);
+            m_verticalScrollBar->setValue(m_scrollOffset + viewportH);
         break;
     case Qt::Key_Home:
         if (needsVScroll)
@@ -422,7 +422,7 @@ void QTuiScrollArea::mousePressEvent(TuiMouseEvent *event)
         return;
 
     // Viewport position -> content position
-    const QPoint content = event->pos() - geometry().topLeft() + QPoint(m_scrollX, m_scrollY);
+    const QPoint content = event->pos() - geometry().topLeft() + QPoint(m_scrollX, m_scrollOffset);
     if (!m_widget->geometry().contains(content))
         return;
 

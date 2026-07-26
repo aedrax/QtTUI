@@ -8,7 +8,7 @@
 namespace QtTUI {
 
 QTuiTableView::QTuiTableView(QTuiWidget *parent)
-    : QTuiWidget(parent)
+    : QTuiAbstractScrollArea(parent)
 {
     setFocusPolicy(Qt::StrongFocus);
     // Layouts resize views through setGeometry(); no resize events are
@@ -69,11 +69,6 @@ void QTuiTableView::setCurrentIndex(const QModelIndex &index)
     m_currentCol = col;
     ensureCurrentVisible();
     markDirty();
-}
-
-int QTuiTableView::scrollOffset() const
-{
-    return m_scrollOffset;
 }
 
 int QTuiTableView::horizontalScrollOffset() const
@@ -616,14 +611,7 @@ void QTuiTableView::ensureCurrentVisible()
     if (!m_model)
         return;
 
-    int visibleDataRows = geometry().height() - m_headerHeight;
-    if (visibleDataRows <= 0)
-        return;
-
-    if (m_currentRow < m_scrollOffset)
-        m_scrollOffset = m_currentRow;
-    else if (m_currentRow >= m_scrollOffset + visibleDataRows)
-        m_scrollOffset = m_currentRow - visibleDataRows + 1;
+    scrollRowIntoView(m_currentRow, geometry().height() - m_headerHeight);
 }
 
 void QTuiTableView::ensureCurrentColumnVisible()

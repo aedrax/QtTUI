@@ -1,13 +1,13 @@
 #ifndef QTTUI_QTUILISTVIEW_H
 #define QTTUI_QTUILISTVIEW_H
 
-#include <QtTUI/QTuiWidget.h>
+#include <QtTUI/QTuiAbstractScrollArea.h>
 #include <QAbstractItemModel>
 #include <QModelIndex>
 
 namespace QtTUI {
 
-class QTuiListView : public QTuiWidget {
+class QTuiListView : public QTuiAbstractScrollArea {
     Q_OBJECT
 public:
     explicit QTuiListView(QTuiWidget *parent = nullptr);
@@ -18,7 +18,6 @@ public:
     QModelIndex currentIndex() const;
     void setCurrentIndex(const QModelIndex &index);
 
-    int scrollOffset() const;
 
     void paintEvent(ScreenBuffer &buffer) override;
 
@@ -46,7 +45,6 @@ private:
 
     QAbstractItemModel *m_model = nullptr;
     int m_currentRow = 0;
-    int m_scrollOffset = 0;
 };
 
 } // namespace QtTUI
