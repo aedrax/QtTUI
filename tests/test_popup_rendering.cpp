@@ -1077,6 +1077,52 @@ private slots:
         QVERIFY(!button->underMouse());
         QVERIFY(!QTuiToolTip::isVisible());
     }
+
+    // After a left press, drag motion and the release go to the pressed
+    // widget, also outside it
+    void mouseGrabDuringDrag()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 40, 10));
+        app.setMainWindow(&mainWindow);
+        auto *central = new FillWidget(QLatin1Char('C'));
+        mainWindow.setCentralWidget(central);
+
+        class Recorder : public QTuiWidget {
+        public:
+            using QTuiWidget::QTuiWidget;
+            QList<int> types;
+            QList<QPoint> positions;
+        protected:
+            void mousePressEvent(TuiMouseEvent *e) override
+            {
+                types.append(e->mouseType());
+                positions.append(e->pos());
+            }
+        };
+        auto *small = new Recorder(central);
+        small->setGeometry(QRect(2, 2, 2, 1));
+        mainWindow.show();
+        auto send = [&mainWindow](TuiMouseEvent::MouseEventType type, Qt::MouseButton b, QPoint p) {
+            TuiMouseEvent ev(type, b, p);
+            QCoreApplication::sendEvent(&mainWindow, &ev);
+        };
+
+        send(TuiMouseEvent::Press, Qt::LeftButton, QPoint(2, 2));
+        send(TuiMouseEvent::Move, Qt::LeftButton, QPoint(20, 7));   // far outside
+        send(TuiMouseEvent::Release, Qt::LeftButton, QPoint(25, 8));
+        QCOMPARE(small->types, (QList<int>{TuiMouseEvent::Press, TuiMouseEvent::Move,
+                                           TuiMouseEvent::Release}));
+        QCOMPARE(small->positions.at(1), QPoint(20, 7));
+
+        // After the release there is no grab: a drag elsewhere does not reach it
+        send(TuiMouseEvent::Move, Qt::LeftButton, QPoint(20, 7));
+        QCOMPARE(small->types.size(), 3);
+    }
 };
 
 QTEST_APPLESS_MAIN(TestPopupRendering)

@@ -79,6 +79,10 @@ private:
     QTuiLayout *m_layout = nullptr;
     QList<QTuiWidget *> m_focusChain;
 
+    // The widget that got the last left press; it gets the drag motion and
+    // the release until the button comes up (an implicit grab, as in Qt)
+    QPointer<QTuiWidget> m_mouseGrabber;
+
     // The widget under the mouse, and the timer for its hover tooltip
     QPointer<QTuiWidget> m_hovered;
     QTimer *m_hoverTimer = nullptr;

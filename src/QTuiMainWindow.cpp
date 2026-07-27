@@ -460,6 +460,21 @@ void QTuiMainWindow::keyPressEvent(TuiKeyEvent *event)
 
 void QTuiMainWindow::mousePressEvent(TuiMouseEvent *event)
 {
+    // During a drag, motion and the release go to the widget that got the
+    // press, also outside its geometry
+    if (m_mouseGrabber) {
+        const bool drag = event->mouseType() == TuiMouseEvent::Move
+            && event->button() != Qt::NoButton;
+        const bool release = event->mouseType() == TuiMouseEvent::Release;
+        if (drag || release) {
+            QPointer<QTuiWidget> grabber = m_mouseGrabber;
+            if (release)
+                m_mouseGrabber.clear();
+            QCoreApplication::sendEvent(grabber, event);
+            return;
+        }
+    }
+
     // Hide the tooltip first: it is a popup, and a click outside a visible
     // popup is swallowed
     if (event->mouseType() == TuiMouseEvent::Press)
@@ -518,6 +533,10 @@ void QTuiMainWindow::mousePressEvent(TuiMouseEvent *event)
             QTuiToolTip::showFor(target);
         }
         QCoreApplication::sendEvent(target, event);
+
+        // A left press starts a possible drag
+        if (event->mouseType() == TuiMouseEvent::Press && event->button() == Qt::LeftButton)
+            m_mouseGrabber = target;
 
         // A right press asks for a context menu
         if (event->mouseType() == TuiMouseEvent::Press && event->button() == Qt::RightButton)
