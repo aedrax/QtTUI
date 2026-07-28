@@ -514,6 +514,28 @@ private slots:
         QCOMPARE(ms.width(), 1);
         QCOMPARE(ms.height(), 1);
     }
+
+    void splitter_dragHandle()
+    {
+        QTuiSplitter sp(Qt::Horizontal);
+        sp.addWidget(new SplitterTestWidget());
+        sp.addWidget(new SplitterTestWidget());
+        sp.setGeometry(QRect(0, 0, 21, 3));
+        QTuiSplitterHandle *h = sp.handle(0);
+        QCOMPARE(h->geometry().x(), 10);
+        QSignalSpy moved(&sp, &QTuiSplitter::splitterMoved);
+
+        TuiMouseEvent drag(TuiMouseEvent::Move, Qt::LeftButton, QPoint(14, 1));
+        QCoreApplication::sendEvent(h, &drag);
+        QCOMPARE(h->geometry().x(), 14);
+        QCOMPARE(sp.sizes().at(0), 14);
+        QCOMPARE(moved.count(), 1);
+
+        // Motion without a button (hover) does nothing
+        TuiMouseEvent hover(TuiMouseEvent::Move, Qt::NoButton, QPoint(5, 1));
+        QCoreApplication::sendEvent(h, &hover);
+        QCOMPARE(h->geometry().x(), 14);
+    }
 };
 
 QTEST_MAIN(TestStackedSplitter)

@@ -70,6 +70,27 @@ void QTuiSplitterHandle::paintEvent(ScreenBuffer &buffer)
     }
 }
 
+int QTuiSplitterHandle::indexInSplitter() const
+{
+    QTuiSplitter *s = splitter();
+    return s ? s->m_handles.indexOf(const_cast<QTuiSplitterHandle *>(this)) : -1;
+}
+
+void QTuiSplitterHandle::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() != TuiMouseEvent::Move || event->button() != Qt::LeftButton)
+        return;
+    QTuiSplitter *s = splitter();
+    const int index = indexInSplitter();
+    if (!s || index < 0)
+        return;
+    // Move the handle to the mouse position (the split clamps it)
+    const int delta = m_orientation == Qt::Horizontal ? event->x() - geometry().x()
+                                                      : event->y() - geometry().y();
+    if (delta != 0)
+        s->moveSplitter(index, delta);
+}
+
 void QTuiSplitterHandle::keyPressEvent(TuiKeyEvent *event)
 {
     QTuiSplitter *s = splitter();

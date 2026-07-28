@@ -59,9 +59,12 @@ public:
 
 protected:
     void keyPressEvent(TuiKeyEvent *event) override;
+    // Dragging the handle with the left button moves it
+    void mousePressEvent(TuiMouseEvent *event) override;
 
 private:
     friend class QTuiSplitter;
+    int indexInSplitter() const;
     Qt::Orientation m_orientation;
 };
 
