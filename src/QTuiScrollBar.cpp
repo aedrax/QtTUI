@@ -242,7 +242,10 @@ void QTuiScrollBar::keyPressEvent(TuiKeyEvent *event)
 
 void QTuiScrollBar::mousePressEvent(TuiMouseEvent *event)
 {
-    if (event->mouseType() != TuiMouseEvent::Press)
+    // A press jumps to the position; a drag with the left button follows
+    // the mouse
+    const bool drag = event->mouseType() == TuiMouseEvent::Move && event->button() == Qt::LeftButton;
+    if (event->mouseType() != TuiMouseEvent::Press && !drag)
         return;
 
     const QRect geo = geometry();

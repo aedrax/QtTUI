@@ -514,6 +514,26 @@ private slots:
         }
         QVERIFY(hasScrollBarChar);
     }
+
+    void scrollBar_dragFollowsMouse()
+    {
+        QTuiScrollBar sb(Qt::Vertical);
+        sb.setGeometry(QRect(0, 0, 1, 11));
+        sb.setRange(0, 100);
+        TuiMouseEvent press(TuiMouseEvent::Press, Qt::LeftButton, QPoint(0, 0));
+        QCoreApplication::sendEvent(&sb, &press);
+        QCOMPARE(sb.value(), 0);
+        TuiMouseEvent drag(TuiMouseEvent::Move, Qt::LeftButton, QPoint(0, 5));
+        QCoreApplication::sendEvent(&sb, &drag);
+        QCOMPARE(sb.value(), 50);
+        // Beyond the end (the grab sends positions outside the bar)
+        TuiMouseEvent past(TuiMouseEvent::Move, Qt::LeftButton, QPoint(0, 30));
+        QCoreApplication::sendEvent(&sb, &past);
+        QCOMPARE(sb.value(), 100);
+        TuiMouseEvent hover(TuiMouseEvent::Move, Qt::NoButton, QPoint(0, 2));
+        QCoreApplication::sendEvent(&sb, &hover);
+        QCOMPARE(sb.value(), 100);
+    }
 };
 
 QTEST_MAIN(TestQTuiScrollWidgets)
