@@ -348,6 +348,33 @@ private slots:
         // The rows show the new order
         QCOMPARE(buf.backCell(0, 1).ch, U'c');
     }
+
+    void dragHeaderSeparatorResizesColumn()
+    {
+        SimpleTableModel model(2, 3); // cells "R0C0": natural width 4
+        QTuiTableView view;
+        view.setGeometry(QRect(0, 0, 40, 4));
+        view.setModel(&model);
+        QCOMPARE(view.columnWidth(0), 4);
+        auto send = [&view](TuiMouseEvent::MouseEventType t, int x) {
+            TuiMouseEvent ev(t, Qt::LeftButton, QPoint(x, 0));
+            QCoreApplication::sendEvent(&view, &ev);
+        };
+        // The separator after column 0 is at x = 4
+        send(TuiMouseEvent::Press, 4);
+        send(TuiMouseEvent::Move, 10);
+        send(TuiMouseEvent::Release, 10);
+        QCOMPARE(view.columnWidth(0), 10);
+        QCOMPARE(view.columnWidth(1), 4);
+
+        // Column 1 now starts at x = 11
+        ScreenBuffer buf(40, 4);
+        view.paintEvent(buf);
+        QCOMPARE(buf.backCell(11, 1).ch, U'R');
+
+        view.setColumnWidth(2, 7);
+        QCOMPARE(view.columnWidth(2), 7);
+    }
 };
 
 QTEST_MAIN(TestQTuiTableView)

@@ -2,6 +2,7 @@
 #define QTTUI_QTUITABLEVIEW_H
 
 #include <QtTUI/QTuiAbstractItemView.h>
+#include <QHash>
 #include <QAbstractItemModel>
 #include <QModelIndex>
 #include <QVector>
@@ -30,6 +31,13 @@ public:
     void sortByColumn(int column, Qt::SortOrder order);
     int sortColumn() const; // -1 if not sorted
     Qt::SortOrder sortOrder() const;
+
+    // Column widths, as in QTableView. A width set here replaces the
+    // natural width (the widest of the header and the visible cells);
+    // columns still shrink if the view is too narrow. Dragging the cell
+    // after a column header with the left button sets its width.
+    int columnWidth(int column) const;
+    void setColumnWidth(int column, int width);
 
     void paintEvent(ScreenBuffer &buffer) override;
 
@@ -65,6 +73,9 @@ private:
     int m_horizontalScrollOffset = 0;
     static constexpr int m_headerHeight = 1;
     bool m_sortingEnabled = false;
+    QHash<int, int> m_userColumnWidths;
+    int m_resizingColumn = -1; // column that a header drag resizes
+    int m_resizeColumnX = 0;   // its left edge, relative to the view
     int m_sortColumn = -1;
     Qt::SortOrder m_sortOrder = Qt::AscendingOrder;
 

@@ -300,6 +300,20 @@ Qt::SortOrder QTuiTableView::sortOrder() const
     return m_sortOrder;
 }
 
+int QTuiTableView::columnWidth(int column) const
+{
+    return effectiveColumnWidths().value(column);
+}
+
+void QTuiTableView::setColumnWidth(int column, int width)
+{
+    if (column < 0)
+        return;
+    m_userColumnWidths.insert(column, qMax(1, width));
+    invalidateColumnWidths();
+    markDirty();
+}
+
 QString QTuiTableView::headerText(int column) const
 {
     QString text = m_model->headerData(column, Qt::Horizontal, Qt::DisplayRole).toString();
@@ -318,6 +332,17 @@ void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
         emit doubleClicked(index);
         emit activated(index);
         return;
+    }
+    // A header drag resizes the column that it started on
+    if (m_resizingColumn >= 0) {
+        if (event->mouseType() == TuiMouseEvent::Move && event->button() == Qt::LeftButton) {
+            setColumnWidth(m_resizingColumn, event->x() - geometry().x() - m_resizeColumnX);
+            return;
+        }
+        if (event->mouseType() == TuiMouseEvent::Release) {
+            m_resizingColumn = -1;
+            return;
+        }
     }
     if (event->mouseType() != TuiMouseEvent::Press)
         return;
@@ -350,6 +375,13 @@ void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
         if (clickX >= xOff && clickX < colEnd) {
             clickedCol = c;
             break;
+        }
+        // A left press on the separator after a header starts a resize
+        if (onHeader && clickX == colEnd && c < cols - 1
+            && event->button() == Qt::LeftButton) {
+            m_resizingColumn = c;
+            m_resizeColumnX = xOff;
+            return;
         }
         xOff = colEnd + 1; // +1 for separator
     }
@@ -705,6 +737,9 @@ const QVector<int> &QTuiTableView::effectiveColumnWidths() const
                 maxW = len;
         }
         colWidths[c] = qMax(1, maxW); // at least 1 char per column
+        // A width that the user set replaces the natural width
+        if (m_userColumnWidths.contains(c))
+            colWidths[c] = m_userColumnWidths.value(c);
     }
 
     // Step 2: Constrain total column widths to view width
