@@ -531,14 +531,21 @@ void QTuiLineEdit::insertPastedText(const QString &pasted)
 
 void QTuiLineEdit::mousePressEvent(TuiMouseEvent *event)
 {
-    if (event->mouseType() != TuiMouseEvent::Press)
+    // A press places the cursor; a drag with the left button selects from
+    // the press position to the mouse
+    const bool drag = event->mouseType() == TuiMouseEvent::Move && event->button() == Qt::LeftButton;
+    if (event->mouseType() != TuiMouseEvent::Press && !drag)
         return;
 
     const QRect geo = geometry();
     const int clickCol = event->x() - geo.x() + m_scrollOffset;
     const int shownIndex = clickCol <= 0 ? 0 : QtTuiUnicode::indexOfColumn(displayText(), clickCol);
+    if (drag && m_selAnchor < 0)
+        m_selAnchor = m_cursorPos;
     m_cursorPos = textIndex(shownIndex);
-    m_selAnchor = -1;
+    if (!drag)
+        m_selAnchor = -1;
+    adjustScrollToCursor();
     markDirty();
 }
 

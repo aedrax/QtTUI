@@ -585,7 +585,10 @@ void QTuiTextEdit::editKey(TuiKeyEvent *event)
 
 void QTuiTextEdit::mousePressEvent(TuiMouseEvent *event)
 {
-    if (event->mouseType() != TuiMouseEvent::Press)
+    // A press places the cursor; a drag with the left button selects from
+    // there to the mouse
+    const bool drag = event->mouseType() == TuiMouseEvent::Move && event->button() == Qt::LeftButton;
+    if (event->mouseType() != TuiMouseEvent::Press && !drag)
         return;
 
     const QRect geo = geometry();
@@ -596,10 +599,17 @@ void QTuiTextEdit::mousePressEvent(TuiMouseEvent *event)
     const int clickCol = event->x() - geo.x() + m_scrollCol; // display column
     const int col = (clickCol <= 0) ? 0 : QtTuiUnicode::indexOfColumn(line, clickCol);
 
+    if (drag)
+        startOrExtendSelection(); // the anchor is the cursor before the move
     m_cursorRow = row;
     m_cursorCol = col;
     m_desiredCol = QtTuiUnicode::columnOfIndex(line, col);
-    clearSelection();
+    if (drag) {
+        m_selEndRow = m_cursorRow;
+        m_selEndCol = m_cursorCol;
+    } else {
+        clearSelection();
+    }
     scrollToVisible();
     markDirty();
 }

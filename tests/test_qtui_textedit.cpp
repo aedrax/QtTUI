@@ -719,7 +719,10 @@ private slots:
         te.setFocus();
         te.setPlainText("Hello");
 
-        sendMouse(te, TuiMouseEvent::Move, 3, 0);
+        // Hover motion (no button) and a release do not move the cursor; a
+        // Move with the left button down is a drag (see dragSelects)
+        TuiMouseEvent hover(TuiMouseEvent::Move, Qt::NoButton, QPoint(3, 0));
+        QCoreApplication::sendEvent(&te, &hover);
         sendMouse(te, TuiMouseEvent::Release, 3, 0);
         QCOMPARE(te.cursorRow(), 0);
         QCOMPARE(te.cursorColumn(), 0);
@@ -1237,6 +1240,18 @@ private slots:
         TuiKeyEvent x(Qt::Key_X, Qt::NoModifier, QStringLiteral("x"));
         QCoreApplication::sendEvent(&te, &x);
         QCOMPARE(te.toPlainText(), QStringLiteral("x"));
+    }
+
+    void dragSelects()
+    {
+        QTuiTextEdit te;
+        te.setGeometry(QRect(0, 0, 20, 5));
+        te.setPlainText(QStringLiteral("abc\ndef"));
+        TuiMouseEvent press(TuiMouseEvent::Press, Qt::LeftButton, QPoint(1, 0));
+        QCoreApplication::sendEvent(&te, &press);
+        TuiMouseEvent drag(TuiMouseEvent::Move, Qt::LeftButton, QPoint(2, 1));
+        QCoreApplication::sendEvent(&te, &drag);
+        QCOMPARE(te.selectedText(), QStringLiteral("bc\nde"));
     }
 };
 

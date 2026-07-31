@@ -525,6 +525,21 @@ private slots:
         le.setText(QStringLiteral("new"));
         QVERIFY(!le.isUndoAvailable());
     }
+
+    void dragSelects()
+    {
+        QTuiLineEdit le;
+        le.setGeometry(QRect(0, 0, 20, 1));
+        le.setText(QStringLiteral("hello world"));
+        TuiMouseEvent press(TuiMouseEvent::Press, Qt::LeftButton, QPoint(6, 0));
+        QCoreApplication::sendEvent(&le, &press);
+        TuiMouseEvent drag(TuiMouseEvent::Move, Qt::LeftButton, QPoint(11, 0));
+        QCoreApplication::sendEvent(&le, &drag);
+        QCOMPARE(le.selectedText(), QStringLiteral("world"));
+        // A new press ends the selection
+        QCoreApplication::sendEvent(&le, &press);
+        QVERIFY(!le.hasSelectedText());
+    }
 };
 
 QTEST_MAIN(TestQTuiLineEdit)
