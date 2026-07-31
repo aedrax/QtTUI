@@ -1,5 +1,8 @@
 #include <QtTest/QtTest>
 #include <QtTUI/UI_Loader.h>
+#include <QRegularExpression>
+#include <memory>
+#include <QtTUI/QTuiCheckBox.h>
 #include <QtTUI/QTuiWidget.h>
 #include <QtTUI/QTuiMainWindow.h>
 #include <QtTUI/QTuiLabel.h>
@@ -35,6 +38,8 @@ private slots:
     void testRoundTrip();
     void testLoadFromFile();
     void testSerializeNull();
+    void testAnyPropertyByName();
+    void testPropertiesRoundTrip();
 };
 
 // ---------------------------------------------------------------
@@ -90,7 +95,10 @@ void TestUILoader::testAvailableWidgets()
     QVERIFY(widgets.contains(QStringLiteral("QTuiDockWidget")));
     QVERIFY(widgets.contains(QStringLiteral("QTuiMdiArea")));
     QVERIFY(widgets.contains(QStringLiteral("QTuiMdiSubWindow")));
-    QCOMPARE(widgets.size(), 46);
+    QVERIFY(widgets.contains(QStringLiteral("QTuiWidget")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiFrame")));
+    QVERIFY(widgets.contains(QStringLiteral("QTuiPlainTextEdit")));
+    QCOMPARE(widgets.size(), 49);
 }
 
 // ---------------------------------------------------------------
@@ -355,6 +363,52 @@ void TestUILoader::testSerializeNull()
     UI_Loader loader;
     QByteArray result = loader.serialize(nullptr);
     QVERIFY(result.isEmpty());
+}
+
+void TestUILoader::testAnyPropertyByName()
+{
+    // Any Q_PROPERTY can be set by name; an enum takes its value name
+    UI_Loader loader;
+    const QByteArray json = R"({
+        "type": "QTuiWidget",
+        "children": [
+            {"type": "QTuiLineEdit", "objectName": "pw", "echoMode": "Password",
+             "readOnly": true, "maxLength": 8, "placeholderText": "Secret"},
+            {"type": "QTuiCheckBox", "objectName": "cb", "text": "Agree", "checked": true},
+            {"type": "QTuiLineEdit", "objectName": "bad", "noSuchProperty": 1}
+        ]
+    })";
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Unknown property.*noSuchProperty"));
+    std::unique_ptr<QTuiWidget> root(loader.loadFromData(json));
+    QVERIFY(root);
+    auto *pw = root->findChild<QTuiLineEdit *>(QStringLiteral("pw"));
+    QVERIFY(pw);
+    QCOMPARE(pw->echoMode(), QTuiLineEdit::Password);
+    QVERIFY(pw->isReadOnly());
+    QCOMPARE(pw->maxLength(), 8);
+    QCOMPARE(pw->placeholderText(), QStringLiteral("Secret"));
+    auto *cb = root->findChild<QTuiCheckBox *>(QStringLiteral("cb"));
+    QVERIFY(cb && cb->isChecked());
+    QCOMPARE(cb->text(), QStringLiteral("Agree"));
+}
+
+void TestUILoader::testPropertiesRoundTrip()
+{
+    // serialize() writes the properties that differ from a new widget,
+    // enums by name, and loading the result gives the same values
+    UI_Loader loader;
+    QTuiLineEdit edit;
+    edit.setEchoMode(QTuiLineEdit::NoEcho);
+    edit.setPlaceholderText(QStringLiteral("hint"));
+    const QByteArray data = loader.serialize(&edit);
+    QVERIFY2(data.contains("\"echoMode\": \"NoEcho\""), data.constData());
+    QVERIFY(!data.contains("maxLength")); // still the default
+
+    std::unique_ptr<QTuiWidget> copy(loader.loadFromData(data));
+    auto *edit2 = qobject_cast<QTuiLineEdit *>(copy.get());
+    QVERIFY(edit2);
+    QCOMPARE(edit2->echoMode(), QTuiLineEdit::NoEcho);
+    QCOMPARE(edit2->placeholderText(), QStringLiteral("hint"));
 }
 
 QTEST_MAIN(TestUILoader)

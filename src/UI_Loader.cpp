@@ -44,6 +44,10 @@
 #include <QtTUI/QTuiDockWidget.h>
 #include <QtTUI/QTuiMdiArea.h>
 #include <QtTUI/QTuiMdiSubWindow.h>
+#include <QtTUI/QTuiFrame.h>
+#include <QtTUI/QTuiPlainTextEdit.h>
+#include <QMetaProperty>
+#include <memory>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -54,8 +58,18 @@ namespace QtTUI {
 UI_Loader::UI_Loader(QObject *parent)
     : QObject(parent)
 {
-    // Register all built-in widget types that currently exist
-    // Note: QTuiWidget is abstract (pure virtual paintEvent) and cannot be instantiated directly
+    // Register all built-in widget types. A plain QTuiWidget is a container
+    // (it can have a layout). Dialogs are not here: they always attach to
+    // the main window, not to the parent in the file.
+    registerWidget(QStringLiteral("QTuiWidget"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiWidget(parent);
+    });
+    registerWidget(QStringLiteral("QTuiFrame"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiFrame(parent);
+    });
+    registerWidget(QStringLiteral("QTuiPlainTextEdit"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiPlainTextEdit(parent);
+    });
 
     registerWidget(QStringLiteral("QTuiMainWindow"), [](QTuiWidget *parent) -> QTuiWidget * {
         return new QTuiMainWindow(parent);
@@ -319,6 +333,15 @@ QTuiWidget *UI_Loader::createWidget(const QJsonObject &obj, QTuiWidget *parent)
     return widget;
 }
 
+// Keys with their own handling; every other key is a Q_PROPERTY name
+static bool isReservedKey(const QString &key)
+{
+    static const QStringList reserved = {QStringLiteral("type"), QStringLiteral("children"),
+                                         QStringLiteral("objectName"), QStringLiteral("geometry"),
+                                         QStringLiteral("visible")};
+    return reserved.contains(key);
+}
+
 void UI_Loader::applyProperties(QTuiWidget *widget, const QJsonObject &obj)
 {
     // objectName
@@ -336,14 +359,41 @@ void UI_Loader::applyProperties(QTuiWidget *widget, const QJsonObject &obj)
         widget->setGeometry(QRect(x, y, w, h));
     }
 
-    // text - use QObject property system so it works for any widget with a "text" property
-    if (obj.contains(QStringLiteral("text"))) {
-        widget->setProperty("text", obj.value(QStringLiteral("text")).toString());
-    }
-
     // visible
     if (obj.contains(QStringLiteral("visible"))) {
         widget->setVisible(obj.value(QStringLiteral("visible")).toBool(true));
+    }
+
+    // Every other key sets the Q_PROPERTY of that name, for example
+    // "text", "checked", "readOnly", "echoMode": "Password"
+    const QMetaObject *meta = widget->metaObject();
+    for (auto it = obj.constBegin(); it != obj.constEnd(); ++it) {
+        if (isReservedKey(it.key()))
+            continue;
+        const int index = meta->indexOfProperty(it.key().toLatin1().constData());
+        if (index < 0 || !meta->property(index).isWritable()) {
+            qWarning() << "UI_Loader: Unknown property" << it.key() << "for" << meta->className();
+            continue;
+        }
+        const QMetaProperty prop = meta->property(index);
+        QVariant value;
+        if (prop.isEnumType() && it.value().isString()) {
+            // An enum value by its name
+            bool ok = false;
+            const int v = prop.enumerator().keyToValue(it.value().toString().toLatin1().constData(), &ok);
+            if (!ok) {
+                qWarning() << "UI_Loader: Unknown value" << it.value().toString() << "for" << it.key();
+                continue;
+            }
+            value = v;
+        } else {
+            value = it.value().toVariant();
+            if (!value.convert(prop.metaType())) {
+                qWarning() << "UI_Loader: Cannot convert the value of" << it.key();
+                continue;
+            }
+        }
+        prop.write(widget, value);
     }
 }
 
@@ -380,10 +430,27 @@ QJsonObject UI_Loader::serializeWidget(const QTuiWidget *widget) const
     geoObj.insert(QStringLiteral("height"), geo.height());
     obj.insert(QStringLiteral("geometry"), geoObj);
 
-    // text (only if the widget has a valid "text" property)
-    const QVariant textVar = widget->property("text");
-    if (textVar.isValid() && !textVar.toString().isEmpty())
-        obj.insert(QStringLiteral("text"), textVar.toString());
+    // Writable properties that differ from a new widget of the same type.
+    // Values that JSON cannot hold directly (such as rectangles) are skipped.
+    auto factory = m_factories.find(typeName);
+    std::unique_ptr<QTuiWidget> defaults(factory != m_factories.end() ? factory.value()(nullptr) : nullptr);
+    const QMetaObject *meta = widget->metaObject();
+    for (int i = QObject::staticMetaObject.propertyCount(); i < meta->propertyCount(); ++i) {
+        const QMetaProperty prop = meta->property(i);
+        const QString name = QString::fromLatin1(prop.name());
+        if (!prop.isWritable() || isReservedKey(name))
+            continue;
+        const QVariant value = prop.read(widget);
+        if (defaults && prop.read(defaults.get()) == value)
+            continue;
+        if (prop.isEnumType()) {
+            obj.insert(name, QString::fromLatin1(prop.enumerator().valueToKey(value.toInt())));
+            continue;
+        }
+        const QJsonValue json = QJsonValue::fromVariant(value);
+        if (!json.isNull() && !json.isUndefined() && !json.isObject() && !json.isArray())
+            obj.insert(name, json);
+    }
 
     // visible (only serialize if false, since true is the default)
     if (!widget->isVisible())
