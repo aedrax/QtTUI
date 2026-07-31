@@ -37,12 +37,20 @@ signals:
 
 protected:
     void keyPressEvent(TuiKeyEvent *event) override;
+    // Mouse: a press activates the window. On the title bar, [X] closes
+    // it, [□] maximizes or restores it, and a drag moves it; a drag on
+    // the bottom-right corner resizes it.
+    void mousePressEvent(TuiMouseEvent *event) override;
 
 private:
     QTuiWidget *m_widget = nullptr;
     QString m_windowTitle;
     QRect m_normalGeometry;
     bool m_maximized = false;
+
+    enum class Drag { None, Move, Resize };
+    Drag m_drag = Drag::None;
+    QPoint m_dragOffset; // mouse position minus the top-left corner (Move)
 };
 
 } // namespace QtTUI

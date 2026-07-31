@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiMdiSubWindow.h>
+#include <QtTUI/QTuiMdiArea.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
@@ -69,6 +70,57 @@ void QTuiMdiSubWindow::showNormal()
         setGeometry(m_normalGeometry);
 
     emit windowStateChanged(oldState, Qt::WindowNoState);
+}
+
+void QTuiMdiSubWindow::mousePressEvent(TuiMouseEvent *event)
+{
+    const QRect geo = geometry();
+    const QPoint pos = event->pos();
+
+    if (event->mouseType() == TuiMouseEvent::Release) {
+        m_drag = Drag::None;
+        return;
+    }
+
+    if (event->mouseType() == TuiMouseEvent::Move && event->button() == Qt::LeftButton) {
+        // Keep the window inside the MDI area
+        const QRect area = parentWidget() ? parentWidget()->geometry() : QRect(geo.topLeft(), geo.size());
+        if (m_drag == Drag::Move) {
+            QRect moved(pos - m_dragOffset, geo.size());
+            moved.moveLeft(qBound(area.left(), moved.left(), qMax(area.left(), area.right() + 1 - moved.width())));
+            moved.moveTop(qBound(area.top(), moved.top(), qMax(area.top(), area.bottom() + 1 - moved.height())));
+            setGeometry(moved);
+        } else if (m_drag == Drag::Resize) {
+            const QSize min = minimumSize();
+            const int w = qBound(min.width(), pos.x() - geo.x() + 1, area.right() + 1 - geo.x());
+            const int h = qBound(min.height(), pos.y() - geo.y() + 1, area.bottom() + 1 - geo.y());
+            setGeometry(QRect(geo.topLeft(), QSize(w, h)));
+        }
+        return;
+    }
+
+    if (event->mouseType() != TuiMouseEvent::Press || event->button() != Qt::LeftButton)
+        return;
+
+    if (auto *area = qobject_cast<QTuiMdiArea *>(parentWidget()))
+        area->setActiveSubWindow(this);
+    markDirty();
+
+    const int closeStart = geo.x() + geo.width() - 1 - 3; // "[X]"
+    const int maxStart = closeStart - 3;                    // "[□]"
+    if (pos.y() == geo.y()) {
+        if (pos.x() >= closeStart && pos.x() < closeStart + 3) {
+            close();
+        } else if (pos.x() >= maxStart && pos.x() < maxStart + 3) {
+            m_maximized ? showNormal() : showMaximized();
+        } else if (!m_maximized) {
+            m_drag = Drag::Move;
+            m_dragOffset = pos - geo.topLeft();
+        }
+        return;
+    }
+    if (!m_maximized && pos == QPoint(geo.right(), geo.bottom()))
+        m_drag = Drag::Resize;
 }
 
 void QTuiMdiSubWindow::close()

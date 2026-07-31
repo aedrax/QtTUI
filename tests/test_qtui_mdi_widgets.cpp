@@ -465,6 +465,45 @@ private slots:
         area.setGeometry(QRect(8, 12, 40, 12));
         QCOMPARE(sub1->geometry().topLeft(), QPoint(8, 12));
     }
+
+    void subWindowMouseMoveResizeClose()
+    {
+        QTuiMdiArea area;
+        area.setGeometry(QRect(0, 0, 40, 15));
+        auto *sub = area.addSubWindow(new MdiContentWidget());
+        sub->setWindowTitle(QStringLiteral("W"));
+        sub->setGeometry(QRect(2, 2, 16, 6));
+        auto send = [sub](TuiMouseEvent::MouseEventType t, QPoint p) {
+            TuiMouseEvent ev(t, Qt::LeftButton, p);
+            QCoreApplication::sendEvent(sub, &ev);
+        };
+
+        // Drag the title bar: the window moves with the mouse
+        send(TuiMouseEvent::Press, QPoint(5, 2));
+        send(TuiMouseEvent::Move, QPoint(10, 4));
+        send(TuiMouseEvent::Release, QPoint(10, 4));
+        QCOMPARE(sub->geometry(), QRect(7, 4, 16, 6));
+
+        // It stays inside the area
+        send(TuiMouseEvent::Press, QPoint(10, 4));
+        send(TuiMouseEvent::Move, QPoint(60, 40));
+        send(TuiMouseEvent::Release, QPoint(60, 40));
+        QCOMPARE(sub->geometry().bottomRight(), QPoint(39, 14));
+
+        // Drag the bottom-right corner: the window resizes
+        sub->setGeometry(QRect(2, 2, 16, 6));
+        send(TuiMouseEvent::Press, QPoint(17, 7));
+        send(TuiMouseEvent::Move, QPoint(25, 10));
+        send(TuiMouseEvent::Release, QPoint(25, 10));
+        QCOMPARE(sub->geometry(), QRect(2, 2, 24, 9));
+
+        // [□] maximizes, [X] closes
+        send(TuiMouseEvent::Press, QPoint(2 + 24 - 1 - 6, 2));
+        QVERIFY(sub->isMaximized());
+        const QRect g = sub->geometry();
+        send(TuiMouseEvent::Press, QPoint(g.x() + g.width() - 1 - 3, g.y()));
+        QVERIFY(!sub->isVisible());
+    }
 };
 
 QTEST_MAIN(TestQTuiMdiWidgets)
