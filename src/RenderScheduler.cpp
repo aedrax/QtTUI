@@ -17,6 +17,14 @@ RenderScheduler::RenderScheduler(QTuiApplication *app)
     // Connect theme change signal to mark all visible widgets dirty
     connect(Theme_Engine::instance(), &Theme_Engine::themeChanged,
             this, &RenderScheduler::onThemeChanged);
+    updateRendererThemeColors();
+}
+
+// The renderer needs the theme colors for its no-color mode
+void RenderScheduler::updateRendererThemeColors()
+{
+    const ThemeProperties theme = Theme_Engine::instance()->properties(QStringLiteral("default"));
+    AnsiRenderer::setThemeColors(theme.foreground, theme.background);
 }
 
 void RenderScheduler::scheduleDirtyRegion(const QRect &region)
@@ -266,6 +274,7 @@ void RenderScheduler::clearHiddenPopupRegions(QTuiWidget *widget, const QRect &s
 
 void RenderScheduler::onThemeChanged()
 {
+    updateRendererThemeColors();
     QTuiMainWindow *mainWindow = m_app->mainWindow();
     if (mainWindow && mainWindow->isVisible()) {
         markAllVisibleWidgetsDirty(mainWindow);

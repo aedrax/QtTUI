@@ -99,10 +99,17 @@ static QTuiLabel *sectionLabel(const QString &className, QTuiWidget *parent)
         page->addWidget(new QTuiLabel(QString(), parent));
 
     auto *label = new QTuiLabel(QStringLiteral("▍ %1").arg(className), parent);
-    ThemeProperties header = Theme_Engine::instance()->properties(QStringLiteral("default"));
-    header.foreground = Palette::Accent;
-    header.bold = true;
-    Theme_Engine::instance()->setWidgetOverride(label, header);
+    // Bold accent text on the background of the current theme; follow a
+    // theme change (View menu)
+    auto applyHeaderStyle = [label]() {
+        ThemeProperties header = Theme_Engine::instance()->properties(QStringLiteral("default"));
+        header.foreground = Theme_Engine::instance()->activeTheme() == QLatin1String("light")
+            ? header.focusBackground : Palette::Accent;
+        header.bold = true;
+        Theme_Engine::instance()->setWidgetOverride(label, header);
+    };
+    applyHeaderStyle();
+    QObject::connect(Theme_Engine::instance(), &Theme_Engine::themeChanged, label, applyHeaderStyle);
     return label;
 }
 
@@ -792,6 +799,18 @@ void buildGallery(QTuiMainWindow &window)
     auto *newAction = fileMenu->addAction("&New project...", "Ctrl+N");
     auto *quitAction = fileMenu->addAction("&Quit", "Ctrl+Q");
     QObject::connect(quitAction, &QTuiAction::triggered, qApp, &QCoreApplication::quit);
+    // View > Light theme / Dark theme switch between the built-in light
+    // theme and the gallery theme
+    auto *viewMenu = menuBar->addMenu("&View");
+    auto *lightAction = viewMenu->addAction("&Light theme");
+    auto *darkAction = viewMenu->addAction("&Dark theme");
+    QObject::connect(lightAction, &QTuiAction::triggered, []() {
+        Theme_Engine::instance()->setActiveTheme("light");
+    });
+    QObject::connect(darkAction, &QTuiAction::triggered, []() {
+        if (Theme_Engine::instance()->activeTheme() != QLatin1String("gallery"))
+            applyGalleryTheme();
+    });
     window.setMenuBar(menuBar);
 
     // Status bar

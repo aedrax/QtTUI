@@ -640,6 +640,26 @@ private slots:
                 qputenv(names[i], saved[i]);
         }
     }
+
+    void colorMode_noColorWithLightTheme()
+    {
+        // With a light theme, normal cells stay normal and only cells with
+        // a background near the text color (focus) get reverse video
+        AnsiRenderer::setColorMode(AnsiRenderer::NoColor);
+        AnsiRenderer::setThemeColors(Color(30, 30, 30), Color(250, 250, 250));
+        Cell normal;
+        normal.foreground = Color(30, 30, 30);
+        normal.background = Color(250, 250, 250);
+        Cell focused;
+        focused.foreground = Color(255, 255, 255);
+        focused.background = Color(0, 95, 184);
+        const QByteArray normalSeq = AnsiRenderer::sgrSequence(normal);
+        const QByteArray focusedSeq = AnsiRenderer::sgrSequence(focused);
+        AnsiRenderer::setThemeColors(Color(255, 255, 255), Color(0, 0, 0));
+        AnsiRenderer::setColorMode(AnsiRenderer::TrueColor);
+        QCOMPARE(normalSeq, QByteArray("\x1b[0m"));
+        QCOMPARE(focusedSeq, QByteArray("\x1b[0;7m"));
+    }
 };
 
 QTEST_MAIN(TestAnsiRenderer)

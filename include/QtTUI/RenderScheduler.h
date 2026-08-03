@@ -23,6 +23,7 @@ public:
 private slots:
     void executeRenderPass();
     void onThemeChanged();
+    void updateRendererThemeColors();
 
 private:
     void paintTree(QTuiWidget *widget, const QRect &parentClipRect);

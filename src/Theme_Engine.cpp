@@ -60,6 +60,21 @@ void Theme_Engine::registerDefaultTheme()
         defaultProps.insert(type, base);
 
     m_themes.insert(QStringLiteral("default"), defaultProps);
+
+    // A built-in light theme: dark text on a light background, with a
+    // blue focus color. Select it with setActiveTheme("light").
+    ThemeProperties light;
+    light.foreground = Color(30, 30, 30);
+    light.background = Color(250, 250, 250);
+    light.focusForeground = Color(255, 255, 255);
+    light.focusBackground = Color(0, 95, 184);
+    light.disabledForeground = Color(150, 150, 150);
+    light.disabledBackground = Color(250, 250, 250);
+    QHash<QString, ThemeProperties> lightProps;
+    lightProps.insert(QStringLiteral("default"), light);
+    for (const auto &type : widgetTypes)
+        lightProps.insert(type, light);
+    m_themes.insert(QStringLiteral("light"), lightProps);
 }
 
 void Theme_Engine::registerTheme(const QString &name, const QHash<QString, ThemeProperties> &properties)
