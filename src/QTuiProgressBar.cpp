@@ -1,12 +1,36 @@
 #include <QtTUI/QTuiProgressBar.h>
+#include <QTimer>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 
 namespace QtTUI {
 
+// Time between two steps of the busy block
+static constexpr int kBusyStepMs = 100;
+
 QTuiProgressBar::QTuiProgressBar(QTuiWidget *parent)
     : QTuiWidget(parent)
+    , m_busyTimer(new QTimer(this))
 {
+    m_busyTimer->setInterval(kBusyStepMs);
+    connect(m_busyTimer, &QTimer::timeout, this, [this]() {
+        // Move the block only while the bar can show (all parents visible)
+        for (QTuiWidget *w = this; w; w = w->parentWidget()) {
+            if (!w->isVisible())
+                return;
+        }
+        ++m_indeterminatePos;
+        markDirty();
+    });
+    connect(this, &QTuiWidget::visibilityChanged, this, &QTuiProgressBar::updateBusyTimer);
+}
+
+void QTuiProgressBar::updateBusyTimer()
+{
+    if (isIndeterminate() && isVisible())
+        m_busyTimer->start();
+    else
+        m_busyTimer->stop();
 }
 
 int QTuiProgressBar::value() const
@@ -40,6 +64,7 @@ void QTuiProgressBar::setMinimum(int min)
         m_maximum = m_minimum;
     if (!isIndeterminate())
         setValue(m_value);
+    updateBusyTimer();
     markDirty();
 }
 
@@ -57,6 +82,7 @@ void QTuiProgressBar::setMaximum(int max)
         m_minimum = m_maximum;
     if (!isIndeterminate())
         setValue(m_value);
+    updateBusyTimer();
     markDirty();
 }
 
@@ -68,6 +94,7 @@ void QTuiProgressBar::setRange(int min, int max)
     m_maximum = qMax(min, max);
     if (!isIndeterminate())
         setValue(m_value);
+    updateBusyTimer();
     markDirty();
 }
 
@@ -257,7 +284,6 @@ void QTuiProgressBar::paintEvent(ScreenBuffer &buffer)
         int period = 2 * travelRange;
         int phase = m_indeterminatePos % period;
         int blockStart = (phase < travelRange) ? phase : (period - phase);
-        ++m_indeterminatePos;
 
         if (m_orientation == Qt::Horizontal) {
             int contentRow = innerY + innerH / 2;

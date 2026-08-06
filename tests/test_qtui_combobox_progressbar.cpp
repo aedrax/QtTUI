@@ -1,4 +1,5 @@
 #include <QtTest/QtTest>
+#include <QtTUI/ScreenBuffer.h>
 #include <QSignalSpy>
 #include <QCoreApplication>
 #include <QStringListModel>
@@ -463,6 +464,33 @@ private slots:
         QCOMPARE(pb.isIndeterminate(), false);
         QCOMPARE(pb.minimum(), 0);
         QCOMPARE(pb.maximum(), 100);
+    }
+
+    void progressBar_busyBlockMoves()
+    {
+        QTuiProgressBar bar;
+        bar.setGeometry(QRect(0, 0, 22, 3));
+        bar.setRange(0, 0);
+        QVERIFY(bar.isIndeterminate());
+        auto row = [&bar]() {
+            ScreenBuffer buf(22, 3);
+            bar.paintEvent(buf);
+            QString text;
+            for (int x = 0; x < 22; ++x)
+                text += QChar(char16_t(buf.backCell(x, 1).ch));
+            return text;
+        };
+        const QString first = row();
+        // Painting alone does not move the block; the timer does
+        QCOMPARE(row(), first);
+        QTRY_VERIFY(row() != first);
+
+        // A hidden bar does not move: hide it, wait, show it again
+        const QString beforeHide = row();
+        bar.setVisible(false);
+        QTest::qWait(350);
+        bar.setVisible(true);
+        QCOMPARE(row(), beforeHide);
     }
 };
 

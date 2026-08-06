@@ -6,6 +6,8 @@
 #include <QString>
 #include <QChar>
 
+class QTimer;
+
 namespace QtTUI {
 
 class QTuiProgressBar : public QTuiWidget {
@@ -37,6 +39,8 @@ public:
     QChar emptyChar() const;
     void setEmptyChar(const QChar &ch);
 
+    // Busy mode, as in QProgressBar: setRange(0, 0) shows a block that
+    // moves back and forth instead of a value
     bool isIndeterminate() const;
 
     void paintEvent(ScreenBuffer &buffer) override;
@@ -54,6 +58,8 @@ private:
     QChar m_fillChar = QChar(0x2588);  // █ full block
     QChar m_emptyChar = QChar(0x2591); // ░ light shade
     int m_indeterminatePos = 0;        // animation counter for indeterminate mode
+    QTimer *m_busyTimer = nullptr;     // moves the busy block; runs only while busy
+    void updateBusyTimer();
 };
 
 } // namespace QtTUI

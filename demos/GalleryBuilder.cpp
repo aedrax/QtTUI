@@ -464,6 +464,12 @@ static QTuiWidget *createSelectionTab(QTuiWidget *parent, QTuiStatusBar *statusB
     progress->setValue(65);
     page->addWidget(progress);
 
+    // -- QTuiProgressBar in busy mode: setRange(0, 0) --
+    page->addWidget(sectionLabel("QTuiProgressBar (busy)", page));
+    auto *busy = new QTuiProgressBar(page);
+    busy->setRange(0, 0);
+    page->addWidget(busy);
+
     // -- QTuiLabel section (styled text) --
     page->addWidget(sectionLabel("QTuiLabel", page));
     auto *styledLabel = new QTuiLabel(QStringLiteral("Styled label with sample text"), page);
