@@ -472,7 +472,9 @@ static QTuiWidget *createSelectionTab(QTuiWidget *parent, QTuiStatusBar *statusB
 
     // -- QTuiLabel section (styled text) --
     page->addWidget(sectionLabel("QTuiLabel", page));
-    auto *styledLabel = new QTuiLabel(QStringLiteral("Styled label with sample text"), page);
+    auto *styledLabel = new QTuiLabel(
+        QStringLiteral("Markdown: **bold**, *italic*, `code` and ~~strikethrough~~"), page);
+    styledLabel->setTextFormat(Qt::MarkdownText);
     page->addWidget(styledLabel);
 
     return page;

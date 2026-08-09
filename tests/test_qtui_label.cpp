@@ -384,6 +384,54 @@ private slots:
                 }
             });
     }
+
+    void markdownStyles()
+    {
+        QTuiLabel label(QStringLiteral("a **bold** and `x` \\*no*"));
+        label.setTextFormat(Qt::MarkdownText);
+        QCOMPARE(label.displayText(), QStringLiteral("a bold and x *no*"));
+        // The size is the shown text, not the markup
+        QCOMPARE(label.minimumSize(), QSize(17, 1));
+
+        label.setGeometry(QRect(0, 0, 20, 1));
+        label.setAlignment(Qt::AlignLeft | Qt::AlignTop);
+        ScreenBuffer buf(20, 1);
+        label.paintEvent(buf);
+        QVERIFY(!buf.backCell(0, 0).bold);       // "a"
+        QVERIFY(buf.backCell(2, 0).bold);        // "b" of bold
+        QVERIFY(buf.backCell(5, 0).bold);        // "d"
+        QVERIFY(!buf.backCell(7, 0).bold);       // "and"
+        QVERIFY(buf.backCell(11, 0).inverse);    // code "x"
+        QCOMPARE(buf.backCell(13, 0).ch, U'*');  // escaped, not italic
+        QVERIFY(!buf.backCell(14, 0).italic);
+    }
+
+    void htmlStylesAndWrapping()
+    {
+        QTuiLabel label(QStringLiteral("<b>one two</b> <i>three</i> &lt;4&gt;"));
+        label.setTextFormat(Qt::RichText);
+        QCOMPARE(label.displayText(), QStringLiteral("one two three <4>"));
+        label.setWordWrap(true);
+        label.setGeometry(QRect(0, 0, 8, 3));
+        label.setAlignment(Qt::AlignLeft | Qt::AlignTop);
+        ScreenBuffer buf(8, 3);
+        label.paintEvent(buf);
+        // Lines: "one two" / "three" / "<4>"; styles follow the words
+        QCOMPARE(buf.backCell(4, 0).ch, U't');
+        QVERIFY(buf.backCell(4, 0).bold);
+        QCOMPARE(buf.backCell(0, 1).ch, U't');
+        QVERIFY(buf.backCell(0, 1).italic);
+        QVERIFY(!buf.backCell(0, 1).bold);
+        QCOMPARE(buf.backCell(0, 2).ch, U'<');
+        QVERIFY(!buf.backCell(0, 2).italic);
+    }
+
+    void plainTextIsUnchanged()
+    {
+        QTuiLabel label(QStringLiteral("**not bold** <b>"));
+        QCOMPARE(label.textFormat(), Qt::PlainText);
+        QCOMPARE(label.displayText(), label.text());
+    }
 };
 
 QTEST_MAIN(TestQTuiLabel)
