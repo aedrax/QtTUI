@@ -12,6 +12,7 @@
 #include <QtTest/QtTest>
 #include <QSignalSpy>
 #include <QTimer>
+#include <QTranslator>
 #include <QTemporaryDir>
 #include <QDir>
 #include <QFile>
@@ -1122,6 +1123,50 @@ private slots:
         // After the release there is no grab: a drag elsewhere does not reach it
         send(TuiMouseEvent::Move, Qt::LeftButton, QPoint(20, 7));
         QCOMPARE(small->types.size(), 3);
+    }
+
+    // Library text goes through tr(): a translator changes it
+    void libraryTextIsTranslatable()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 80, 24));
+        app.setMainWindow(&mainWindow);
+
+        // Puts the context in front of each text: "[QtTUI::QTuiWizard] Next"
+        class TagTranslator : public QTranslator {
+        public:
+            QString translate(const char *context, const char *source, const char *, int) const override
+            {
+                return QStringLiteral("[%1] %2").arg(QLatin1String(context), QLatin1String(source));
+            }
+            bool isEmpty() const override { return false; }
+        };
+        TagTranslator translator;
+        QCoreApplication::installTranslator(&translator);
+
+        QTuiMessageBox box(QTuiMessageBox::Question, QStringLiteral("T"), QStringLiteral("Q?"),
+                           QTuiMessageBox::Yes | QTuiMessageBox::No);
+        QStringList labels;
+        for (QTuiPushButton *b : box.findChildren<QTuiPushButton *>())
+            labels.append(b->text());
+        QVERIFY2(labels.contains(QStringLiteral("[QtTUI::QTuiMessageBox] Yes")), qPrintable(labels.join(',')));
+
+        QTuiWizard wizard;
+        wizard.addPage(new QTuiWizardPage);
+        bool hasNext = false;
+        for (QTuiPushButton *b : wizard.findChildren<QTuiPushButton *>())
+            hasNext = hasNext || b->text() == QStringLiteral("[QtTUI::QTuiWizard] Next");
+        QVERIFY(hasNext);
+        bool hasStep = false;
+        for (QTuiLabel *l : wizard.findChildren<QTuiLabel *>())
+            hasStep = hasStep || l->text().startsWith(QStringLiteral("[QtTUI::QTuiWizard] Step 1 of 1"));
+        QVERIFY(hasStep);
+
+        QCoreApplication::removeTranslator(&translator);
     }
 };
 

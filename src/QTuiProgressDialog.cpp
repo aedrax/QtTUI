@@ -10,7 +10,7 @@ namespace QtTUI {
 static constexpr int kBarWidth = 40;
 
 QTuiProgressDialog::QTuiProgressDialog(QTuiWidget *parent)
-    : QTuiProgressDialog(QString(), QStringLiteral("Cancel"), 0, 100, parent)
+    : QTuiProgressDialog(QString(), tr("Cancel"), 0, 100, parent)
 {
 }
 

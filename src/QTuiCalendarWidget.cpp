@@ -178,8 +178,12 @@ void QTuiCalendarWidget::paintEvent(ScreenBuffer &buffer)
     const int headerX = x0 + qMax(0, (w - headerLen) / 2);
     writeString(headerX, y0, header, fg, bg, true);
 
-    // Row 1: Weekday header "Mo Tu We Th Fr Sa Su"
-    const QString weekdays = QStringLiteral("Mo Tu We Th Fr Sa Su");
+    // Row 1: Weekday header, 2 characters per day from the locale
+    // ("Mo Tu We Th Fr Sa Su" in English), like the month name above
+    QStringList days;
+    for (int day = Qt::Monday; day <= Qt::Sunday; ++day)
+        days.append(QLocale().dayName(day, QLocale::ShortFormat).left(2));
+    const QString weekdays = days.join(QLatin1Char(' '));
     const int weekdaysLen = static_cast<int>(weekdays.length());
     const int weekdayX = x0 + qMax(0, (w - weekdaysLen) / 2);
     writeString(weekdayX, y0 + 1, weekdays, fg, bg, false, true);

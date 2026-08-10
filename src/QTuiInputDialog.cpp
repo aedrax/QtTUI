@@ -149,8 +149,8 @@ void QTuiInputDialog::rebuild()
     row->addSpacing(kFieldWidth - 18); // with the two buttons: kFieldWidth
     row->addStretch();
     m_buttonRow = new QTuiWidget(this);
-    auto *ok = new QTuiPushButton(QStringLiteral("OK"), m_buttonRow);
-    auto *cancel = new QTuiPushButton(QStringLiteral("Cancel"), m_buttonRow);
+    auto *ok = new QTuiPushButton(tr("OK"), m_buttonRow);
+    auto *cancel = new QTuiPushButton(tr("Cancel"), m_buttonRow);
     connect(ok, &QTuiPushButton::clicked, this, &QTuiDialog::accept);
     connect(cancel, &QTuiPushButton::clicked, this, &QTuiDialog::reject);
     row->addWidget(ok);

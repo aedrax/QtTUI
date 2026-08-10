@@ -40,7 +40,7 @@ QTuiFileDialog::QTuiFileDialog(QTuiWidget *parent, const QString &caption,
     , m_model(new QStringListModel(this))
     , m_nameEdit(new QTuiLineEdit(this))
 {
-    setWindowTitle(caption.isEmpty() ? QStringLiteral("Choose a file") : caption);
+    setWindowTitle(caption.isEmpty() ? tr("Choose a file") : caption);
     m_list->setModel(m_model);
 
     auto *column = new QTuiBoxLayout(QTuiBoxLayout::TopToBottom);
@@ -54,8 +54,8 @@ QTuiFileDialog::QTuiFileDialog(QTuiWidget *parent, const QString &caption,
     auto *row = new QTuiBoxLayout(QTuiBoxLayout::LeftToRight);
     row->setSpacing(1);
     row->addStretch();
-    auto *ok = new QTuiPushButton(QStringLiteral("OK"), buttons);
-    auto *cancel = new QTuiPushButton(QStringLiteral("Cancel"), buttons);
+    auto *ok = new QTuiPushButton(tr("OK"), buttons);
+    auto *cancel = new QTuiPushButton(tr("Cancel"), buttons);
     row->addWidget(ok);
     row->addWidget(cancel);
     buttons->setLayout(row);

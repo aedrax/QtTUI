@@ -43,10 +43,10 @@ QTuiWizard::QTuiWizard(QTuiWidget *parent)
     Theme_Engine::instance()->setWidgetOverride(m_header, bold);
 
     auto *buttons = new QTuiWidget(this);
-    m_back = new QTuiPushButton(QStringLiteral("Back"), buttons);
-    m_next = new QTuiPushButton(QStringLiteral("Next"), buttons);
-    m_finish = new QTuiPushButton(QStringLiteral("Finish"), buttons);
-    m_cancel = new QTuiPushButton(QStringLiteral("Cancel"), buttons);
+    m_back = new QTuiPushButton(tr("Back"), buttons);
+    m_next = new QTuiPushButton(tr("Next"), buttons);
+    m_finish = new QTuiPushButton(tr("Finish"), buttons);
+    m_cancel = new QTuiPushButton(tr("Cancel"), buttons);
     auto *row = new QTuiBoxLayout(QTuiBoxLayout::LeftToRight);
     row->setSpacing(1);
     row->addStretch();
@@ -132,7 +132,7 @@ void QTuiWizard::updateButtons()
 
     const QString title = currentPage() ? currentPage()->title() : QString();
     m_header->setText(m_stack->count() > 0
-        ? QStringLiteral("Step %1 of %2: %3").arg(id + 1).arg(m_stack->count()).arg(title)
+        ? tr("Step %1 of %2: %3").arg(id + 1).arg(m_stack->count()).arg(title)
         : title);
 }
 

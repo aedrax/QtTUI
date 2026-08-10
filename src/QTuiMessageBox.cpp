@@ -15,10 +15,10 @@ static constexpr int kMaxTextWidth = 56;
 static const QList<QPair<QTuiMessageBox::StandardButton, const char *>> &buttonOrder()
 {
     static const QList<QPair<QTuiMessageBox::StandardButton, const char *>> order = {
-        {QTuiMessageBox::Ok, "OK"},
-        {QTuiMessageBox::Yes, "Yes"},
-        {QTuiMessageBox::No, "No"},
-        {QTuiMessageBox::Cancel, "Cancel"},
+        {QTuiMessageBox::Ok, QT_TRANSLATE_NOOP("QtTUI::QTuiMessageBox", "OK")},
+        {QTuiMessageBox::Yes, QT_TRANSLATE_NOOP("QtTUI::QTuiMessageBox", "Yes")},
+        {QTuiMessageBox::No, QT_TRANSLATE_NOOP("QtTUI::QTuiMessageBox", "No")},
+        {QTuiMessageBox::Cancel, QT_TRANSLATE_NOOP("QtTUI::QTuiMessageBox", "Cancel")},
     };
     return order;
 }
@@ -160,7 +160,7 @@ void QTuiMessageBox::rebuild()
     for (const auto &entry : buttonOrder()) {
         if (!(m_buttons & entry.first))
             continue;
-        auto *button = new QTuiPushButton(QString::fromLatin1(entry.second), buttonRow);
+        auto *button = new QTuiPushButton(tr(entry.second), buttonRow);
         const StandardButton id = entry.first;
         connect(button, &QTuiPushButton::clicked, this, [this, id]() {
             m_clicked = id;
