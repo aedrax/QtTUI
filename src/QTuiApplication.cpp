@@ -228,6 +228,18 @@ void QTuiApplication::triggerRender()
     m_scheduler->renderNow();
 }
 
+static Qt::LayoutDirection s_layoutDirection = Qt::LeftToRight;
+
+Qt::LayoutDirection QTuiApplication::layoutDirection()
+{
+    return s_layoutDirection;
+}
+
+void QTuiApplication::setLayoutDirection(Qt::LayoutDirection direction)
+{
+    s_layoutDirection = direction == Qt::LayoutDirectionAuto ? Qt::LeftToRight : direction;
+}
+
 QTuiClipboard *QTuiApplication::clipboard()
 {
     // Parented to the application when one exists, so it is deleted with it

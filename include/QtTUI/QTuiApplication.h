@@ -45,6 +45,11 @@ public:
     // The application clipboard (created on first use)
     static QTuiClipboard *clipboard();
 
+    // Default layout direction of widgets (LeftToRight unless set), as in
+    // QGuiApplication. Set it before you build the widgets.
+    static Qt::LayoutDirection layoutDirection();
+    static void setLayoutDirection(Qt::LayoutDirection direction);
+
     // Gives the terminal back to the shell and stops the process, as Ctrl+Z
     // does in a normal program. The main window calls this for Ctrl+Z
     // unless an action uses Ctrl+Z as its shortcut. On resume ("fg"), the

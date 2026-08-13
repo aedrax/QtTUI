@@ -209,10 +209,10 @@ void QTuiFormLayout::apply(const QRect &availableArea)
         const int rowHeight = std::max({1, labelH, fieldH});
 
         if (row.label)
-            row.label->setGeometry(QRect(x, currentY, maxLabelWidth, rowHeight));
+            row.label->setGeometry(visualRect(QRect(x, currentY, maxLabelWidth, rowHeight), rect));
 
         if (row.field)
-            row.field->setGeometry(QRect(x + maxLabelWidth + gap, currentY, fieldWidth, rowHeight));
+            row.field->setGeometry(visualRect(QRect(x + maxLabelWidth + gap, currentY, fieldWidth, rowHeight), rect));
 
         currentY += rowHeight;
     }

@@ -43,6 +43,10 @@ public:
 protected:
     QRect contentsRect(const QRect &availableArea) const;
 
+    // rect mirrored horizontally inside area if the layout's widget (the
+    // nearest widget among its parents) is right-to-left; else rect
+    QRect visualRect(const QRect &rect, const QRect &area) const;
+
     // Concrete apply() implementations must call this first so that
     // invalidate() can re-apply the same area later.
     void recordAppliedRect(const QRect &availableArea);

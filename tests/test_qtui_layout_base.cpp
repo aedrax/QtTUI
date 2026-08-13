@@ -6,6 +6,8 @@
 #include <QtTUI/QTuiBoxLayout.h>
 #include <QtTUI/QTuiWidget.h>
 #include <QtTUI/QTuiFrame.h>
+#include <QtTUI/QTuiApplication.h>
+#include <QtTUI/QTuiFormLayout.h>
 #include <QSignalSpy>
 #include <QStringListModel>
 #include <QtTUI/TuiEvents.h>
@@ -607,6 +609,41 @@ private slots:
         TuiKeyEvent enter(Qt::Key_Return, Qt::NoModifier);
         QCoreApplication::sendEvent(&list, &enter);
         QCOMPARE(spy.count(), 1);
+    }
+
+    void rightToLeftMirrorsLayouts()
+    {
+        // Box: in a right-to-left widget the first item is on the right
+        QTuiWidget row;
+        auto *a = new LayoutTestWidget(QSize(3, 1), &row);
+        auto *b = new LayoutTestWidget(QSize(4, 1), &row);
+        auto *box = new QTuiBoxLayout(QTuiBoxLayout::LeftToRight);
+        box->addWidget(a);
+        box->addWidget(b);
+        box->addStretch();
+        row.setLayout(box);
+        row.setLayoutDirection(Qt::RightToLeft);
+        row.setGeometry(QRect(0, 0, 20, 1));
+        QCOMPARE(a->geometry(), QRect(17, 0, 3, 1));
+        QCOMPARE(b->geometry(), QRect(13, 0, 4, 1));
+
+        // A child inherits the direction; unset goes back to the default
+        QVERIFY(a->isRightToLeft());
+        row.unsetLayoutDirection();
+        QCOMPARE(row.layoutDirection(), Qt::LeftToRight);
+
+        // The application default applies to widgets without a direction
+        QTuiApplication::setLayoutDirection(Qt::RightToLeft);
+        QTuiWidget form;
+        auto *label = new LayoutTestWidget(QSize(5, 1), &form);
+        auto *field = new LayoutTestWidget(QSize(5, 1), &form);
+        auto *fl = new QTuiFormLayout;
+        fl->addRow(label, field);
+        form.setLayout(fl);
+        form.setGeometry(QRect(0, 0, 20, 1));
+        QTuiApplication::setLayoutDirection(Qt::LeftToRight);
+        QCOMPARE(label->geometry(), QRect(15, 0, 5, 1)); // label column on the right
+        QCOMPARE(field->geometry(), QRect(0, 0, 15, 1));
     }
 };
 

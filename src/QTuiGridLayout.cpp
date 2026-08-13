@@ -361,7 +361,7 @@ void QTuiGridLayout::apply(const QRect &availableArea)
         for (int r = gi.row; r < gi.row + gi.rowSpan && r < rows; ++r)
             h += rowHeights[r];
 
-        gi.item->setGeometry(QRect(x, y, w, h));
+        gi.item->setGeometry(visualRect(QRect(x, y, w, h), rect));
     }
 }
 

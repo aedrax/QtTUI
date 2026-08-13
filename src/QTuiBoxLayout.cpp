@@ -353,7 +353,7 @@ void QTuiBoxLayout::apply(const QRect &availableArea)
             geom = QRect(pos, contentY, alloc, cross);
         }
 
-        widget->setGeometry(geom);
+        widget->setGeometry(visualRect(geom, QRect(contentX, contentY, contentW, contentH)));
         widget->setVisible(true);
         m_layoutHidden.remove(widget);
         pos += alloc;

@@ -58,7 +58,11 @@ void QTuiGroupBox::setChecked(bool checked)
 
 void QTuiGroupBox::setLayout(QTuiLayout *layout)
 {
+    // The group box owns the layout, as QWidget::setLayout() does; the
+    // layout also finds its layout direction through its parent
     m_layout = layout;
+    if (m_layout)
+        m_layout->setParent(this);
 }
 
 QTuiLayout *QTuiGroupBox::layout() const

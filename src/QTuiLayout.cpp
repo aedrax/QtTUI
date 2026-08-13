@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiLayout.h>
+#include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiWidget.h>
 
 #include <QCoreApplication>
@@ -119,6 +120,24 @@ QRect QTuiLayout::contentsRect(const QRect &availableArea) const
 {
     return availableArea.adjusted(m_marginLeft, m_marginTop,
                                  -m_marginRight, -m_marginBottom);
+}
+
+QRect QTuiLayout::visualRect(const QRect &rect, const QRect &area) const
+{
+    for (QObject *o = parent(); o; o = o->parent()) {
+        if (auto *w = qobject_cast<QTuiWidget *>(o)) {
+            if (!w->isRightToLeft())
+                return rect;
+            QRect mirrored = rect;
+            mirrored.moveLeft(area.left() + area.right() - rect.right());
+            return mirrored;
+        }
+    }
+    if (QTuiApplication::layoutDirection() != Qt::RightToLeft)
+        return rect;
+    QRect mirrored = rect;
+    mirrored.moveLeft(area.left() + area.right() - rect.right());
+    return mirrored;
 }
 
 } // namespace QtTUI

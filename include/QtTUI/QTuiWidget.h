@@ -85,6 +85,16 @@ public:
     // True while the mouse is over the widget (the main window sets it)
     bool underMouse() const;
 
+    // Layout direction, as in QWidget. A widget without its own direction
+    // uses its parent's, and a top-level widget uses
+    // QTuiApplication::layoutDirection(). In a right-to-left widget, box,
+    // grid and form layouts mirror horizontally. There is no bidirectional
+    // text reordering: text in a cell shows in its stored order.
+    Qt::LayoutDirection layoutDirection() const;
+    void setLayoutDirection(Qt::LayoutDirection direction);
+    void unsetLayoutDirection();
+    bool isRightToLeft() const;
+
     // Context menu, as in QWidget. A right click on the widget, or
     // Shift+F10 while it has focus, asks for a context menu:
     // - DefaultContextMenu (default): the parent widget answers instead
@@ -189,6 +199,7 @@ private:
     QTuiSizePolicy m_sizePolicy;
     Qt::ContextMenuPolicy m_contextMenuPolicy = Qt::DefaultContextMenu;
     bool m_underMouse = false;
+    Qt::LayoutDirection m_layoutDirection = Qt::LayoutDirectionAuto; // Auto: inherit
     QList<QPointer<QTuiAction>> m_actions;
     Qt::FocusPolicy m_focusPolicy = Qt::NoFocus;
 

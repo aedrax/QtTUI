@@ -195,6 +195,33 @@ void QTuiWidget::setPaintedByParent(bool paintedByParent)
     m_paintedByParent = paintedByParent;
 }
 
+Qt::LayoutDirection QTuiWidget::layoutDirection() const
+{
+    if (m_layoutDirection != Qt::LayoutDirectionAuto)
+        return m_layoutDirection;
+    if (const QTuiWidget *parent = parentWidget())
+        return parent->layoutDirection();
+    return QTuiApplication::layoutDirection();
+}
+
+void QTuiWidget::setLayoutDirection(Qt::LayoutDirection direction)
+{
+    m_layoutDirection = direction;
+    if (m_layout)
+        m_layout->invalidate();
+    markDirty();
+}
+
+void QTuiWidget::unsetLayoutDirection()
+{
+    setLayoutDirection(Qt::LayoutDirectionAuto);
+}
+
+bool QTuiWidget::isRightToLeft() const
+{
+    return layoutDirection() == Qt::RightToLeft;
+}
+
 bool QTuiWidget::underMouse() const
 {
     return m_underMouse;
