@@ -77,6 +77,7 @@ private slots:
 
 private:
     void restoreTerminal();
+    void deleteClipboard();
 
     // QObject-based subsystems are owned via QObject parenting (parent = this);
     // plain pointers avoid double deletion. Non-QObject subsystems stay in
@@ -86,6 +87,7 @@ private:
     std::unique_ptr<ScreenBuffer> m_screenBuffer;
     RenderScheduler *m_scheduler = nullptr;
     QSocketNotifier *m_inputNotifier = nullptr;
+    QObject *m_consoleNotifier = nullptr; // Windows: QWinEventNotifier
     QTuiMainWindow *m_mainWindow = nullptr;
     bool m_terminalInitialized = false;
     bool m_messageHandlerInstalled = false;

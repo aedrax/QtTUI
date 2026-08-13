@@ -159,6 +159,7 @@ QTuiApplication::QTuiApplication(int &argc, char **argv)
     connect(m_inputNotifier, &QSocketNotifier::activated, this, &QTuiApplication::onInputReady);
 #else
     auto *consoleNotifier = new QWinEventNotifier(GetStdHandle(STD_INPUT_HANDLE), this);
+    m_consoleNotifier = consoleNotifier;
     connect(consoleNotifier, &QWinEventNotifier::activated, this, &QTuiApplication::onInputReady);
 #endif
 
@@ -183,6 +184,24 @@ QTuiApplication::~QTuiApplication()
             s_logFile.close();
         s_logOpenAttempted = false;
     }
+
+    // Delete the QtTUI subsystems (with their notifiers and timers) now,
+    // while QCoreApplication and its event dispatcher still exist. As plain
+    // QObject children they would go after ~QCoreApplication(), too late to
+    // unregister their notifiers and timers; a later QTuiApplication in the
+    // same process (tests) then got events for deleted objects. Only the
+    // objects that QtTUI creates: Qt attaches its own children too.
+    delete m_inputNotifier;
+    m_inputNotifier = nullptr;
+    delete m_consoleNotifier;
+    m_consoleNotifier = nullptr;
+    delete m_scheduler;
+    m_scheduler = nullptr;
+    delete m_inputParser;
+    m_inputParser = nullptr;
+    delete m_backend;
+    m_backend = nullptr;
+    deleteClipboard();
 
     if (s_instance == this)
         s_instance = nullptr;
@@ -262,13 +281,20 @@ void QTuiApplication::setLayoutDirection(Qt::LayoutDirection direction)
     s_layoutDirection = direction == Qt::LayoutDirectionAuto ? Qt::LeftToRight : direction;
 }
 
+// Parented to the application when one exists, so it is deleted with it
+static QPointer<QTuiClipboard> s_clipboard;
+
 QTuiClipboard *QTuiApplication::clipboard()
 {
-    // Parented to the application when one exists, so it is deleted with it
-    static QPointer<QTuiClipboard> s_clipboard;
     if (!s_clipboard)
         s_clipboard = new QTuiClipboard(instance());
     return s_clipboard;
+}
+
+void QTuiApplication::deleteClipboard()
+{
+    if (s_clipboard && s_clipboard->parent() == this)
+        delete s_clipboard;
 }
 
 void QTuiApplication::suspend()
