@@ -266,6 +266,26 @@ QList<QTuiAction *> QTuiWidget::actions() const
     return result;
 }
 
+QString QTuiWidget::accessibleName() const
+{
+    return m_accessibleName;
+}
+
+void QTuiWidget::setAccessibleName(const QString &name)
+{
+    m_accessibleName = name;
+}
+
+QString QTuiWidget::accessibleDescription() const
+{
+    return m_accessibleDescription;
+}
+
+void QTuiWidget::setAccessibleDescription(const QString &description)
+{
+    m_accessibleDescription = description;
+}
+
 QString QTuiWidget::toolTip() const
 {
     return m_toolTip;

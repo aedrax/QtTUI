@@ -50,6 +50,18 @@ public:
     static Qt::LayoutDirection layoutDirection();
     static void setLayoutDirection(Qt::LayoutDirection direction);
 
+    // Reduced motion: no moving busy bar and no pressed-button flash. The
+    // start value comes from QTTUI_REDUCE_MOTION=1.
+    static bool reducedMotion();
+    static void setReducedMotion(bool reduced);
+
+    // Focus cursor: the terminal cursor stays on the focus widget, also
+    // when it is not editable, so screen readers and magnifiers that
+    // follow the cursor follow the focus. The start value comes from
+    // QTTUI_FOCUS_CURSOR=1.
+    static bool focusCursor();
+    static void setFocusCursor(bool on);
+
     // Gives the terminal back to the shell and stops the process, as Ctrl+Z
     // does in a normal program. The main window calls this for Ctrl+Z
     // unless an action uses Ctrl+Z as its shortcut. On resume ("fg"), the

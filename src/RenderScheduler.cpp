@@ -123,6 +123,10 @@ void RenderScheduler::executeRenderPass()
     QTuiWidget *focused = QTuiWidget::focusWidget();
     if (focused && focused->isVisible())
         cursorPos = focused->terminalCursorPos();
+    // Focus cursor mode: a widget without its own cursor gets the cursor
+    // on its first cell
+    if (focused && focused->isVisible() && cursorPos.x() < 0 && QTuiApplication::focusCursor())
+        cursorPos = focused->geometry().topLeft();
 
     const bool cursorVisible = cursorPos.x() >= 0 && cursorPos.y() >= 0
         && cursorPos.x() < buffer->width() && cursorPos.y() < buffer->height();

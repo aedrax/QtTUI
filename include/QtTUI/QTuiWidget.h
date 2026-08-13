@@ -28,6 +28,9 @@ class QTuiWidget : public QObject {
     Q_PROPERTY(bool visible READ isVisible WRITE setVisible NOTIFY visibilityChanged)
     Q_PROPERTY(bool enabled READ isEnabled WRITE setEnabled NOTIFY enabledChanged)
     Q_PROPERTY(Qt::FocusPolicy focusPolicy READ focusPolicy WRITE setFocusPolicy)
+    Q_PROPERTY(QString toolTip READ toolTip WRITE setToolTip)
+    Q_PROPERTY(QString accessibleName READ accessibleName WRITE setAccessibleName)
+    Q_PROPERTY(QString accessibleDescription READ accessibleDescription WRITE setAccessibleDescription)
 public:
     explicit QTuiWidget(QTuiWidget *parent = nullptr);
     ~QTuiWidget() override;
@@ -81,6 +84,13 @@ public:
     // Text that QTuiToolTip shows when the widget gets focus
     QString toolTip() const;
     void setToolTip(const QString &toolTip);
+
+    // Names for assistive technology, as in QWidget. QtTUI stores them for
+    // the application; it has no screen reader interface of its own.
+    QString accessibleName() const;
+    void setAccessibleName(const QString &name);
+    QString accessibleDescription() const;
+    void setAccessibleDescription(const QString &description);
 
     // True while the mouse is over the widget (the main window sets it)
     bool underMouse() const;
@@ -196,6 +206,8 @@ private:
     bool m_paintedByParent = false;
     QPointer<QTuiLayout> m_layout;
     QString m_toolTip;
+    QString m_accessibleName;
+    QString m_accessibleDescription;
     QTuiSizePolicy m_sizePolicy;
     Qt::ContextMenuPolicy m_contextMenuPolicy = Qt::DefaultContextMenu;
     bool m_underMouse = false;

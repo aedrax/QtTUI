@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiProgressBar.h>
+#include <QtTUI/QTuiApplication.h>
 #include <QTimer>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
@@ -27,7 +28,8 @@ QTuiProgressBar::QTuiProgressBar(QTuiWidget *parent)
 
 void QTuiProgressBar::updateBusyTimer()
 {
-    if (isIndeterminate() && isVisible())
+    // Reduced motion: the busy block stands still
+    if (isIndeterminate() && isVisible() && !QTuiApplication::reducedMotion())
         m_busyTimer->start();
     else
         m_busyTimer->stop();

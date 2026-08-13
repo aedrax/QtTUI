@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiAbstractButton.h>
+#include <QtTUI/QTuiApplication.h>
 #include <QtTUI/TuiEvents.h>
 #include <QTimer>
 
@@ -74,8 +75,11 @@ void QTuiAbstractButton::setDown(bool down)
 
 void QTuiAbstractButton::animateClick()
 {
-    setDown(true);
-    m_releaseTimer->start();
+    // Reduced motion: no pressed-look flash
+    if (!QTuiApplication::reducedMotion()) {
+        setDown(true);
+        m_releaseTimer->start();
+    }
     click();
 }
 

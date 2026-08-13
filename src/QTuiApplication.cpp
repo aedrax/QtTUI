@@ -229,6 +229,28 @@ void QTuiApplication::triggerRender()
 }
 
 static Qt::LayoutDirection s_layoutDirection = Qt::LeftToRight;
+static bool s_reducedMotion = qEnvironmentVariableIntValue("QTTUI_REDUCE_MOTION") != 0;
+static bool s_focusCursor = qEnvironmentVariableIntValue("QTTUI_FOCUS_CURSOR") != 0;
+
+bool QTuiApplication::reducedMotion()
+{
+    return s_reducedMotion;
+}
+
+void QTuiApplication::setReducedMotion(bool reduced)
+{
+    s_reducedMotion = reduced;
+}
+
+bool QTuiApplication::focusCursor()
+{
+    return s_focusCursor;
+}
+
+void QTuiApplication::setFocusCursor(bool on)
+{
+    s_focusCursor = on;
+}
 
 Qt::LayoutDirection QTuiApplication::layoutDirection()
 {

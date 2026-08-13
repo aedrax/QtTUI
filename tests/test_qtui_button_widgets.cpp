@@ -2,6 +2,7 @@
 #include <rapidcheck.h>
 #include <QtTUI/QTuiAbstractButton.h>
 #include <QtTUI/QTuiPushButton.h>
+#include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiToolButton.h>
 #include <QtTUI/QTuiCheckBox.h>
 #include <QtTUI/QTuiRadioButton.h>
@@ -702,6 +703,26 @@ private slots:
             QCOMPARE(clicked.count(), 1);
         }
         QVERIFY(check.isChecked()); // only the left click toggled it
+    }
+
+    void reducedMotionHasNoPressedFlash()
+    {
+        QTuiApplication::setReducedMotion(true);
+        QTuiPushButton button(QStringLiteral("OK"));
+        QSignalSpy clicked(&button, &QTuiPushButton::clicked);
+        button.animateClick();
+        QTuiApplication::setReducedMotion(false);
+        QCOMPARE(clicked.count(), 1);
+        QVERIFY(!button.isDown());
+    }
+
+    void accessibleNameAndDescription()
+    {
+        QTuiPushButton button(QStringLiteral("X"));
+        button.setAccessibleName(QStringLiteral("Close"));
+        button.setAccessibleDescription(QStringLiteral("Closes the window"));
+        QCOMPARE(button.property("accessibleName").toString(), QStringLiteral("Close"));
+        QCOMPARE(button.accessibleDescription(), QStringLiteral("Closes the window"));
     }
 };
 

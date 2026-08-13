@@ -1,4 +1,5 @@
 #include <QtTest/QtTest>
+#include <QtTUI/QTuiApplication.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QSignalSpy>
 #include <QCoreApplication>
@@ -491,6 +492,22 @@ private slots:
         QTest::qWait(350);
         bar.setVisible(true);
         QCOMPARE(row(), beforeHide);
+    }
+
+    void progressBar_reducedMotionBusyBarStandsStill()
+    {
+        QTuiApplication::setReducedMotion(true);
+        QTuiProgressBar bar;
+        bar.setGeometry(QRect(0, 0, 22, 3));
+        bar.setRange(0, 0);
+        ScreenBuffer a(22, 3);
+        bar.paintEvent(a);
+        QTest::qWait(350);
+        ScreenBuffer b(22, 3);
+        bar.paintEvent(b);
+        QTuiApplication::setReducedMotion(false);
+        for (int x = 0; x < 22; ++x)
+            QCOMPARE(b.backCell(x, 1).ch, a.backCell(x, 1).ch);
     }
 };
 
