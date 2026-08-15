@@ -99,98 +99,98 @@ else()
 endif()
 
 set(QTTUI_HEADERS
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QtTUI
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QtTUIGlobal.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QtTuiUnicode.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/ScreenBuffer.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/AnsiRenderer.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/TerminalBackend.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/TuiEvents.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/InputParser.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiWidget.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiMainWindow.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiLineEdit.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTableView.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiListView.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiBoxLayout.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiApplication.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/RenderScheduler.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiSizePolicy.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiLayoutItem.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiLayout.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiLabel.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiFormLayout.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiGridLayout.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiStackedLayout.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/Theme_Engine.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/UI_Loader.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiPlainTextEdit.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiPushButton.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiToolButton.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiToolTip.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiCheckBox.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiClipboard.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiRadioButton.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiButtonGroup.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiSpinBox.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiDoubleSpinBox.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiSlider.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiDial.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiDialog.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiComboBox.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiCompleter.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiProgressBar.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiProgressDialog.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTextEdit.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiDateTimeEdit.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiLCDNumber.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiScrollBar.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiScrollArea.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiGroupBox.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiCollapsible.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTabBar.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTabWidget.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiToolBox.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiStackedWidget.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiSplitter.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiFileDialog.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiFocusFrame.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiFrame.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiSizeGrip.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiCalendarWidget.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiInputDialog.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiItemDelegate.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiStyledItemDelegate.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiHeaderView.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTreeView.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiColumnView.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiUndoStack.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiUndoView.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiValidator.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiWizard.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiDataWidgetMapper.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiListWidgetItem.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiListWidget.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTableWidgetItem.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTableWidget.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTreeWidgetItem.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTreeWidgetItemIterator.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiTreeWidget.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiAbstractButton.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiAbstractItemView.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiAbstractScrollArea.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiAction.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiKeySequence.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiMenu.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiMenuBar.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiMessageBox.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiToolBar.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiStatusBar.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiWidgetAction.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiDockWidget.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiMdiSubWindow.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/QTuiMdiArea.h
-    ${CMAKE_SOURCE_DIR}/include/QtTUI/RenderUtils.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QtTUI
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QtTUIGlobal.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QtTuiUnicode.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/ScreenBuffer.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/AnsiRenderer.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/TerminalBackend.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/TuiEvents.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/InputParser.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiWidget.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiMainWindow.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiLineEdit.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiTableView.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiListView.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiBoxLayout.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiApplication.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/RenderScheduler.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiSizePolicy.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiLayoutItem.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiLayout.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiLabel.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiFormLayout.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiGridLayout.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiStackedLayout.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/Theme_Engine.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/UI_Loader.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiPlainTextEdit.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiPushButton.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiToolButton.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiToolTip.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiCheckBox.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiClipboard.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiRadioButton.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiButtonGroup.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiSpinBox.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiDoubleSpinBox.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiSlider.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiDial.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiDialog.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiComboBox.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiCompleter.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiProgressBar.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiProgressDialog.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiTextEdit.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiDateTimeEdit.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiLCDNumber.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiScrollBar.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiScrollArea.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiGroupBox.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiCollapsible.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiTabBar.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiTabWidget.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiToolBox.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiStackedWidget.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiSplitter.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiFileDialog.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiFocusFrame.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiFrame.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiSizeGrip.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiCalendarWidget.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiInputDialog.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiItemDelegate.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiStyledItemDelegate.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiHeaderView.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiTreeView.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiColumnView.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiUndoStack.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiUndoView.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiValidator.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiWizard.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiDataWidgetMapper.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiListWidgetItem.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiListWidget.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiTableWidgetItem.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiTableWidget.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiTreeWidgetItem.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiTreeWidgetItemIterator.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiTreeWidget.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiAbstractButton.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiAbstractItemView.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiAbstractScrollArea.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiAction.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiKeySequence.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiMenu.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiMenuBar.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiMessageBox.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiToolBar.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiStatusBar.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiWidgetAction.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiDockWidget.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiMdiSubWindow.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiMdiArea.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/RenderUtils.h
 )
 
 # QtTUI is deliberately a STATIC library. The public headers carry no export
@@ -203,7 +203,7 @@ add_library(QtTUI::QtTUI ALIAS QtTUI)
 
 target_include_directories(QtTUI
     PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
 )
 
@@ -218,13 +218,13 @@ install(TARGETS QtTUI
 )
 
 # Install public headers (*.h files)
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/QtTUI
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/QtTUI
     DESTINATION include
     FILES_MATCHING PATTERN "*.h"
 )
 
 # Install umbrella header (no extension, not matched by *.h glob)
-install(FILES ${CMAKE_SOURCE_DIR}/include/QtTUI/QtTUI
+install(FILES ${PROJECT_SOURCE_DIR}/include/QtTUI/QtTUI
     DESTINATION include/QtTUI
 )
 
@@ -238,19 +238,19 @@ install(EXPORT QtTUITargets
 include(CMakePackageConfigHelpers)
 
 configure_package_config_file(
-    ${CMAKE_SOURCE_DIR}/cmake/QtTUIConfig.cmake.in
-    ${CMAKE_BINARY_DIR}/QtTUIConfig.cmake
+    ${PROJECT_SOURCE_DIR}/cmake/QtTUIConfig.cmake.in
+    ${PROJECT_BINARY_DIR}/QtTUIConfig.cmake
     INSTALL_DESTINATION lib/cmake/QtTUI
 )
 
 write_basic_package_version_file(
-    ${CMAKE_BINARY_DIR}/QtTUIConfigVersion.cmake
+    ${PROJECT_BINARY_DIR}/QtTUIConfigVersion.cmake
     VERSION ${PROJECT_VERSION}
     COMPATIBILITY SameMajorVersion
 )
 
 install(FILES
-    ${CMAKE_BINARY_DIR}/QtTUIConfig.cmake
-    ${CMAKE_BINARY_DIR}/QtTUIConfigVersion.cmake
+    ${PROJECT_BINARY_DIR}/QtTUIConfig.cmake
+    ${PROJECT_BINARY_DIR}/QtTUIConfigVersion.cmake
     DESTINATION lib/cmake/QtTUI
 )

@@ -1,7 +1,9 @@
 @PACKAGE_INIT@
 
 include(CMakeFindDependencyMacro)
-find_dependency(Qt6 COMPONENTS Core)
+# The Qt that QtTUI was built with. A static QtTUI needs the same Qt, or
+# linking fails with missing Qt symbols; this check fails early instead.
+find_dependency(Qt6 @Qt6_VERSION@ COMPONENTS Core)
 
 include("${CMAKE_CURRENT_LIST_DIR}/QtTUITargets.cmake")
 

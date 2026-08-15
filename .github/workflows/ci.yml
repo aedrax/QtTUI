@@ -1,0 +1,43 @@
+# Builds QtTUI with the Qt 6 of Ubuntu 24.04 (6.4) and runs all tests.
+# The tests fetch RapidCheck with FetchContent, so the job needs network.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the build tools and Qt 6
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake g++ ninja-build qt6-base-dev
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Install and use as a package
+        run: |
+          cmake --install build --prefix "$RUNNER_TEMP/qttui"
+          mkdir -p "$RUNNER_TEMP/consumer"
+          cat > "$RUNNER_TEMP/consumer/CMakeLists.txt" <<'CMAKE'
+          cmake_minimum_required(VERSION 3.16)
+          project(consumer LANGUAGES CXX)
+          set(CMAKE_CXX_STANDARD 17)
+          find_package(QtTUI REQUIRED)
+          add_executable(consumer main.cpp)
+          target_link_libraries(consumer PRIVATE QtTUI::QtTUI)
+          CMAKE
+          printf '#include <QtTUI/QtTUI>\nint main() { QtTUI::QTuiLabel l; return 0; }\n' > "$RUNNER_TEMP/consumer/main.cpp"
+          cmake -S "$RUNNER_TEMP/consumer" -B "$RUNNER_TEMP/consumer/build" -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/qttui"
+          cmake --build "$RUNNER_TEMP/consumer/build"
