@@ -432,6 +432,20 @@ private slots:
         QCOMPARE(label.textFormat(), Qt::PlainText);
         QCOMPARE(label.displayText(), label.text());
     }
+
+    void wideCharAtEdgeStopsTheLine()
+    {
+        // "ab日c" in 3 cells: the wide character does not fit, so the line
+        // ends there; "c" must not take its place
+        QTuiLabel label(QString::fromUtf8("ab\xE6\x97\xA5" "c"));
+        label.setGeometry(QRect(0, 0, 3, 1));
+        label.setAlignment(Qt::AlignLeft | Qt::AlignTop);
+        ScreenBuffer buf(3, 1);
+        label.paintEvent(buf);
+        QCOMPARE(buf.backCell(0, 0).ch, U'a');
+        QCOMPARE(buf.backCell(1, 0).ch, U'b');
+        QVERIFY(buf.backCell(2, 0).ch != U'c');
+    }
 };
 
 QTEST_MAIN(TestQTuiLabel)

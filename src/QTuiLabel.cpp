@@ -375,6 +375,7 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
         // The source of the line starts after spaces and line breaks
         while (src < shown.length() && (shown.at(src) == QLatin1Char(' ') || shown.at(src) == QLatin1Char('\n')))
             ++src;
+        bool full = false; // a cluster did not fit: the rest of the line is cut
         while (QtTuiUnicode::nextCluster(line, i, c)) {
             // Match the cluster with its source character for the style
             quint8 bits = 0;
@@ -385,8 +386,10 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
                 bits = styles.value(src);
                 src += i - c.index;
             }
-            if (col + c.width > geoW || geoX + col + c.width > buffer.width())
-                continue; // keep matching, so the next line starts right
+            if (full || col + c.width > geoW || geoX + col + c.width > buffer.width()) {
+                full = true; // keep matching, so the next line starts right
+                continue;
+            }
             Cell styled = style;
             styled.bold = style.bold || (bits & Bold);
             styled.italic = style.italic || (bits & Italic);
