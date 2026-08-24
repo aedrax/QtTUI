@@ -15,6 +15,11 @@ QTuiProgressBar::QTuiProgressBar(QTuiWidget *parent)
 {
     m_busyTimer->setInterval(kBusyStepMs);
     connect(m_busyTimer, &QTimer::timeout, this, [this]() {
+        // Reduced motion set while the bar was busy: stop here
+        if (QTuiApplication::reducedMotion()) {
+            m_busyTimer->stop();
+            return;
+        }
         // Move the block only while the bar can show (all parents visible)
         for (QTuiWidget *w = this; w; w = w->parentWidget()) {
             if (!w->isVisible())

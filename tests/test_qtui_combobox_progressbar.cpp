@@ -509,6 +509,23 @@ private slots:
         for (int x = 0; x < 22; ++x)
             QCOMPARE(b.backCell(x, 1).ch, a.backCell(x, 1).ch);
     }
+
+    void progressBar_reducedMotionStopsARunningBusyBar()
+    {
+        QTuiProgressBar bar;
+        bar.setGeometry(QRect(0, 0, 22, 3));
+        bar.setRange(0, 0); // starts moving
+        QTuiApplication::setReducedMotion(true);
+        QTest::qWait(150); // one tick sees the setting and stops
+        ScreenBuffer a(22, 3);
+        bar.paintEvent(a);
+        QTest::qWait(350);
+        ScreenBuffer b(22, 3);
+        bar.paintEvent(b);
+        QTuiApplication::setReducedMotion(false);
+        for (int x = 0; x < 22; ++x)
+            QCOMPARE(b.backCell(x, 1).ch, a.backCell(x, 1).ch);
+    }
 };
 
 QTEST_MAIN(TestQTuiComboBoxProgressBar)
