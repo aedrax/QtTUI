@@ -646,7 +646,7 @@ private slots:
         // With a light theme, normal cells stay normal and only cells with
         // a background near the text color (focus) get reverse video
         AnsiRenderer::setColorMode(AnsiRenderer::NoColor);
-        AnsiRenderer::setThemeColors(Color(30, 30, 30), Color(250, 250, 250));
+        AnsiRenderer::setThemeColors(Color(30, 30, 30), Color(250, 250, 250), Color(0, 95, 184));
         Cell normal;
         normal.foreground = Color(30, 30, 30);
         normal.background = Color(250, 250, 250);
@@ -655,10 +655,33 @@ private slots:
         focused.background = Color(0, 95, 184);
         const QByteArray normalSeq = AnsiRenderer::sgrSequence(normal);
         const QByteArray focusedSeq = AnsiRenderer::sgrSequence(focused);
-        AnsiRenderer::setThemeColors(Color(255, 255, 255), Color(0, 0, 0));
+        AnsiRenderer::setThemeColors(Color(255, 255, 255), Color(0, 0, 0), Color(0, 80, 160));
         AnsiRenderer::setColorMode(AnsiRenderer::TrueColor);
         QCOMPARE(normalSeq, QByteArray("\x1b[0m"));
         QCOMPARE(focusedSeq, QByteArray("\x1b[0;7m"));
+    }
+
+    void colorMode_noColorDefaultThemeFocus()
+    {
+        // The built-in default theme: white on black, focus background
+        // (0, 80, 160). That color is darker than the middle, but focus
+        // must still show without color
+        AnsiRenderer::setColorMode(AnsiRenderer::NoColor);
+        AnsiRenderer::setThemeColors(Color(255, 255, 255), Color(0, 0, 0), Color(0, 80, 160));
+        Cell focused;
+        focused.foreground = Color(255, 255, 255);
+        focused.background = Color(0, 80, 160);
+        const QByteArray focusedSeq = AnsiRenderer::sgrSequence(focused);
+        // The gallery theme: its bar surface is close to the background
+        AnsiRenderer::setThemeColors(Color(192, 202, 245), Color(26, 27, 38), Color(122, 162, 247));
+        Cell surface;
+        surface.foreground = Color(192, 202, 245);
+        surface.background = Color(36, 40, 59);
+        const QByteArray surfaceSeq = AnsiRenderer::sgrSequence(surface);
+        AnsiRenderer::setThemeColors(Color(255, 255, 255), Color(0, 0, 0), Color(0, 80, 160));
+        AnsiRenderer::setColorMode(AnsiRenderer::TrueColor);
+        QCOMPARE(focusedSeq, QByteArray("\x1b[0;7m"));
+        QCOMPARE(surfaceSeq, QByteArray("\x1b[0m"));
     }
 };
 

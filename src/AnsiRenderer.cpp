@@ -152,11 +152,14 @@ QByteArray AnsiRenderer::render(const ScreenBuffer &buffer)
 static AnsiRenderer::ColorMode s_colorMode = AnsiRenderer::TrueColor;
 static Color s_themeForeground(255, 255, 255);
 static Color s_themeBackground(0, 0, 0);
+static Color s_themeFocusBackground(0, 80, 160);
 
-void AnsiRenderer::setThemeColors(const Color &foreground, const Color &background)
+void AnsiRenderer::setThemeColors(const Color &foreground, const Color &background,
+                                  const Color &focusBackground)
 {
     s_themeForeground = foreground;
     s_themeBackground = background;
+    s_themeFocusBackground = focusBackground;
 }
 
 AnsiRenderer::ColorMode AnsiRenderer::colorMode()
@@ -292,12 +295,13 @@ QByteArray AnsiRenderer::sgrSequence(const Cell &cell)
         seq.append(";4");
     if (cell.strikethrough)
         seq.append(";9");
-    // Without color, a cell whose background is closer to the theme text
-    // color than to the theme background (focus, selection, a pressed
-    // button, a tooltip) uses reverse video instead
+    // Without color, a cell uses reverse video if its background is the
+    // theme focus background (focus, selection), or is closer to the theme
+    // text color than to the theme background (a tooltip, a pressed button)
     const int bg = luminance(cell.background);
     const bool highlighted = s_colorMode == NoColor
-        && qAbs(bg - luminance(s_themeForeground)) < qAbs(bg - luminance(s_themeBackground));
+        && (cell.background == s_themeFocusBackground
+            || qAbs(bg - luminance(s_themeForeground)) < qAbs(bg - luminance(s_themeBackground)));
     if (cell.inverse != highlighted)
         seq.append(";7");
 

@@ -24,7 +24,7 @@ RenderScheduler::RenderScheduler(QTuiApplication *app)
 void RenderScheduler::updateRendererThemeColors()
 {
     const ThemeProperties theme = Theme_Engine::instance()->properties(QStringLiteral("default"));
-    AnsiRenderer::setThemeColors(theme.foreground, theme.background);
+    AnsiRenderer::setThemeColors(theme.foreground, theme.background, theme.focusBackground);
 }
 
 void RenderScheduler::scheduleDirtyRegion(const QRect &region)

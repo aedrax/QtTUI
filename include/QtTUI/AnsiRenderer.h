@@ -23,11 +23,13 @@ public:
     // COLORTERM (truecolor or 24bit), then TERM (*-256color, dumb).
     static ColorMode detectColorMode();
 
-    // The theme text and background colors. Without color, a cell whose
-    // background is closer to the theme text color than to the theme
-    // background (focus, selection, a tooltip) gets reverse video. This
-    // works for dark and light themes. The default is white on black.
-    static void setThemeColors(const Color &foreground, const Color &background);
+    // The theme text, background and focus background colors. Without
+    // color, a cell gets reverse video if its background is the focus
+    // background (focus, selection), or is closer to the theme text color
+    // than to the theme background (a tooltip). This works for dark and
+    // light themes. The default is the built-in default theme.
+    static void setThemeColors(const Color &foreground, const Color &background,
+                               const Color &focusBackground);
 
     QByteArray render(const ScreenBuffer &buffer);
 
