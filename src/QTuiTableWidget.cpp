@@ -202,16 +202,30 @@ void QTuiTableWidget::setVerticalHeaderLabels(const QStringList &labels)
 
 QList<QTuiTableWidgetSelectionRange> QTuiTableWidget::selectedRanges() const
 {
-    QModelIndex idx = currentIndex();
-    if (!idx.isValid())
-        return {};
+    QList<QTuiTableWidgetSelectionRange> ranges;
+    if (!selectionModel())
+        return ranges;
+    for (const QItemSelectionRange &r : selectionModel()->selection()) {
+        QTuiTableWidgetSelectionRange range;
+        range.m_topRow = r.top();
+        range.m_bottomRow = r.bottom();
+        range.m_leftColumn = r.left();
+        range.m_rightColumn = r.right();
+        ranges.append(range);
+    }
+    return ranges;
+}
 
-    QTuiTableWidgetSelectionRange range;
-    range.m_topRow = idx.row();
-    range.m_bottomRow = idx.row();
-    range.m_leftColumn = idx.column();
-    range.m_rightColumn = idx.column();
-    return { range };
+QList<QTuiTableWidgetItem *> QTuiTableWidget::selectedItems() const
+{
+    QList<QTuiTableWidgetItem *> items;
+    if (!selectionModel())
+        return items;
+    for (const QModelIndex &index : selectionModel()->selectedIndexes()) {
+        if (QTuiTableWidgetItem *it = item(index.row(), index.column()))
+            items.append(it);
+    }
+    return items;
 }
 
 void QTuiTableWidget::keyPressEvent(TuiKeyEvent *event)

@@ -247,3 +247,7 @@ qttui_add_test(test_shortcut_dispatch test_shortcut_dispatch.cpp)
 # Enabled state + focus policy tests: disabled widgets are inert, Tab chain
 # and mouse focus honor focusPolicy, group box disables children (backlog #12)
 qttui_add_test(test_enabled_focuspolicy test_enabled_focuspolicy.cpp)
+
+# Selection tests: selection model, selection modes and behaviors, and
+# the selected items of the item widgets
+qttui_add_test(test_selection test_selection.cpp)

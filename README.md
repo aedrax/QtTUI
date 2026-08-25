@@ -8,7 +8,7 @@ QtTUI needs only the Qt Core module. It does not use Qt GUI.
 🚀 Features
 -----------
 
-*   **Qt Model/View:** The views work with any `QAbstractItemModel`: the Qt Core models (`QStringListModel`, `QSortFilterProxyModel`, ...) and your own. A model from Qt GUI (such as `QStandardItemModel`) also works if you link `Qt6::Gui` yourself. The views read the model on each paint and do not copy its data.
+*   **Qt Model/View:** The views work with any `QAbstractItemModel`: the Qt Core models (`QStringListModel`, `QSortFilterProxyModel`, ...) and your own. A model from Qt GUI (such as `QStandardItemModel`) also works if you link `Qt6::Gui` yourself. The views read the model on each paint and do not copy its data. The selection is a `QItemSelectionModel`, with the Qt selection modes (single, multi, extended, contiguous) and behaviors (items, rows, columns): Shift and Ctrl with the arrow keys, Space or a click select more items, and Ctrl+A selects all.
 
 *   **Widgets:** Buttons, check boxes, radio buttons, line edits (with validators, password mode, completion, undo), text edits, spin boxes, sliders, combo boxes, progress bars (also a busy bar), table, list, tree and column views (sorting, column resizing), tabs, splitters, scroll areas, group boxes, MDI windows, menus, tool bars, status bars, tooltips, and context menus.
 

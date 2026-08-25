@@ -30,6 +30,7 @@ void QTuiColumnView::setModel(QAbstractItemModel *model)
     m_columns.clear();
     m_activeColumn = 0;
     m_scrollOffset = 0;
+    resetSelectionModel();
 
     if (m_model) {
         connectModel();
@@ -92,6 +93,7 @@ void QTuiColumnView::setCurrentIndex(const QModelIndex &index)
     m_activeColumn = m_columns.size() - 1;
     scrollToVisible();
     markDirty();
+    selectCurrent(Qt::NoModifier, false);
 }
 
 int QTuiColumnView::defaultColumnWidth() const
@@ -186,7 +188,7 @@ void QTuiColumnView::paintEvent(ScreenBuffer &buffer)
                     cell.setChar((x < text.length()) ? text.at(x).unicode() : u' ');
                     cell.bold = false;
 
-                    if (isCurrent) {
+                    if (isCurrent || isSelected(idx)) {
                         cell.foreground = theme.focusForeground;
                         cell.background = theme.focusBackground;
                     } else {
@@ -221,8 +223,12 @@ void QTuiColumnView::keyPressEvent(TuiKeyEvent *event)
     if (!m_model || m_columns.isEmpty())
         return;
 
+    if (selectionKeyPressEvent(event))
+        return;
+
     Column &activeCol = m_columns[m_activeColumn];
     int rowCount = m_model->rowCount(activeCol.rootIndex);
+    const QModelIndex previous = currentIndex();
 
     switch (event->key()) {
     case Qt::Key_Up:
@@ -277,6 +283,9 @@ void QTuiColumnView::keyPressEvent(TuiKeyEvent *event)
     default:
         break;
     }
+
+    if (currentIndex() != previous)
+        selectCurrent(event->modifiers(), false);
 }
 
 // --- Model signal slots ---

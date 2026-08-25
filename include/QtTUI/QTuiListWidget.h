@@ -43,6 +43,7 @@ public:
     QTuiListWidgetItem *item(int row) const;
 
     QTuiListWidgetItem *currentItem() const;
+    QList<QTuiListWidgetItem *> selectedItems() const;
     void setCurrentItem(QTuiListWidgetItem *item);
     int currentRow() const;
     void setCurrentRow(int row);

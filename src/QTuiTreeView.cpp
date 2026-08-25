@@ -39,6 +39,7 @@ void QTuiTreeView::setModel(QAbstractItemModel *model)
     m_pendingRemovalFlatRow = -1;
     m_expandedItems.clear();
     m_flatList.clear();
+    resetSelectionModel();
 
     if (m_model) {
         connectModel();
@@ -56,11 +57,14 @@ QModelIndex QTuiTreeView::currentIndex() const
 void QTuiTreeView::setCurrentIndex(const QModelIndex &index)
 {
     int row = flatRowForIndex(index);
-    if (row >= 0 && row != m_currentRow) {
+    if (row < 0)
+        return;
+    if (row != m_currentRow) {
         m_currentRow = row;
         scrollToVisible();
         markDirty();
     }
+    selectCurrent(Qt::NoModifier, false);
 }
 
 void QTuiTreeView::expand(const QModelIndex &index)
@@ -164,27 +168,14 @@ void QTuiTreeView::paintEvent(ScreenBuffer &buffer)
         bool isCurrent = (flatRow == m_currentRow);
         bool hasChildren = m_model->hasChildren(item.index);
 
-        // Determine style - use focus colors only when widget has focus
-        Cell style;
-        style.bold = false;
-        style.inverse = false;
-        if (isCurrent && hasFocus()) {
-            style.foreground = theme.focusForeground;
-            style.background = theme.focusBackground;
-        } else {
-            style.foreground = theme.foreground;
-            style.background = theme.background;
-        }
+        const Cell style = itemStyle(item.index, isCurrent, theme);
 
-        // Fill the entire row with the appropriate background (for current row highlighting)
-        if (isCurrent && hasFocus()) {
+        // Fill the entire row with the item style first (for highlighting)
+        if (style.background != theme.background || style.underline) {
             for (int x = 0; x < viewWidth; ++x) {
                 Cell &cell = buffer.backCell(geo.x() + x, screenY);
+                cell = style;
                 cell.setChar(U' ');
-                cell.foreground = theme.focusForeground;
-                cell.background = theme.focusBackground;
-                cell.bold = false;
-                cell.inverse = false;
             }
         }
 
@@ -261,6 +252,9 @@ void QTuiTreeView::keyPressEvent(TuiKeyEvent *event)
 {
     if (!m_model || m_flatList.isEmpty())
         return;
+    if (selectionKeyPressEvent(event))
+        return;
+    const int previousRow = m_currentRow;
 
     switch (event->key()) {
     case Qt::Key_Up:
@@ -328,6 +322,9 @@ void QTuiTreeView::keyPressEvent(TuiKeyEvent *event)
     default:
         break;
     }
+
+    if (m_currentRow != previousRow)
+        selectCurrent(event->modifiers(), false);
 }
 
 void QTuiTreeView::mousePressEvent(TuiMouseEvent *event)
@@ -352,9 +349,37 @@ void QTuiTreeView::mousePressEvent(TuiMouseEvent *event)
     const QRect geo = geometry();
     int clickedRow = (event->y() - geo.y()) + m_scrollOffset;
     if (clickedRow >= 0 && clickedRow < m_flatList.size()) {
+        // Another button keeps a selection that contains the item
         m_currentRow = clickedRow;
         markDirty();
+        if (event->button() == Qt::LeftButton)
+            selectCurrent(event->modifiers(), true);
+        else if (!isSelected(currentIndex()))
+            selectCurrent(Qt::NoModifier, true);
     }
+}
+
+QItemSelection QTuiTreeView::selectionRange(const QModelIndex &from, const QModelIndex &to) const
+{
+    // The visible rows between the two items, at any depth
+    const int a = flatRowForIndex(from);
+    const int b = flatRowForIndex(to);
+    if (a < 0 || b < 0)
+        return QItemSelection(to, to);
+    QItemSelection range;
+    for (int row = qMin(a, b); row <= qMax(a, b); ++row) {
+        const QModelIndex index = m_flatList.at(row).index;
+        range.select(index, index);
+    }
+    return range;
+}
+
+void QTuiTreeView::selectAll()
+{
+    if (!selectionModel() || m_flatList.isEmpty() || selectionMode() < MultiSelection)
+        return;
+    selectionModel()->select(selectionRange(m_flatList.first().index, m_flatList.last().index),
+                             QItemSelectionModel::ClearAndSelect);
 }
 
 // --- Model signal slots ---

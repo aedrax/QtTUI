@@ -37,6 +37,7 @@ void QTuiListView::setModel(QAbstractItemModel *model)
     m_model = model;
     m_currentRow = 0;
     m_scrollOffset = 0;
+    resetSelectionModel();
 
     if (m_model)
         connectModel();
@@ -54,11 +55,12 @@ void QTuiListView::setCurrentIndex(const QModelIndex &index)
     if (!m_model)
         return;
     int row = qBound(0, index.row(), qMax(0, m_model->rowCount() - 1));
-    if (row == m_currentRow)
-        return;
-    m_currentRow = row;
-    ensureCurrentVisible();
-    markDirty();
+    if (row != m_currentRow) {
+        m_currentRow = row;
+        ensureCurrentVisible();
+        markDirty();
+    }
+    selectCurrent(Qt::NoModifier, false);
 }
 
 void QTuiListView::paintEvent(ScreenBuffer &buffer)
@@ -92,29 +94,14 @@ void QTuiListView::paintEvent(ScreenBuffer &buffer)
         QModelIndex idx = m_model->index(modelRow, 0);
         QString itemText = m_model->data(idx, Qt::DisplayRole).toString();
 
-        bool isCurrent = (modelRow == m_currentRow);
+        const Cell style = itemStyle(idx, modelRow == m_currentRow, theme);
 
-        // Set up style cell for renderTextTruncated
-        Cell style;
-        style.bold = false;
-        style.inverse = false;
-        if (isCurrent && hasFocus()) {
-            style.foreground = theme.focusForeground;
-            style.background = theme.focusBackground;
-        } else {
-            style.foreground = theme.foreground;
-            style.background = theme.background;
-        }
-
-        // Fill the entire row with the appropriate background first (for current row highlighting)
-        if (isCurrent && hasFocus()) {
+        // Fill the entire row with the item style first (for highlighting)
+        if (style.background != theme.background || style.underline) {
             for (int x = 0; x < viewWidth; ++x) {
                 Cell &cell = buffer.backCell(geo.x() + x, screenY);
+                cell = style;
                 cell.setChar(U' ');
-                cell.foreground = theme.focusForeground;
-                cell.background = theme.focusBackground;
-                cell.bold = false;
-                cell.inverse = false;
             }
         }
 
@@ -128,7 +115,11 @@ void QTuiListView::keyPressEvent(TuiKeyEvent *event)
     if (!m_model || m_model->rowCount() == 0)
         return;
 
+    if (selectionKeyPressEvent(event))
+        return;
+
     const int rowCount = m_model->rowCount();
+    const int previousRow = m_currentRow;
 
     switch (event->key()) {
     case Qt::Key_Up:
@@ -147,6 +138,8 @@ void QTuiListView::keyPressEvent(TuiKeyEvent *event)
         break;
     }
 
+    if (m_currentRow != previousRow)
+        selectCurrent(event->modifiers(), false);
     markDirty();
 }
 
@@ -171,8 +164,13 @@ void QTuiListView::mousePressEvent(TuiMouseEvent *event)
     if (clickedRow >= 0 && clickedRow < m_model->rowCount()) {
         // Any button selects the row (a context menu then acts on it);
         // only the left button activates it
+        // Another button keeps a selection that contains the row
         m_currentRow = clickedRow;
         markDirty();
+        if (event->button() == Qt::LeftButton)
+            selectCurrent(event->modifiers(), true);
+        else if (!isSelected(currentIndex()))
+            selectCurrent(Qt::NoModifier, true);
         if (event->button() == Qt::LeftButton)
             emit activated(m_model->index(m_currentRow, 0));
     }

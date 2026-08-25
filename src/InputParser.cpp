@@ -80,6 +80,12 @@ void InputParser::handleGround(char byte)
         return;
     }
 
+    // Ctrl+Space (and Ctrl+@) sends NUL
+    if (ubyte == 0x00) {
+        postKeyEvent(Qt::Key_Space, Qt::ControlModifier);
+        return;
+    }
+
     // Ctrl+letter: 0x01-0x1A (except special cases)
     if (ubyte >= 0x01 && ubyte <= 0x1A) {
         if (ubyte == '\t') {

@@ -287,6 +287,18 @@ QTuiTreeWidgetItem *QTuiTreeWidget::currentItem() const
     return itemFromIndex(idx);
 }
 
+QList<QTuiTreeWidgetItem *> QTuiTreeWidget::selectedItems() const
+{
+    QList<QTuiTreeWidgetItem *> items;
+    if (!selectionModel())
+        return items;
+    for (const QModelIndex &index : selectionModel()->selectedIndexes()) {
+        if (index.column() == 0)
+            items.append(itemFromIndex(index));
+    }
+    return items;
+}
+
 void QTuiTreeWidget::setCurrentItem(QTuiTreeWidgetItem *item)
 {
     if (!item)

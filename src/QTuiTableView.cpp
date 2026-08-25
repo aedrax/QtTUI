@@ -40,6 +40,7 @@ void QTuiTableView::setModel(QAbstractItemModel *model)
     m_scrollOffset = 0;
     m_horizontalScrollOffset = 0;
     invalidateColumnWidths();
+    resetSelectionModel();
 
     if (m_model)
         connectModel();
@@ -58,12 +59,13 @@ void QTuiTableView::setCurrentIndex(const QModelIndex &index)
         return;
     int row = qBound(0, index.row(), qMax(0, m_model->rowCount() - 1));
     int col = qBound(0, index.column(), qMax(0, m_model->columnCount() - 1));
-    if (row == m_currentRow && col == m_currentCol)
-        return;
-    m_currentRow = row;
-    m_currentCol = col;
-    ensureCurrentVisible();
-    markDirty();
+    if (row != m_currentRow || col != m_currentCol) {
+        m_currentRow = row;
+        m_currentCol = col;
+        ensureCurrentVisible();
+        markDirty();
+    }
+    selectCurrent(Qt::NoModifier, false);
 }
 
 int QTuiTableView::horizontalScrollOffset() const
@@ -173,24 +175,14 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
             int availWidth = qMin(colWidths[c], geo.x() + viewWidth - xOff);
 
             QString cellText;
+            QModelIndex idx;
             if (modelRow < rows) {
-                QModelIndex idx = m_model->index(modelRow, c);
+                idx = m_model->index(modelRow, c);
                 cellText = m_model->data(idx, Qt::DisplayRole).toString();
             }
 
-            // Determine style based on focus highlighting
-            // Use focusForeground/focusBackground only when widget has focus
             bool isCurrent = (modelRow == m_currentRow && c == m_currentCol && modelRow < rows);
-            Cell cellStyle;
-            if (isCurrent && hasFocus()) {
-                cellStyle.foreground = theme.focusForeground;
-                cellStyle.background = theme.focusBackground;
-            } else {
-                cellStyle.foreground = theme.foreground;
-                cellStyle.background = theme.background;
-            }
-            cellStyle.bold = false;
-            cellStyle.inverse = false;
+            const Cell cellStyle = itemStyle(idx, isCurrent, theme);
 
             // Render cell text using renderTextTruncated
             renderTextTruncated(buffer, xOff, screenY, cellText, availWidth, cellStyle);
@@ -204,15 +196,20 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
                 cell.background = cellStyle.background;
                 cell.bold = false;
                 cell.inverse = false;
+                cell.underline = cellStyle.underline;
             }
             xOff += availWidth;
 
-            // Render separator space between columns
+            // Render separator space between columns. Between two selected
+            // cells it has the selection color, so a selected row is one bar.
             if (c < cols - 1 && xOff < geo.x() + viewWidth) {
+                const bool joined = isSelected(idx)
+                    && isSelected(m_model->index(modelRow, c + 1));
                 Cell &sep = buffer.backCell(xOff, screenY);
                 sep.setChar(U' ');
                 sep.foreground = theme.foreground;
-                sep.background = theme.background;
+                sep.background = joined ? cellStyle.background : theme.background;
+                sep.underline = false;
                 sep.bold = false;
                 sep.inverse = false;
                 xOff++;
@@ -235,8 +232,12 @@ void QTuiTableView::keyPressEvent(TuiKeyEvent *event)
     if (!m_model || m_model->rowCount() == 0 || m_model->columnCount() == 0)
         return;
 
+    if (selectionKeyPressEvent(event))
+        return;
+
     const int rowCount = m_model->rowCount();
     const int colCount = m_model->columnCount();
+    const QModelIndex previous = currentIndex();
 
     switch (event->key()) {
     case Qt::Key_Up:
@@ -263,6 +264,8 @@ void QTuiTableView::keyPressEvent(TuiKeyEvent *event)
         break;
     }
 
+    if (currentIndex() != previous)
+        selectCurrent(event->modifiers(), false);
     markDirty();
 }
 
@@ -399,9 +402,14 @@ void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
         return;
     }
 
+    // Another button keeps a selection that contains the cell
     m_currentRow = clickedRow;
     m_currentCol = clickedCol;
     markDirty();
+    if (event->button() == Qt::LeftButton)
+        selectCurrent(event->modifiers(), true);
+    else if (!isSelected(currentIndex()))
+        selectCurrent(Qt::NoModifier, true);
 }
 
 void QTuiTableView::onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)

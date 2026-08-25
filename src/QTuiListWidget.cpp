@@ -142,6 +142,18 @@ QTuiListWidgetItem *QTuiListWidget::currentItem() const
     return m_items.at(row);
 }
 
+QList<QTuiListWidgetItem *> QTuiListWidget::selectedItems() const
+{
+    QList<QTuiListWidgetItem *> items;
+    if (!selectionModel())
+        return items;
+    for (const QModelIndex &index : selectionModel()->selectedIndexes()) {
+        if (index.column() == 0 && index.row() < m_items.size())
+            items.append(m_items.at(index.row()));
+    }
+    return items;
+}
+
 void QTuiListWidget::setCurrentItem(QTuiListWidgetItem *item)
 {
     int row = rowForItem(item);

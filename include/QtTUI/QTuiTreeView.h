@@ -25,6 +25,9 @@ public:
     void collapse(const QModelIndex &index);
     bool isExpanded(const QModelIndex &index) const;
 
+    // Selects all visible items in the three multiple modes
+    void selectAll() override;
+
     void setItemDelegate(QTuiItemDelegate *delegate);
     QTuiItemDelegate *itemDelegate() const;
 
@@ -37,6 +40,7 @@ signals:
 protected:
     void keyPressEvent(TuiKeyEvent *event) override;
     void mousePressEvent(TuiMouseEvent *event) override;
+    QItemSelection selectionRange(const QModelIndex &from, const QModelIndex &to) const override;
 
 private slots:
     void onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight);

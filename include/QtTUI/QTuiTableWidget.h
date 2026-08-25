@@ -52,6 +52,8 @@ public:
     void setVerticalHeaderLabels(const QStringList &labels);
 
     QList<QTuiTableWidgetSelectionRange> selectedRanges() const;
+    // The selected cells that have an item
+    QList<QTuiTableWidgetItem *> selectedItems() const;
 
 signals:
     void currentCellChanged(int row, int column, int previousRow, int previousColumn);

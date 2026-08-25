@@ -6,6 +6,8 @@
 #include <QtTUI/QtTUI>
 #include <QSortFilterProxyModel>
 #include <QStringListModel>
+#include <algorithm>
+#include <functional>
 #include <QTimer>
 
 using namespace QtTUI;
@@ -510,9 +512,16 @@ static QTuiWidget *createModelViewTab(QTuiWidget *parent, QTuiStatusBar *statusB
          QStringLiteral("Delta"), QStringLiteral("Echo")}, page);
     auto *listView = new QTuiListView(page);
     listView->setModel(listModel);
+    // Shift and Ctrl with the arrow keys, Space or a click select more items
+    listView->setSelectionMode(QTuiAbstractItemView::ExtendedSelection);
+    QObject::connect(listView->selectionModel(), &QItemSelectionModel::selectionChanged,
+                     [listView, statusBar]() {
+        const int count = listView->selectionModel()->selectedIndexes().size();
+        statusBar->showMessage(QStringLiteral("List: %1 selected").arg(count));
+    });
     // Right click (or Shift+F10) opens a menu with the list actions
     listView->setContextMenuPolicy(Qt::ActionsContextMenu);
-    listView->setToolTip("Right click or Shift+F10 for a menu");
+    listView->setToolTip("Shift or Ctrl selects more; right click for a menu");
     auto *addItem = new QTuiAction("Add item", listView);
     QObject::connect(addItem, &QTuiAction::triggered, [listModel, statusBar]() {
         const int row = listModel->rowCount();
@@ -520,12 +529,16 @@ static QTuiWidget *createModelViewTab(QTuiWidget *parent, QTuiStatusBar *statusB
         listModel->setData(listModel->index(row), QStringLiteral("Item %1").arg(row + 1));
         statusBar->showMessage("Added an item");
     });
-    auto *removeItem = new QTuiAction("Remove current item", listView);
+    auto *removeItem = new QTuiAction("Remove selected items", listView);
     QObject::connect(removeItem, &QTuiAction::triggered, [listModel, listView, statusBar]() {
-        const QModelIndex current = listView->currentIndex();
-        if (current.isValid())
-            listModel->removeRows(current.row(), 1);
-        statusBar->showMessage("Removed an item");
+        // Remove from the last row, so the other row numbers stay correct
+        QList<int> rows;
+        for (const QModelIndex &index : listView->selectionModel()->selectedIndexes())
+            rows.append(index.row());
+        std::sort(rows.begin(), rows.end(), std::greater<int>());
+        for (int row : rows)
+            listModel->removeRows(row, 1);
+        statusBar->showMessage(QStringLiteral("Removed %1 items").arg(rows.size()));
     });
     listView->addAction(addItem);
     listView->addAction(removeItem);

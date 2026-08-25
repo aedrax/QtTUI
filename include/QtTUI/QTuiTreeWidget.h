@@ -48,6 +48,7 @@ public:
     int columnCount() const;
     void setColumnCount(int columns);
     QTuiTreeWidgetItem *currentItem() const;
+    QList<QTuiTreeWidgetItem *> selectedItems() const;
     void setCurrentItem(QTuiTreeWidgetItem *item);
 signals:
     void currentItemChanged(QTuiTreeWidgetItem *current, QTuiTreeWidgetItem *previous);
