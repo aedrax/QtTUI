@@ -79,7 +79,9 @@ signals:
     void doubleClicked(const QModelIndex &index);
 
 protected:
-    // Each view calls this in setModel(), after it sets m_model
+    // Each view calls this at the end of setModel(), after it connects to
+    // the model signals. The base then connects to the row signals after
+    // the view, so the view updates its rows first.
     void resetSelectionModel();
     // Each view calls this after a key or a click makes a different item
     // current. It updates the selection for the mode and the modifiers.
@@ -88,7 +90,8 @@ protected:
     // selection.
     bool selectionKeyPressEvent(TuiKeyEvent *event);
     bool isSelected(const QModelIndex &index) const;
-    // The style of an item. A selected item has the focus colors. The
+    // The style of an item. A selected item has the focus colors, or a
+    // dimmer color and bold text if the view does not have focus. The
     // current item of a focused view also has the focus colors in
     // SingleSelection and NoSelection, and an underline in the multiple
     // modes, where it can be current but not selected.
@@ -102,11 +105,16 @@ protected:
 private:
     QItemSelectionModel::SelectionFlags behaviorFlags() const;
     void onSelectionCurrentChanged(const QModelIndex &current);
+    // After rows move, the current row of the view is again the current
+    // index of the selection model, which follows the items through
+    // inserts, removes and sorts
+    void followSelectionModel();
 
     QItemSelectionModel *m_selectionModel = nullptr;
     SelectionMode m_selectionMode = SingleSelection;
     SelectionBehavior m_selectionBehavior = SelectItems;
     QPersistentModelIndex m_selectionAnchor;
+    QList<QMetaObject::Connection> m_modelConnections;
     // True while the view follows a current index set on the selection
     // model, so that selectCurrent() does not change the selection
     bool m_followingSelectionModel = false;

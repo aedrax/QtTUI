@@ -40,10 +40,10 @@ void QTuiTableView::setModel(QAbstractItemModel *model)
     m_scrollOffset = 0;
     m_horizontalScrollOffset = 0;
     invalidateColumnWidths();
-    resetSelectionModel();
 
     if (m_model)
         connectModel();
+    resetSelectionModel();
 }
 
 QModelIndex QTuiTableView::currentIndex() const

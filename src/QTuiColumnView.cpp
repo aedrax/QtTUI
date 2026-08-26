@@ -30,12 +30,12 @@ void QTuiColumnView::setModel(QAbstractItemModel *model)
     m_columns.clear();
     m_activeColumn = 0;
     m_scrollOffset = 0;
-    resetSelectionModel();
 
     if (m_model) {
         connectModel();
         rebuildColumns();
     }
+    resetSelectionModel();
     markDirty();
 }
 

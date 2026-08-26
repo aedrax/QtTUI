@@ -182,6 +182,41 @@ private slots:
         QCOMPARE(selectedRows(view), QList<int>{0});
     }
 
+    void currentItemFollowsRowChanges()
+    {
+        QStringListModel model(QStringList{"c", "a", "b"});
+        QTuiListView view;
+        view.setGeometry(QRect(0, 0, 10, 5));
+        view.setModel(&model);
+        view.setCurrentIndex(model.index(2, 0)); // "b"
+        model.insertRows(0, 1);
+        QCOMPARE(view.currentIndex(), view.selectionModel()->currentIndex());
+        QCOMPARE(view.currentIndex().data().toString(), QStringLiteral("b"));
+        model.sort(0); // "", "a", "b", "c"
+        QCOMPARE(view.currentIndex(), view.selectionModel()->currentIndex());
+        QCOMPARE(view.currentIndex().data().toString(), QStringLiteral("b"));
+
+        QTuiTableView table;
+        table.setGeometry(QRect(0, 0, 10, 5));
+        table.setModel(&model);
+        table.setCurrentIndex(model.index(1, 0)); // "a"
+        model.removeRows(0, 1);
+        QCOMPARE(table.currentIndex(), table.selectionModel()->currentIndex());
+        QCOMPARE(table.currentIndex().data().toString(), QStringLiteral("a"));
+    }
+
+    void treeCurrentItemFollowsRowChanges()
+    {
+        QStringListModel model(QStringList{"x", "y", "z"});
+        QTuiTreeView tree;
+        tree.setGeometry(QRect(0, 0, 10, 5));
+        tree.setModel(&model);
+        tree.setCurrentIndex(model.index(2, 0));
+        model.insertRows(0, 2);
+        QCOMPARE(tree.currentIndex(), tree.selectionModel()->currentIndex());
+        QCOMPARE(tree.currentIndex().data().toString(), QStringLiteral("z"));
+    }
+
     void selectedItemsAreHighlightedWithoutFocus()
     {
         QTuiListView view;
@@ -189,9 +224,12 @@ private slots:
         click(view, 0, 2);
         ScreenBuffer buffer(10, 5);
         view.paintEvent(buffer);
+        // A dimmer color and bold text, not the focus look
         const ThemeProperties theme = view.themeProperties();
-        QCOMPARE(buffer.backCell(5, 2).background, theme.focusBackground);
-        QCOMPARE(buffer.backCell(5, 1).background, theme.background);
+        QVERIFY(buffer.backCell(0, 2).background != theme.focusBackground);
+        QVERIFY(buffer.backCell(0, 2).background != theme.background);
+        QVERIFY(buffer.backCell(0, 2).bold);
+        QCOMPARE(buffer.backCell(0, 1).background, theme.background);
     }
 
     void tableSelectRowsSelectsTheWholeRow()
@@ -244,6 +282,18 @@ private slots:
         click(list, 0, 2);
         const auto items = list.selectedItems();
         QCOMPARE(items.size(), 2);
+    }
+
+    void uiLoaderSetsTheSelectionProperties()
+    {
+        UI_Loader loader;
+        QScopedPointer<QTuiWidget> widget(loader.loadFromData(
+            R"({"type": "QTuiListView", "selectionMode": "ExtendedSelection",
+                "selectionBehavior": "SelectRows"})"));
+        auto *view = qobject_cast<QTuiListView *>(widget.data());
+        QVERIFY(view);
+        QCOMPARE(view->selectionMode(), QTuiAbstractItemView::ExtendedSelection);
+        QCOMPARE(view->selectionBehavior(), QTuiAbstractItemView::SelectRows);
     }
 
     void ctrlSpaceIsParsed()

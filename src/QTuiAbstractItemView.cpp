@@ -83,10 +83,25 @@ void QTuiAbstractItemView::selectAll()
 
 void QTuiAbstractItemView::resetSelectionModel()
 {
+    for (const QMetaObject::Connection &connection : std::as_const(m_modelConnections))
+        disconnect(connection);
+    m_modelConnections.clear();
     QItemSelectionModel *old = m_selectionModel;
     setSelectionModel(m_model ? new QItemSelectionModel(m_model, this) : nullptr);
     if (old && old->parent() == this)
         delete old;
+    if (!m_model)
+        return;
+    using M = QAbstractItemModel;
+    const auto follow = [this]() { followSelectionModel(); };
+    m_modelConnections = {
+        connect(m_model, &M::rowsInserted, this, follow),
+        connect(m_model, &M::rowsRemoved, this, follow),
+        connect(m_model, &M::rowsMoved, this, follow),
+        connect(m_model, &M::columnsInserted, this, follow),
+        connect(m_model, &M::columnsRemoved, this, follow),
+        connect(m_model, &M::layoutChanged, this, follow),
+    };
 }
 
 QItemSelectionModel::SelectionFlags QTuiAbstractItemView::behaviorFlags() const
@@ -187,6 +202,17 @@ Cell QTuiAbstractItemView::itemStyle(const QModelIndex &index, bool isCurrent,
     style.bold = false;
     style.inverse = false;
     style.underline = cursor && multiple;
+    // Without focus, the selection stays visible but does not look like
+    // focus: half the focus color on the background, and bold text (which
+    // also shows without color)
+    if (highlight && !hasFocus()) {
+        const auto mix = [](uint8_t a, uint8_t b) { return uint8_t((a + b) / 2); };
+        style.foreground = theme.foreground;
+        style.background = Color(mix(theme.focusBackground.r, theme.background.r),
+                                 mix(theme.focusBackground.g, theme.background.g),
+                                 mix(theme.focusBackground.b, theme.background.b));
+        style.bold = true;
+    }
     return style;
 }
 
@@ -199,6 +225,12 @@ QItemSelection QTuiAbstractItemView::selectionRange(const QModelIndex &from,
     return QItemSelection(
         m_model->index(qMin(from.row(), to.row()), qMin(from.column(), to.column()), parent),
         m_model->index(qMax(from.row(), to.row()), qMax(from.column(), to.column()), parent));
+}
+
+void QTuiAbstractItemView::followSelectionModel()
+{
+    if (m_selectionModel)
+        onSelectionCurrentChanged(m_selectionModel->currentIndex());
 }
 
 void QTuiAbstractItemView::onSelectionCurrentChanged(const QModelIndex &current)

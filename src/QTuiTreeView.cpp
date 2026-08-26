@@ -39,12 +39,12 @@ void QTuiTreeView::setModel(QAbstractItemModel *model)
     m_pendingRemovalFlatRow = -1;
     m_expandedItems.clear();
     m_flatList.clear();
-    resetSelectionModel();
 
     if (m_model) {
         connectModel();
         rebuildFlatList();
     }
+    resetSelectionModel();
 }
 
 QModelIndex QTuiTreeView::currentIndex() const

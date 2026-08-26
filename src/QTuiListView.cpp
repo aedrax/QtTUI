@@ -37,10 +37,10 @@ void QTuiListView::setModel(QAbstractItemModel *model)
     m_model = model;
     m_currentRow = 0;
     m_scrollOffset = 0;
-    resetSelectionModel();
 
     if (m_model)
         connectModel();
+    resetSelectionModel();
 }
 
 QModelIndex QTuiListView::currentIndex() const
