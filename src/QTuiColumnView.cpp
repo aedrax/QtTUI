@@ -96,6 +96,37 @@ void QTuiColumnView::setCurrentIndex(const QModelIndex &index)
     selectCurrent(Qt::NoModifier, false);
 }
 
+void QTuiColumnView::scrollTo(const QModelIndex &index, ScrollHint hint)
+{
+    Q_UNUSED(hint); // the columns do not scroll vertically
+    for (int ci = 0; ci < m_columns.size(); ++ci) {
+        if (m_columns.at(ci).rootIndex == index.parent()) {
+            scrollToVisible(ci);
+            markDirty();
+            updateEditorGeometry();
+            return;
+        }
+    }
+}
+
+QRect QTuiColumnView::visualRect(const QModelIndex &index) const
+{
+    if (!m_model || index.model() != m_model)
+        return QRect();
+    const QRect geo = geometry();
+    if (index.row() >= geo.height())
+        return QRect();
+    // The same column positions as paintEvent
+    int x = 0;
+    for (int ci = m_scrollOffset; ci < m_columns.size() && x < geo.width(); ++ci) {
+        const int width = qMin(columnWidth(ci), geo.width() - x);
+        if (m_columns.at(ci).rootIndex == index.parent())
+            return QRect(geo.x() + x, geo.y() + index.row(), width, 1);
+        x += width + 1;
+    }
+    return QRect();
+}
+
 int QTuiColumnView::defaultColumnWidth() const
 {
     return m_defaultColumnWidth;
@@ -223,7 +254,7 @@ void QTuiColumnView::keyPressEvent(TuiKeyEvent *event)
     if (!m_model || m_columns.isEmpty())
         return;
 
-    if (selectionKeyPressEvent(event))
+    if (editKeyPressEvent(event) || selectionKeyPressEvent(event))
         return;
 
     Column &activeCol = m_columns[m_activeColumn];
@@ -422,20 +453,22 @@ void QTuiColumnView::rebuildColumns()
     scrollToVisible();
 }
 
-void QTuiColumnView::scrollToVisible()
+void QTuiColumnView::scrollToVisible(int column)
 {
+    if (column < 0)
+        column = m_activeColumn;
     int viewWidth = geometry().width();
     if (viewWidth <= 0)
         return;
 
     // Calculate total width of columns from scrollOffset to activeColumn
-    // Ensure the active column is visible
-    if (m_activeColumn < m_scrollOffset)
-        m_scrollOffset = m_activeColumn;
+    // Ensure the column is visible
+    if (column < m_scrollOffset)
+        m_scrollOffset = column;
 
-    // Check if active column fits in view
+    // Check if the column fits in view
     int usedWidth = 0;
-    for (int ci = m_scrollOffset; ci <= m_activeColumn && ci < m_columns.size(); ++ci) {
+    for (int ci = m_scrollOffset; ci <= column && ci < m_columns.size(); ++ci) {
         int colW = columnWidth(ci);
         // Add separator width
         if (ci < m_columns.size() - 1)
@@ -443,8 +476,8 @@ void QTuiColumnView::scrollToVisible()
         usedWidth += colW;
     }
 
-    // If active column doesn't fit, scroll right
-    while (usedWidth > viewWidth && m_scrollOffset < m_activeColumn) {
+    // If the column doesn't fit, scroll right
+    while (usedWidth > viewWidth && m_scrollOffset < column) {
         int removedW = columnWidth(m_scrollOffset);
         if (m_scrollOffset < m_columns.size() - 1)
             removedW += 1;

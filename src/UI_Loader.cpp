@@ -378,9 +378,12 @@ void UI_Loader::applyProperties(QTuiWidget *widget, const QJsonObject &obj)
         const QMetaProperty prop = meta->property(index);
         QVariant value;
         if (prop.isEnumType() && it.value().isString()) {
-            // An enum value by its name
+            // An enum value by its name, or flags as "A|B"
             bool ok = false;
-            const int v = prop.enumerator().keyToValue(it.value().toString().toLatin1().constData(), &ok);
+            const QMetaEnum e = prop.enumerator();
+            const QByteArray key = it.value().toString().toLatin1();
+            const int v = e.isFlag() ? e.keysToValue(key.constData(), &ok)
+                                     : e.keyToValue(key.constData(), &ok);
             if (!ok) {
                 qWarning() << "UI_Loader: Unknown value" << it.value().toString() << "for" << it.key();
                 continue;
@@ -444,7 +447,9 @@ QJsonObject UI_Loader::serializeWidget(const QTuiWidget *widget) const
         if (defaults && prop.read(defaults.get()) == value)
             continue;
         if (prop.isEnumType()) {
-            obj.insert(name, QString::fromLatin1(prop.enumerator().valueToKey(value.toInt())));
+            const QMetaEnum e = prop.enumerator();
+            const int v = value.toInt();
+            obj.insert(name, QString::fromLatin1(e.isFlag() ? e.valueToKeys(v) : QByteArray(e.valueToKey(v))));
             continue;
         }
         const QJsonValue json = QJsonValue::fromVariant(value);

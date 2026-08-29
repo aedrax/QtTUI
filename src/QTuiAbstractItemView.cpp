@@ -1,5 +1,8 @@
 #include <QtTUI/QTuiAbstractItemView.h>
 #include <QtTUI/TuiEvents.h>
+#include <QtTUI/QTuiStyledItemDelegate.h>
+#include <QtTUI/QTuiLineEdit.h>
+#include <QCoreApplication>
 #include <QDebug>
 
 namespace QtTUI {
@@ -7,6 +10,7 @@ namespace QtTUI {
 QTuiAbstractItemView::QTuiAbstractItemView(QTuiWidget *parent)
     : QTuiAbstractScrollArea(parent)
 {
+    connect(this, &QTuiWidget::geometryChanged, this, [this]() { updateEditorGeometry(); });
 }
 
 QAbstractItemModel *QTuiAbstractItemView::model() const
@@ -101,6 +105,7 @@ void QTuiAbstractItemView::resetSelectionModel()
         connect(m_model, &M::columnsInserted, this, follow),
         connect(m_model, &M::columnsRemoved, this, follow),
         connect(m_model, &M::layoutChanged, this, follow),
+        connect(m_model, &M::modelReset, this, [this]() { closeEditor(false); }),
     };
 }
 
@@ -231,6 +236,180 @@ void QTuiAbstractItemView::followSelectionModel()
 {
     if (m_selectionModel)
         onSelectionCurrentChanged(m_selectionModel->currentIndex());
+    // The edited item can move or go away
+    if (m_editor && !m_editIndex.isValid())
+        closeEditor(false);
+    updateEditorGeometry();
+}
+
+QTuiAbstractItemView::EditTriggers QTuiAbstractItemView::editTriggers() const
+{
+    return m_editTriggers;
+}
+
+void QTuiAbstractItemView::setEditTriggers(EditTriggers triggers)
+{
+    m_editTriggers = triggers;
+}
+
+void QTuiAbstractItemView::setItemDelegate(QTuiItemDelegate *delegate)
+{
+    if (m_delegate == delegate)
+        return;
+    closeEditor(false);
+    m_delegate = delegate;
+    markDirty();
+}
+
+QTuiItemDelegate *QTuiAbstractItemView::itemDelegate() const
+{
+    return m_delegate;
+}
+
+QTuiItemDelegate *QTuiAbstractItemView::editingDelegate()
+{
+    if (m_delegate)
+        return m_delegate;
+    if (!m_defaultDelegate)
+        m_defaultDelegate = new QTuiStyledItemDelegate(this);
+    return m_defaultDelegate;
+}
+
+bool QTuiAbstractItemView::edit(const QModelIndex &index)
+{
+    if (!m_model || !index.isValid() || index.model() != m_model
+        || !(m_model->flags(index) & Qt::ItemIsEditable))
+        return false;
+    closeEditor(true);
+
+    scrollTo(index);
+    const QRect rect = visualRect(index);
+    if (rect.isEmpty())
+        return false;
+    QTuiItemDelegate *delegate = editingDelegate();
+    QTuiWidget *editor = delegate->createEditor(this, index);
+    if (!editor)
+        return false;
+
+    m_editor = editor;
+    m_editIndex = index;
+    delegate->setEditorData(editor, index);
+    // As in Qt, the text of a line edit is selected, so typing replaces it
+    if (auto *lineEdit = qobject_cast<QTuiLineEdit *>(editor))
+        lineEdit->selectAll();
+    editor->setGeometry(rect);
+    editor->installEventFilter(this);
+    editor->setVisible(true);
+    editor->setFocus();
+    // The focus leaves the editor: write the value, as Qt does
+    connect(editor, &QTuiWidget::focusLost, this, [this, editor]() {
+        if (m_editor == editor)
+            closeEditor(true);
+    });
+    return true;
+}
+
+bool QTuiAbstractItemView::isEditing() const
+{
+    return m_editor;
+}
+
+QTuiWidget *QTuiAbstractItemView::editor() const
+{
+    return m_editor;
+}
+
+void QTuiAbstractItemView::closeEditor(bool commit)
+{
+    QTuiWidget *editor = m_editor;
+    if (!editor)
+        return;
+    // Clear m_editor first: setFocus() below makes the editor lose the
+    // focus, and that must not close it again
+    m_editor = nullptr;
+    if (commit && m_model && m_editIndex.isValid())
+        editingDelegate()->setModelData(editor, m_model, m_editIndex);
+    m_editIndex = QPersistentModelIndex();
+    editor->removeEventFilter(this);
+    const bool hadFocus = editor->hasFocus();
+    editor->setVisible(false);
+    editor->deleteLater();
+    if (hadFocus)
+        setFocus();
+    markDirty();
+}
+
+void QTuiAbstractItemView::updateEditorGeometry()
+{
+    if (!m_editor)
+        return;
+    const QRect rect = visualRect(m_editIndex);
+    if (rect.isEmpty())
+        closeEditor(true);
+    else
+        m_editor->setGeometry(rect);
+}
+
+bool QTuiAbstractItemView::editKeyPressEvent(TuiKeyEvent *event)
+{
+    const QModelIndex index = currentIndex();
+    if (!index.isValid())
+        return false;
+    if (event->key() == Qt::Key_F2 && event->modifiers() == Qt::NoModifier
+        && (m_editTriggers & EditKeyPressed))
+        return edit(index);
+
+    // A printable character, without Ctrl or Alt, opens the editor and
+    // goes to it
+    const QString text = event->text();
+    const bool printable = !text.isEmpty() && text.at(0).isPrint() && text != QLatin1String(" ")
+        && !(event->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier));
+    if (printable && (m_editTriggers & AnyKeyPressed) && edit(index)) {
+        TuiKeyEvent copy(event->key(), event->modifiers(), text);
+        QCoreApplication::sendEvent(m_editor, &copy);
+        return true;
+    }
+    return false;
+}
+
+bool QTuiAbstractItemView::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == m_editor && event->type() == TuiEventTypes::keyEventType()) {
+        const int key = static_cast<TuiKeyEvent *>(event)->key();
+        // An open popup of the editor (the list of a combo box) takes
+        // Enter and Escape first
+        bool popupOpen = false;
+        for (QTuiWidget *child : m_editor->findChildren<QTuiWidget *>()) {
+            if (child->isPopup() && child->isVisible())
+                popupOpen = true;
+        }
+        if (!popupOpen) {
+            if (key == Qt::Key_Return || key == Qt::Key_Enter) {
+                closeEditor(true);
+                return true;
+            }
+            if (key == Qt::Key_Escape) {
+                closeEditor(false);
+                return true;
+            }
+        }
+    }
+    return QTuiAbstractScrollArea::eventFilter(watched, event);
+}
+
+void QTuiAbstractItemView::scrollToRow(int row, int visibleRows, int rowCount, ScrollHint hint)
+{
+    if (visibleRows <= 0 || row < 0)
+        return;
+    switch (hint) {
+    case EnsureVisible:    scrollRowIntoView(row, visibleRows); break;
+    case PositionAtTop:    m_scrollOffset = row; break;
+    case PositionAtBottom: m_scrollOffset = row - visibleRows + 1; break;
+    case PositionAtCenter: m_scrollOffset = row - visibleRows / 2; break;
+    }
+    m_scrollOffset = qBound(0, m_scrollOffset, qMax(0, rowCount - visibleRows));
+    markDirty();
+    updateEditorGeometry();
 }
 
 void QTuiAbstractItemView::onSelectionCurrentChanged(const QModelIndex &current)

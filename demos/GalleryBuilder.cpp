@@ -336,9 +336,25 @@ public:
     int columnCount(const QModelIndex & = {}) const override { return m_headers.size(); }
 
     QVariant data(const QModelIndex &idx, int role) const override {
-        if (role != Qt::DisplayRole || !idx.isValid())
+        if ((role != Qt::DisplayRole && role != Qt::EditRole) || !idx.isValid())
             return {};
         return m_data.at(idx.row()).at(idx.column());
+    }
+
+    // The Value column is editable (F2 or a double click)
+    Qt::ItemFlags flags(const QModelIndex &idx) const override {
+        Qt::ItemFlags f = QAbstractTableModel::flags(idx);
+        if (idx.column() == 2)
+            f |= Qt::ItemIsEditable;
+        return f;
+    }
+
+    bool setData(const QModelIndex &idx, const QVariant &value, int role) override {
+        if (role != Qt::EditRole || !(flags(idx) & Qt::ItemIsEditable))
+            return false;
+        m_data[idx.row()][idx.column()] = value.toString();
+        emit dataChanged(idx, idx);
+        return true;
     }
 
     QVariant headerData(int section, Qt::Orientation orientation, int role) const override {
@@ -498,6 +514,7 @@ static QTuiWidget *createModelViewTab(QTuiWidget *parent, QTuiStatusBar *statusB
     auto *tableView = new QTuiTableView(page);
     tableView->setModel(tableModel);
     tableView->setSortingEnabled(true);
+    tableView->setToolTip("F2 or a double click edits a value");
     QObject::connect(tableView, &QTuiTableView::activated, [statusBar, tableModel](const QModelIndex &idx) {
         if (!idx.isValid()) return;
         const QString name = tableModel->data(tableModel->index(idx.row(), 0), Qt::DisplayRole).toString();

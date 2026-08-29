@@ -251,3 +251,7 @@ qttui_add_test(test_enabled_focuspolicy test_enabled_focuspolicy.cpp)
 # Selection tests: selection model, selection modes and behaviors, and
 # the selected items of the item widgets
 qttui_add_test(test_selection test_selection.cpp)
+
+# Editing tests: edit triggers, the editor lifetime, scrollTo() and
+# visualRect() of the item views
+qttui_add_test(test_editing test_editing.cpp)

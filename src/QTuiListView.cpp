@@ -63,6 +63,24 @@ void QTuiListView::setCurrentIndex(const QModelIndex &index)
     selectCurrent(Qt::NoModifier, false);
 }
 
+void QTuiListView::scrollTo(const QModelIndex &index, ScrollHint hint)
+{
+    if (!m_model || index.model() != m_model || index.parent().isValid())
+        return;
+    scrollToRow(index.row(), geometry().height(), m_model->rowCount(), hint);
+}
+
+QRect QTuiListView::visualRect(const QModelIndex &index) const
+{
+    if (!m_model || index.model() != m_model || index.parent().isValid())
+        return QRect();
+    const QRect geo = geometry();
+    const int line = index.row() - m_scrollOffset;
+    if (line < 0 || line >= geo.height())
+        return QRect();
+    return QRect(geo.x(), geo.y() + line, geo.width(), 1);
+}
+
 void QTuiListView::paintEvent(ScreenBuffer &buffer)
 {
     const QRect geo = geometry();
@@ -115,7 +133,7 @@ void QTuiListView::keyPressEvent(TuiKeyEvent *event)
     if (!m_model || m_model->rowCount() == 0)
         return;
 
-    if (selectionKeyPressEvent(event))
+    if (editKeyPressEvent(event) || selectionKeyPressEvent(event))
         return;
 
     const int rowCount = m_model->rowCount();
@@ -152,6 +170,8 @@ void QTuiListView::mousePressEvent(TuiMouseEvent *event)
             return;
         // No activated() here: in a list view each click already activates
         emit doubleClicked(index);
+        if (editTriggers() & DoubleClicked)
+            edit(index);
         return;
     }
     if (event->mouseType() != TuiMouseEvent::Press)

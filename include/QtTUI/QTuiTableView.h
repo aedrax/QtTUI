@@ -18,6 +18,8 @@ public:
 
     QModelIndex currentIndex() const override;
     void setCurrentIndex(const QModelIndex &index) override;
+    void scrollTo(const QModelIndex &index, ScrollHint hint = EnsureVisible) override;
+    QRect visualRect(const QModelIndex &index) const override;
 
     int horizontalScrollOffset() const;
 
@@ -63,7 +65,7 @@ private:
     void disconnectModel();
     void connectModel();
     void ensureCurrentVisible();
-    void ensureCurrentColumnVisible();
+    void ensureColumnVisible(int column);
     void clampCurrentIndex();
     void invalidateColumnWidths();
     const QVector<int> &effectiveColumnWidths() const;

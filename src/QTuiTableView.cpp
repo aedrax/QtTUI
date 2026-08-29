@@ -23,7 +23,7 @@ QTuiTableView::QTuiTableView(QTuiWidget *parent)
             m_scrollOffset = qBound(0, m_scrollOffset, qMax(0, rows - visibleDataRows));
         clampCurrentIndex();
         ensureCurrentVisible();
-        ensureCurrentColumnVisible();
+        ensureColumnVisible(m_currentCol);
         markDirty();
     });
 }
@@ -66,6 +66,34 @@ void QTuiTableView::setCurrentIndex(const QModelIndex &index)
         markDirty();
     }
     selectCurrent(Qt::NoModifier, false);
+}
+
+void QTuiTableView::scrollTo(const QModelIndex &index, ScrollHint hint)
+{
+    if (!m_model || index.model() != m_model || index.parent().isValid())
+        return;
+    ensureColumnVisible(index.column());
+    scrollToRow(index.row(), geometry().height() - m_headerHeight, m_model->rowCount(), hint);
+}
+
+QRect QTuiTableView::visualRect(const QModelIndex &index) const
+{
+    if (!m_model || index.model() != m_model || index.parent().isValid())
+        return QRect();
+    const QRect geo = geometry();
+    const int line = index.row() - m_scrollOffset;
+    if (line < 0 || line >= geo.height() - m_headerHeight)
+        return QRect();
+    // The same column positions as paintEvent: a separator after each column
+    const QVector<int> colWidths = effectiveColumnWidths();
+    int x = geo.x();
+    for (int c = m_horizontalScrollOffset; c < colWidths.size() && x < geo.right() + 1; ++c) {
+        const int width = qMin(colWidths.at(c), geo.right() + 1 - x);
+        if (c == index.column())
+            return QRect(x, geo.y() + m_headerHeight + line, width, 1);
+        x += width + 1;
+    }
+    return QRect();
 }
 
 int QTuiTableView::horizontalScrollOffset() const
@@ -232,7 +260,7 @@ void QTuiTableView::keyPressEvent(TuiKeyEvent *event)
     if (!m_model || m_model->rowCount() == 0 || m_model->columnCount() == 0)
         return;
 
-    if (selectionKeyPressEvent(event))
+    if (editKeyPressEvent(event) || selectionKeyPressEvent(event))
         return;
 
     const int rowCount = m_model->rowCount();
@@ -250,11 +278,11 @@ void QTuiTableView::keyPressEvent(TuiKeyEvent *event)
         break;
     case Qt::Key_Left:
         m_currentCol = qMax(0, m_currentCol - 1);
-        ensureCurrentColumnVisible();
+        ensureColumnVisible(m_currentCol);
         break;
     case Qt::Key_Right:
         m_currentCol = qMin(colCount - 1, m_currentCol + 1);
-        ensureCurrentColumnVisible();
+        ensureColumnVisible(m_currentCol);
         break;
     case Qt::Key_Return:
     case Qt::Key_Enter:
@@ -333,6 +361,10 @@ void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
         if (!index.isValid())
             return;
         emit doubleClicked(index);
+        // No editor for a double click on the header
+        const bool onHeader = event->y() - geometry().y() < m_headerHeight;
+        if (!onHeader && (editTriggers() & DoubleClicked) && edit(index))
+            return;
         emit activated(index);
         return;
     }
@@ -530,7 +562,7 @@ void QTuiTableView::onColumnsInserted(const QModelIndex &parent, int first, int 
     clampCurrentIndex();
     m_horizontalScrollOffset = qBound(0, m_horizontalScrollOffset,
                                       qMax(0, m_model->columnCount() - 1));
-    ensureCurrentColumnVisible();
+    ensureColumnVisible(m_currentCol);
     markDirty();
 }
 
@@ -547,7 +579,7 @@ void QTuiTableView::onColumnsRemoved(const QModelIndex &parent, int first, int l
     clampCurrentIndex();
     m_horizontalScrollOffset = qBound(0, m_horizontalScrollOffset,
                                       qMax(0, m_model->columnCount() - 1));
-    ensureCurrentColumnVisible();
+    ensureColumnVisible(m_currentCol);
     markDirty();
 }
 
@@ -575,7 +607,7 @@ void QTuiTableView::onLayoutChanged()
     invalidateColumnWidths();
     clampCurrentIndex();
     ensureCurrentVisible();
-    ensureCurrentColumnVisible();
+    ensureColumnVisible(m_currentCol);
     markDirty();
 }
 
@@ -649,7 +681,7 @@ void QTuiTableView::ensureCurrentVisible()
     scrollRowIntoView(m_currentRow, geometry().height() - m_headerHeight);
 }
 
-void QTuiTableView::ensureCurrentColumnVisible()
+void QTuiTableView::ensureColumnVisible(int column)
 {
     if (!m_model)
         return;
@@ -658,9 +690,9 @@ void QTuiTableView::ensureCurrentColumnVisible()
     if (cols == 0)
         return;
 
-    // If current column is before the horizontal scroll offset, scroll left
-    if (m_currentCol < m_horizontalScrollOffset)
-        m_horizontalScrollOffset = m_currentCol;
+    // If the column is before the horizontal scroll offset, scroll left
+    if (column < m_horizontalScrollOffset)
+        m_horizontalScrollOffset = column;
 
     const int viewWidth = geometry().width();
     if (viewWidth <= 0)
@@ -686,9 +718,9 @@ void QTuiTableView::ensureCurrentColumnVisible()
         return lastVisibleCol;
     };
 
-    // Scroll right until the current column is visible
-    while (m_horizontalScrollOffset < m_currentCol
-           && m_currentCol > lastVisibleFrom(m_horizontalScrollOffset)) {
+    // Scroll right until the column is visible
+    while (m_horizontalScrollOffset < column
+           && column > lastVisibleFrom(m_horizontalScrollOffset)) {
         m_horizontalScrollOffset++;
     }
 }

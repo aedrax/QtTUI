@@ -131,14 +131,31 @@ bool QTuiTreeView::isExpanded(const QModelIndex &index) const
     return m_expandedItems.contains(QPersistentModelIndex(index));
 }
 
-void QTuiTreeView::setItemDelegate(QTuiItemDelegate *delegate)
+void QTuiTreeView::scrollTo(const QModelIndex &index, ScrollHint hint)
 {
-    m_delegate = delegate;
+    if (!m_model || index.model() != m_model)
+        return;
+    // Expand the parents, so that the item has a row
+    QList<QModelIndex> parents;
+    for (QModelIndex p = index.parent(); p.isValid(); p = p.parent())
+        parents.prepend(p);
+    for (const QModelIndex &p : parents)
+        expand(p);
+    scrollToRow(flatRowForIndex(index), geometry().height(), m_flatList.size(), hint);
 }
 
-QTuiItemDelegate *QTuiTreeView::itemDelegate() const
+QRect QTuiTreeView::visualRect(const QModelIndex &index) const
 {
-    return m_delegate;
+    const int row = flatRowForIndex(index);
+    const QRect geo = geometry();
+    const int line = row - m_scrollOffset;
+    if (row < 0 || line < 0 || line >= geo.height())
+        return QRect();
+    // The text starts after the indentation and the 2 cells of the indicator
+    const int x = m_flatList.at(row).depth * m_indentWidth + 2;
+    if (x >= geo.width())
+        return QRect();
+    return QRect(geo.x() + x, geo.y() + line, geo.width() - x, 1);
 }
 
 void QTuiTreeView::paintEvent(ScreenBuffer &buffer)
@@ -252,7 +269,7 @@ void QTuiTreeView::keyPressEvent(TuiKeyEvent *event)
 {
     if (!m_model || m_flatList.isEmpty())
         return;
-    if (selectionKeyPressEvent(event))
+    if (editKeyPressEvent(event) || selectionKeyPressEvent(event))
         return;
     const int previousRow = m_currentRow;
 
@@ -335,6 +352,8 @@ void QTuiTreeView::mousePressEvent(TuiMouseEvent *event)
         if (!index.isValid())
             return;
         emit doubleClicked(index);
+        if ((editTriggers() & DoubleClicked) && edit(index))
+            return;
         // A double click on an item with children expands or collapses it
         if (m_model && m_model->hasChildren(index))
             isExpanded(index) ? collapse(index) : expand(index);
@@ -619,6 +638,7 @@ void QTuiTreeView::rebuildFlatList()
     if (!m_model)
         return;
     buildFlatListRecursive(QModelIndex(), 0);
+    updateEditorGeometry();
 }
 
 void QTuiTreeView::buildFlatListRecursive(const QModelIndex &parent, int depth)

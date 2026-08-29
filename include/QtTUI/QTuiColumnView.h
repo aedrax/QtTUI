@@ -17,6 +17,9 @@ public:
 
     QModelIndex currentIndex() const override;
     void setCurrentIndex(const QModelIndex &index) override;
+    // Scrolls to the column of the item, if the view shows that column
+    void scrollTo(const QModelIndex &index, ScrollHint hint = EnsureVisible) override;
+    QRect visualRect(const QModelIndex &index) const override;
 
     int defaultColumnWidth() const;
     void setDefaultColumnWidth(int width);
@@ -46,7 +49,8 @@ private:
     };
 
     void rebuildColumns();
-    void scrollToVisible();
+    // Scrolls so that the column (the active column if -1) is visible
+    void scrollToVisible(int column = -1);
     void connectModel();
     void disconnectModel();
     int columnWidth(int columnIndex) const;

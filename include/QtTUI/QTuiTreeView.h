@@ -20,6 +20,8 @@ public:
 
     QModelIndex currentIndex() const override;
     void setCurrentIndex(const QModelIndex &index) override;
+    void scrollTo(const QModelIndex &index, ScrollHint hint = EnsureVisible) override;
+    QRect visualRect(const QModelIndex &index) const override;
 
     void expand(const QModelIndex &index);
     void collapse(const QModelIndex &index);
@@ -28,8 +30,6 @@ public:
     // Selects all visible items in the three multiple modes
     void selectAll() override;
 
-    void setItemDelegate(QTuiItemDelegate *delegate);
-    QTuiItemDelegate *itemDelegate() const;
 
     void paintEvent(ScreenBuffer &buffer) override;
 
@@ -65,7 +65,6 @@ private:
     int flatRowForIndex(const QModelIndex &index) const;
     void markDirtyFromRowToBottom(int flatRow);
 
-    QTuiItemDelegate *m_delegate = nullptr;
     QList<FlattenedItem> m_flatList;
     QSet<QPersistentModelIndex> m_expandedItems;
     int m_currentRow = 0;

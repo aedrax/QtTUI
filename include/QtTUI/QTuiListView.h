@@ -18,6 +18,8 @@ public:
 
     QModelIndex currentIndex() const override;
     void setCurrentIndex(const QModelIndex &index) override;
+    void scrollTo(const QModelIndex &index, ScrollHint hint = EnsureVisible) override;
+    QRect visualRect(const QModelIndex &index) const override;
 
 
     void paintEvent(ScreenBuffer &buffer) override;
