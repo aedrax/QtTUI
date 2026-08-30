@@ -35,7 +35,37 @@ QVariant QTuiTableWidgetModel::data(const QModelIndex &index, int role) const
     QTuiTableWidgetItem *item = (*m_itemsRef)[r][c];
     if (!item)
         return {};
-    return item->data(role);
+    // As in Qt, the edit text is the display text
+    return item->data(role == Qt::EditRole ? Qt::DisplayRole : role);
+}
+
+Qt::ItemFlags QTuiTableWidgetModel::flags(const QModelIndex &index) const
+{
+    if (!index.isValid() || !m_itemsRef)
+        return Qt::NoItemFlags;
+    if (QTuiTableWidgetItem *item = (*m_itemsRef)[index.row()][index.column()])
+        return item->flags();
+    // An empty cell is editable, as in Qt
+    return Qt::ItemIsEditable | Qt::ItemIsSelectable | Qt::ItemIsEnabled;
+}
+
+bool QTuiTableWidgetModel::setData(const QModelIndex &index, const QVariant &value, int role)
+{
+    if (!index.isValid() || !m_itemsRef)
+        return false;
+    if (role == Qt::EditRole)
+        role = Qt::DisplayRole;
+    QTuiTableWidgetItem *item = (*m_itemsRef)[index.row()][index.column()];
+    if (!item) {
+        // A value for an empty cell makes a new item, as in Qt
+        auto *table = qobject_cast<QTuiTableWidget *>(QObject::parent());
+        if (!table || !value.isValid())
+            return false;
+        item = new QTuiTableWidgetItem;
+        table->setItem(index.row(), index.column(), item);
+    }
+    item->setData(role, value);
+    return true;
 }
 
 QVariant QTuiTableWidgetModel::headerData(int section, Qt::Orientation orientation, int role) const

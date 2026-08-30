@@ -501,6 +501,43 @@ private slots:
         QCOMPARE(buf->backCell(5, 5).ch, U'C');
     }
 
+    // In a dialog, Escape closes an open item editor first; the next
+    // Escape rejects the dialog
+    void escapeClosesAnItemEditorBeforeTheDialog()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 60, 20));
+        app.setMainWindow(&mainWindow);
+        mainWindow.show();
+
+        QStringListModel model(QStringList{"a", "b"});
+        QTuiDialog dialog;
+        auto *box = new QTuiBoxLayout(QTuiBoxLayout::TopToBottom);
+        // A list view has no size hint; this one asks for 20 x 3 cells
+        struct SizedList : QTuiListView {
+            using QTuiListView::QTuiListView;
+            QSize minimumSize() const override { return QSize(20, 3); }
+        };
+        auto *view = new SizedList(&dialog);
+        view->setModel(&model);
+        box->addWidget(view);
+        dialog.setLayout(box);
+        dialog.open();
+        view->setFocus();
+        QVERIFY(view->edit(model.index(0, 0)));
+
+        sendKey(mainWindow, Qt::Key_Escape);
+        QVERIFY(!view->isEditing());
+        QVERIFY(dialog.isVisible());
+        QVERIFY(view->hasFocus());
+        sendKey(mainWindow, Qt::Key_Escape);
+        QVERIFY(!dialog.isVisible());
+    }
+
     // A dialog is modal: Tab cycles inside it, Escape rejects it, an
     // outside click and other shortcuts do nothing, and focus returns
     // to the previous widget when it closes

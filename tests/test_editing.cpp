@@ -235,6 +235,93 @@ private slots:
         QCOMPARE(rect, QRect(4, 1, 16, 1));
     }
 
+    void tableWidgetItemsAreEditable()
+    {
+        QTuiTableWidget table(2, 2);
+        table.setGeometry(QRect(0, 0, 30, 5));
+        table.setItem(0, 0, new QTuiTableWidgetItem("x"));
+        table.setFocus();
+        QVERIFY(table.edit(table.model()->index(0, 0)));
+        QCOMPARE(qobject_cast<QTuiLineEdit *>(table.editor())->text(), QStringLiteral("x"));
+        sendText(table.editor(), QStringLiteral("new"));
+        sendKey(table.editor(), Qt::Key_Return);
+        QCOMPARE(table.item(0, 0)->text(), QStringLiteral("new"));
+
+        // An empty cell is editable too, and gets an item
+        QVERIFY(table.edit(table.model()->index(1, 1)));
+        sendText(table.editor(), QStringLiteral("e"));
+        sendKey(table.editor(), Qt::Key_Return);
+        QVERIFY(table.item(1, 1));
+        QCOMPARE(table.item(1, 1)->text(), QStringLiteral("e"));
+
+        // An item without ItemIsEditable is read-only
+        table.item(0, 0)->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
+        QVERIFY(!table.edit(table.model()->index(0, 0)));
+    }
+
+    void listAndTreeItemsEditOnlyWithTheFlag()
+    {
+        QTuiListWidget list;
+        list.setGeometry(QRect(0, 0, 10, 3));
+        list.addItem(QStringLiteral("l"));
+        QVERIFY(!list.edit(list.model()->index(0, 0)));
+        list.item(0)->setFlags(list.item(0)->flags() | Qt::ItemIsEditable);
+        QVERIFY(list.edit(list.model()->index(0, 0)));
+        sendText(list.editor(), QStringLiteral("L"));
+        sendKey(list.editor(), Qt::Key_Return);
+        QCOMPARE(list.item(0)->text(), QStringLiteral("L"));
+
+        QTuiTreeWidget tree;
+        tree.setGeometry(QRect(0, 0, 20, 3));
+        auto *item = new QTuiTreeWidgetItem({"t"});
+        tree.addTopLevelItem(item);
+        QVERIFY(!tree.edit(tree.model()->index(0, 0)));
+        item->setFlags(item->flags() | Qt::ItemIsEditable);
+        QVERIFY(tree.edit(tree.model()->index(0, 0)));
+        sendText(tree.editor(), QStringLiteral("T"));
+        sendKey(tree.editor(), Qt::Key_Return);
+        QCOMPARE(item->text(0), QStringLiteral("T"));
+    }
+
+    void comboBoxEditorStaysOpenWithItsList()
+    {
+        QTuiTableWidget table(1, 1);
+        table.setGeometry(QRect(0, 0, 30, 5));
+        auto *item = new QTuiTableWidgetItem("red");
+        item->setData(Qt::UserRole, QStringList{"red", "green", "blue"});
+        table.setItem(0, 0, item);
+        table.setFocus();
+        QVERIFY(table.edit(table.model()->index(0, 0)));
+        auto *combo = qobject_cast<QTuiComboBox *>(table.editor());
+        QVERIFY(combo);
+        QCOMPARE(combo->currentText(), QStringLiteral("red"));
+        // Space opens the list, Down and Enter choose "green"
+        sendKey(QTuiWidget::focusWidget(), Qt::Key_Space, Qt::NoModifier, QStringLiteral(" "));
+        sendKey(QTuiWidget::focusWidget(), Qt::Key_Down);
+        sendKey(QTuiWidget::focusWidget(), Qt::Key_Return);
+        QVERIFY(table.isEditing());
+        QCOMPARE(combo->currentText(), QStringLiteral("green"));
+        sendKey(QTuiWidget::focusWidget(), Qt::Key_Return);
+        QVERIFY(!table.isEditing());
+        QCOMPARE(item->text(), QStringLiteral("green"));
+    }
+
+    void delegateSignalsWriteAndClose()
+    {
+        QTuiListView view;
+        setUpList(view);
+        QTuiStyledItemDelegate delegate;
+        view.setItemDelegate(&delegate);
+        QVERIFY(view.edit(m_model.index(0, 0)));
+        QTuiWidget *editor = view.editor();
+        sendText(editor, QStringLiteral("w"));
+        emit delegate.commitData(editor);
+        QCOMPARE(m_model.index(0, 0).data().toString(), QStringLiteral("w"));
+        QVERIFY(view.isEditing());
+        emit delegate.closeEditor(editor);
+        QVERIFY(!view.isEditing());
+    }
+
     void scrollToHints()
     {
         QStringList rows;

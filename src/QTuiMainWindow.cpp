@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiMainWindow.h>
+#include <QtTUI/QTuiAbstractItemView.h>
 #include <QtTUI/QTuiAction.h>
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiKeySequence.h>
@@ -381,6 +382,17 @@ void QTuiMainWindow::pasteEvent(TuiPasteEvent *event)
         QCoreApplication::sendEvent(focused, event);
 }
 
+// True if the widget is the editor of an item view, or inside one
+static bool insideItemEditor(QTuiWidget *widget)
+{
+    for (QTuiWidget *w = widget; w; w = w->parentWidget()) {
+        auto *view = qobject_cast<QTuiAbstractItemView *>(w->parentWidget());
+        if (view && view->editor() == w)
+            return true;
+    }
+    return false;
+}
+
 void QTuiMainWindow::keyPressEvent(TuiKeyEvent *event)
 {
     QTuiToolTip::hideText();
@@ -423,11 +435,12 @@ void QTuiMainWindow::keyPressEvent(TuiKeyEvent *event)
             return;
         }
         // Escape rejects the dialog, unless a popup inside it (a completer
-        // or a dropdown) is open: that popup closes first
+        // or a dropdown) is open, or an item view edits an item: that popup
+        // or editor closes first
         if (event->key() == Qt::Key_Escape) {
             QList<QTuiWidget *> inner;
             collectVisiblePopupsIn(dialog, inner);
-            if (inner.isEmpty()) {
+            if (inner.isEmpty() && !insideItemEditor(focused)) {
                 dialog->reject();
                 return;
             }

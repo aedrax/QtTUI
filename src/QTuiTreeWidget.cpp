@@ -96,7 +96,23 @@ QVariant QTuiTreeWidgetModel::data(const QModelIndex &index, int role) const
     if (!item)
         return {};
 
-    return item->data(index.column(), role);
+    // As in Qt, the edit text is the display text
+    return item->data(index.column(), role == Qt::EditRole ? Qt::DisplayRole : role);
+}
+
+Qt::ItemFlags QTuiTreeWidgetModel::flags(const QModelIndex &index) const
+{
+    QTuiTreeWidgetItem *item = index.isValid() ? itemForIndex(index) : nullptr;
+    return item ? item->flags() : Qt::NoItemFlags;
+}
+
+bool QTuiTreeWidgetModel::setData(const QModelIndex &index, const QVariant &value, int role)
+{
+    QTuiTreeWidgetItem *item = index.isValid() ? itemForIndex(index) : nullptr;
+    if (!item)
+        return false;
+    item->setData(index.column(), role == Qt::EditRole ? Qt::DisplayRole : role, value);
+    return true;
 }
 
 bool QTuiTreeWidgetModel::hasChildren(const QModelIndex &parent) const

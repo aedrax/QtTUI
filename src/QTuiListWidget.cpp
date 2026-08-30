@@ -24,7 +24,23 @@ QVariant QTuiListWidgetModel::data(const QModelIndex &index, int role) const
     int row = index.row();
     if (row < 0 || row >= m_itemsRef->size())
         return {};
-    return m_itemsRef->at(row)->data(role);
+    // As in Qt, the edit text is the display text
+    return m_itemsRef->at(row)->data(role == Qt::EditRole ? Qt::DisplayRole : role);
+}
+
+Qt::ItemFlags QTuiListWidgetModel::flags(const QModelIndex &index) const
+{
+    if (!index.isValid() || !m_itemsRef || index.row() >= m_itemsRef->size())
+        return Qt::NoItemFlags;
+    return m_itemsRef->at(index.row())->flags();
+}
+
+bool QTuiListWidgetModel::setData(const QModelIndex &index, const QVariant &value, int role)
+{
+    if (!index.isValid() || !m_itemsRef || index.row() >= m_itemsRef->size())
+        return false;
+    m_itemsRef->at(index.row())->setData(role == Qt::EditRole ? Qt::DisplayRole : role, value);
+    return true;
 }
 
 void QTuiListWidgetModel::appendItem(QTuiListWidgetItem *item)

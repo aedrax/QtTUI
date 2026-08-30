@@ -301,12 +301,37 @@ bool QTuiAbstractItemView::edit(const QModelIndex &index)
     editor->installEventFilter(this);
     editor->setVisible(true);
     editor->setFocus();
-    // The focus leaves the editor: write the value, as Qt does
-    connect(editor, &QTuiWidget::focusLost, this, [this, editor]() {
-        if (m_editor == editor)
-            closeEditor(true);
+    watchEditorFocus(editor);
+    // A delegate can also write the value, or close the editor, itself
+    connect(delegate, &QTuiItemDelegate::commitData, editor, [this](QTuiWidget *w) {
+        if (w == m_editor && m_model && m_editIndex.isValid())
+            editingDelegate()->setModelData(w, m_model, m_editIndex);
+    });
+    connect(delegate, &QTuiItemDelegate::closeEditor, editor, [this](QTuiWidget *w) {
+        if (w == m_editor)
+            closeEditor(false);
     });
     return true;
+}
+
+void QTuiAbstractItemView::watchEditorFocus(QTuiWidget *widget)
+{
+    // The focus leaves the editor: write the value, as Qt does. The focus
+    // can also go to a child of the editor (the list of a combo box);
+    // then the editor stays open, and the view watches that child.
+    connect(widget, &QTuiWidget::focusLost, this, [this, widget]() {
+        if (!m_editor || !(widget == m_editor || m_editor->isAncestorOf(widget)))
+            return;
+        QTuiWidget *focus = focusWidget();
+        if (focus && m_editor->isAncestorOf(focus)) {
+            if (!m_watchedEditorWidgets.contains(focus)) {
+                m_watchedEditorWidgets.append(focus);
+                watchEditorFocus(focus);
+            }
+            return;
+        }
+        closeEditor(true);
+    }, Qt::DirectConnection);
 }
 
 bool QTuiAbstractItemView::isEditing() const
@@ -330,6 +355,7 @@ void QTuiAbstractItemView::closeEditor(bool commit)
     if (commit && m_model && m_editIndex.isValid())
         editingDelegate()->setModelData(editor, m_model, m_editIndex);
     m_editIndex = QPersistentModelIndex();
+    m_watchedEditorWidgets.clear();
     editor->removeEventFilter(this);
     const bool hadFocus = editor->hasFocus();
     editor->setVisible(false);

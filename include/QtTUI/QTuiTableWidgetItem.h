@@ -30,7 +30,8 @@ public:
 private:
     friend class QTuiTableWidget;
     QHash<int, QVariant> m_data;
-    Qt::ItemFlags m_flags = Qt::ItemIsSelectable | Qt::ItemIsEnabled;
+    // Editable by default, as in Qt
+    Qt::ItemFlags m_flags = Qt::ItemIsEditable | Qt::ItemIsSelectable | Qt::ItemIsEnabled;
     QTuiTableWidget *m_tableWidget = nullptr;
     int m_row = -1;
     int m_column = -1;

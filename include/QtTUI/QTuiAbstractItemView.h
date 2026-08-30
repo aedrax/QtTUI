@@ -163,6 +163,7 @@ protected:
 
 private:
     QTuiItemDelegate *editingDelegate();
+    void watchEditorFocus(QTuiWidget *widget);
     QItemSelectionModel::SelectionFlags behaviorFlags() const;
     void onSelectionCurrentChanged(const QModelIndex &current);
     // After rows move, the current row of the view is again the current
@@ -177,6 +178,8 @@ private:
     QList<QMetaObject::Connection> m_modelConnections;
     QPointer<QTuiWidget> m_editor;
     QPersistentModelIndex m_editIndex;
+    // Children of the editor that the view watches for focus loss
+    QList<QPointer<QTuiWidget>> m_watchedEditorWidgets;
     EditTriggers m_editTriggers = EditTriggers(DoubleClicked | EditKeyPressed);
     QTuiItemDelegate *m_defaultDelegate = nullptr;
     // True while the view follows a current index set on the selection
