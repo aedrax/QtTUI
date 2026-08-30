@@ -339,6 +339,38 @@ private slots:
         engine->setActiveTheme("default");
     }
 
+    void loadThemeEntriesStartFromDefault()
+    {
+        auto *engine = Theme_Engine::instance();
+
+        QByteArray json = R"({
+            "name": "inherit_theme",
+            "widgets": {
+                "default": { "foreground": "#c0caf5", "background": "#1a1b26", "italic": true },
+                "QTuiPushButton": { "borderStyle": "rounded", "background": "#24283b" }
+            }
+        })";
+
+        QTemporaryFile tmpFile;
+        QVERIFY(tmpFile.open());
+        tmpFile.write(json);
+        tmpFile.flush();
+        QVERIFY(engine->loadTheme(tmpFile.fileName()));
+
+        engine->setActiveTheme("inherit_theme");
+        ThemeProperties button = engine->properties("QTuiPushButton");
+        // From the "default" entry
+        QCOMPARE(button.foreground, Color(0xc0, 0xca, 0xf5));
+        QVERIFY(button.italic);
+        // From the button entry
+        QCOMPARE(button.background, Color(0x24, 0x28, 0x3b));
+        QCOMPARE(button.borderStyle, QStringLiteral("rounded"));
+        // A type without an entry uses the "default" entry
+        QCOMPARE(engine->properties("QTuiLabel").background, Color(0x1a, 0x1b, 0x26));
+
+        engine->setActiveTheme("default");
+    }
+
     void loadThemeMissingFile()
     {
         auto *engine = Theme_Engine::instance();

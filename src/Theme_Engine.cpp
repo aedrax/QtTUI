@@ -285,16 +285,12 @@ bool Theme_Engine::loadTheme(const QString &filePath)
         }
     }
 
-    // Parse widgets section
+    // Parse widgets section. Each entry starts from the "default" entry of
+    // the file, so an entry sets only the properties that are different.
     QHash<QString, ThemeProperties> themeProps;
     QJsonObject widgetsObj = root.value(QStringLiteral("widgets")).toObject();
-    ThemeProperties defaults;
 
-    for (auto it = widgetsObj.begin(); it != widgetsObj.end(); ++it) {
-        QString widgetType = it.key();
-        QJsonObject propObj = it.value().toObject();
-        ThemeProperties props = defaults;
-
+    auto parseEntry = [&](const QJsonObject &propObj, ThemeProperties props) {
         if (propObj.contains(QStringLiteral("foreground")))
             props.foreground = parseColorString(propObj.value(QStringLiteral("foreground")).toString(), loadedAliases);
         if (propObj.contains(QStringLiteral("background")))
@@ -315,8 +311,16 @@ bool Theme_Engine::loadTheme(const QString &filePath)
             props.italic = propObj.value(QStringLiteral("italic")).toBool();
         if (propObj.contains(QStringLiteral("underline")))
             props.underline = propObj.value(QStringLiteral("underline")).toBool();
+        return props;
+    };
 
-        themeProps.insert(widgetType, props);
+    const QString defaultKey = QStringLiteral("default");
+    const ThemeProperties defaults = parseEntry(widgetsObj.value(defaultKey).toObject(), ThemeProperties());
+    if (widgetsObj.contains(defaultKey))
+        themeProps.insert(defaultKey, defaults);
+    for (auto it = widgetsObj.begin(); it != widgetsObj.end(); ++it) {
+        if (it.key() != defaultKey)
+            themeProps.insert(it.key(), parseEntry(it.value().toObject(), defaults));
     }
 
     m_themes.insert(themeName, themeProps);
