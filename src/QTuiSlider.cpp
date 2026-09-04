@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiSlider.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
@@ -140,21 +141,7 @@ void QTuiSlider::paintEvent(ScreenBuffer &buffer)
     }
 
     // Clear the entire widget area
-    for (int row = 0; row < geoH; ++row) {
-        for (int col = 0; col < geoW; ++col) {
-            int px = geoX + col;
-            int py = geoY + row;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                cell.setChar(U' ');
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = false;
-                cell.italic = false;
-                cell.underline = false;
-            }
-        }
-    }
+    fillRect(buffer, geo, cellStyle(fg, bg));
 
     int range = m_maximum - m_minimum;
 

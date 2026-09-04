@@ -188,62 +188,22 @@ void QTuiTreeView::paintEvent(ScreenBuffer &buffer)
         const Cell style = itemStyle(item.index, isCurrent, theme);
 
         // Fill the entire row with the item style first (for highlighting)
-        if (style.background != theme.background || style.underline) {
-            for (int x = 0; x < viewWidth; ++x) {
-                Cell &cell = buffer.backCell(geo.x() + x, screenY);
-                cell = style;
-                cell.setChar(U' ');
-            }
-        }
+        if (style.background != theme.background || style.underline)
+            fillRect(buffer, QRect(geo.x(), screenY, viewWidth, 1), style);
 
-        // Compute indentation offset
-        int indentOffset = item.depth * m_indentWidth;
-
-        // Render indentation spaces
-        for (int i = 0; i < indentOffset && i < viewWidth; ++i) {
-            Cell &cell = buffer.backCell(geo.x() + i, screenY);
-            cell.setChar(U' ');
-            cell.foreground = style.foreground;
-            cell.background = style.background;
-            cell.bold = false;
-            cell.inverse = false;
-        }
-
-        // Render expand/collapse indicator
-        int indicatorOffset = indentOffset;
-        if (hasChildren) {
-            // Use multi-byte indicator characters: ▶ (collapsed) or ▼ (expanded)
-            const char32_t indicatorChar = item.expanded ? char32_t(0x25BC) : char32_t(0x25B6);
-            if (indicatorOffset < viewWidth) {
-                Cell &cell = buffer.backCell(geo.x() + indicatorOffset, screenY);
-                cell.setChar(indicatorChar);
-                cell.foreground = style.foreground;
-                cell.background = style.background;
-                cell.bold = false;
-                cell.inverse = false;
-            }
-            indicatorOffset++;
-            // Space after indicator
-            if (indicatorOffset < viewWidth) {
-                Cell &cell = buffer.backCell(geo.x() + indicatorOffset, screenY);
-                cell.setChar(U' ');
-                cell.foreground = style.foreground;
-                cell.background = style.background;
-                cell.bold = false;
-                cell.inverse = false;
-            }
-            indicatorOffset++;
-        } else {
-            // No indicator for leaves, but reserve the same space for alignment
-            for (int i = 0; i < 2 && indicatorOffset < viewWidth; ++i, ++indicatorOffset) {
-                Cell &cell = buffer.backCell(geo.x() + indicatorOffset, screenY);
-                cell.setChar(U' ');
-                cell.foreground = style.foreground;
-                cell.background = style.background;
-                cell.bold = false;
-                cell.inverse = false;
-            }
-        }
+        // The indentation and the expand/collapse indicator use the item
+        // colors without bold or inverse. The indicator is ▶ (collapsed) or
+        // ▼ (expanded) and a space; a leaf gets two spaces for alignment.
+        Cell plain = style;
+        plain.bold = false;
+        plain.inverse = false;
+        const int indentOffset = item.depth * m_indentWidth;
+        const int indicatorOffset = indentOffset + 2;
+        fillRect(buffer, QRect(geo.x(), screenY, qMin(indicatorOffset, viewWidth), 1), plain);
+        if (hasChildren)
+            renderText(buffer, geo.x() + indentOffset, screenY,
+                       item.expanded ? QStringLiteral("▼") : QStringLiteral("▶"),
+                       viewWidth - indentOffset, plain);
 
         // Render item text with truncation
         if (m_delegate) {

@@ -44,13 +44,7 @@ public:
             // row uses the focus colors
             style.foreground = current ? theme.focusForeground : theme.background;
             style.background = current ? theme.focusBackground : theme.foreground;
-            for (int x = geo.x(); x < geo.x() + geo.width(); ++x) {
-                Cell &cell = buffer.backCell(x, geo.y() + i);
-                cell.setChar(U' ');
-                cell.foreground = style.foreground;
-                cell.background = style.background;
-                cell.bold = false;
-            }
+            fillRect(buffer, QRect(geo.x(), geo.y() + i, geo.width(), 1), style);
             renderTextTruncated(buffer, geo.x() + 1, geo.y() + i,
                                 matches.at(row), geo.width() - 1, style);
         }

@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiWidget.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/QTuiLayout.h>
 #include <QtTUI/QTuiAction.h>
 #include <QtTUI/QTuiApplication.h>
@@ -448,20 +449,7 @@ void QTuiWidget::clearBackground(ScreenBuffer &buffer, const QRect &clipRect)
         return;
 
     const auto theme = themeProperties();
-
-    for (int row = clearArea.y(); row < clearArea.y() + clearArea.height(); ++row) {
-        for (int col = clearArea.x(); col < clearArea.x() + clearArea.width(); ++col) {
-            Cell &cell = buffer.backCell(col, row);
-            cell.setChar(U' ');
-            cell.foreground = theme.foreground;
-            cell.background = theme.background;
-            cell.bold = false;
-            cell.italic = false;
-            cell.underline = false;
-            cell.strikethrough = false;
-            cell.inverse = false;
-        }
-    }
+    fillRect(buffer, clearArea, cellStyle(theme.foreground, theme.background));
 
     // Handle geometry-shrink clearing: clear old geometry areas not covered by new geometry
     if (m_hasDirtyRegions && !m_dirtyOld.isEmpty() && m_dirtyOld != geo) {

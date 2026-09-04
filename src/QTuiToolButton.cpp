@@ -1,4 +1,6 @@
 #include <QtTUI/QTuiToolButton.h>
+#include <QtTUI/RenderUtils.h>
+#include <QtTUI/QtTuiUnicode.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
@@ -75,21 +77,7 @@ void QTuiToolButton::paintEvent(ScreenBuffer &buffer)
         std::swap(fg, bg);
 
     // Clear the entire area with background (no border)
-    for (int row = 0; row < geoH; ++row) {
-        for (int col = 0; col < geoW; ++col) {
-            int px = geoX + col;
-            int py = geoY + row;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                cell.setChar(U' ');
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = theme.bold;
-                cell.italic = theme.italic;
-                cell.underline = theme.underline;
-            }
-        }
-    }
+    fillRect(buffer, geo, cellStyle(theme, fg, bg));
 
     // Build content string: icon + text + optional dropdown indicator
     QString content;
@@ -104,24 +92,14 @@ void QTuiToolButton::paintEvent(ScreenBuffer &buffer)
     // Render content centered vertically, with 1 char left padding
     int contentRow = geoY + geoH / 2;
     int availWidth = geoW - 2; // 1 char padding each side
-    int textLen = qMin(static_cast<int>(content.length()), availWidth);
+    int textLen = qMin(QtTuiUnicode::stringWidth(content), availWidth);
     int startCol = geoX + 1; // 1 char left padding
     if (pressed && textLen < availWidth)
         ++startCol;
 
-    for (int i = 0; i < textLen; ++i) {
-        int px = startCol + i;
-        int py = contentRow;
-        if (px < buffer.width() && py < buffer.height()) {
-            Cell &cell = buffer.backCell(px, py);
-            cell.setChar(content.at(i).unicode());
-            cell.foreground = fg;
-            cell.background = bg;
-            cell.bold = theme.bold || (enabled && hasFocus());
-            cell.italic = theme.italic;
-            cell.underline = theme.underline;
-        }
-    }
+    Cell textStyle = cellStyle(theme, fg, bg);
+    textStyle.bold = theme.bold || (enabled && hasFocus());
+    renderText(buffer, startCol, contentRow, content, textLen, textStyle);
 }
 
 void QTuiToolButton::keyPressEvent(TuiKeyEvent *event)

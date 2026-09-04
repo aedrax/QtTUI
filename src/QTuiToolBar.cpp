@@ -1,4 +1,6 @@
 #include <QtTUI/QTuiToolBar.h>
+#include <QtTUI/RenderUtils.h>
+#include <QtTUI/QtTuiUnicode.h>
 #include <QtTUI/QTuiAction.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
@@ -63,7 +65,7 @@ QSize QTuiToolBar::minimumSize() const
         if (item.isSeparator) {
             width += 3; // " | "
         } else if (item.action) {
-            width += item.action->text().length() + 2; // padding
+            width += QtTuiUnicode::stringWidth(item.action->text()) + 2; // padding
         } else if (item.widget) {
             width += item.widget->minimumSize().width();
         }
@@ -82,19 +84,7 @@ void QTuiToolBar::paintEvent(ScreenBuffer &buffer)
     Color bg = theme.background;
 
     // Clear the bar row
-    for (int col = 0; col < geo.width() && (geo.x() + col) < buffer.width(); ++col) {
-        int px = geo.x() + col;
-        int py = geo.y();
-        if (py < buffer.height()) {
-            Cell &cell = buffer.backCell(px, py);
-            cell.setChar(U' ');
-            cell.foreground = fg;
-            cell.background = bg;
-            cell.bold = false;
-            cell.italic = false;
-            cell.underline = false;
-        }
-    }
+    fillRect(buffer, QRect(geo.x(), geo.y(), geo.width(), 1), cellStyle(fg, bg));
 
     int xPos = geo.x();
     int py = geo.y();
@@ -108,51 +98,18 @@ void QTuiToolBar::paintEvent(ScreenBuffer &buffer)
 
         if (item.isSeparator) {
             // Render separator as " | "
-            const QString sep = QStringLiteral(" | ");
-            for (int c = 0; c < sep.length(); ++c) {
-                if (xPos < buffer.width()) {
-                    Cell &cell = buffer.backCell(xPos, py);
-                    cell.setChar(sep.at(c).unicode());
-                    cell.foreground = fg;
-                    cell.background = bg;
-                }
-                xPos++;
-            }
+            xPos += renderText(buffer, xPos, py, QStringLiteral(" | "), 3, cellStyle(fg, bg));
         } else if (item.action) {
-            bool isFocused = hasFocus() && (navigableIndex == m_focusedItem);
-            Color itemFg = isFocused ? bg : fg;
-            Color itemBg = isFocused ? fg : bg;
-
-            // Leading space
-            if (xPos < buffer.width()) {
-                Cell &cell = buffer.backCell(xPos, py);
-                cell.setChar(U' ');
-                cell.foreground = itemFg;
-                cell.background = itemBg;
-            }
-            xPos++;
-
-            // Action text
+            // The action has a space on each side; only the text of the focused action is bold
+            const bool isFocused = hasFocus() && (navigableIndex == m_focusedItem);
+            const Cell spaceStyle = isFocused ? cellStyle(bg, fg) : cellStyle(fg, bg);
+            Cell textStyle = spaceStyle;
+            textStyle.bold = isFocused;
             const QString text = item.action->text();
-            for (int c = 0; c < text.length(); ++c) {
-                if (xPos < buffer.width()) {
-                    Cell &cell = buffer.backCell(xPos, py);
-                    cell.setChar(text.at(c).unicode());
-                    cell.foreground = itemFg;
-                    cell.background = itemBg;
-                    cell.bold = isFocused;
-                }
-                xPos++;
-            }
-
-            // Trailing space
-            if (xPos < buffer.width()) {
-                Cell &cell = buffer.backCell(xPos, py);
-                cell.setChar(U' ');
-                cell.foreground = itemFg;
-                cell.background = itemBg;
-            }
-            xPos++;
+            const int textWidth = QtTuiUnicode::stringWidth(text);
+            fillRect(buffer, QRect(xPos, py, textWidth + 2, 1), spaceStyle);
+            renderText(buffer, xPos + 1, py, text, textWidth, textStyle);
+            xPos += textWidth + 2;
 
             navigableIndex++;
         } else if (item.widget) {
@@ -225,7 +182,7 @@ void QTuiToolBar::mousePressEvent(TuiMouseEvent *event)
         if (item.isSeparator) {
             itemWidth = 3; // " | "
         } else if (item.action) {
-            itemWidth = item.action->text().length() + 2; // padding
+            itemWidth = QtTuiUnicode::stringWidth(item.action->text()) + 2; // padding
         } else if (item.widget) {
             itemWidth = item.widget->minimumSize().width();
         }

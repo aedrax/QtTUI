@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiStyledItemDelegate.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/QTuiLineEdit.h>
 #include <QtTUI/QTuiSpinBox.h>
@@ -26,32 +27,10 @@ void QTuiStyledItemDelegate::paint(ScreenBuffer &buffer, const QRect &rect,
 
     QString text = index.data(Qt::DisplayRole).toString();
 
-    int y = rect.y();
-    int x = rect.x();
-    int maxWidth = rect.width();
-
-    // Fill the entire rect with themed background first
-    for (int col = 0; col < maxWidth; ++col) {
-        int cx = x + col;
-        if (cx >= 0 && cx < buffer.width() && y >= 0 && y < buffer.height()) {
-            Cell &cell = buffer.backCell(cx, y);
-            cell.setChar(U' ');
-            cell.foreground = props.foreground;
-            cell.background = props.background;
-            cell.bold = props.bold;
-            cell.italic = props.italic;
-            cell.underline = props.underline;
-        }
-    }
-
-    // Render text characters with themed attributes
-    for (int i = 0; i < text.length() && i < maxWidth; ++i) {
-        int cx = x + i;
-        if (cx >= 0 && cx < buffer.width() && y >= 0 && y < buffer.height()) {
-            Cell &cell = buffer.backCell(cx, y);
-            cell.setChar(text.at(i).unicode());
-        }
-    }
+    // Fill the first row of the rect with the theme, then write the text
+    const Cell style = cellStyle(props, props.foreground, props.background);
+    fillRect(buffer, QRect(rect.x(), rect.y(), rect.width(), 1), style);
+    renderText(buffer, rect.x(), rect.y(), text, rect.width(), style);
 }
 
 QTuiWidget *QTuiStyledItemDelegate::createEditor(QTuiWidget *parent,

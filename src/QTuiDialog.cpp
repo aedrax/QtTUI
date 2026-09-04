@@ -2,6 +2,7 @@
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiLayout.h>
 #include <QtTUI/QTuiMainWindow.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/QtTuiUnicode.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/Theme_Engine.h>
@@ -179,41 +180,14 @@ void QTuiDialog::paintEvent(ScreenBuffer &buffer)
     clearBackground(buffer, geo);
 
     const auto theme = themeProperties();
-    const auto border = Theme_Engine::borderChars(QStringLiteral("rounded"));
-    const int right = geo.x() + geo.width() - 1;
-    const int bottom = geo.y() + geo.height() - 1;
-    auto put = [&](int x, int y, char32_t ch, bool bold = false) {
-        if (x < 0 || y < 0 || x >= buffer.width() || y >= buffer.height())
-            return;
-        Cell &cell = buffer.backCell(x, y);
-        cell.setChar(ch);
-        cell.foreground = theme.foreground;
-        cell.background = theme.background;
-        cell.bold = bold;
-    };
-
-    for (int x = geo.x() + 1; x < right; ++x) {
-        put(x, geo.y(), border.horizontal);
-        put(x, bottom, border.horizontal);
-    }
-    for (int y = geo.y() + 1; y < bottom; ++y) {
-        put(geo.x(), y, border.vertical);
-        put(right, y, border.vertical);
-    }
-    put(geo.x(), geo.y(), border.topLeft);
-    put(right, geo.y(), border.topRight);
-    put(geo.x(), bottom, border.bottomLeft);
-    put(right, bottom, border.bottomRight);
+    drawBorder(buffer, geo, QStringLiteral("rounded"), cellStyle(theme.foreground, theme.background));
 
     // Title in the top border: "╭─ Title ───╮"
     if (!m_title.isEmpty() && geo.width() > 6) {
-        const QString title = QLatin1Char(' ') + m_title + QLatin1Char(' ');
-        int x = geo.x() + 2;
-        for (const QChar ch : title) {
-            if (x >= right - 1)
-                break;
-            put(x++, geo.y(), ch.unicode(), true);
-        }
+        Cell titleStyle = cellStyle(theme.foreground, theme.background);
+        titleStyle.bold = true;
+        renderText(buffer, geo.x() + 2, geo.y(), QLatin1Char(' ') + m_title + QLatin1Char(' '),
+                   geo.width() - 4, titleStyle);
     }
 }
 

@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiUndoView.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
@@ -92,27 +93,14 @@ void QTuiUndoView::paintEvent(ScreenBuffer &buffer)
                 bg = theme.disabledBackground;
             }
 
-            for (int x = 0; x < viewWidth; ++x) {
-                Cell &cell = buffer.backCell(geo.x() + x, screenY);
-                cell.setChar((x < text.length()) ? text.at(x).unicode() : u' ');
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = isCurrent;
-                cell.italic = false;
-                cell.underline = false;
-                cell.inverse = isCurrent;
-            }
+            Cell style = cellStyle(fg, bg);
+            style.bold = isCurrent;
+            style.inverse = isCurrent;
+            fillRect(buffer, QRect(geo.x(), screenY, viewWidth, 1), style);
+            renderText(buffer, geo.x(), screenY, text, viewWidth, style);
         } else {
-            for (int x = 0; x < viewWidth; ++x) {
-                Cell &cell = buffer.backCell(geo.x() + x, screenY);
-                cell.setChar(U' ');
-                cell.foreground = theme.foreground;
-                cell.background = theme.background;
-                cell.bold = false;
-                cell.italic = false;
-                cell.underline = false;
-                cell.inverse = false;
-            }
+            fillRect(buffer, QRect(geo.x(), screenY, viewWidth, 1),
+                     cellStyle(theme.foreground, theme.background));
         }
     }
 }

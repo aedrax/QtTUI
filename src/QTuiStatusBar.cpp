@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiStatusBar.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 
@@ -73,16 +74,7 @@ void QTuiStatusBar::paintEvent(ScreenBuffer &buffer)
         return;
 
     // Clear the entire status bar row
-    for (int col = 0; col < geo.width() && (geo.x() + col) < buffer.width(); ++col) {
-        int px = geo.x() + col;
-        Cell &cell = buffer.backCell(px, py);
-        cell.setChar(U' ');
-        cell.foreground = fg;
-        cell.background = bg;
-        cell.bold = false;
-        cell.italic = false;
-        cell.underline = false;
-    }
+    fillRect(buffer, QRect(geo.x(), py, geo.width(), 1), cellStyle(fg, bg));
 
     // Calculate space used by permanent widgets on the right
     int permanentWidth = 0;
@@ -92,19 +84,7 @@ void QTuiStatusBar::paintEvent(ScreenBuffer &buffer)
     }
 
     // Render message text on the left
-    const QString msg = currentMessage();
-    int availableForMessage = geo.width() - permanentWidth;
-    int xPos = geo.x();
-
-    for (int i = 0; i < msg.length() && i < availableForMessage; ++i) {
-        if (xPos < buffer.width()) {
-            Cell &cell = buffer.backCell(xPos, py);
-            cell.setChar(msg.at(i).unicode());
-            cell.foreground = fg;
-            cell.background = bg;
-        }
-        xPos++;
-    }
+    renderText(buffer, geo.x(), py, currentMessage(), geo.width() - permanentWidth, cellStyle(fg, bg));
 
     // Position permanent widgets on the right side
     int rightX = geo.x() + geo.width();

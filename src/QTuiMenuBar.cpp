@@ -1,4 +1,6 @@
 #include <QtTUI/QTuiMenuBar.h>
+#include <QtTUI/RenderUtils.h>
+#include <QtTUI/QtTuiUnicode.h>
 #include <QtTUI/QTuiMenu.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
@@ -67,7 +69,7 @@ void QTuiMenuBar::openMenu(int index)
     for (int i = 0; i < index; ++i) {
         QString displayTitle = m_menus.at(i)->title();
         displayTitle.remove(QLatin1Char('&'));
-        xOffset += displayTitle.length() + 2; // title + padding
+        xOffset += QtTuiUnicode::stringWidth(displayTitle) + 2; // title + padding
     }
 
     QPoint pos(geo.x() + xOffset, geo.y() + 1);
@@ -118,7 +120,7 @@ QSize QTuiMenuBar::minimumSize() const
     for (const auto *menu : m_menus) {
         QString displayTitle = menu->title();
         displayTitle.remove(QLatin1Char('&'));
-        width += displayTitle.length() + 2; // padding around each title
+        width += QtTuiUnicode::stringWidth(displayTitle) + 2; // padding around each title
     }
     return QSize(qMax(width, 1), 1);
 }
@@ -134,19 +136,7 @@ void QTuiMenuBar::paintEvent(ScreenBuffer &buffer)
     Color bg = theme.background;
 
     // Clear the bar row
-    for (int col = 0; col < geo.width() && (geo.x() + col) < buffer.width(); ++col) {
-        int px = geo.x() + col;
-        int py = geo.y();
-        if (py < buffer.height()) {
-            Cell &cell = buffer.backCell(px, py);
-            cell.setChar(U' ');
-            cell.foreground = fg;
-            cell.background = bg;
-            cell.bold = false;
-            cell.italic = false;
-            cell.underline = false;
-        }
-    }
+    fillRect(buffer, QRect(geo.x(), geo.y(), geo.width(), 1), cellStyle(fg, bg));
 
     // Render menu titles
     int xPos = geo.x();
@@ -158,39 +148,15 @@ void QTuiMenuBar::paintEvent(ScreenBuffer &buffer)
         QString displayTitle = m_menus.at(i)->title();
         displayTitle.remove(QLatin1Char('&'));
 
-        bool isActive = (i == m_activeMenuIndex);
-        Color titleFg = isActive ? bg : fg;
-        Color titleBg = isActive ? fg : bg;
-
-        // Leading space
-        if (xPos < buffer.width()) {
-            Cell &cell = buffer.backCell(xPos, py);
-            cell.setChar(U' ');
-            cell.foreground = titleFg;
-            cell.background = titleBg;
-        }
-        xPos++;
-
-        // Title text
-        for (int c = 0; c < displayTitle.length(); ++c) {
-            if (xPos < buffer.width()) {
-                Cell &cell = buffer.backCell(xPos, py);
-                cell.setChar(displayTitle.at(c).unicode());
-                cell.foreground = titleFg;
-                cell.background = titleBg;
-                cell.bold = isActive;
-            }
-            xPos++;
-        }
-
-        // Trailing space
-        if (xPos < buffer.width()) {
-            Cell &cell = buffer.backCell(xPos, py);
-            cell.setChar(U' ');
-            cell.foreground = titleFg;
-            cell.background = titleBg;
-        }
-        xPos++;
+        // The title has a space on each side; only the text of the active title is bold
+        const bool isActive = (i == m_activeMenuIndex);
+        const Cell spaceStyle = isActive ? cellStyle(bg, fg) : cellStyle(fg, bg);
+        Cell textStyle = spaceStyle;
+        textStyle.bold = isActive;
+        const int textWidth = QtTuiUnicode::stringWidth(displayTitle);
+        fillRect(buffer, QRect(xPos, py, textWidth + 2, 1), spaceStyle);
+        renderText(buffer, xPos + 1, py, displayTitle, textWidth, textStyle);
+        xPos += textWidth + 2;
     }
 }
 
@@ -260,7 +226,7 @@ void QTuiMenuBar::mousePressEvent(TuiMouseEvent *event)
     for (int i = 0; i < m_menus.size(); ++i) {
         QString displayTitle = m_menus.at(i)->title();
         displayTitle.remove(QLatin1Char('&'));
-        int itemWidth = displayTitle.length() + 2; // leading + trailing space
+        int itemWidth = QtTuiUnicode::stringWidth(displayTitle) + 2; // leading + trailing space
 
         if (clickX >= xPos && clickX < xPos + itemWidth) {
             m_activeMenuIndex = i;

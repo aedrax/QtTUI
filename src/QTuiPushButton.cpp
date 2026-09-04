@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiPushButton.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
@@ -42,7 +43,6 @@ void QTuiPushButton::paintEvent(ScreenBuffer &buffer)
         return;
 
     const auto theme = themeProperties();
-    const auto border = Theme_Engine::borderChars(theme.borderStyle);
 
     const int geoX = geo.x();
     const int geoY = geo.y();
@@ -79,83 +79,8 @@ void QTuiPushButton::paintEvent(ScreenBuffer &buffer)
     if (pressed)
         std::swap(fg, bg);
 
-    // Clear the entire button area with background
-    for (int row = 0; row < geoH; ++row) {
-        for (int col = 0; col < geoW; ++col) {
-            int px = geoX + col;
-            int py = geoY + row;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                cell.setChar(U' ');
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = theme.bold;
-                cell.italic = theme.italic;
-                cell.underline = theme.underline;
-            }
-        }
-    }
-
-    // Render top border
-    if (geoH >= 1) {
-        int py = geoY;
-        for (int col = 0; col < geoW; ++col) {
-            int px = geoX + col;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                if (col == 0)
-                    cell.setChar(border.topLeft);
-                else if (col == geoW - 1)
-                    cell.setChar(border.topRight);
-                else
-                    cell.setChar(border.horizontal);
-                cell.foreground = fg;
-                cell.background = bg;
-            }
-        }
-    }
-
-    // Render bottom border
-    if (geoH >= 3) {
-        int py = geoY + geoH - 1;
-        for (int col = 0; col < geoW; ++col) {
-            int px = geoX + col;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                if (col == 0)
-                    cell.setChar(border.bottomLeft);
-                else if (col == geoW - 1)
-                    cell.setChar(border.bottomRight);
-                else
-                    cell.setChar(border.horizontal);
-                cell.foreground = fg;
-                cell.background = bg;
-            }
-        }
-    }
-
-    // Render left and right borders for middle rows
-    for (int row = 1; row < geoH - 1; ++row) {
-        int py = geoY + row;
-        if (py < buffer.height()) {
-            // Left border
-            int pxLeft = geoX;
-            if (pxLeft < buffer.width()) {
-                Cell &cell = buffer.backCell(pxLeft, py);
-                cell.setChar(border.vertical);
-                cell.foreground = fg;
-                cell.background = bg;
-            }
-            // Right border
-            int pxRight = geoX + geoW - 1;
-            if (pxRight < buffer.width()) {
-                Cell &cell = buffer.backCell(pxRight, py);
-                cell.setChar(border.vertical);
-                cell.foreground = fg;
-                cell.background = bg;
-            }
-        }
-    }
+    fillRect(buffer, geo, cellStyle(theme, fg, bg));
+    drawBorder(buffer, geo, theme.borderStyle, cellStyle(theme, fg, bg));
 
     // Build content string: icon + text
     QString content;
@@ -169,24 +94,14 @@ void QTuiPushButton::paintEvent(ScreenBuffer &buffer)
     if (geoH >= 3 && geoW >= 3) {
         int contentRow = geoY + geoH / 2; // Middle row
         int innerWidth = geoW - 2;        // Exclude left/right borders
-        int textLen = qMin(static_cast<int>(content.length()), innerWidth);
+        int textLen = qMin(QtTuiUnicode::stringWidth(content), innerWidth);
         int startCol = 1 + (innerWidth - textLen) / 2; // Center within inner area
         if (pressed && startCol + textLen < geoW - 1)
             ++startCol;
 
-        for (int i = 0; i < textLen; ++i) {
-            int px = geoX + startCol + i;
-            int py = contentRow;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                cell.setChar(content.at(i).unicode());
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = theme.bold || (enabled && hasFocus());
-                cell.italic = theme.italic;
-                cell.underline = theme.underline;
-            }
-        }
+        Cell textStyle = cellStyle(theme, fg, bg);
+        textStyle.bold = theme.bold || (enabled && hasFocus());
+        renderText(buffer, geoX + startCol, contentRow, content, textLen, textStyle);
     }
 }
 

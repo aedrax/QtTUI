@@ -1,7 +1,84 @@
 #include <QtTUI/RenderUtils.h>
 #include <QtTUI/QtTuiUnicode.h>
+#include <QtTUI/Theme_Engine.h>
 
 namespace QtTUI {
+
+Cell cellStyle(const Color &fg, const Color &bg)
+{
+    Cell style;
+    style.foreground = fg;
+    style.background = bg;
+    return style;
+}
+
+Cell cellStyle(const ThemeProperties &theme, const Color &fg, const Color &bg)
+{
+    Cell style = cellStyle(fg, bg);
+    style.bold = theme.bold;
+    style.italic = theme.italic;
+    style.underline = theme.underline;
+    return style;
+}
+
+void fillRect(ScreenBuffer &buffer, const QRect &rect, const Cell &style)
+{
+    // QRect::intersected() normalizes a negative size, so check it first
+    if (rect.isEmpty())
+        return;
+    const QRect area = rect.intersected(QRect(0, 0, buffer.width(), buffer.height()));
+    for (int y = area.top(); y <= area.bottom(); ++y)
+        for (int x = area.left(); x <= area.right(); ++x)
+            buffer.putChar(x, y, U' ', style);
+}
+
+void drawBorder(ScreenBuffer &buffer, const QRect &rect, const QString &borderStyle,
+                const Cell &style)
+{
+    const auto border = Theme_Engine::borderChars(borderStyle);
+    const int x0 = rect.x();
+    const int y0 = rect.y();
+    const int w = rect.width();
+    const int h = rect.height();
+    auto put = [&](int x, int y, char32_t ch) {
+        if (x >= 0 && y >= 0 && x < buffer.width() && y < buffer.height())
+            buffer.putChar(x, y, ch, style);
+    };
+
+    if (h >= 1) {
+        for (int col = 0; col < w; ++col)
+            put(x0 + col, y0, col == 0 ? border.topLeft
+                              : col == w - 1 ? border.topRight : border.horizontal);
+    }
+    if (h >= 2) {
+        for (int col = 0; col < w; ++col)
+            put(x0 + col, y0 + h - 1, col == 0 ? border.bottomLeft
+                                      : col == w - 1 ? border.bottomRight : border.horizontal);
+    }
+    for (int row = 1; row < h - 1; ++row) {
+        put(x0, y0 + row, border.vertical);
+        put(x0 + w - 1, y0 + row, border.vertical);
+    }
+}
+
+int renderText(ScreenBuffer &buffer, int x, int y, const QString &text,
+               int maxWidth, const Cell &style)
+{
+    if (y < 0 || y >= buffer.height())
+        return 0;
+    maxWidth = qMin(maxWidth, buffer.width() - x);
+    int col = 0;
+    int i = 0;
+    QtTuiUnicode::Cluster c;
+    while (QtTuiUnicode::nextCluster(text, i, c)) {
+        if (col + c.width > maxWidth)
+            break;
+        if (x + col >= 0)
+            buffer.putChar(x + col, y, c.base, c.combining, style);
+        col += c.width;
+    }
+    return col;
+}
 
 void renderTextTruncated(ScreenBuffer &buffer,
                          int x, int y,
@@ -18,13 +95,7 @@ void renderTextTruncated(ScreenBuffer &buffer,
 
     if (totalCols <= maxWidth) {
         // Full string fits — write without truncation
-        int col = 0;
-        int i = 0;
-        QtTuiUnicode::Cluster c;
-        while (QtTuiUnicode::nextCluster(text, i, c)) {
-            buffer.putChar(x + col, y, c.base, c.combining, style);
-            col += c.width;
-        }
+        renderText(buffer, x, y, text, maxWidth, style);
         return;
     }
 

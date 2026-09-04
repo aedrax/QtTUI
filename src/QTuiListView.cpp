@@ -115,13 +115,8 @@ void QTuiListView::paintEvent(ScreenBuffer &buffer)
         const Cell style = itemStyle(idx, modelRow == m_currentRow, theme);
 
         // Fill the entire row with the item style first (for highlighting)
-        if (style.background != theme.background || style.underline) {
-            for (int x = 0; x < viewWidth; ++x) {
-                Cell &cell = buffer.backCell(geo.x() + x, screenY);
-                cell = style;
-                cell.setChar(U' ');
-            }
-        }
+        if (style.background != theme.background || style.underline)
+            fillRect(buffer, QRect(geo.x(), screenY, viewWidth, 1), style);
 
         // Render text with truncation
         renderTextTruncated(buffer, geo.x(), screenY, itemText, viewWidth, style);

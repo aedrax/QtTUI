@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiScrollArea.h>
+#include <QtTUI/RenderUtils.h>
 #include <QCoreApplication>
 #include <functional>
 #include <QtTUI/QTuiScrollBar.h>
@@ -219,21 +220,7 @@ void QTuiScrollArea::paintEvent(ScreenBuffer &buffer)
     const Color bg = theme.background;
 
     // Clear the viewport area with background
-    for (int row = 0; row < viewportH; ++row) {
-        for (int col = 0; col < viewportW; ++col) {
-            int px = geo.x() + col;
-            int py = geo.y() + row;
-            if (px >= buffer.width() || py >= buffer.height())
-                continue;
-            Cell &cell = buffer.backCell(px, py);
-            cell.setChar(U' ');
-            cell.foreground = fg;
-            cell.background = bg;
-            cell.bold = false;
-            cell.italic = false;
-            cell.underline = false;
-        }
-    }
+    fillRect(buffer, QRect(geo.x(), geo.y(), viewportW, viewportH), cellStyle(fg, bg));
 
     // Render the clipped portion of the child widget into a temporary buffer,
     // then copy the visible region into the main buffer
@@ -330,16 +317,8 @@ void QTuiScrollArea::paintEvent(ScreenBuffer &buffer)
     }
 
     // Fill corner cell if both scroll bars are visible
-    if (needsVScroll && needsHScroll) {
-        int cx = geo.x() + geo.width() - 1;
-        int cy = geo.y() + geo.height() - 1;
-        if (cx < buffer.width() && cy < buffer.height()) {
-            Cell &corner = buffer.backCell(cx, cy);
-            corner.setChar(U' ');
-            corner.foreground = fg;
-            corner.background = bg;
-        }
-    }
+    if (needsVScroll && needsHScroll)
+        fillRect(buffer, QRect(geo.right(), geo.bottom(), 1, 1), cellStyle(fg, bg));
 }
 
 void QTuiScrollArea::keyPressEvent(TuiKeyEvent *event)

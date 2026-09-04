@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiSplitter.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
@@ -411,19 +412,7 @@ void QTuiSplitter::paintEvent(ScreenBuffer &buffer)
     const Color bg = theme.background;
 
     // Clear the splitter area
-    for (int row = 0; row < geo.height(); ++row) {
-        for (int col = 0; col < geo.width(); ++col) {
-            int px = geo.x() + col;
-            int py = geo.y() + row;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                cell.setChar(U' ');
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = false;
-            }
-        }
-    }
+    fillRect(buffer, geo, cellStyle(fg, bg));
 
     // Paint child widgets
     for (auto *w : m_widgets) {

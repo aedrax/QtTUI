@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiTabWidget.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
@@ -193,19 +194,7 @@ void QTuiTabWidget::paintEvent(ScreenBuffer &buffer)
     m_tabBar->paintEvent(buffer);
 
     // Clear the content area below the tab bar
-    for (int row = 1; row < h; ++row) {
-        for (int col = 0; col < w; ++col) {
-            int px = x0 + col;
-            int py = y0 + row;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                cell.setChar(U' ');
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = false;
-            }
-        }
-    }
+    fillRect(buffer, geo.adjusted(0, 1, 0, 0), cellStyle(fg, bg));
 
     // Draw a separator line between tab bar and content
     if (h > 1) {

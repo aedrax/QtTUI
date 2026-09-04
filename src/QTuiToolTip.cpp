@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiToolTip.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiMainWindow.h>
 #include <QtTUI/QTuiWidget.h>
@@ -38,16 +39,10 @@ public:
         if (!isVisible() || geo.isEmpty())
             return;
         const auto theme = themeProperties();
-        const QString line = QLatin1Char(' ') + text + QLatin1Char(' ');
-        int col = 0;
-        for (int x = geo.x(); x < geo.x() + geo.width() && x < buffer.width(); ++x) {
-            Cell &cell = buffer.backCell(x, geo.y());
-            cell.setChar(col < line.length() ? line.at(col).unicode() : U' ');
-            cell.foreground = theme.background;
-            cell.background = theme.foreground;
-            cell.bold = false;
-            ++col;
-        }
+        // The tip uses the inverted theme colors
+        const Cell style = cellStyle(theme.background, theme.foreground);
+        fillRect(buffer, QRect(geo.x(), geo.y(), geo.width(), 1), style);
+        renderText(buffer, geo.x() + 1, geo.y(), text, geo.width() - 1, style);
     }
 };
 

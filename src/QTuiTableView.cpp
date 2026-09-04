@@ -126,75 +126,37 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
         firstVisibleCol = 0;
 
     // --- Render column headers on first row with bold text ---
+    // The separators between the columns and the rest of each row use the
+    // plain theme colors.
+    const Cell plain = cellStyle(theme.foreground, theme.background);
     {
-        Cell headerStyle;
-        headerStyle.foreground = theme.foreground;
-        headerStyle.background = theme.background;
+        Cell headerStyle = plain;
         headerStyle.bold = true;
-        headerStyle.inverse = false;
+        fillRect(buffer, QRect(geo.x(), geo.y(), viewWidth, 1), plain);
 
         int xOff = geo.x();
         for (int c = firstVisibleCol; c < cols; ++c) {
             if (xOff >= geo.x() + viewWidth)
                 break;
             int availWidth = qMin(colWidths[c], geo.x() + viewWidth - xOff);
-            QString header = headerText(c);
-            renderTextTruncated(buffer, xOff, geo.y(), header, availWidth, headerStyle);
-            // Fill remaining space in column with background
-            int textLen = qMin(header.length(), availWidth);
-            for (int i = textLen; i < availWidth; ++i) {
-                Cell &cell = buffer.backCell(xOff + i, geo.y());
-                cell.setChar(U' ');
-                cell.foreground = theme.foreground;
-                cell.background = theme.background;
-                cell.bold = true;
-                cell.inverse = false;
-            }
-            xOff += availWidth;
-            // Render separator space between columns
-            if (c < cols - 1 && xOff < geo.x() + viewWidth) {
-                Cell &sep = buffer.backCell(xOff, geo.y());
-                sep.setChar(U' ');
-                sep.foreground = theme.foreground;
-                sep.background = theme.background;
-                sep.bold = false;
-                sep.inverse = false;
-                xOff++;
-            }
-        }
-        // Fill remaining header row with background
-        for (int x = xOff; x < geo.x() + viewWidth; ++x) {
-            Cell &cell = buffer.backCell(x, geo.y());
-            cell.setChar(U' ');
-            cell.foreground = theme.foreground;
-            cell.background = theme.background;
-            cell.bold = false;
-            cell.inverse = false;
+            fillRect(buffer, QRect(xOff, geo.y(), availWidth, 1), headerStyle);
+            renderTextTruncated(buffer, xOff, geo.y(), headerText(c), availWidth, headerStyle);
+            xOff += availWidth + 1;
         }
     }
 
     // --- Handle empty model (0 rows): fill remaining with theme background ---
+    int visibleDataRows = viewHeight - m_headerHeight;
     if (rows == 0) {
-        int visibleDataRows = viewHeight - m_headerHeight;
-        for (int vr = 0; vr < visibleDataRows; ++vr) {
-            int screenY = geo.y() + m_headerHeight + vr;
-            for (int x = geo.x(); x < geo.x() + viewWidth; ++x) {
-                Cell &cell = buffer.backCell(x, screenY);
-                cell.setChar(U' ');
-                cell.foreground = theme.foreground;
-                cell.background = theme.background;
-                cell.bold = false;
-                cell.inverse = false;
-            }
-        }
+        fillRect(buffer, QRect(geo.x(), geo.y() + m_headerHeight, viewWidth, visibleDataRows), plain);
         return;
     }
 
     // --- Render visible data rows ---
-    int visibleDataRows = viewHeight - m_headerHeight;
     for (int vr = 0; vr < visibleDataRows; ++vr) {
         int modelRow = m_scrollOffset + vr;
         int screenY = geo.y() + m_headerHeight + vr;
+        fillRect(buffer, QRect(geo.x(), screenY, viewWidth, 1), plain);
 
         int xOff = geo.x();
         for (int c = firstVisibleCol; c < cols; ++c) {
@@ -210,47 +172,23 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
             }
 
             bool isCurrent = (modelRow == m_currentRow && c == m_currentCol && modelRow < rows);
-            const Cell cellStyle = itemStyle(idx, isCurrent, theme);
+            const Cell style = itemStyle(idx, isCurrent, theme);
 
-            // Render cell text using renderTextTruncated
-            renderTextTruncated(buffer, xOff, screenY, cellText, availWidth, cellStyle);
-
-            // Fill remaining space with background (clear old content)
-            int textLen = qMin(cellText.length(), availWidth);
-            for (int i = textLen; i < availWidth; ++i) {
-                Cell &cell = buffer.backCell(xOff + i, screenY);
-                cell.setChar(U' ');
-                cell.foreground = cellStyle.foreground;
-                cell.background = cellStyle.background;
-                cell.bold = false;
-                cell.inverse = false;
-                cell.underline = cellStyle.underline;
-            }
+            // The space after the text has the item colors, without bold or inverse
+            Cell padStyle = style;
+            padStyle.bold = false;
+            padStyle.inverse = false;
+            fillRect(buffer, QRect(xOff, screenY, availWidth, 1), padStyle);
+            renderTextTruncated(buffer, xOff, screenY, cellText, availWidth, style);
             xOff += availWidth;
 
             // Render separator space between columns. Between two selected
             // cells it has the selection color, so a selected row is one bar.
             if (c < cols - 1 && xOff < geo.x() + viewWidth) {
-                const bool joined = isSelected(idx)
-                    && isSelected(m_model->index(modelRow, c + 1));
-                Cell &sep = buffer.backCell(xOff, screenY);
-                sep.setChar(U' ');
-                sep.foreground = theme.foreground;
-                sep.background = joined ? cellStyle.background : theme.background;
-                sep.underline = false;
-                sep.bold = false;
-                sep.inverse = false;
+                if (isSelected(idx) && isSelected(m_model->index(modelRow, c + 1)))
+                    fillRect(buffer, QRect(xOff, screenY, 1, 1), cellStyle(theme.foreground, style.background));
                 xOff++;
             }
-        }
-        // Fill remaining row with background
-        for (int x = xOff; x < geo.x() + viewWidth; ++x) {
-            Cell &cell = buffer.backCell(x, screenY);
-            cell.setChar(U' ');
-            cell.foreground = theme.foreground;
-            cell.background = theme.background;
-            cell.bold = false;
-            cell.inverse = false;
         }
     }
 }

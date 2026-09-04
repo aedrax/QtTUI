@@ -3,9 +3,42 @@
 
 #include <QtTUI/QtTUIGlobal.h>
 #include <QtTUI/ScreenBuffer.h>
+#include <QtTUI/Theme_Engine.h>
+#include <QRect>
 #include <QString>
 
 namespace QtTUI {
+
+/** A cell style with the two colors and no text attributes. */
+Cell cellStyle(const Color &fg, const Color &bg);
+/** A cell style with the two colors and the bold, italic and underline of theme. */
+Cell cellStyle(const ThemeProperties &theme, const Color &fg, const Color &bg);
+
+/**
+ * Sets each cell of rect to a space with the attributes of style. The
+ * function clips rect to the buffer.
+ */
+void fillRect(ScreenBuffer &buffer, const QRect &rect, const Cell &style);
+
+/**
+ * Draws a border on the edge of rect with the characters of borderStyle
+ * (see Theme_Engine::borderChars) and the attributes of style. The function
+ * draws the top row if the height is at least 1, the bottom row if it is at
+ * least 2, and the side columns of the rows between them. It clips to the
+ * buffer.
+ */
+void drawBorder(ScreenBuffer &buffer, const QRect &rect, const QString &borderStyle,
+                const Cell &style);
+
+/**
+ * Writes text into the buffer at (x, y), in maxWidth COLUMNS at most, and
+ * returns the number of columns that it wrote. The function stops at
+ * maxWidth and at the right edge of the buffer, without an ellipsis. A
+ * wide character that does not fit is not written. Each character gets the
+ * attributes of style.
+ */
+int renderText(ScreenBuffer &buffer, int x, int y, const QString &text,
+               int maxWidth, const Cell &style);
 
 /**
  * Writes text into the buffer at (x, y) truncated to maxWidth COLUMNS.

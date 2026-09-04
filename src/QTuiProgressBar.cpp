@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiProgressBar.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/QTuiApplication.h>
 #include <QTimer>
 #include <QtTUI/Theme_Engine.h>
@@ -179,7 +180,6 @@ void QTuiProgressBar::paintEvent(ScreenBuffer &buffer)
         return;
 
     const auto theme = themeProperties();
-    const auto border = Theme_Engine::borderChars(theme.borderStyle);
 
     const int geoX = geo.x();
     const int geoY = geo.y();
@@ -194,81 +194,8 @@ void QTuiProgressBar::paintEvent(ScreenBuffer &buffer)
         bg = theme.focusBackground;
     }
 
-    // Clear the entire widget area with background
-    for (int row = 0; row < geoH; ++row) {
-        for (int col = 0; col < geoW; ++col) {
-            int px = geoX + col;
-            int py = geoY + row;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                cell.setChar(U' ');
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = theme.bold;
-                cell.italic = theme.italic;
-                cell.underline = theme.underline;
-            }
-        }
-    }
-
-    // Render top border
-    if (geoH >= 1) {
-        int py = geoY;
-        for (int col = 0; col < geoW; ++col) {
-            int px = geoX + col;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                if (col == 0)
-                    cell.setChar(border.topLeft);
-                else if (col == geoW - 1)
-                    cell.setChar(border.topRight);
-                else
-                    cell.setChar(border.horizontal);
-                cell.foreground = fg;
-                cell.background = bg;
-            }
-        }
-    }
-
-    // Render bottom border
-    if (geoH >= 3) {
-        int py = geoY + geoH - 1;
-        for (int col = 0; col < geoW; ++col) {
-            int px = geoX + col;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                if (col == 0)
-                    cell.setChar(border.bottomLeft);
-                else if (col == geoW - 1)
-                    cell.setChar(border.bottomRight);
-                else
-                    cell.setChar(border.horizontal);
-                cell.foreground = fg;
-                cell.background = bg;
-            }
-        }
-    }
-
-    // Render left and right borders for middle rows
-    for (int row = 1; row < geoH - 1; ++row) {
-        int py = geoY + row;
-        if (py < buffer.height()) {
-            int pxLeft = geoX;
-            if (pxLeft < buffer.width()) {
-                Cell &cell = buffer.backCell(pxLeft, py);
-                cell.setChar(border.vertical);
-                cell.foreground = fg;
-                cell.background = bg;
-            }
-            int pxRight = geoX + geoW - 1;
-            if (pxRight < buffer.width()) {
-                Cell &cell = buffer.backCell(pxRight, py);
-                cell.setChar(border.vertical);
-                cell.foreground = fg;
-                cell.background = bg;
-            }
-        }
-    }
+    fillRect(buffer, geo, cellStyle(theme, fg, bg));
+    drawBorder(buffer, geo, theme.borderStyle, cellStyle(theme, fg, bg));
 
     // Inner content area (inside borders)
     const int innerX = geoX + 1;
@@ -352,16 +279,11 @@ void QTuiProgressBar::paintEvent(ScreenBuffer &buffer)
 
         // Overlay format text centered on the bar
         if (!formatText.isEmpty()) {
-            int textLen = qMin(static_cast<int>(formatText.length()), innerW);
+            int textLen = qMin(QtTuiUnicode::stringWidth(formatText), innerW);
             int startCol = (innerW - textLen) / 2;
-            for (int i = 0; i < textLen; ++i) {
-                int px = innerX + startCol + i;
-                if (px >= buffer.width() || contentRow >= buffer.height())
-                    continue;
-                Cell &cell = buffer.backCell(px, contentRow);
-                cell.setChar(formatText.at(i).unicode());
-                cell.bold = true;
-            }
+            Cell textStyle = cellStyle(theme, fg, bg);
+            textStyle.bold = true;
+            renderText(buffer, innerX + startCol, contentRow, formatText, textLen, textStyle);
         }
     } else {
         // Vertical: fill from bottom up

@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiLCDNumber.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 
@@ -200,7 +201,6 @@ void QTuiLCDNumber::paintEvent(ScreenBuffer &buffer)
         return;
 
     const auto theme = themeProperties();
-    const auto border = Theme_Engine::borderChars(theme.borderStyle);
 
     const int geoX = geo.x();
     const int geoY = geo.y();
@@ -210,25 +210,10 @@ void QTuiLCDNumber::paintEvent(ScreenBuffer &buffer)
     Color fg = hasFocus() ? theme.focusForeground : theme.foreground;
     Color bg = hasFocus() ? theme.focusBackground : theme.background;
 
-    // Clear entire widget area
-    for (int row = 0; row < geoH; ++row) {
-        for (int col = 0; col < geoW; ++col) {
-            int px = geoX + col;
-            int py = geoY + row;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                cell.setChar(U' ');
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = theme.bold;
-                cell.italic = theme.italic;
-                cell.underline = theme.underline;
-            }
-        }
-    }
+    fillRect(buffer, geo, cellStyle(theme, fg, bg));
 
     // Border: the LCD number is a Box frame
-    drawBorder(buffer, geo, theme.borderStyle, fg, bg);
+    drawBorder(buffer, geo, theme.borderStyle, cellStyle(theme, fg, bg));
 
     // Render segment art for each character in display text
     // Inner area starts at (geoX+1, geoY+1), size (geoW-2, geoH-2)
@@ -258,21 +243,13 @@ void QTuiLCDNumber::paintEvent(ScreenBuffer &buffer)
         startCol = 1;
 
     // Render 3 rows of segment art
+    Cell segmentStyle = cellStyle(theme, fg, bg);
+    segmentStyle.bold = true;
     for (int line = 0; line < 3; ++line) {
         int col = startCol;
         for (int d = 0; d < allSegments.size(); ++d) {
             const QString &artLine = allSegments[d][line];
-            for (int c = 0; c < artLine.length() && c < 3; ++c) {
-                int px = geoX + col + c;
-                int py = geoY + 1 + line;
-                if (px < buffer.width() && py < buffer.height() && (col + c) < geoW - 1) {
-                    Cell &cell = buffer.backCell(px, py);
-                    cell.setChar(artLine.at(c).unicode());
-                    cell.foreground = fg;
-                    cell.background = bg;
-                    cell.bold = true;
-                }
-            }
+            renderText(buffer, geoX + col, geoY + 1 + line, artLine.left(3), geoW - 1 - col, segmentStyle);
             col += 3;
             // Add gap between digits
             if (d < allSegments.size() - 1)

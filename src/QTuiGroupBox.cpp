@@ -1,5 +1,6 @@
 #include <QtTUI/QTuiGroupBox.h>
 #include <QtTUI/QTuiLayout.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
@@ -99,111 +100,30 @@ void QTuiGroupBox::paintEvent(ScreenBuffer &buffer)
         return;
 
     const auto theme = themeProperties();
-    const auto border = Theme_Engine::borderChars(theme.borderStyle);
     const Color fg = theme.foreground;
     const Color bg = theme.background;
 
     const int x0 = geo.x();
     const int y0 = geo.y();
     const int w = geo.width();
-    const int h = geo.height();
 
     // --- Render chrome first: borders and title ---
 
-    // Draw border
-    for (int col = 0; col < w; ++col) {
-        int px = x0 + col;
-        // Top border
-        if (y0 < buffer.height() && px < buffer.width()) {
-            Cell &cell = buffer.backCell(px, y0);
-            if (col == 0)
-                cell.setChar(border.topLeft);
-            else if (col == w - 1)
-                cell.setChar(border.topRight);
-            else
-                cell.setChar(border.horizontal);
-            cell.foreground = fg;
-            cell.background = bg;
-            cell.bold = theme.bold;
-        }
-        // Bottom border
-        int by = y0 + h - 1;
-        if (by < buffer.height() && px < buffer.width()) {
-            Cell &cell = buffer.backCell(px, by);
-            if (col == 0)
-                cell.setChar(border.bottomLeft);
-            else if (col == w - 1)
-                cell.setChar(border.bottomRight);
-            else
-                cell.setChar(border.horizontal);
-            cell.foreground = fg;
-            cell.background = bg;
-            cell.bold = theme.bold;
-        }
-    }
-
-    // Left and right borders (interior rows)
-    for (int row = 1; row < h - 1; ++row) {
-        int py = y0 + row;
-        if (py >= buffer.height())
-            continue;
-        // Left
-        if (x0 < buffer.width()) {
-            Cell &cell = buffer.backCell(x0, py);
-            cell.setChar(border.vertical);
-            cell.foreground = fg;
-            cell.background = bg;
-            cell.bold = theme.bold;
-        }
-        // Right
-        int rx = x0 + w - 1;
-        if (rx < buffer.width()) {
-            Cell &cell = buffer.backCell(rx, py);
-            cell.setChar(border.vertical);
-            cell.foreground = fg;
-            cell.background = bg;
-            cell.bold = theme.bold;
-        }
-    }
-
-    // Clear interior (content area)
-    for (int row = 1; row < h - 1; ++row) {
-        for (int col = 1; col < w - 1; ++col) {
-            int px = x0 + col;
-            int py = y0 + row;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                cell.setChar(U' ');
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = false;
-            }
-        }
-    }
+    // The border and the title use the bold of the theme; the interior is plain
+    Cell chromeStyle = cellStyle(fg, bg);
+    chromeStyle.bold = theme.bold;
+    drawBorder(buffer, geo, theme.borderStyle, chromeStyle);
+    fillRect(buffer, geo.adjusted(1, 1, -1, -1), cellStyle(fg, bg));
 
     // Draw title in top border (if present)
     if (!m_title.isEmpty() && w > 4) {
-        int titleCol = 2; // start after border + space
         QString titleStr;
         if (m_checkable) {
             titleStr = (m_checked ? QStringLiteral("[x] ") : QStringLiteral("[ ] "));
         }
         titleStr += m_title;
-
-        int maxLen = w - 4; // leave room for border chars and spacing
-        if (titleStr.length() > maxLen)
-            titleStr = titleStr.left(maxLen);
-
-        for (int i = 0; i < titleStr.length(); ++i) {
-            int px = x0 + titleCol + i;
-            if (px < buffer.width() && y0 < buffer.height()) {
-                Cell &cell = buffer.backCell(px, y0);
-                cell.setChar(titleStr.at(i).unicode());
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = theme.bold;
-            }
-        }
+        // Start after the border and a space; leave room for the border chars and spacing
+        renderText(buffer, x0 + 2, y0, titleStr, w - 4, chromeStyle);
     }
 
     // --- Compute content area and set child geometries within it ---

@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiDateTimeEdit.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
@@ -262,7 +263,6 @@ void QTuiDateTimeEdit::paintEvent(ScreenBuffer &buffer)
         return;
 
     const auto theme = themeProperties();
-    const auto border = Theme_Engine::borderChars(theme.borderStyle);
 
     const int geoX = geo.x();
     const int geoY = geo.y();
@@ -277,81 +277,8 @@ void QTuiDateTimeEdit::paintEvent(ScreenBuffer &buffer)
         bg = theme.focusBackground;
     }
 
-    // Clear the entire widget area
-    for (int row = 0; row < geoH; ++row) {
-        for (int col = 0; col < geoW; ++col) {
-            int px = geoX + col;
-            int py = geoY + row;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                cell.setChar(U' ');
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = theme.bold;
-                cell.italic = theme.italic;
-                cell.underline = theme.underline;
-            }
-        }
-    }
-
-    // Render top border
-    if (geoH >= 1) {
-        int py = geoY;
-        for (int col = 0; col < geoW; ++col) {
-            int px = geoX + col;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                if (col == 0)
-                    cell.setChar(border.topLeft);
-                else if (col == geoW - 1)
-                    cell.setChar(border.topRight);
-                else
-                    cell.setChar(border.horizontal);
-                cell.foreground = fg;
-                cell.background = bg;
-            }
-        }
-    }
-
-    // Render bottom border
-    if (geoH >= 3) {
-        int py = geoY + geoH - 1;
-        for (int col = 0; col < geoW; ++col) {
-            int px = geoX + col;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                if (col == 0)
-                    cell.setChar(border.bottomLeft);
-                else if (col == geoW - 1)
-                    cell.setChar(border.bottomRight);
-                else
-                    cell.setChar(border.horizontal);
-                cell.foreground = fg;
-                cell.background = bg;
-            }
-        }
-    }
-
-    // Render left and right borders for middle rows
-    for (int row = 1; row < geoH - 1; ++row) {
-        int py = geoY + row;
-        if (py < buffer.height()) {
-            int pxLeft = geoX;
-            if (pxLeft < buffer.width()) {
-                Cell &cell = buffer.backCell(pxLeft, py);
-                cell.setChar(border.vertical);
-                cell.foreground = fg;
-                cell.background = bg;
-            }
-            int pxRight = geoX + geoW - 1;
-            if (pxRight < buffer.width()) {
-                Cell &cell = buffer.backCell(pxRight, py);
-                cell.setChar(border.vertical);
-                cell.foreground = fg;
-                cell.background = bg;
-            }
-        }
-    }
+    fillRect(buffer, geo, cellStyle(theme, fg, bg));
+    drawBorder(buffer, geo, theme.borderStyle, cellStyle(theme, fg, bg));
 
     // Render formatted datetime content in the middle row
     if (geoH >= 3 && geoW >= 3) {
@@ -375,26 +302,17 @@ void QTuiDateTimeEdit::paintEvent(ScreenBuffer &buffer)
             }
         }
 
-        for (int i = 0; i < textLen; ++i) {
-            int px = geoX + startCol + i;
-            int py = contentRow;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                cell.setChar(formatted.at(i).unicode());
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = theme.bold;
-                cell.italic = theme.italic;
-                cell.underline = theme.underline;
+        const Cell textStyle = cellStyle(theme, fg, bg);
+        renderText(buffer, geoX + startCol, contentRow, formatted, textLen, textStyle);
 
-                // Highlight the active section with underline
-                if (hasFocus() && activeRange.startPos >= 0
-                    && i >= activeRange.startPos
-                    && i < activeRange.startPos + activeRange.length) {
-                    cell.underline = true;
-                    cell.bold = true;
-                }
-            }
+        // Highlight the active section with underline
+        if (hasFocus() && activeRange.startPos >= 0 && activeRange.startPos < textLen) {
+            Cell sectionStyle = textStyle;
+            sectionStyle.underline = true;
+            sectionStyle.bold = true;
+            renderText(buffer, geoX + startCol + activeRange.startPos, contentRow,
+                       formatted.mid(activeRange.startPos, activeRange.length),
+                       textLen - activeRange.startPos, sectionStyle);
         }
     }
 }

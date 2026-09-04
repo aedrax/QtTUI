@@ -1,4 +1,5 @@
 #include <QtTUI/RenderScheduler.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiMainWindow.h>
 #include <QtTUI/QTuiWidget.h>
@@ -171,19 +172,7 @@ void RenderScheduler::clearVacatedRegion(QTuiWidget *parent, const QRect &region
         return;
 
     ThemeProperties parentTheme = parent->themeProperties();
-    for (int row = region.y(); row < region.y() + region.height(); ++row) {
-        for (int col = region.x(); col < region.x() + region.width(); ++col) {
-            Cell &cell = buffer->backCell(col, row);
-            cell.setChar(U' ');
-            cell.foreground = parentTheme.foreground;
-            cell.background = parentTheme.background;
-            cell.bold = false;
-            cell.italic = false;
-            cell.underline = false;
-            cell.strikethrough = false;
-            cell.inverse = false;
-        }
-    }
+    fillRect(*buffer, region, cellStyle(parentTheme.foreground, parentTheme.background));
 }
 
 void RenderScheduler::paintTree(QTuiWidget *widget, const QRect &parentClipRect)

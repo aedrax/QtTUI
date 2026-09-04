@@ -30,11 +30,6 @@ public:
 protected:
     // Draws the frame of this widget if it has one
     void drawFrame(ScreenBuffer &buffer) const;
-    // Draws a border on the edge of rect: the top row if the height is at
-    // least 1, the bottom row if it is at least 2, and the side columns of
-    // the rows between them
-    static void drawBorder(ScreenBuffer &buffer, const QRect &rect, const QString &style,
-                           const Color &fg, const Color &bg);
 
 private:
     Shape m_shape = NoFrame;

@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiLabel.h>
+#include <QtTUI/RenderUtils.h>
 #include <QHash>
 #include <QtTUI/QtTuiUnicode.h>
 #include <QtTUI/Theme_Engine.h>
@@ -300,21 +301,7 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
     const Color bg = hasFocus() ? theme.focusBackground : theme.background;
 
     // Clear the label area with background
-    for (int row = 0; row < geoH; ++row) {
-        for (int col = 0; col < geoW; ++col) {
-            int px = geoX + col;
-            int py = geoY + row;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                cell.setChar(U' ');
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = theme.bold;
-                cell.italic = theme.italic;
-                cell.underline = theme.underline;
-            }
-        }
-    }
+    fillRect(buffer, geo, cellStyle(theme, fg, bg));
 
     // Get wrapped lines
     QString shown;

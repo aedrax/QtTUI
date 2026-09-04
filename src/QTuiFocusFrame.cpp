@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiFocusFrame.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 
@@ -84,42 +85,9 @@ void QTuiFocusFrame::paintEvent(ScreenBuffer &buffer)
     const Color fg = theme.focusForeground;
     const Color bg = theme.background;
 
-    const auto border = Theme_Engine::borderChars(theme.borderStyle);
-
-    const int x0 = geo.x();
-    const int y0 = geo.y();
-    const int w = geo.width();
-    const int h = geo.height();
-    const int x1 = x0 + w - 1;
-    const int y1 = y0 + h - 1;
-
-    // Draw the four corners
-    auto setCell = [&](int x, int y, char32_t ch) {
-        if (x >= 0 && x < buffer.width() && y >= 0 && y < buffer.height()) {
-            Cell &cell = buffer.backCell(x, y);
-            cell.setChar(ch);
-            cell.foreground = fg;
-            cell.background = bg;
-            cell.bold = theme.bold;
-        }
-    };
-
-    setCell(x0, y0, border.topLeft);
-    setCell(x1, y0, border.topRight);
-    setCell(x0, y1, border.bottomLeft);
-    setCell(x1, y1, border.bottomRight);
-
-    // Draw top and bottom horizontal edges
-    for (int col = x0 + 1; col < x1; ++col) {
-        setCell(col, y0, border.horizontal);
-        setCell(col, y1, border.horizontal);
-    }
-
-    // Draw left and right vertical edges
-    for (int row = y0 + 1; row < y1; ++row) {
-        setCell(x0, row, border.vertical);
-        setCell(x1, row, border.vertical);
-    }
+    Cell style = cellStyle(fg, bg);
+    style.bold = theme.bold;
+    drawBorder(buffer, geo, theme.borderStyle, style);
 }
 
 } // namespace QtTUI

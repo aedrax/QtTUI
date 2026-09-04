@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiStackedWidget.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 
@@ -133,25 +134,8 @@ void QTuiStackedWidget::paintEvent(ScreenBuffer &buffer)
     const Color fg = theme.foreground;
     const Color bg = theme.background;
 
-    const int x0 = geo.x();
-    const int y0 = geo.y();
-    const int w = geo.width();
-    const int h = geo.height();
-
     // Clear the widget area
-    for (int row = 0; row < h; ++row) {
-        for (int col = 0; col < w; ++col) {
-            int px = x0 + col;
-            int py = y0 + row;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                cell.setChar(U' ');
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = false;
-            }
-        }
-    }
+    fillRect(buffer, geo, cellStyle(fg, bg));
 
     // Paint only the current widget
     if (m_currentIndex >= 0 && m_currentIndex < m_widgets.size()) {

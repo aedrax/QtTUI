@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiToolBox.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
@@ -131,19 +132,7 @@ void QTuiToolBox::paintEvent(ScreenBuffer &buffer)
     const int h = geo.height();
 
     // Clear entire area
-    for (int row = 0; row < h; ++row) {
-        for (int col = 0; col < w; ++col) {
-            int px = x0 + col;
-            int py = y0 + row;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                cell.setChar(U' ');
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = false;
-            }
-        }
-    }
+    fillRect(buffer, geo, cellStyle(fg, bg));
 
     // Render headers and content vertically
     int currentRow = 0;
@@ -154,29 +143,10 @@ void QTuiToolBox::paintEvent(ScreenBuffer &buffer)
 
         // Draw header row
         QString indicator = isCurrent ? QStringLiteral("\u25BC ") : QStringLiteral("\u25B6 ");
-        QString headerLine = indicator + item.label;
-        if (headerLine.length() > w)
-            headerLine = headerLine.left(w);
-
-        Color headerFg = isFocusedHeader ? focusFg : fg;
-        Color headerBg = isFocusedHeader ? focusBg : bg;
-
-        int py = y0 + currentRow;
-        if (py < buffer.height()) {
-            for (int col = 0; col < w; ++col) {
-                int px = x0 + col;
-                if (px >= buffer.width())
-                    continue;
-                Cell &cell = buffer.backCell(px, py);
-                if (col < headerLine.length())
-                    cell.setChar(headerLine.at(col).unicode());
-                else
-                    cell.setChar(U' ');
-                cell.foreground = headerFg;
-                cell.background = headerBg;
-                cell.bold = theme.bold || isFocusedHeader;
-            }
-        }
+        Cell headerStyle = isFocusedHeader ? cellStyle(focusFg, focusBg) : cellStyle(fg, bg);
+        headerStyle.bold = theme.bold || isFocusedHeader;
+        fillRect(buffer, QRect(x0, y0 + currentRow, w, 1), headerStyle);
+        renderText(buffer, x0, y0 + currentRow, indicator + item.label, w, headerStyle);
         ++currentRow;
 
         // If this is the current (expanded) item, render its content widget

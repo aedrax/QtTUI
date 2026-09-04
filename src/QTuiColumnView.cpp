@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiColumnView.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
@@ -176,16 +177,7 @@ void QTuiColumnView::paintEvent(ScreenBuffer &buffer)
     const int viewHeight = geo.height();
 
     // Clear the entire area first
-    for (int y = 0; y < viewHeight; ++y) {
-        for (int x = 0; x < viewWidth; ++x) {
-            Cell &cell = buffer.backCell(geo.x() + x, geo.y() + y);
-            cell.setChar(U' ');
-            cell.foreground = theme.foreground;
-            cell.background = theme.background;
-            cell.bold = false;
-            cell.inverse = false;
-        }
-    }
+    fillRect(buffer, geo, cellStyle(theme.foreground, theme.background));
 
     // Draw each visible column
     int xOffset = 0;
@@ -214,20 +206,12 @@ void QTuiColumnView::paintEvent(ScreenBuffer &buffer)
                 if (hasChildren)
                     text += QStringLiteral(" ▶");
 
-                for (int x = 0; x < drawWidth; ++x) {
-                    Cell &cell = buffer.backCell(geo.x() + xOffset + x, screenY);
-                    cell.setChar((x < text.length()) ? text.at(x).unicode() : u' ');
-                    cell.bold = false;
-
-                    if (isCurrent || isSelected(idx)) {
-                        cell.foreground = theme.focusForeground;
-                        cell.background = theme.focusBackground;
-                    } else {
-                        cell.foreground = theme.foreground;
-                        cell.background = theme.background;
-                    }
-                    cell.inverse = isCurrent;
-                }
+                Cell style = (isCurrent || isSelected(idx))
+                    ? cellStyle(theme.focusForeground, theme.focusBackground)
+                    : cellStyle(theme.foreground, theme.background);
+                style.inverse = isCurrent;
+                fillRect(buffer, QRect(geo.x() + xOffset, screenY, drawWidth, 1), style);
+                renderText(buffer, geo.x() + xOffset, screenY, text, drawWidth, style);
             }
             // Empty rows already cleared above
         }

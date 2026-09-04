@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiMdiArea.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/QTuiMdiSubWindow.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
@@ -142,19 +143,7 @@ void QTuiMdiArea::paintEvent(ScreenBuffer &buffer)
     const Color bg = theme.background;
 
     // Clear the MDI area background
-    for (int row = 0; row < geo.height(); ++row) {
-        for (int col = 0; col < geo.width(); ++col) {
-            int px = geo.x() + col;
-            int py = geo.y() + row;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                cell.setChar(U' ');
-                cell.foreground = theme.foreground;
-                cell.background = bg;
-                cell.bold = false;
-            }
-        }
-    }
+    fillRect(buffer, geo, cellStyle(theme.foreground, bg));
 
     // Paint each subwindow; active window is painted last (on top)
     for (auto *sub : m_subWindows) {

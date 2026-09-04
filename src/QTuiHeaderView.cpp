@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiHeaderView.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
@@ -158,93 +159,37 @@ void QTuiHeaderView::paintEvent(ScreenBuffer &buffer)
         return;
 
     const auto theme = themeProperties();
-    const Color fg = theme.foreground;
-    const Color bg = theme.background;
-    const Color focusFg = theme.focusForeground;
-    const Color focusBg = theme.focusBackground;
     const int n = count();
+    // Writes the label of section i in a cell of w columns at (x, y)
+    auto paintSection = [&](int i, Qt::Orientation orientation, int x, int y, int w) {
+        Cell style = cellStyle(theme, theme.foreground, theme.background);
+        if (hasFocus() && i == m_focusedSection) {
+            style.foreground = theme.focusForeground;
+            style.background = theme.focusBackground;
+            style.bold = true;
+        }
+        fillRect(buffer, QRect(x, y, w, 1), style);
+        renderText(buffer, x, y, m_model->headerData(i, orientation, Qt::DisplayRole).toString(), w, style);
+    };
 
     if (m_orientation == Qt::Horizontal) {
         // Render header labels in a single row
-        const int y = geo.y();
         int x = geo.x();
-
         for (int i = 0; i < n; ++i) {
             if (isSectionHidden(i))
                 continue;
-
-            int secWidth = sectionSize(i);
-            QString label = m_model->headerData(i, Qt::Horizontal, Qt::DisplayRole).toString();
-            bool isFocused = (hasFocus() && i == m_focusedSection);
-
-            for (int col = 0; col < secWidth; ++col) {
-                int px = x + col;
-                if (px >= buffer.width() || px < 0 || y < 0 || y >= buffer.height())
-                    continue;
-
-                Cell &cell = buffer.backCell(px, y);
-                cell.setChar((col < label.length()) ? label.at(col).unicode() : u' ');
-
-                if (isFocused) {
-                    cell.foreground = focusFg;
-                    cell.background = focusBg;
-                    cell.bold = true;
-                } else {
-                    cell.foreground = fg;
-                    cell.background = bg;
-                    cell.bold = theme.bold;
-                }
-                cell.italic = theme.italic;
-                cell.underline = theme.underline;
-            }
-            x += secWidth;
+            paintSection(i, Qt::Horizontal, x, geo.y(), sectionSize(i));
+            x += sectionSize(i);
         }
-
         // Fill remaining width with background
-        for (int px = x; px < geo.x() + geo.width() && px < buffer.width(); ++px) {
-            if (y >= 0 && y < buffer.height()) {
-                Cell &cell = buffer.backCell(px, y);
-                cell.setChar(U' ');
-                cell.foreground = fg;
-                cell.background = bg;
-            }
-        }
+        fillRect(buffer, QRect(x, geo.y(), geo.right() + 1 - x, 1), cellStyle(theme.foreground, theme.background));
     } else {
         // Vertical: render labels in a single column
-        const int x = geo.x();
-        const int w = geo.width();
         int row = geo.y();
-
-        for (int i = 0; i < n; ++i) {
+        for (int i = 0; i < n && row <= geo.bottom(); ++i) {
             if (isSectionHidden(i))
                 continue;
-            if (row >= geo.y() + geo.height())
-                break;
-
-            QString label = m_model->headerData(i, Qt::Vertical, Qt::DisplayRole).toString();
-            bool isFocused = (hasFocus() && i == m_focusedSection);
-
-            for (int col = 0; col < w; ++col) {
-                int px = x + col;
-                if (px >= buffer.width() || px < 0 || row < 0 || row >= buffer.height())
-                    continue;
-
-                Cell &cell = buffer.backCell(px, row);
-                cell.setChar((col < label.length()) ? label.at(col).unicode() : u' ');
-
-                if (isFocused) {
-                    cell.foreground = focusFg;
-                    cell.background = focusBg;
-                    cell.bold = true;
-                } else {
-                    cell.foreground = fg;
-                    cell.background = bg;
-                    cell.bold = theme.bold;
-                }
-                cell.italic = theme.italic;
-                cell.underline = theme.underline;
-            }
-            ++row;
+            paintSection(i, Qt::Vertical, geo.x(), row++, geo.width());
         }
     }
 }

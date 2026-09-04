@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiComboBox.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
@@ -67,90 +68,23 @@ void QTuiComboBoxPopup::paintEvent(ScreenBuffer &buffer)
     const int gw = geo.width();
     const int gh = geo.height();
 
-    // Clear the popup area
-    for (int row = 0; row < gh; ++row) {
-        for (int col = 0; col < gw; ++col) {
-            int px = gx + col;
-            int py = gy + row;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                cell.setChar(U' ');
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = false;
-                cell.italic = false;
-                cell.underline = false;
-            }
-        }
-    }
+    fillRect(buffer, geo, cellStyle(fg, bg));
+    drawBorder(buffer, geo, theme.borderStyle, cellStyle(fg, bg));
 
     // Top row: separator joining the combo body above (replaces its bottom border)
-    if (gy < buffer.height()) {
-        for (int col = 0; col < gw && (gx + col) < buffer.width(); ++col) {
-            Cell &cell = buffer.backCell(gx + col, gy);
-            if (col == 0 || col == gw - 1)
-                cell.setChar(border.vertical);
-            else
-                cell.setChar(border.horizontal);
-            cell.foreground = fg;
-            cell.background = bg;
-        }
-    }
+    for (int col = 0; col < gw; ++col)
+        buffer.putChar(gx + col, gy, (col == 0 || col == gw - 1) ? border.vertical : border.horizontal,
+                       cellStyle(fg, bg));
 
     // Item rows between the separator and the bottom border
     const int innerWidth = gw - 2;
     const QStringList &items = m_combo->m_items;
-    for (int i = 0; i < items.size(); ++i) {
-        int rowY = gy + 1 + i;
-        if (rowY >= buffer.height() || rowY >= gy + gh - 1)
-            break;
-
-        // Left/right borders
-        if (gx < buffer.width()) {
-            Cell &cell = buffer.backCell(gx, rowY);
-            cell.setChar(border.vertical);
-            cell.foreground = fg;
-            cell.background = bg;
-        }
-        int rx = gx + gw - 1;
-        if (rx < buffer.width()) {
-            Cell &cell = buffer.backCell(rx, rowY);
-            cell.setChar(border.vertical);
-            cell.foreground = fg;
-            cell.background = bg;
-        }
-
-        bool highlighted = (i == m_combo->m_dropdownHighlight);
-        Color itemFg = highlighted ? bg : fg;
-        Color itemBg = highlighted ? fg : bg;
-
-        QString itemStr = items.at(i).left(innerWidth);
-        for (int col = 0; col < innerWidth; ++col) {
-            int px = gx + 1 + col;
-            if (px >= buffer.width())
-                break;
-            Cell &cell = buffer.backCell(px, rowY);
-            cell.setChar(col < itemStr.length() ? itemStr.at(col).unicode() : u' ');
-            cell.foreground = itemFg;
-            cell.background = itemBg;
-            cell.bold = highlighted;
-        }
-    }
-
-    // Bottom border
-    int bottomY = gy + gh - 1;
-    if (bottomY > gy && bottomY < buffer.height()) {
-        for (int col = 0; col < gw && (gx + col) < buffer.width(); ++col) {
-            Cell &cell = buffer.backCell(gx + col, bottomY);
-            if (col == 0)
-                cell.setChar(border.bottomLeft);
-            else if (col == gw - 1)
-                cell.setChar(border.bottomRight);
-            else
-                cell.setChar(border.horizontal);
-            cell.foreground = fg;
-            cell.background = bg;
-        }
+    for (int i = 0; i < items.size() && 1 + i < gh - 1; ++i) {
+        const bool highlighted = (i == m_combo->m_dropdownHighlight);
+        Cell itemStyle = highlighted ? cellStyle(bg, fg) : cellStyle(fg, bg);
+        itemStyle.bold = highlighted;
+        fillRect(buffer, QRect(gx + 1, gy + 1 + i, innerWidth, 1), itemStyle);
+        renderText(buffer, gx + 1, gy + 1 + i, items.at(i), innerWidth, itemStyle);
     }
 }
 
@@ -388,7 +322,6 @@ void QTuiComboBox::paintEvent(ScreenBuffer &buffer)
         return;
 
     const auto theme = themeProperties();
-    const auto border = Theme_Engine::borderChars(theme.borderStyle);
 
     const int geoX = geo.x();
     const int geoY = geo.y();
@@ -406,115 +339,24 @@ void QTuiComboBox::paintEvent(ScreenBuffer &buffer)
         bg = theme.focusBackground;
     }
 
-    // Clear the combo body (3 rows: border, content, border)
-    int totalH = qMin(geoH, 3);
-    for (int row = 0; row < totalH; ++row) {
-        for (int col = 0; col < geoW; ++col) {
-            int px = geoX + col;
-            int py = geoY + row;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                cell.setChar(U' ');
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = theme.bold;
-                cell.italic = theme.italic;
-                cell.underline = theme.underline;
-            }
-        }
-    }
-
-    // Render top border
-    if (geoH >= 1) {
-        int py = geoY;
-        for (int col = 0; col < geoW; ++col) {
-            int px = geoX + col;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                if (col == 0)
-                    cell.setChar(border.topLeft);
-                else if (col == geoW - 1)
-                    cell.setChar(border.topRight);
-                else
-                    cell.setChar(border.horizontal);
-                cell.foreground = fg;
-                cell.background = bg;
-            }
-        }
-    }
-
-    // Render bottom border of the combo body (row 2). When the dropdown popup
-    // is open, its top separator row paints over this in the topmost pass.
-    if (geoH >= 3) {
-        int py = geoY + 2;
-        for (int col = 0; col < geoW; ++col) {
-            int px = geoX + col;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                if (col == 0)
-                    cell.setChar(border.bottomLeft);
-                else if (col == geoW - 1)
-                    cell.setChar(border.bottomRight);
-                else
-                    cell.setChar(border.horizontal);
-                cell.foreground = fg;
-                cell.background = bg;
-            }
-        }
-    }
-
-    // Render left/right borders for the content row (row 1)
-    if (geoH >= 2) {
-        int py = geoY + 1;
-        if (py < buffer.height()) {
-            int pxLeft = geoX;
-            if (pxLeft < buffer.width()) {
-                buffer.backCell(pxLeft, py).setChar(border.vertical);
-                buffer.backCell(pxLeft, py).foreground = fg;
-                buffer.backCell(pxLeft, py).background = bg;
-            }
-            int pxRight = geoX + geoW - 1;
-            if (pxRight < buffer.width()) {
-                buffer.backCell(pxRight, py).setChar(border.vertical);
-                buffer.backCell(pxRight, py).foreground = fg;
-                buffer.backCell(pxRight, py).background = bg;
-            }
-        }
-    }
+    // The combo body has 3 rows: border, content, border. When the dropdown
+    // popup is open, its top separator row paints over the bottom border in
+    // the topmost pass.
+    const QRect body(geoX, geoY, geoW, qMin(geoH, 3));
+    fillRect(buffer, body, cellStyle(theme, fg, bg));
+    drawBorder(buffer, body, theme.borderStyle, cellStyle(theme, fg, bg));
 
     // Render current item text + dropdown indicator in the content row
     if (geoH >= 3 && geoW >= 3) {
-        int contentRow = geoY + 1;
-        int innerWidth = geoW - 2;
-
-        QString displayText = m_editable ? m_editText : currentText();
-        // Reserve 2 chars for " ▼" or " ▲"
-        int textSpace = innerWidth - 2;
-        if (textSpace < 0) textSpace = 0;
-        QString truncated = displayText.left(textSpace);
-
-        // Write text left-aligned
-        for (int i = 0; i < truncated.length(); ++i) {
-            int px = geoX + 1 + i;
-            int py = contentRow;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                cell.setChar(truncated.at(i).unicode());
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = theme.bold || focused;
-            }
-        }
-
-        // Write dropdown indicator at the right end
-        const char32_t indicator = m_dropdownOpen ? char32_t(0x25B2) : char32_t(0x25BC); // ▲ or ▼
-        int indicatorPos = geoX + geoW - 2;
-        if (indicatorPos > geoX && indicatorPos < buffer.width() && contentRow < buffer.height()) {
-            Cell &cell = buffer.backCell(indicatorPos, contentRow);
-            cell.setChar(indicator);
-            cell.foreground = fg;
-            cell.background = bg;
-        }
+        const int contentRow = geoY + 1;
+        const QString displayText = m_editable ? m_editText : currentText();
+        Cell textStyle = cellStyle(theme, fg, bg);
+        textStyle.bold = theme.bold || focused;
+        // Reserve 2 columns for " ▼" or " ▲"
+        renderText(buffer, geoX + 1, contentRow, displayText, geoW - 4, textStyle);
+        renderText(buffer, geoX + geoW - 2, contentRow,
+                   m_dropdownOpen ? QStringLiteral("▲") : QStringLiteral("▼"), 1,
+                   cellStyle(theme, fg, bg));
     }
 
     // The open item list is rendered by the QTuiComboBoxPopup popup child in

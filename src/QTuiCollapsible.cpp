@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiCollapsible.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
@@ -87,25 +88,10 @@ void QTuiCollapsible::paintEvent(ScreenBuffer &buffer)
     // Draw title bar
     // Indicator: ▼ (expanded) or ▶ (collapsed)
     QString indicator = m_collapsed ? QStringLiteral("\u25B6 ") : QStringLiteral("\u25BC ");
-    QString titleLine = indicator + m_title;
-
-    if (titleLine.length() > w)
-        titleLine = titleLine.left(w);
-
-    // Render title bar row
-    for (int col = 0; col < w; ++col) {
-        int px = x0 + col;
-        if (px >= buffer.width() || y0 >= buffer.height())
-            continue;
-        Cell &cell = buffer.backCell(px, y0);
-        if (col < titleLine.length())
-            cell.setChar(titleLine.at(col).unicode());
-        else
-            cell.setChar(U' ');
-        cell.foreground = focusFg;
-        cell.background = focusBg;
-        cell.bold = theme.bold;
-    }
+    Cell titleStyle = cellStyle(focusFg, focusBg);
+    titleStyle.bold = theme.bold;
+    fillRect(buffer, QRect(x0, y0, w, 1), titleStyle);
+    renderText(buffer, x0, y0, indicator + m_title, w, titleStyle);
 
     if (m_collapsed) {
         // When collapsed, hide children - nothing more to render
@@ -114,19 +100,7 @@ void QTuiCollapsible::paintEvent(ScreenBuffer &buffer)
 
     // When expanded, clear the content area below the title bar
     int h = geo.height();
-    for (int row = 1; row < h; ++row) {
-        for (int col = 0; col < w; ++col) {
-            int px = x0 + col;
-            int py = y0 + row;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                cell.setChar(U' ');
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = false;
-            }
-        }
-    }
+    fillRect(buffer, geo.adjusted(0, 1, 0, 0), cellStyle(fg, bg));
 
     // Stack the visible children in rows below the title bar, each at its
     // minimum height; the last child gets the remaining rows
