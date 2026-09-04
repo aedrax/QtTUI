@@ -31,6 +31,15 @@ void drawBorder(ScreenBuffer &buffer, const QRect &rect, const QString &borderSt
                 const Cell &style);
 
 /**
+ * Draws the frame of a window (a dock widget, an MDI sub-window) on rect
+ * with the colors of theme: a border, a bold title from column 2 of the
+ * top row, the button text (for example "[X]") at the right end of the top
+ * row, and a clear interior. The buttons show only if they fit.
+ */
+void drawWindowFrame(ScreenBuffer &buffer, const QRect &rect, const ThemeProperties &theme,
+                     const QString &title, const QString &buttons);
+
+/**
  * Writes text into the buffer at (x, y), in maxWidth COLUMNS at most, and
  * returns the number of columns that it wrote. The function stops at
  * maxWidth and at the right edge of the buffer, without an ellipsis. A

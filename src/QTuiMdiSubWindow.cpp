@@ -1,7 +1,6 @@
 #include <QtTUI/QTuiMdiSubWindow.h>
 #include <QtTUI/QTuiMdiArea.h>
-#include <QtTUI/Theme_Engine.h>
-#include <QtTUI/ScreenBuffer.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/TuiEvents.h>
 
 namespace QtTUI {
@@ -147,144 +146,14 @@ void QTuiMdiSubWindow::paintEvent(ScreenBuffer &buffer)
     if (!isVisible() || geo.isEmpty())
         return;
 
-    const auto theme = themeProperties();
-    const auto border = Theme_Engine::borderChars(theme.borderStyle);
-    const Color fg = theme.foreground;
-    const Color bg = theme.background;
+    // Maximize/restore indicator: [□] when normal, [▫] when maximized
+    drawWindowFrame(buffer, geo, themeProperties(), m_windowTitle,
+                    (m_maximized ? QStringLiteral("[▫]") : QStringLiteral("[□]")) + QStringLiteral("[X]"));
 
     const int x0 = geo.x();
     const int y0 = geo.y();
     const int w = geo.width();
     const int h = geo.height();
-
-    // --- Title bar (row 0) ---
-    for (int col = 0; col < w; ++col) {
-        int px = x0 + col;
-        if (px >= buffer.width() || y0 >= buffer.height())
-            continue;
-        Cell &cell = buffer.backCell(px, y0);
-        if (col == 0)
-            cell.setChar(border.topLeft);
-        else if (col == w - 1)
-            cell.setChar(border.topRight);
-        else
-            cell.setChar(border.horizontal);
-        cell.foreground = fg;
-        cell.background = bg;
-        cell.bold = theme.bold;
-    }
-
-    // Write title text starting at col 2
-    if (!m_windowTitle.isEmpty() && w > 4) {
-        int indicatorWidth = 7; // " [□][X]" or " [▫][X]"
-        int maxTitleLen = w - 4 - indicatorWidth;
-        if (maxTitleLen < 0)
-            maxTitleLen = 0;
-        QString titleStr = m_windowTitle.left(maxTitleLen);
-
-        int titleCol = 2;
-        for (int i = 0; i < titleStr.length(); ++i) {
-            int px = x0 + titleCol + i;
-            if (px < buffer.width() && y0 < buffer.height()) {
-                Cell &cell = buffer.backCell(px, y0);
-                cell.setChar(titleStr.at(i).unicode());
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = true;
-            }
-        }
-    }
-
-    // Write maximize/restore indicator and close indicator near right edge
-    if (w >= 10) {
-        // Maximize/restore indicator: [□] when normal, [▫] when maximized
-        QString maxStr = m_maximized ? QStringLiteral("[▫]") : QStringLiteral("[□]");
-        QString closeStr = QStringLiteral("[X]");
-
-        int closeStart = x0 + w - 1 - closeStr.length();
-        int maxStart = closeStart - maxStr.length();
-
-        // Draw maximize/restore indicator
-        for (int i = 0; i < maxStr.length(); ++i) {
-            int px = maxStart + i;
-            if (px >= x0 + 1 && px < buffer.width() && y0 < buffer.height()) {
-                Cell &cell = buffer.backCell(px, y0);
-                cell.setChar(maxStr.at(i).unicode());
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = theme.bold;
-            }
-        }
-
-        // Draw close indicator
-        for (int i = 0; i < closeStr.length(); ++i) {
-            int px = closeStart + i;
-            if (px >= x0 + 1 && px < buffer.width() && y0 < buffer.height()) {
-                Cell &cell = buffer.backCell(px, y0);
-                cell.setChar(closeStr.at(i).unicode());
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = theme.bold;
-            }
-        }
-    }
-
-    // --- Bottom border ---
-    int by = y0 + h - 1;
-    if (by < buffer.height()) {
-        for (int col = 0; col < w; ++col) {
-            int px = x0 + col;
-            if (px >= buffer.width())
-                continue;
-            Cell &cell = buffer.backCell(px, by);
-            if (col == 0)
-                cell.setChar(border.bottomLeft);
-            else if (col == w - 1)
-                cell.setChar(border.bottomRight);
-            else
-                cell.setChar(border.horizontal);
-            cell.foreground = fg;
-            cell.background = bg;
-            cell.bold = theme.bold;
-        }
-    }
-
-    // --- Left and right borders (interior rows) ---
-    for (int row = 1; row < h - 1; ++row) {
-        int py = y0 + row;
-        if (py >= buffer.height())
-            continue;
-        if (x0 < buffer.width()) {
-            Cell &cell = buffer.backCell(x0, py);
-            cell.setChar(border.vertical);
-            cell.foreground = fg;
-            cell.background = bg;
-            cell.bold = theme.bold;
-        }
-        int rx = x0 + w - 1;
-        if (rx < buffer.width()) {
-            Cell &cell = buffer.backCell(rx, py);
-            cell.setChar(border.vertical);
-            cell.foreground = fg;
-            cell.background = bg;
-            cell.bold = theme.bold;
-        }
-    }
-
-    // --- Clear interior ---
-    for (int row = 1; row < h - 1; ++row) {
-        for (int col = 1; col < w - 1; ++col) {
-            int px = x0 + col;
-            int py = y0 + row;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                cell.setChar(U' ');
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = false;
-            }
-        }
-    }
 
     // --- Paint content widget ---
     if (m_widget && m_widget->isVisible()) {

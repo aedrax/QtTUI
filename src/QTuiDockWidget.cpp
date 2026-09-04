@@ -1,6 +1,5 @@
 #include <QtTUI/QTuiDockWidget.h>
-#include <QtTUI/Theme_Engine.h>
-#include <QtTUI/ScreenBuffer.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/TuiEvents.h>
 
 namespace QtTUI {
@@ -85,128 +84,7 @@ void QTuiDockWidget::paintEvent(ScreenBuffer &buffer)
     if (!isVisible() || geo.isEmpty())
         return;
 
-    const auto theme = themeProperties();
-    const auto border = Theme_Engine::borderChars(theme.borderStyle);
-    const Color fg = theme.foreground;
-    const Color bg = theme.background;
-
-    const int x0 = geo.x();
-    const int y0 = geo.y();
-    const int w = geo.width();
-    const int h = geo.height();
-
-    // --- Title bar (row 0) ---
-    // Top border with title and close indicator
-    for (int col = 0; col < w; ++col) {
-        int px = x0 + col;
-        if (px >= buffer.width() || y0 >= buffer.height())
-            continue;
-        Cell &cell = buffer.backCell(px, y0);
-        if (col == 0)
-            cell.setChar(border.topLeft);
-        else if (col == w - 1)
-            cell.setChar(border.topRight);
-        else
-            cell.setChar(border.horizontal);
-        cell.foreground = fg;
-        cell.background = bg;
-        cell.bold = theme.bold;
-    }
-
-    // Write title text starting at col 2
-    if (!m_windowTitle.isEmpty() && w > 4) {
-        // Reserve space for close indicator "[X]" at the right (3 chars + 1 space before border)
-        int closeIndicatorWidth = 4; // " [X]"
-        int maxTitleLen = w - 4 - closeIndicatorWidth; // borders + close
-        if (maxTitleLen < 0)
-            maxTitleLen = 0;
-        QString titleStr = m_windowTitle.left(maxTitleLen);
-
-        int titleCol = 2;
-        for (int i = 0; i < titleStr.length(); ++i) {
-            int px = x0 + titleCol + i;
-            if (px < buffer.width() && y0 < buffer.height()) {
-                Cell &cell = buffer.backCell(px, y0);
-                cell.setChar(titleStr.at(i).unicode());
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = true;
-            }
-        }
-    }
-
-    // Write close indicator "[X]" near right edge of title bar
-    if (w >= 6) {
-        const QString closeStr = QStringLiteral("[X]");
-        int closeStart = x0 + w - 1 - closeStr.length(); // before right border
-        for (int i = 0; i < closeStr.length(); ++i) {
-            int px = closeStart + i;
-            if (px >= x0 + 1 && px < buffer.width() && y0 < buffer.height()) {
-                Cell &cell = buffer.backCell(px, y0);
-                cell.setChar(closeStr.at(i).unicode());
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = theme.bold;
-            }
-        }
-    }
-
-    // --- Bottom border ---
-    int by = y0 + h - 1;
-    if (by < buffer.height()) {
-        for (int col = 0; col < w; ++col) {
-            int px = x0 + col;
-            if (px >= buffer.width())
-                continue;
-            Cell &cell = buffer.backCell(px, by);
-            if (col == 0)
-                cell.setChar(border.bottomLeft);
-            else if (col == w - 1)
-                cell.setChar(border.bottomRight);
-            else
-                cell.setChar(border.horizontal);
-            cell.foreground = fg;
-            cell.background = bg;
-            cell.bold = theme.bold;
-        }
-    }
-
-    // --- Left and right borders (interior rows) ---
-    for (int row = 1; row < h - 1; ++row) {
-        int py = y0 + row;
-        if (py >= buffer.height())
-            continue;
-        if (x0 < buffer.width()) {
-            Cell &cell = buffer.backCell(x0, py);
-            cell.setChar(border.vertical);
-            cell.foreground = fg;
-            cell.background = bg;
-            cell.bold = theme.bold;
-        }
-        int rx = x0 + w - 1;
-        if (rx < buffer.width()) {
-            Cell &cell = buffer.backCell(rx, py);
-            cell.setChar(border.vertical);
-            cell.foreground = fg;
-            cell.background = bg;
-            cell.bold = theme.bold;
-        }
-    }
-
-    // --- Clear interior ---
-    for (int row = 1; row < h - 1; ++row) {
-        for (int col = 1; col < w - 1; ++col) {
-            int px = x0 + col;
-            int py = y0 + row;
-            if (px < buffer.width() && py < buffer.height()) {
-                Cell &cell = buffer.backCell(px, py);
-                cell.setChar(U' ');
-                cell.foreground = fg;
-                cell.background = bg;
-                cell.bold = false;
-            }
-        }
-    }
+    drawWindowFrame(buffer, geo, themeProperties(), m_windowTitle, QStringLiteral("[X]"));
 
     // --- Paint content widget within content area ---
     if (m_widget && m_widget->isVisible()) {

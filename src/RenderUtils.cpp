@@ -61,6 +61,27 @@ void drawBorder(ScreenBuffer &buffer, const QRect &rect, const QString &borderSt
     }
 }
 
+void drawWindowFrame(ScreenBuffer &buffer, const QRect &rect, const ThemeProperties &theme,
+                     const QString &title, const QString &buttons)
+{
+    const Cell plain = cellStyle(theme.foreground, theme.background);
+    Cell chrome = plain;
+    chrome.bold = theme.bold;
+    drawBorder(buffer, rect, theme.borderStyle, chrome);
+    fillRect(buffer, rect.adjusted(1, 1, -1, -1), plain);
+
+    const int buttonsWidth = QtTuiUnicode::stringWidth(buttons);
+    if (!title.isEmpty() && rect.width() > 4) {
+        // Leave the borders, the buttons and a space before the buttons
+        Cell titleStyle = plain;
+        titleStyle.bold = true;
+        renderText(buffer, rect.x() + 2, rect.y(), title, rect.width() - 5 - buttonsWidth, titleStyle);
+    }
+    // The buttons end before the right border
+    if (rect.width() >= buttonsWidth + 3)
+        renderText(buffer, rect.right() - buttonsWidth, rect.y(), buttons, buttonsWidth, chrome);
+}
+
 int renderText(ScreenBuffer &buffer, int x, int y, const QString &text,
                int maxWidth, const Cell &style)
 {

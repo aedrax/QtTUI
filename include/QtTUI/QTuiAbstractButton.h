@@ -62,6 +62,10 @@ protected:
 
     void keyPressEvent(TuiKeyEvent *event) override;
     void mousePressEvent(TuiMouseEvent *event) override;
+    // Paints "<indicator> <text>" on the first row, for a check box or a
+    // radio button. The indicator has 3 columns; it inverts while the
+    // button is down.
+    void paintIndicator(ScreenBuffer &buffer, const QString &indicator);
 
 private:
     QString m_text;

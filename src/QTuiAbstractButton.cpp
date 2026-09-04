@@ -1,5 +1,6 @@
 #include <QtTUI/QTuiAbstractButton.h>
 #include <QtTUI/QTuiApplication.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/TuiEvents.h>
 #include <QTimer>
 
@@ -127,6 +128,29 @@ void QTuiAbstractButton::mousePressEvent(TuiMouseEvent *event)
         || event->button() != Qt::LeftButton)
         return;
     animateClick();
+}
+
+void QTuiAbstractButton::paintIndicator(ScreenBuffer &buffer, const QString &indicator)
+{
+    const QRect geo = geometry();
+    if (!isVisible() || geo.isEmpty())
+        return;
+
+    // Determine colors based on focus state
+    const auto theme = themeProperties();
+    Color fg = theme.foreground;
+    Color bg = theme.background;
+    if (hasFocus()) {
+        fg = theme.focusForeground;
+        bg = theme.focusBackground;
+    }
+
+    const Cell style = cellStyle(theme, fg, bg);
+    fillRect(buffer, geo, style);
+    const int indicatorWidth = renderText(buffer, geo.x(), geo.y(), indicator, geo.width(),
+                                          (isDown() && isEffectivelyEnabled()) ? cellStyle(theme, bg, fg) : style);
+    renderText(buffer, geo.x() + indicatorWidth, geo.y(), QLatin1Char(' ') + text(),
+               geo.width() - indicatorWidth, style);
 }
 
 } // namespace QtTUI
