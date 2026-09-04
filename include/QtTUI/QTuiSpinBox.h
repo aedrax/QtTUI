@@ -2,12 +2,11 @@
 #define QTTUI_QTUISPINBOX_H
 
 #include <QtTUI/QtTUIGlobal.h>
-#include <QtTUI/QTuiWidget.h>
-#include <QString>
+#include <QtTUI/QTuiAbstractSpinBox.h>
 
 namespace QtTUI {
 
-class QTuiSpinBox : public QTuiWidget {
+class QTuiSpinBox : public QTuiAbstractSpinBox {
     Q_OBJECT
     Q_PROPERTY(int value READ value WRITE setValue NOTIFY valueChanged)
     Q_PROPERTY(int minimum READ minimum WRITE setMinimum)
@@ -32,34 +31,22 @@ public:
     bool wrapping() const;
     void setWrapping(bool wrapping);
 
-    QString prefix() const;
-    void setPrefix(const QString &prefix);
-    QString suffix() const;
-    void setSuffix(const QString &suffix);
-
-    void paintEvent(ScreenBuffer &buffer) override;
+    void stepBy(int steps) override;
     QSize minimumSize() const override;
-    // Bare printable-key shortcuts must not fire while this widget has focus
-    bool acceptsTextInput() const override { return true; }
 
 signals:
     void valueChanged(int value);
 
 protected:
-    void keyPressEvent(TuiKeyEvent *event) override;
-    void mousePressEvent(TuiMouseEvent *event) override;
+    QString valueText() const override;
 
 private:
-    void stepUp();
-    void stepDown();
 
     int m_value = 0;
     int m_minimum = 0;
     int m_maximum = 99;
     int m_singleStep = 1;
     bool m_wrapping = false;
-    QString m_prefix;
-    QString m_suffix;
 };
 
 } // namespace QtTUI

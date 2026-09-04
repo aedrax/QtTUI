@@ -77,6 +77,7 @@ set(QTTUI_SOURCES
     QTuiAbstractButton.cpp
     QTuiAbstractItemView.cpp
     QTuiAbstractScrollArea.cpp
+    QTuiAbstractSpinBox.cpp
     QTuiAction.cpp
     QTuiKeySequence.cpp
     QTuiMenu.cpp
@@ -179,6 +180,7 @@ set(QTTUI_HEADERS
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiAbstractButton.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiAbstractItemView.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiAbstractScrollArea.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiAbstractSpinBox.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiAction.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiKeySequence.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiMenu.h
