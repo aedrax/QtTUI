@@ -34,7 +34,6 @@ public:
 private:
     void advance();
     bool matchesFlags(QTuiTreeWidgetItem *item) const;
-    void initFromItem(QTuiTreeWidgetItem *item);
 
     QList<QTuiTreeWidgetItem *> m_stack;
     IteratorFlags m_flags;

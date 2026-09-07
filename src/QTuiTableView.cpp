@@ -487,29 +487,8 @@ void QTuiTableView::onRowsRemoved(const QModelIndex &parent, int first, int last
     ensureCurrentVisible();
 }
 
-void QTuiTableView::onColumnsInserted(const QModelIndex &parent, int first, int last)
+void QTuiTableView::onColumnsChanged()
 {
-    Q_UNUSED(parent);
-    Q_UNUSED(first);
-    Q_UNUSED(last);
-
-    if (!m_model)
-        return;
-
-    invalidateColumnWidths();
-    clampCurrentIndex();
-    m_horizontalScrollOffset = qBound(0, m_horizontalScrollOffset,
-                                      qMax(0, m_model->columnCount() - 1));
-    ensureColumnVisible(m_currentCol);
-    markDirty();
-}
-
-void QTuiTableView::onColumnsRemoved(const QModelIndex &parent, int first, int last)
-{
-    Q_UNUSED(parent);
-    Q_UNUSED(first);
-    Q_UNUSED(last);
-
     if (!m_model)
         return;
 
@@ -571,9 +550,9 @@ void QTuiTableView::disconnectModel()
     disconnect(m_model, &QAbstractItemModel::rowsRemoved,
                this, &QTuiTableView::onRowsRemoved);
     disconnect(m_model, &QAbstractItemModel::columnsInserted,
-               this, &QTuiTableView::onColumnsInserted);
+               this, &QTuiTableView::onColumnsChanged);
     disconnect(m_model, &QAbstractItemModel::columnsRemoved,
-               this, &QTuiTableView::onColumnsRemoved);
+               this, &QTuiTableView::onColumnsChanged);
     disconnect(m_model, &QAbstractItemModel::headerDataChanged,
                this, &QTuiTableView::onHeaderDataChanged);
     disconnect(m_model, &QAbstractItemModel::layoutChanged,
@@ -595,9 +574,9 @@ void QTuiTableView::connectModel()
     connect(m_model, &QAbstractItemModel::rowsRemoved,
             this, &QTuiTableView::onRowsRemoved);
     connect(m_model, &QAbstractItemModel::columnsInserted,
-            this, &QTuiTableView::onColumnsInserted);
+            this, &QTuiTableView::onColumnsChanged);
     connect(m_model, &QAbstractItemModel::columnsRemoved,
-            this, &QTuiTableView::onColumnsRemoved);
+            this, &QTuiTableView::onColumnsChanged);
     connect(m_model, &QAbstractItemModel::headerDataChanged,
             this, &QTuiTableView::onHeaderDataChanged);
     connect(m_model, &QAbstractItemModel::layoutChanged,

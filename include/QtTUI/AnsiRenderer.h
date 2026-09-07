@@ -36,7 +36,6 @@ public:
     // Serialization helpers
     static QByteArray sgrSequence(const Cell &cell);
     static QByteArray cursorPosition(int x, int y);  // 0-based to 1-based CUP
-    static QByteArray cursorMove(int dx, int dy);     // Relative CU[ABCD]
     static QByteArray resetAttributes();
 
     // Parsing helpers (for round-trip testing)

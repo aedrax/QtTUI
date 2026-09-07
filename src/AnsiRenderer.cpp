@@ -330,39 +330,6 @@ QByteArray AnsiRenderer::cursorPosition(int x, int y)
     return seq;
 }
 
-QByteArray AnsiRenderer::cursorMove(int dx, int dy)
-{
-    QByteArray seq;
-
-    // Vertical movement: CUU (up) / CUD (down)
-    if (dy < 0) {
-        // CUU: \e[nA (cursor up)
-        seq.append("\x1b[");
-        seq.append(QByteArray::number(-dy));
-        seq.append('A');
-    } else if (dy > 0) {
-        // CUD: \e[nB (cursor down)
-        seq.append("\x1b[");
-        seq.append(QByteArray::number(dy));
-        seq.append('B');
-    }
-
-    // Horizontal movement: CUF (forward/right) / CUB (backward/left)
-    if (dx > 0) {
-        // CUF: \e[nC (cursor forward)
-        seq.append("\x1b[");
-        seq.append(QByteArray::number(dx));
-        seq.append('C');
-    } else if (dx < 0) {
-        // CUB: \e[nD (cursor backward)
-        seq.append("\x1b[");
-        seq.append(QByteArray::number(-dx));
-        seq.append('D');
-    }
-
-    return seq;
-}
-
 QByteArray AnsiRenderer::resetAttributes()
 {
     return QByteArray("\x1b[0m");
