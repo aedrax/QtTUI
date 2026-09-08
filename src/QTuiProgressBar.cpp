@@ -181,27 +181,17 @@ void QTuiProgressBar::paintEvent(ScreenBuffer &buffer)
 
     const auto theme = themeProperties();
 
-    const int geoX = geo.x();
-    const int geoY = geo.y();
-    const int geoW = geo.width();
-    const int geoH = geo.height();
-
-    Color fg = theme.foreground;
-    Color bg = theme.background;
-
-    if (hasFocus()) {
-        fg = theme.focusForeground;
-        bg = theme.focusBackground;
-    }
+    Color fg = hasFocus() ? theme.focusForeground : theme.foreground;
+    Color bg = hasFocus() ? theme.focusBackground : theme.background;
 
     fillRect(buffer, geo, cellStyle(theme, fg, bg));
     drawBorder(buffer, geo, theme.borderStyle, cellStyle(theme, fg, bg));
 
     // Inner content area (inside borders)
-    const int innerX = geoX + 1;
-    const int innerY = geoY + 1;
-    const int innerW = geoW - 2;
-    const int innerH = geoH - 2;
+    const int innerX = geo.x() + 1;
+    const int innerY = geo.y() + 1;
+    const int innerW = geo.width() - 2;
+    const int innerH = geo.height() - 2;
 
     if (innerW <= 0 || innerH <= 0)
         return;

@@ -56,12 +56,9 @@ void QTuiComboBoxPopup::paintEvent(ScreenBuffer &buffer)
 
     // Match the combo body's colors: while the dropdown is open it holds the
     // focus, so the pair reads as one focused control.
-    Color fg = theme.foreground;
-    Color bg = theme.background;
-    if (hasFocus() || m_combo->hasFocus()) {
-        fg = theme.focusForeground;
-        bg = theme.focusBackground;
-    }
+    const bool focused = hasFocus() || m_combo->hasFocus();
+    Color fg = focused ? theme.focusForeground : theme.foreground;
+    Color bg = focused ? theme.focusBackground : theme.background;
 
     const int gx = geo.x();
     const int gy = geo.y();
@@ -323,38 +320,28 @@ void QTuiComboBox::paintEvent(ScreenBuffer &buffer)
 
     const auto theme = themeProperties();
 
-    const int geoX = geo.x();
-    const int geoY = geo.y();
-    const int geoW = geo.width();
-    const int geoH = geo.height();
-
     // Determine colors based on focus state. While the dropdown popup is open
     // it holds the focus, so treat the combo body as focused too.
-    Color fg = theme.foreground;
-    Color bg = theme.background;
-
     const bool focused = hasFocus() || m_dropdownOpen;
-    if (focused) {
-        fg = theme.focusForeground;
-        bg = theme.focusBackground;
-    }
+    Color fg = focused ? theme.focusForeground : theme.foreground;
+    Color bg = focused ? theme.focusBackground : theme.background;
 
     // The combo body has 3 rows: border, content, border. When the dropdown
     // popup is open, its top separator row paints over the bottom border in
     // the topmost pass.
-    const QRect body(geoX, geoY, geoW, qMin(geoH, 3));
+    const QRect body(geo.x(), geo.y(), geo.width(), qMin(geo.height(), 3));
     fillRect(buffer, body, cellStyle(theme, fg, bg));
     drawBorder(buffer, body, theme.borderStyle, cellStyle(theme, fg, bg));
 
     // Render current item text + dropdown indicator in the content row
-    if (geoH >= 3 && geoW >= 3) {
-        const int contentRow = geoY + 1;
+    if (geo.height() >= 3 && geo.width() >= 3) {
+        const int contentRow = geo.y() + 1;
         const QString displayText = m_editable ? m_editText : currentText();
         Cell textStyle = cellStyle(theme, fg, bg);
         textStyle.bold = theme.bold || focused;
         // Reserve 2 columns for " ▼" or " ▲"
-        renderText(buffer, geoX + 1, contentRow, displayText, geoW - 4, textStyle);
-        renderText(buffer, geoX + geoW - 2, contentRow,
+        renderText(buffer, geo.x() + 1, contentRow, displayText, geo.width() - 4, textStyle);
+        renderText(buffer, geo.x() + geo.width() - 2, contentRow,
                    m_dropdownOpen ? QStringLiteral("▲") : QStringLiteral("▼"), 1,
                    cellStyle(theme, fg, bg));
     }

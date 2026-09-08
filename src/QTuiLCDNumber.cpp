@@ -202,11 +202,6 @@ void QTuiLCDNumber::paintEvent(ScreenBuffer &buffer)
 
     const auto theme = themeProperties();
 
-    const int geoX = geo.x();
-    const int geoY = geo.y();
-    const int geoW = geo.width();
-    const int geoH = geo.height();
-
     Color fg = hasFocus() ? theme.focusForeground : theme.foreground;
     Color bg = hasFocus() ? theme.focusBackground : theme.background;
 
@@ -216,11 +211,11 @@ void QTuiLCDNumber::paintEvent(ScreenBuffer &buffer)
     drawBorder(buffer, geo, theme.borderStyle, cellStyle(theme, fg, bg));
 
     // Render segment art for each character in display text
-    // Inner area starts at (geoX+1, geoY+1), size (geoW-2, geoH-2)
-    if (geoH < 5 || geoW < 3)
+    // Inner area starts at (geo.x()+1, geo.y()+1), size (geo.width()-2, geo.height()-2)
+    if (geo.height() < 5 || geo.width() < 3)
         return; // Not enough space for content
 
-    int innerW = geoW - 2;
+    int innerW = geo.width() - 2;
 
     // Pad or truncate display text to fit digit count
     QString displayStr = m_displayText;
@@ -249,7 +244,7 @@ void QTuiLCDNumber::paintEvent(ScreenBuffer &buffer)
         int col = startCol;
         for (int d = 0; d < allSegments.size(); ++d) {
             const QString &artLine = allSegments[d][line];
-            renderText(buffer, geoX + col, geoY + 1 + line, artLine.left(3), geoW - 1 - col, segmentStyle);
+            renderText(buffer, geo.x() + col, geo.y() + 1 + line, artLine.left(3), geo.width() - 1 - col, segmentStyle);
             col += 3;
             // Add gap between digits
             if (d < allSegments.size() - 1)

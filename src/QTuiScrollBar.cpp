@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiScrollBar.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
@@ -115,101 +116,35 @@ void QTuiScrollBar::paintEvent(ScreenBuffer &buffer)
 
     const auto theme = themeProperties();
 
-    const int geoX = geo.x();
-    const int geoY = geo.y();
-    const int geoW = geo.width();
-    const int geoH = geo.height();
+    Color fg = hasFocus() ? theme.focusForeground : theme.foreground;
+    Color bg = hasFocus() ? theme.focusBackground : theme.background;
 
-    Color fg = theme.foreground;
-    Color bg = theme.background;
+    const bool vertical = m_orientation == Qt::Vertical;
+    const int range = m_maximum - m_minimum;
+    const int trackLen = vertical ? geo.height() : geo.width();
 
-    if (hasFocus()) {
-        fg = theme.focusForeground;
-        bg = theme.focusBackground;
+    // Compute thumb size proportional to pageStep vs total range
+    int thumbSize = 1;
+    if (range > 0 && trackLen > 1) {
+        thumbSize = qMax(1, static_cast<int>(
+            static_cast<double>(m_pageStep) / (range + m_pageStep) * trackLen + 0.5));
+        thumbSize = qMin(thumbSize, trackLen);
     }
 
-    int range = m_maximum - m_minimum;
+    // Compute thumb position
+    int thumbPos = 0;
+    int scrollableTrack = trackLen - thumbSize;
+    if (range > 0 && scrollableTrack > 0) {
+        thumbPos = static_cast<int>(
+            static_cast<double>(m_value - m_minimum) / range * scrollableTrack + 0.5);
+        thumbPos = qBound(0, thumbPos, scrollableTrack);
+    }
 
-    if (m_orientation == Qt::Vertical) {
-        int trackLen = geoH;
-
-        // Compute thumb size proportional to pageStep vs total range
-        int thumbSize = 1;
-        if (range > 0 && trackLen > 1) {
-            thumbSize = qMax(1, static_cast<int>(
-                static_cast<double>(m_pageStep) / (range + m_pageStep) * trackLen + 0.5));
-            thumbSize = qMin(thumbSize, trackLen);
-        }
-
-        // Compute thumb position
-        int thumbPos = 0;
-        int scrollableTrack = trackLen - thumbSize;
-        if (range > 0 && scrollableTrack > 0) {
-            thumbPos = static_cast<int>(
-                static_cast<double>(m_value - m_minimum) / range * scrollableTrack + 0.5);
-            thumbPos = qBound(0, thumbPos, scrollableTrack);
-        }
-
-        for (int row = 0; row < trackLen; ++row) {
-            int px = geoX;
-            int py = geoY + row;
-            if (px >= buffer.width() || py >= buffer.height())
-                continue;
-
-            Cell &cell = buffer.backCell(px, py);
-            cell.foreground = fg;
-            cell.background = bg;
-            cell.bold = false;
-            cell.italic = false;
-            cell.underline = false;
-
-            if (row >= thumbPos && row < thumbPos + thumbSize) {
-                cell.setChar(0x2588); // █ thumb
-            } else {
-                cell.setChar(0x2502); // │ track
-            }
-        }
-    } else {
-        // Horizontal
-        int trackLen = geoW;
-
-        int thumbSize = 1;
-        if (range > 0 && trackLen > 1) {
-            thumbSize = qMax(1, static_cast<int>(
-                static_cast<double>(m_pageStep) / (range + m_pageStep) * trackLen + 0.5));
-            thumbSize = qMin(thumbSize, trackLen);
-        }
-
-        int thumbPos = 0;
-        int scrollableTrack = trackLen - thumbSize;
-        if (range > 0 && scrollableTrack > 0) {
-            thumbPos = static_cast<int>(
-                static_cast<double>(m_value - m_minimum) / range * scrollableTrack + 0.5);
-            thumbPos = qBound(0, thumbPos, scrollableTrack);
-        }
-
-        int py = geoY;
-        if (py >= buffer.height())
-            return;
-
-        for (int col = 0; col < trackLen; ++col) {
-            int px = geoX + col;
-            if (px >= buffer.width())
-                continue;
-
-            Cell &cell = buffer.backCell(px, py);
-            cell.foreground = fg;
-            cell.background = bg;
-            cell.bold = false;
-            cell.italic = false;
-            cell.underline = false;
-
-            if (col >= thumbPos && col < thumbPos + thumbSize) {
-                cell.setChar(0x2588); // █ thumb
-            } else {
-                cell.setChar(0x2500); // ─ track
-            }
-        }
+    const Cell style = cellStyle(fg, bg);
+    for (int i = 0; i < trackLen; ++i) {
+        const bool thumb = i >= thumbPos && i < thumbPos + thumbSize;
+        const char32_t ch = thumb ? 0x2588 : (vertical ? 0x2502 : 0x2500); // █ thumb, │ or ─ track
+        buffer.putChar(vertical ? geo.x() : geo.x() + i, vertical ? geo.y() + i : geo.y(), ch, style);
     }
 }
 

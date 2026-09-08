@@ -264,27 +264,17 @@ void QTuiDateTimeEdit::paintEvent(ScreenBuffer &buffer)
 
     const auto theme = themeProperties();
 
-    const int geoX = geo.x();
-    const int geoY = geo.y();
-    const int geoW = geo.width();
-    const int geoH = geo.height();
-
-    Color fg = theme.foreground;
-    Color bg = theme.background;
-
-    if (hasFocus()) {
-        fg = theme.focusForeground;
-        bg = theme.focusBackground;
-    }
+    Color fg = hasFocus() ? theme.focusForeground : theme.foreground;
+    Color bg = hasFocus() ? theme.focusBackground : theme.background;
 
     fillRect(buffer, geo, cellStyle(theme, fg, bg));
     drawBorder(buffer, geo, theme.borderStyle, cellStyle(theme, fg, bg));
 
     // Render formatted datetime content in the middle row
-    if (geoH >= 3 && geoW >= 3) {
+    if (geo.height() >= 3 && geo.width() >= 3) {
         QString formatted = m_dateTime.toString(m_displayFormat);
-        int contentRow = geoY + geoH / 2;
-        int innerWidth = geoW - 2;
+        int contentRow = geo.y() + geo.height() / 2;
+        int innerWidth = geo.width() - 2;
         int textLen = qMin(static_cast<int>(formatted.length()), innerWidth);
         int startCol = 1 + (innerWidth - textLen) / 2; // Center
 
@@ -303,14 +293,14 @@ void QTuiDateTimeEdit::paintEvent(ScreenBuffer &buffer)
         }
 
         const Cell textStyle = cellStyle(theme, fg, bg);
-        renderText(buffer, geoX + startCol, contentRow, formatted, textLen, textStyle);
+        renderText(buffer, geo.x() + startCol, contentRow, formatted, textLen, textStyle);
 
         // Highlight the active section with underline
         if (hasFocus() && activeRange.startPos >= 0 && activeRange.startPos < textLen) {
             Cell sectionStyle = textStyle;
             sectionStyle.underline = true;
             sectionStyle.bold = true;
-            renderText(buffer, geoX + startCol + activeRange.startPos, contentRow,
+            renderText(buffer, geo.x() + startCol + activeRange.startPos, contentRow,
                        formatted.mid(activeRange.startPos, activeRange.length),
                        textLen - activeRange.startPos, sectionStyle);
         }

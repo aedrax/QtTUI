@@ -43,41 +43,13 @@ void QTuiToolButton::paintEvent(ScreenBuffer &buffer)
 
     const auto theme = themeProperties();
 
-    const int geoX = geo.x();
-    const int geoY = geo.y();
-    const int geoW = geo.width();
-    const int geoH = geo.height();
-
-    // Determine colors based on state (a disabled ancestor also disables us)
     const bool enabled = isEffectivelyEnabled();
-    Color fg = theme.foreground;
-    Color bg = theme.background;
-
-    if (!enabled) {
-        fg = theme.disabledForeground;
-        bg = theme.disabledBackground;
-    } else if (hasFocus()) {
-        fg = theme.focusForeground;
-        bg = theme.focusBackground;
-    }
-
-    // If checked, use inverse colors
-    if (isCheckable() && isChecked() && enabled) {
-        std::swap(fg, bg);
-    }
-
-    // Pressed: invert again and move the label 1 cell right
+    // Pressed: move the label 1 cell right
     const bool pressed = isDown() && enabled;
-
-    // Under the mouse (and not focused or pressed): the accent color shows
-    // that a click goes here
-    if (underMouse() && enabled && !hasFocus() && !pressed && !(isCheckable() && isChecked()))
-        fg = theme.focusBackground;
-    if (pressed)
-        std::swap(fg, bg);
+    const Cell style = buttonStyle(theme);
 
     // Clear the entire area with background (no border)
-    fillRect(buffer, geo, cellStyle(theme, fg, bg));
+    fillRect(buffer, geo, style);
 
     // Build content string: icon + text + optional dropdown indicator
     QString content;
@@ -90,14 +62,14 @@ void QTuiToolButton::paintEvent(ScreenBuffer &buffer)
         content += QStringLiteral(" \u25BC"); // " ▼"
 
     // Render content centered vertically, with 1 char left padding
-    int contentRow = geoY + geoH / 2;
-    int availWidth = geoW - 2; // 1 char padding each side
+    int contentRow = geo.y() + geo.height() / 2;
+    int availWidth = geo.width() - 2; // 1 char padding each side
     int textLen = qMin(QtTuiUnicode::stringWidth(content), availWidth);
-    int startCol = geoX + 1; // 1 char left padding
+    int startCol = geo.x() + 1; // 1 char left padding
     if (pressed && textLen < availWidth)
         ++startCol;
 
-    Cell textStyle = cellStyle(theme, fg, bg);
+    Cell textStyle = style;
     textStyle.bold = theme.bold || (enabled && hasFocus());
     renderText(buffer, startCol, contentRow, content, textLen, textStyle);
 }

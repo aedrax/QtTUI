@@ -640,20 +640,15 @@ void QTuiTextEdit::paintEvent(ScreenBuffer &buffer)
         return;
 
     const auto theme = themeProperties();
-    const int geoX = geo.x();
-    const int geoY = geo.y();
-    const int geoW = geo.width();
-    const int geoH = geo.height();
-
     // Determine selection range (normalized)
     int selSR = -1, selSC = -1, selER = -1, selEC = -1;
     bool hasSel = hasSelection();
     if (hasSel)
         normalizeSelection(selSR, selSC, selER, selEC);
 
-    for (int row = 0; row < geoH; ++row) {
+    for (int row = 0; row < geo.height(); ++row) {
         const int lineIdx = m_scrollRow + row;
-        const int py = geoY + row;
+        const int py = geo.y() + row;
         if (py >= buffer.height())
             break;
 
@@ -706,8 +701,8 @@ void QTuiTextEdit::paintEvent(ScreenBuffer &buffer)
         // span are overwritten by the cluster pass below; cells after the
         // text use a virtual index so the end-of-line cursor and selection
         // highlighting keep their pre-Unicode behavior.
-        for (int col = 0; col < geoW; ++col) {
-            const int px = geoX + col;
+        for (int col = 0; col < geo.width(); ++col) {
+            const int px = geo.x() + col;
             if (px >= buffer.width())
                 break;
             const int displayCol = m_scrollCol + col;
@@ -719,21 +714,21 @@ void QTuiTextEdit::paintEvent(ScreenBuffer &buffer)
         int col = -m_scrollCol;
         int i = 0;
         QtTuiUnicode::Cluster c;
-        while (col < geoW && QtTuiUnicode::nextCluster(line, i, c)) {
+        while (col < geo.width() && QtTuiUnicode::nextCluster(line, i, c)) {
             const int nextCol = col + c.width;
             if (nextCol <= 0) {
                 col = nextCol;
                 continue;
             }
             const Cell style = styleFor(c.index);
-            if (col >= 0 && nextCol <= geoW && geoX + nextCol <= buffer.width()) {
-                buffer.putChar(geoX + col, py, c.base, c.combining, style);
+            if (col >= 0 && nextCol <= geo.width() && geo.x() + nextCol <= buffer.width()) {
+                buffer.putChar(geo.x() + col, py, c.base, c.combining, style);
             } else {
                 // A wide cluster straddling the viewport edge: show its
                 // visible half as a styled space
-                for (int x = qMax(0, col); x < qMin(geoW, nextCol); ++x) {
-                    if (geoX + x < buffer.width())
-                        buffer.putChar(geoX + x, py, U' ', style);
+                for (int x = qMax(0, col); x < qMin(geo.width(), nextCol); ++x) {
+                    if (geo.x() + x < buffer.width())
+                        buffer.putChar(geo.x() + x, py, U' ', style);
                 }
             }
             col = nextCol;

@@ -127,18 +127,8 @@ void QTuiSlider::paintEvent(ScreenBuffer &buffer)
 
     const auto theme = themeProperties();
 
-    const int geoX = geo.x();
-    const int geoY = geo.y();
-    const int geoW = geo.width();
-    const int geoH = geo.height();
-
-    Color fg = theme.foreground;
-    Color bg = theme.background;
-
-    if (hasFocus()) {
-        fg = theme.focusForeground;
-        bg = theme.focusBackground;
-    }
+    Color fg = hasFocus() ? theme.focusForeground : theme.foreground;
+    Color bg = hasFocus() ? theme.focusBackground : theme.background;
 
     // Clear the entire widget area
     fillRect(buffer, geo, cellStyle(fg, bg));
@@ -146,11 +136,11 @@ void QTuiSlider::paintEvent(ScreenBuffer &buffer)
     int range = m_maximum - m_minimum;
 
     if (m_orientation == Qt::Horizontal) {
-        bool hasTicks = (m_tickInterval > 0) && (geoH >= 2);
+        bool hasTicks = (m_tickInterval > 0) && (geo.height() >= 2);
         int trackRow = hasTicks ? 1 : 0;
 
         // Compute indicator position on the track
-        int trackWidth = geoW;
+        int trackWidth = geo.width();
         int indicatorPos = 0;
         if (range > 0 && trackWidth > 1)
             indicatorPos = static_cast<int>(static_cast<double>(m_value - m_minimum) / range * (trackWidth - 1) + 0.5);
@@ -158,9 +148,9 @@ void QTuiSlider::paintEvent(ScreenBuffer &buffer)
 
         // Render tick marks row
         if (hasTicks) {
-            int py = geoY;
+            int py = geo.y();
             for (int col = 0; col < trackWidth; ++col) {
-                int px = geoX + col;
+                int px = geo.x() + col;
                 if (px >= buffer.width() || py >= buffer.height())
                     continue;
 
@@ -187,10 +177,10 @@ void QTuiSlider::paintEvent(ScreenBuffer &buffer)
         }
 
         // Render track row
-        int py = geoY + trackRow;
+        int py = geo.y() + trackRow;
         if (py < buffer.height()) {
             for (int col = 0; col < trackWidth; ++col) {
-                int px = geoX + col;
+                int px = geo.x() + col;
                 if (px >= buffer.width())
                     continue;
 
@@ -207,10 +197,10 @@ void QTuiSlider::paintEvent(ScreenBuffer &buffer)
         }
     } else {
         // Vertical orientation
-        bool hasTicks = (m_tickInterval > 0) && (geoW >= 3);
+        bool hasTicks = (m_tickInterval > 0) && (geo.width() >= 3);
         int trackCol = 0;
 
-        int trackHeight = geoH;
+        int trackHeight = geo.height();
         // Position inverted: max at top, min at bottom
         int indicatorPos = 0;
         if (range > 0 && trackHeight > 1)
@@ -219,8 +209,8 @@ void QTuiSlider::paintEvent(ScreenBuffer &buffer)
 
         // Render track column
         for (int row = 0; row < trackHeight; ++row) {
-            int px = geoX + trackCol;
-            int py = geoY + row;
+            int px = geo.x() + trackCol;
+            int py = geo.y() + row;
             if (px >= buffer.width() || py >= buffer.height())
                 continue;
 
@@ -239,8 +229,8 @@ void QTuiSlider::paintEvent(ScreenBuffer &buffer)
         if (hasTicks) {
             int tickCol = trackCol + 1;
             for (int row = 0; row < trackHeight; ++row) {
-                int px = geoX + tickCol;
-                int py = geoY + row;
+                int px = geo.x() + tickCol;
+                int py = geo.y() + row;
                 if (px >= buffer.width() || py >= buffer.height())
                     continue;
 

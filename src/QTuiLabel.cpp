@@ -291,11 +291,6 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
         return;
 
     const auto theme = themeProperties();
-    const int geoX = geo.x();
-    const int geoY = geo.y();
-    const int geoW = geo.width();
-    const int geoH = geo.height();
-
     // Determine colors based on focus state
     const Color fg = hasFocus() ? theme.focusForeground : theme.foreground;
     const Color bg = hasFocus() ? theme.focusBackground : theme.background;
@@ -307,7 +302,7 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
     QString shown;
     QVector<quint8> styles;
     parse(&shown, &styles);
-    QStringList lines = wrapText(shown, geoW);
+    QStringList lines = wrapText(shown, geo.width());
     // Position in `shown` of the next character to match with the lines;
     // wrapping drops or joins spaces, so spaces in `shown` are skipped
     int src = 0;
@@ -318,9 +313,9 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
     int totalLines = lines.size();
     int startRow = 0;
     if (m_alignment & Qt::AlignVCenter) {
-        startRow = (geoH - totalLines) / 2;
+        startRow = (geo.height() - totalLines) / 2;
     } else if (m_alignment & Qt::AlignBottom) {
-        startRow = geoH - totalLines;
+        startRow = geo.height() - totalLines;
     }
     // AlignTop: startRow stays 0
     startRow = qMax(0, startRow);
@@ -328,18 +323,18 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
     // Render each line
     for (int lineIdx = 0; lineIdx < lines.size(); ++lineIdx) {
         int row = startRow + lineIdx;
-        if (row >= geoH)
+        if (row >= geo.height())
             break;
 
         const QString &line = lines.at(lineIdx);
-        const int textCols = qMin(QtTuiUnicode::stringWidth(line), geoW);
+        const int textCols = qMin(QtTuiUnicode::stringWidth(line), geo.width());
 
         // Horizontal alignment: determine starting column (display columns)
         int startCol = 0;
         if (m_alignment & Qt::AlignHCenter) {
-            startCol = (geoW - textCols) / 2;
+            startCol = (geo.width() - textCols) / 2;
         } else if (m_alignment & Qt::AlignRight) {
-            startCol = geoW - textCols;
+            startCol = geo.width() - textCols;
         }
         // AlignLeft: startCol stays 0
         startCol = qMax(0, startCol);
@@ -353,7 +348,7 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
         style.italic = theme.italic;
         style.underline = theme.underline;
 
-        const int py = geoY + row;
+        const int py = geo.y() + row;
         if (py >= buffer.height())
             continue;
         int col = startCol;
@@ -373,7 +368,7 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
                 bits = styles.value(src);
                 src += i - c.index;
             }
-            if (full || col + c.width > geoW || geoX + col + c.width > buffer.width()) {
+            if (full || col + c.width > geo.width() || geo.x() + col + c.width > buffer.width()) {
                 full = true; // keep matching, so the next line starts right
                 continue;
             }
@@ -383,7 +378,7 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
             styled.underline = style.underline || (bits & Underline);
             styled.strikethrough = bits & Strike;
             styled.inverse = bits & Code;
-            buffer.putChar(geoX + col, py, c.base, c.combining, styled);
+            buffer.putChar(geo.x() + col, py, c.base, c.combining, styled);
             col += c.width;
         }
     }

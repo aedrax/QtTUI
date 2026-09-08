@@ -9,6 +9,8 @@ class QTimer;
 
 namespace QtTUI {
 
+struct Cell;
+
 // Base class of the button widgets, like QAbstractButton: text, the
 // checkable and checked state, the pressed look, and click handling.
 //
@@ -66,6 +68,9 @@ protected:
     // radio button. The indicator has 3 columns; it inverts while the
     // button is down.
     void paintIndicator(ScreenBuffer &buffer, const QString &indicator);
+    // The colors of a push button or a tool button for its state: disabled,
+    // focused, checked, under the mouse or pressed
+    Cell buttonStyle(const ThemeProperties &theme) const;
 
 private:
     QString m_text;

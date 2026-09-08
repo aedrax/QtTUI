@@ -63,13 +63,8 @@ void QTuiAbstractSpinBox::paintEvent(ScreenBuffer &buffer)
     const auto theme = themeProperties();
 
     // Determine colors based on focus state
-    Color fg = theme.foreground;
-    Color bg = theme.background;
-
-    if (hasFocus()) {
-        fg = theme.focusForeground;
-        bg = theme.focusBackground;
-    }
+    Color fg = hasFocus() ? theme.focusForeground : theme.foreground;
+    Color bg = hasFocus() ? theme.focusBackground : theme.background;
 
     fillRect(buffer, geo, cellStyle(theme, fg, bg));
     drawBorder(buffer, geo, theme.borderStyle, cellStyle(theme, fg, bg));

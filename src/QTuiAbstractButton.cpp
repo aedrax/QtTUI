@@ -138,12 +138,8 @@ void QTuiAbstractButton::paintIndicator(ScreenBuffer &buffer, const QString &ind
 
     // Determine colors based on focus state
     const auto theme = themeProperties();
-    Color fg = theme.foreground;
-    Color bg = theme.background;
-    if (hasFocus()) {
-        fg = theme.focusForeground;
-        bg = theme.focusBackground;
-    }
+    Color fg = hasFocus() ? theme.focusForeground : theme.foreground;
+    Color bg = hasFocus() ? theme.focusBackground : theme.background;
 
     const Cell style = cellStyle(theme, fg, bg);
     fillRect(buffer, geo, style);
@@ -151,6 +147,39 @@ void QTuiAbstractButton::paintIndicator(ScreenBuffer &buffer, const QString &ind
                                           (isDown() && isEffectivelyEnabled()) ? cellStyle(theme, bg, fg) : style);
     renderText(buffer, geo.x() + indicatorWidth, geo.y(), QLatin1Char(' ') + text(),
                geo.width() - indicatorWidth, style);
+}
+
+Cell QTuiAbstractButton::buttonStyle(const ThemeProperties &theme) const
+{
+    // A disabled ancestor also gives this button the disabled colors
+    const bool enabled = isEffectivelyEnabled();
+    Color fg = theme.foreground;
+    Color bg = theme.background;
+
+    if (!enabled) {
+        fg = theme.disabledForeground;
+        bg = theme.disabledBackground;
+    } else if (hasFocus()) {
+        fg = theme.focusForeground;
+        bg = theme.focusBackground;
+    }
+
+    // If checked, use inverse colors as visual indicator
+    if (isCheckable() && isChecked() && enabled) {
+        std::swap(fg, bg);
+    }
+
+    // Pressed: invert the colors again
+    const bool pressed = isDown() && enabled;
+
+    // Under the mouse (and not focused or pressed): the accent color shows
+    // that a click goes here
+    if (underMouse() && enabled && !hasFocus() && !pressed && !(isCheckable() && isChecked()))
+        fg = theme.focusBackground;
+    if (pressed)
+        std::swap(fg, bg);
+
+    return cellStyle(theme, fg, bg);
 }
 
 } // namespace QtTUI

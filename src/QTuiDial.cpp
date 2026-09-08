@@ -127,18 +127,8 @@ void QTuiDial::paintEvent(ScreenBuffer &buffer)
 
     const auto theme = themeProperties();
 
-    const int geoX = geo.x();
-    const int geoY = geo.y();
-    const int geoW = geo.width();
-    const int geoH = geo.height();
-
-    Color fg = theme.foreground;
-    Color bg = theme.background;
-
-    if (hasFocus()) {
-        fg = theme.focusForeground;
-        bg = theme.focusBackground;
-    }
+    Color fg = hasFocus() ? theme.focusForeground : theme.foreground;
+    Color bg = hasFocus() ? theme.focusBackground : theme.background;
 
     // Clear the entire widget area
     fillRect(buffer, geo, cellStyle(fg, bg));
@@ -154,20 +144,20 @@ void QTuiDial::paintEvent(ScreenBuffer &buffer)
     // We center this pattern within the widget geometry.
 
     // Use at least 5 rows and 9 cols for the dial shape
-    int dialW = qMin(geoW, qMax(9, geoW));
-    int dialH = qMin(geoH, qMax(5, geoH));
+    int dialW = qMin(geo.width(), qMax(9, geo.width()));
+    int dialH = qMin(geo.height(), qMax(5, geo.height()));
 
     // Offsets to center the dial in the widget
-    int offX = (geoW - dialW) / 2;
-    int offY = (geoH - dialH) / 2;
+    int offX = (geo.width() - dialW) / 2;
+    int offY = (geo.height() - dialH) / 2;
 
     // Inner width between the side borders (row 2)
     int innerW = dialW - 2; // excluding │ on each side
 
     // Helper to write a character at a position
     auto writeChar = [&](int col, int row, char32_t ch, bool bold = false) {
-        int px = geoX + offX + col;
-        int py = geoY + offY + row;
+        int px = geo.x() + offX + col;
+        int py = geo.y() + offY + row;
         if (px >= 0 && px < buffer.width() && py >= 0 && py < buffer.height()) {
             Cell &cell = buffer.backCell(px, py);
             cell.setChar(ch);
