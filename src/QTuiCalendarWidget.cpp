@@ -107,6 +107,18 @@ void QTuiCalendarWidget::moveCursor(int days)
     markDirty();
 }
 
+void QTuiCalendarWidget::selectCursorDate()
+{
+    if (clampDate(m_cursorDate) != m_cursorDate)
+        return;
+    if (m_cursorDate != m_selectedDate) {
+        m_selectedDate = m_cursorDate;
+        emit selectionChanged();
+        markDirty();
+    }
+    emit activated(m_cursorDate);
+}
+
 QSize QTuiCalendarWidget::minimumSize() const
 {
     // 22 cols wide: "Mo Tu We Th Fr Sa Su" = 20 chars + 1 col padding each side
@@ -279,23 +291,9 @@ void QTuiCalendarWidget::keyPressEvent(TuiKeyEvent *event)
         showNextMonth();
         break;
     case Qt::Key_Return:
-    case Qt::Key_Enter: {
-        // Select the cursor date if it's within range
-        bool inRange = true;
-        if (m_minimumDate.isValid() && m_cursorDate < m_minimumDate)
-            inRange = false;
-        if (m_maximumDate.isValid() && m_cursorDate > m_maximumDate)
-            inRange = false;
-
-        if (inRange && m_cursorDate != m_selectedDate) {
-            m_selectedDate = m_cursorDate;
-            emit selectionChanged();
-            markDirty();
-        }
-        if (inRange)
-            emit activated(m_cursorDate);
+    case Qt::Key_Enter:
+        selectCursorDate();
         break;
-    }
     default:
         QTuiWidget::keyPressEvent(event);
         return;
@@ -308,19 +306,7 @@ void QTuiCalendarWidget::mousePressEvent(TuiMouseEvent *event)
         return;
 
     // Simplified: select the cursor date (same as Enter)
-    bool inRange = true;
-    if (m_minimumDate.isValid() && m_cursorDate < m_minimumDate)
-        inRange = false;
-    if (m_maximumDate.isValid() && m_cursorDate > m_maximumDate)
-        inRange = false;
-
-    if (inRange && m_cursorDate != m_selectedDate) {
-        m_selectedDate = m_cursorDate;
-        emit selectionChanged();
-        markDirty();
-    }
-    if (inRange)
-        emit activated(m_cursorDate);
+    selectCursorDate();
 }
 
 } // namespace QtTUI

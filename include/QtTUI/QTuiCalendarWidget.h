@@ -40,6 +40,8 @@ private:
     QDate clampDate(const QDate &date) const;
     // Moves the cursor by a number of days and shows its month
     void moveCursor(int days);
+    // Selects the cursor date if it is in the range, and emits activated()
+    void selectCursorDate();
 
     QDate m_selectedDate;
     QDate m_cursorDate;
