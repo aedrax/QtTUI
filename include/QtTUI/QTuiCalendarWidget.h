@@ -38,6 +38,8 @@ private:
     void showPreviousMonth();
     void showNextMonth();
     QDate clampDate(const QDate &date) const;
+    // Moves the cursor by a number of days and shows its month
+    void moveCursor(int days);
 
     QDate m_selectedDate;
     QDate m_cursorDate;

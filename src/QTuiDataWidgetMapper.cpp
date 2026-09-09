@@ -261,50 +261,20 @@ void QTuiDataWidgetMapper::onWidgetTextChanged()
 
 void QTuiDataWidgetMapper::connectWidgetSignals(QTuiWidget *widget)
 {
-    // Look for a textChanged signal on the widget using meta-object
+    // Connect the first change signal the widget has: line edits, spin
+    // boxes, double spin boxes, combo boxes, check boxes
+    static const char *const signatures[] = {
+        "textChanged(QString)", "valueChanged(int)", "valueChanged(double)",
+        "currentIndexChanged(int)", "stateChanged(int)",
+    };
     const QMetaObject *mo = widget->metaObject();
-    int signalIdx = mo->indexOfSignal("textChanged(QString)");
-    if (signalIdx >= 0) {
-        const QMetaMethod signal = mo->method(signalIdx);
-        const QMetaMethod slot = metaObject()->method(
-            metaObject()->indexOfSlot("onWidgetTextChanged()"));
-        connect(widget, signal, this, slot);
-        return;
-    }
-    // Also try valueChanged(int) for spin boxes etc.
-    signalIdx = mo->indexOfSignal("valueChanged(int)");
-    if (signalIdx >= 0) {
-        const QMetaMethod signal = mo->method(signalIdx);
-        const QMetaMethod slot = metaObject()->method(
-            metaObject()->indexOfSlot("onWidgetTextChanged()"));
-        connect(widget, signal, this, slot);
-        return;
-    }
-    // Try valueChanged(double) for double spin boxes
-    signalIdx = mo->indexOfSignal("valueChanged(double)");
-    if (signalIdx >= 0) {
-        const QMetaMethod signal = mo->method(signalIdx);
-        const QMetaMethod slot = metaObject()->method(
-            metaObject()->indexOfSlot("onWidgetTextChanged()"));
-        connect(widget, signal, this, slot);
-        return;
-    }
-    // Try currentIndexChanged(int) for combo boxes
-    signalIdx = mo->indexOfSignal("currentIndexChanged(int)");
-    if (signalIdx >= 0) {
-        const QMetaMethod signal = mo->method(signalIdx);
-        const QMetaMethod slot = metaObject()->method(
-            metaObject()->indexOfSlot("onWidgetTextChanged()"));
-        connect(widget, signal, this, slot);
-        return;
-    }
-    // Try stateChanged(int) for check boxes
-    signalIdx = mo->indexOfSignal("stateChanged(int)");
-    if (signalIdx >= 0) {
-        const QMetaMethod signal = mo->method(signalIdx);
-        const QMetaMethod slot = metaObject()->method(
-            metaObject()->indexOfSlot("onWidgetTextChanged()"));
-        connect(widget, signal, this, slot);
+    for (const char *signature : signatures) {
+        const int signalIdx = mo->indexOfSignal(signature);
+        if (signalIdx >= 0) {
+            connect(widget, mo->method(signalIdx), this,
+                    metaObject()->method(metaObject()->indexOfSlot("onWidgetTextChanged()")));
+            return;
+        }
     }
 }
 

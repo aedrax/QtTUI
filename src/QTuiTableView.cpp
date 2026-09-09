@@ -423,29 +423,8 @@ void QTuiTableView::onRowsInserted(const QModelIndex &parent, int first, int las
         return;
 
     invalidateColumnWidths();
-
-    const QRect geo = geometry();
-    const int visibleDataRows = geo.height() - m_headerHeight;
-    if (visibleDataRows <= 0) {
-        clampCurrentIndex();
-        return;
-    }
-
-    const int firstVisibleRow = m_scrollOffset;
-    const int lastVisibleRow = m_scrollOffset + visibleDataRows - 1;
-
-    // If insertion is entirely below the visible viewport, no dirty marking needed
-    if (first > lastVisibleRow) {
-        clampCurrentIndex();
-        return;
-    }
-
-    // Mark from insertion point (or top of viewport) to bottom of viewport
-    int dirtyTop = qMax(first, firstVisibleRow) - m_scrollOffset + m_headerHeight;
-    QRect dirtyRect(geo.x(), geo.y() + dirtyTop,
-                    geo.width(), visibleDataRows - dirtyTop + m_headerHeight);
-    markDirty(dirtyRect);
-
+    // Mark from the insertion point to the bottom of the view
+    markDirtyFromRowToBottom(first, m_headerHeight);
     clampCurrentIndex();
 }
 
@@ -458,31 +437,8 @@ void QTuiTableView::onRowsRemoved(const QModelIndex &parent, int first, int last
         return;
 
     invalidateColumnWidths();
-
-    const QRect geo = geometry();
-    const int visibleDataRows = geo.height() - m_headerHeight;
-    if (visibleDataRows <= 0) {
-        clampCurrentIndex();
-        ensureCurrentVisible();
-        return;
-    }
-
-    const int firstVisibleRow = m_scrollOffset;
-    const int lastVisibleRow = m_scrollOffset + visibleDataRows - 1;
-
-    // If removal is entirely below the visible viewport, no dirty marking needed
-    if (first > lastVisibleRow) {
-        clampCurrentIndex();
-        ensureCurrentVisible();
-        return;
-    }
-
-    // Mark from removal point (or top of viewport) to bottom of viewport
-    int dirtyTop = qMax(first, firstVisibleRow) - m_scrollOffset + m_headerHeight;
-    QRect dirtyRect(geo.x(), geo.y() + dirtyTop,
-                    geo.width(), visibleDataRows - dirtyTop + m_headerHeight);
-    markDirty(dirtyRect);
-
+    // Mark from the removal point to the bottom of the view
+    markDirtyFromRowToBottom(first, m_headerHeight);
     clampCurrentIndex();
     ensureCurrentVisible();
 }

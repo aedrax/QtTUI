@@ -63,7 +63,6 @@ private:
     void connectModel();
     void scrollToVisible();
     int flatRowForIndex(const QModelIndex &index) const;
-    void markDirtyFromRowToBottom(int flatRow);
 
     QList<FlattenedItem> m_flatList;
     QSet<QPersistentModelIndex> m_expandedItems;

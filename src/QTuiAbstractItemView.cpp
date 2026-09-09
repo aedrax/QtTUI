@@ -438,6 +438,17 @@ void QTuiAbstractItemView::scrollToRow(int row, int visibleRows, int rowCount, S
     updateEditorGeometry();
 }
 
+void QTuiAbstractItemView::markDirtyFromRowToBottom(int row, int top)
+{
+    const QRect geo = geometry();
+    const int visibleRows = geo.height() - top;
+    // Nothing to mark if the row is below the view
+    if (visibleRows <= 0 || row >= m_scrollOffset + visibleRows)
+        return;
+    const int dirtyTop = top + qMax(row, m_scrollOffset) - m_scrollOffset;
+    markDirty(QRect(geo.x(), geo.y() + dirtyTop, geo.width(), geo.height() - dirtyTop));
+}
+
 void QTuiAbstractItemView::onSelectionCurrentChanged(const QModelIndex &current)
 {
     if (!current.isValid() || current == currentIndex())

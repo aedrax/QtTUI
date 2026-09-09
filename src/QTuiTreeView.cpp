@@ -438,26 +438,8 @@ void QTuiTreeView::onRowsInserted(const QModelIndex &parent, int first, int last
         m_currentRow = qMax(0, m_flatList.size() - 1);
     scrollToVisible();
 
-    // Mark from affected row to bottom of viewport
-    const QRect geo = geometry();
-    const int viewHeight = geo.height();
-    if (viewHeight <= 0)
-        return;
-
-    const int firstVisibleRow = m_scrollOffset;
-    const int lastVisibleRow = m_scrollOffset + viewHeight - 1;
-
-    // If no affected row found, or it's below viewport, no marking needed
-    if (affectedFlatRow < 0)
-        affectedFlatRow = 0;
-
-    if (affectedFlatRow > lastVisibleRow)
-        return;
-
-    int dirtyTop = qMax(affectedFlatRow, firstVisibleRow) - m_scrollOffset;
-    QRect dirtyRect(geo.x(), geo.y() + dirtyTop,
-                    geo.width(), viewHeight - dirtyTop);
-    markDirty(dirtyRect);
+    // Mark from the affected row to the bottom of the view
+    markDirtyFromRowToBottom(qMax(0, affectedFlatRow));
 }
 
 void QTuiTreeView::onRowsAboutToBeRemoved(const QModelIndex &parent, int first, int last)
@@ -495,25 +477,8 @@ void QTuiTreeView::onRowsRemoved(const QModelIndex &parent, int first, int last)
         m_currentRow = qMax(0, m_flatList.size() - 1);
     scrollToVisible();
 
-    // Mark from affected row to bottom of viewport
-    const QRect geo = geometry();
-    const int viewHeight = geo.height();
-    if (viewHeight <= 0)
-        return;
-
-    const int firstVisibleRow = m_scrollOffset;
-    const int lastVisibleRow = m_scrollOffset + viewHeight - 1;
-
-    if (affectedFlatRow < 0)
-        affectedFlatRow = 0;
-
-    if (affectedFlatRow > lastVisibleRow)
-        return;
-
-    int dirtyTop = qMax(affectedFlatRow, firstVisibleRow) - m_scrollOffset;
-    QRect dirtyRect(geo.x(), geo.y() + dirtyTop,
-                    geo.width(), viewHeight - dirtyTop);
-    markDirty(dirtyRect);
+    // Mark from the affected row to the bottom of the view
+    markDirtyFromRowToBottom(qMax(0, affectedFlatRow));
 }
 
 void QTuiTreeView::onLayoutChanged()
@@ -631,26 +596,6 @@ int QTuiTreeView::flatRowForIndex(const QModelIndex &index) const
             return i;
     }
     return -1;
-}
-
-void QTuiTreeView::markDirtyFromRowToBottom(int flatRow)
-{
-    const QRect geo = geometry();
-    const int viewHeight = geo.height();
-    if (viewHeight <= 0)
-        return;
-
-    const int firstVisibleRow = m_scrollOffset;
-    const int lastVisibleRow = m_scrollOffset + viewHeight - 1;
-
-    // If the affected row is below the visible viewport, nothing to mark
-    if (flatRow > lastVisibleRow)
-        return;
-
-    int dirtyTop = qMax(flatRow, firstVisibleRow) - m_scrollOffset;
-    QRect dirtyRect(geo.x(), geo.y() + dirtyTop,
-                    geo.width(), viewHeight - dirtyTop);
-    markDirty(dirtyRect);
 }
 
 } // namespace QtTUI

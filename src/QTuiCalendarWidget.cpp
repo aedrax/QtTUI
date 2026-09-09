@@ -96,6 +96,17 @@ QDate QTuiCalendarWidget::clampDate(const QDate &date) const
     return result;
 }
 
+void QTuiCalendarWidget::moveCursor(int days)
+{
+    const QDate clamped = clampDate(m_cursorDate.addDays(days));
+    if (!clamped.isValid() || clamped == m_cursorDate)
+        return;
+    m_cursorDate = clamped;
+    m_displayMonth = m_cursorDate.month();
+    m_displayYear = m_cursorDate.year();
+    markDirty();
+}
+
 QSize QTuiCalendarWidget::minimumSize() const
 {
     // 22 cols wide: "Mo Tu We Th Fr Sa Su" = 20 chars + 1 col padding each side
@@ -249,58 +260,18 @@ void QTuiCalendarWidget::paintEvent(ScreenBuffer &buffer)
 void QTuiCalendarWidget::keyPressEvent(TuiKeyEvent *event)
 {
     switch (event->key()) {
-    case Qt::Key_Left: {
-        const QDate newDate = m_cursorDate.addDays(-1);
-        const QDate clamped = clampDate(newDate);
-        if (clamped.isValid() && clamped != m_cursorDate) {
-            m_cursorDate = clamped;
-            if (m_cursorDate.month() != m_displayMonth || m_cursorDate.year() != m_displayYear) {
-                m_displayMonth = m_cursorDate.month();
-                m_displayYear = m_cursorDate.year();
-            }
-            markDirty();
-        }
+    case Qt::Key_Left:
+        moveCursor(-1);
         break;
-    }
-    case Qt::Key_Right: {
-        const QDate newDate = m_cursorDate.addDays(1);
-        const QDate clamped = clampDate(newDate);
-        if (clamped.isValid() && clamped != m_cursorDate) {
-            m_cursorDate = clamped;
-            if (m_cursorDate.month() != m_displayMonth || m_cursorDate.year() != m_displayYear) {
-                m_displayMonth = m_cursorDate.month();
-                m_displayYear = m_cursorDate.year();
-            }
-            markDirty();
-        }
+    case Qt::Key_Right:
+        moveCursor(1);
         break;
-    }
-    case Qt::Key_Up: {
-        const QDate newDate = m_cursorDate.addDays(-7);
-        const QDate clamped = clampDate(newDate);
-        if (clamped.isValid() && clamped != m_cursorDate) {
-            m_cursorDate = clamped;
-            if (m_cursorDate.month() != m_displayMonth || m_cursorDate.year() != m_displayYear) {
-                m_displayMonth = m_cursorDate.month();
-                m_displayYear = m_cursorDate.year();
-            }
-            markDirty();
-        }
+    case Qt::Key_Up:
+        moveCursor(-7);
         break;
-    }
-    case Qt::Key_Down: {
-        const QDate newDate = m_cursorDate.addDays(7);
-        const QDate clamped = clampDate(newDate);
-        if (clamped.isValid() && clamped != m_cursorDate) {
-            m_cursorDate = clamped;
-            if (m_cursorDate.month() != m_displayMonth || m_cursorDate.year() != m_displayYear) {
-                m_displayMonth = m_cursorDate.month();
-                m_displayYear = m_cursorDate.year();
-            }
-            markDirty();
-        }
+    case Qt::Key_Down:
+        moveCursor(7);
         break;
-    }
     case Qt::Key_PageUp:
         showPreviousMonth();
         break;

@@ -228,28 +228,8 @@ void QTuiListView::onRowsInserted(const QModelIndex &parent, int first, int last
     if (!m_model)
         return;
 
-    const QRect geo = geometry();
-    const int viewHeight = geo.height();
-    if (viewHeight <= 0) {
-        clampCurrentIndex();
-        return;
-    }
-
-    const int firstVisibleRow = m_scrollOffset;
-    const int lastVisibleRow = m_scrollOffset + viewHeight - 1;
-
-    // If insertion is entirely below the visible viewport, no dirty marking needed
-    if (first > lastVisibleRow) {
-        clampCurrentIndex();
-        return;
-    }
-
-    // Mark from insertion point (or top of viewport) to bottom of viewport
-    int dirtyTop = qMax(first, firstVisibleRow) - m_scrollOffset;
-    QRect dirtyRect(geo.x(), geo.y() + dirtyTop,
-                    geo.width(), viewHeight - dirtyTop);
-    markDirty(dirtyRect);
-
+    // Mark from the insertion point to the bottom of the view
+    markDirtyFromRowToBottom(first);
     clampCurrentIndex();
 }
 
@@ -261,30 +241,8 @@ void QTuiListView::onRowsRemoved(const QModelIndex &parent, int first, int last)
     if (!m_model)
         return;
 
-    const QRect geo = geometry();
-    const int viewHeight = geo.height();
-    if (viewHeight <= 0) {
-        clampCurrentIndex();
-        ensureCurrentVisible();
-        return;
-    }
-
-    const int firstVisibleRow = m_scrollOffset;
-    const int lastVisibleRow = m_scrollOffset + viewHeight - 1;
-
-    // If removal is entirely below the visible viewport, no dirty marking needed
-    if (first > lastVisibleRow) {
-        clampCurrentIndex();
-        ensureCurrentVisible();
-        return;
-    }
-
-    // Mark from removal point (or top of viewport) to bottom of viewport
-    int dirtyTop = qMax(first, firstVisibleRow) - m_scrollOffset;
-    QRect dirtyRect(geo.x(), geo.y() + dirtyTop,
-                    geo.width(), viewHeight - dirtyTop);
-    markDirty(dirtyRect);
-
+    // Mark from the removal point to the bottom of the view
+    markDirtyFromRowToBottom(first);
     clampCurrentIndex();
     ensureCurrentVisible();
 }
