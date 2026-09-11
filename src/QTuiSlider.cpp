@@ -7,91 +7,8 @@
 namespace QtTUI {
 
 QTuiSlider::QTuiSlider(Qt::Orientation orientation, QTuiWidget *parent)
-    : QTuiWidget(parent)
-    , m_orientation(orientation)
+    : QTuiAbstractSlider(orientation, parent)
 {
-    setFocusPolicy(Qt::StrongFocus);
-}
-
-int QTuiSlider::value() const
-{
-    return m_value;
-}
-
-void QTuiSlider::setValue(int value)
-{
-    int clamped = qBound(m_minimum, value, m_maximum);
-    if (m_value != clamped) {
-        m_value = clamped;
-        emit valueChanged(m_value);
-        markDirty();
-    }
-}
-
-int QTuiSlider::minimum() const
-{
-    return m_minimum;
-}
-
-void QTuiSlider::setMinimum(int min)
-{
-    if (m_minimum == min)
-        return;
-    m_minimum = min;
-    if (m_maximum < m_minimum)
-        m_maximum = m_minimum;
-    setValue(m_value);
-    markDirty();
-}
-
-int QTuiSlider::maximum() const
-{
-    return m_maximum;
-}
-
-void QTuiSlider::setMaximum(int max)
-{
-    if (m_maximum == max)
-        return;
-    m_maximum = max;
-    if (m_minimum > m_maximum)
-        m_minimum = m_maximum;
-    setValue(m_value);
-    markDirty();
-}
-
-void QTuiSlider::setRange(int min, int max)
-{
-    if (m_minimum == min && m_maximum == qMax(min, max))
-        return;
-    m_minimum = min;
-    m_maximum = qMax(min, max);
-    setValue(m_value);
-    markDirty();
-}
-
-int QTuiSlider::singleStep() const
-{
-    return m_singleStep;
-}
-
-void QTuiSlider::setSingleStep(int step)
-{
-    if (step > 0)
-        m_singleStep = step;
-}
-
-Qt::Orientation QTuiSlider::orientation() const
-{
-    return m_orientation;
-}
-
-void QTuiSlider::setOrientation(Qt::Orientation orientation)
-{
-    if (m_orientation == orientation)
-        return;
-    m_orientation = orientation;
-    markDirty();
 }
 
 int QTuiSlider::tickInterval() const
@@ -258,43 +175,19 @@ void QTuiSlider::paintEvent(ScreenBuffer &buffer)
 
 void QTuiSlider::keyPressEvent(TuiKeyEvent *event)
 {
+    // Up steps up; Right also steps up on a horizontal slider
     const int key = event->key();
-
-    if (m_orientation == Qt::Horizontal) {
-        // Horizontal: Right/Up = increment, Left/Down = decrement
-        if (key == Qt::Key_Right || key == Qt::Key_Up) {
-            int newValue = qBound(m_minimum, m_value + m_singleStep, m_maximum);
-            setValue(newValue);
-        } else if (key == Qt::Key_Left || key == Qt::Key_Down) {
-            int newValue = qBound(m_minimum, m_value - m_singleStep, m_maximum);
-            setValue(newValue);
-        }
-    } else {
-        // Vertical: Up = increment, Down = decrement, Left/Right ignored
-        if (key == Qt::Key_Up) {
-            int newValue = qBound(m_minimum, m_value + m_singleStep, m_maximum);
-            setValue(newValue);
-        } else if (key == Qt::Key_Down) {
-            int newValue = qBound(m_minimum, m_value - m_singleStep, m_maximum);
-            setValue(newValue);
-        }
-    }
+    const bool horizontal = m_orientation == Qt::Horizontal;
+    if (key == Qt::Key_Up || (horizontal && key == Qt::Key_Right))
+        setValue(m_value + m_singleStep);
+    else if (key == Qt::Key_Down || (horizontal && key == Qt::Key_Left))
+        setValue(m_value - m_singleStep);
 }
 
 void QTuiSlider::mousePressEvent(TuiMouseEvent *event)
 {
-    if (event->mouseType() != TuiMouseEvent::Press)
-        return;
-
-    const QRect geo = geometry();
-    int newValue;
-
-    if (m_orientation == Qt::Horizontal) {
-        newValue = m_minimum + (event->x() - geo.x()) * (m_maximum - m_minimum) / qMax(1, geo.width() - 1);
-    } else {
-        newValue = m_minimum + (event->y() - geo.y()) * (m_maximum - m_minimum) / qMax(1, geo.height() - 1);
-    }
-    setValue(qBound(m_minimum, newValue, m_maximum));
+    if (event->mouseType() == TuiMouseEvent::Press)
+        setValue(valueAt(event->x(), event->y()));
 }
 
 } // namespace QtTUI

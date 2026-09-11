@@ -7,77 +7,8 @@
 namespace QtTUI {
 
 QTuiDial::QTuiDial(QTuiWidget *parent)
-    : QTuiWidget(parent)
+    : QTuiAbstractSlider(Qt::Horizontal, parent)
 {
-    setFocusPolicy(Qt::StrongFocus);
-}
-
-int QTuiDial::value() const
-{
-    return m_value;
-}
-
-void QTuiDial::setValue(int value)
-{
-    int clamped = qBound(m_minimum, value, m_maximum);
-    if (m_value != clamped) {
-        m_value = clamped;
-        emit valueChanged(m_value);
-        markDirty();
-    }
-}
-
-int QTuiDial::minimum() const
-{
-    return m_minimum;
-}
-
-void QTuiDial::setMinimum(int min)
-{
-    if (m_minimum == min)
-        return;
-    m_minimum = min;
-    if (m_maximum < m_minimum)
-        m_maximum = m_minimum;
-    setValue(m_value);
-    markDirty();
-}
-
-int QTuiDial::maximum() const
-{
-    return m_maximum;
-}
-
-void QTuiDial::setMaximum(int max)
-{
-    if (m_maximum == max)
-        return;
-    m_maximum = max;
-    if (m_minimum > m_maximum)
-        m_minimum = m_maximum;
-    setValue(m_value);
-    markDirty();
-}
-
-void QTuiDial::setRange(int min, int max)
-{
-    if (m_minimum == min && m_maximum == qMax(min, max))
-        return;
-    m_minimum = min;
-    m_maximum = qMax(min, max);
-    setValue(m_value);
-    markDirty();
-}
-
-int QTuiDial::singleStep() const
-{
-    return m_singleStep;
-}
-
-void QTuiDial::setSingleStep(int step)
-{
-    if (step > 0)
-        m_singleStep = step;
 }
 
 bool QTuiDial::wrapping() const

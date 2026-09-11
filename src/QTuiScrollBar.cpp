@@ -7,79 +7,9 @@
 namespace QtTUI {
 
 QTuiScrollBar::QTuiScrollBar(Qt::Orientation orientation, QTuiWidget *parent)
-    : QTuiWidget(parent)
-    , m_orientation(orientation)
+    : QTuiAbstractSlider(orientation, parent)
 {
-    setFocusPolicy(Qt::StrongFocus);
-}
-
-int QTuiScrollBar::value() const
-{
-    return m_value;
-}
-
-void QTuiScrollBar::setValue(int value)
-{
-    int clamped = qBound(m_minimum, value, m_maximum);
-    if (m_value != clamped) {
-        m_value = clamped;
-        emit valueChanged(m_value);
-        markDirty();
-    }
-}
-
-int QTuiScrollBar::minimum() const
-{
-    return m_minimum;
-}
-
-void QTuiScrollBar::setMinimum(int min)
-{
-    if (m_minimum == min)
-        return;
-    m_minimum = min;
-    if (m_maximum < m_minimum)
-        m_maximum = m_minimum;
-    setValue(m_value);
-    markDirty();
-}
-
-int QTuiScrollBar::maximum() const
-{
-    return m_maximum;
-}
-
-void QTuiScrollBar::setMaximum(int max)
-{
-    if (m_maximum == max)
-        return;
-    m_maximum = max;
-    if (m_minimum > m_maximum)
-        m_minimum = m_maximum;
-    setValue(m_value);
-    markDirty();
-}
-
-void QTuiScrollBar::setRange(int min, int max)
-{
-    max = qMax(min, max);
-    if (m_minimum == min && m_maximum == max)
-        return;
-    m_minimum = min;
-    m_maximum = max;
-    setValue(m_value);
-    markDirty();
-}
-
-int QTuiScrollBar::singleStep() const
-{
-    return m_singleStep;
-}
-
-void QTuiScrollBar::setSingleStep(int step)
-{
-    if (step > 0)
-        m_singleStep = step;
+    m_maximum = 0;
 }
 
 int QTuiScrollBar::pageStep() const
@@ -93,11 +23,6 @@ void QTuiScrollBar::setPageStep(int step)
         m_pageStep = step;
         markDirty();
     }
-}
-
-Qt::Orientation QTuiScrollBar::orientation() const
-{
-    return m_orientation;
 }
 
 QSize QTuiScrollBar::minimumSize() const
@@ -151,28 +76,15 @@ void QTuiScrollBar::paintEvent(ScreenBuffer &buffer)
 void QTuiScrollBar::keyPressEvent(TuiKeyEvent *event)
 {
     const int key = event->key();
-
-    if (m_orientation == Qt::Vertical) {
-        if (key == Qt::Key_Up) {
-            setValue(m_value - m_singleStep);
-        } else if (key == Qt::Key_Down) {
-            setValue(m_value + m_singleStep);
-        } else if (key == Qt::Key_PageUp) {
-            setValue(m_value - m_pageStep);
-        } else if (key == Qt::Key_PageDown) {
-            setValue(m_value + m_pageStep);
-        }
-    } else {
-        if (key == Qt::Key_Left) {
-            setValue(m_value - m_singleStep);
-        } else if (key == Qt::Key_Right) {
-            setValue(m_value + m_singleStep);
-        } else if (key == Qt::Key_PageUp) {
-            setValue(m_value - m_pageStep);
-        } else if (key == Qt::Key_PageDown) {
-            setValue(m_value + m_pageStep);
-        }
-    }
+    const bool vertical = m_orientation == Qt::Vertical;
+    if (key == Qt::Key_PageUp)
+        setValue(m_value - m_pageStep);
+    else if (key == Qt::Key_PageDown)
+        setValue(m_value + m_pageStep);
+    else if (key == (vertical ? Qt::Key_Up : Qt::Key_Left))
+        setValue(m_value - m_singleStep);
+    else if (key == (vertical ? Qt::Key_Down : Qt::Key_Right))
+        setValue(m_value + m_singleStep);
 }
 
 void QTuiScrollBar::mousePressEvent(TuiMouseEvent *event)
@@ -180,18 +92,8 @@ void QTuiScrollBar::mousePressEvent(TuiMouseEvent *event)
     // A press jumps to the position; a drag with the left button follows
     // the mouse
     const bool drag = event->mouseType() == TuiMouseEvent::Move && event->button() == Qt::LeftButton;
-    if (event->mouseType() != TuiMouseEvent::Press && !drag)
-        return;
-
-    const QRect geo = geometry();
-    int newValue;
-
-    if (m_orientation == Qt::Horizontal) {
-        newValue = m_minimum + (event->x() - geo.x()) * (m_maximum - m_minimum) / qMax(1, geo.width() - 1);
-    } else {
-        newValue = m_minimum + (event->y() - geo.y()) * (m_maximum - m_minimum) / qMax(1, geo.height() - 1);
-    }
-    setValue(qBound(m_minimum, newValue, m_maximum));
+    if (event->mouseType() == TuiMouseEvent::Press || drag)
+        setValue(valueAt(event->x(), event->y()));
 }
 
 } // namespace QtTUI
