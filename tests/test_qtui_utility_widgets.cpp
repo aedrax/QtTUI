@@ -1,6 +1,7 @@
 #include <QtTest/QtTest>
 #include <QSignalSpy>
 #include <QCoreApplication>
+#include <QLocale>
 #include <QtTUI/QTuiFocusFrame.h>
 #include <QtTUI/QTuiSizeGrip.h>
 #include <QtTUI/QTuiCalendarWidget.h>
@@ -331,6 +332,39 @@ private slots:
         // selectionChanged emitted because cursor date differs from old selected
         QCOMPARE(selectionSpy.count(), 1);
         QCOMPARE(cal.selectedDate(), QDate(2025, 3, 16));
+    }
+
+    void calendar_clickSelectsTheDateUnderTheMouse()
+    {
+        // The header width depends on the month name
+        QLocale::setDefault(QLocale(QLocale::English));
+        QTuiCalendarWidget cal;
+        cal.setGeometry(QRect(0, 0, 22, 9));
+        cal.setSelectedDate(QDate(2025, 3, 15));
+        QSignalSpy activatedSpy(&cal, &QTuiCalendarWidget::activated);
+        auto click = [&](int x, int y) {
+            TuiMouseEvent ev(TuiMouseEvent::Press, Qt::LeftButton, QPoint(x, y));
+            QCoreApplication::sendEvent(&cal, &ev);
+        };
+
+        // 1 March 2025 is a Saturday: grid row 0, column 5, at x 1 + 5 * 3.
+        // 20 March is a Thursday: grid row 3, column 3.
+        click(1 + 3 * 3 + 1, 2 + 3);
+        QCOMPARE(cal.selectedDate(), QDate(2025, 3, 20));
+        QCOMPARE(activatedSpy.count(), 1);
+
+        // A click on the gap between two days or on a blank cell does nothing
+        click(1 + 3 * 3 + 2, 2 + 3);
+        click(1, 2);
+        QCOMPARE(cal.selectedDate(), QDate(2025, 3, 20));
+        QCOMPARE(activatedSpy.count(), 1);
+
+        // The arrows in the header change the month: "< March 2025 >" is
+        // 14 columns, centered at column 4
+        click(4 + 13, 0);
+        click(4 + 5 * 3 + 1, 2);
+        QCOMPARE(cal.selectedDate(), QDate(2025, 4, 6));
+        QLocale::setDefault(QLocale::system());
     }
 
     void calendar_minMaxConstraints()

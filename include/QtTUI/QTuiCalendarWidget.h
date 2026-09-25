@@ -42,6 +42,10 @@ private:
     void moveCursor(int days);
     // Selects the cursor date if it is in the range, and emits activated()
     void selectCursorDate();
+    // "< <month> <year> >" on row 0
+    QString headerText() const;
+    // The weekday names on row 1, for example "Mo Tu We Th Fr Sa Su"
+    QString weekdayText() const;
 
     QDate m_selectedDate;
     QDate m_cursorDate;

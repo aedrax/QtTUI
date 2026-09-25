@@ -151,6 +151,20 @@ void QTuiCalendarWidget::showNextMonth()
     markDirty();
 }
 
+QString QTuiCalendarWidget::headerText() const
+{
+    const QString monthName = QLocale().monthName(m_displayMonth, QLocale::LongFormat);
+    return QStringLiteral("< %1 %2 >").arg(monthName).arg(m_displayYear);
+}
+
+QString QTuiCalendarWidget::weekdayText() const
+{
+    QStringList days;
+    for (int day = Qt::Monday; day <= Qt::Sunday; ++day)
+        days.append(QLocale().dayName(day, QLocale::ShortFormat).left(2));
+    return days.join(QLatin1Char(' '));
+}
+
 void QTuiCalendarWidget::paintEvent(ScreenBuffer &buffer)
 {
     if (!isVisible())
@@ -195,18 +209,14 @@ void QTuiCalendarWidget::paintEvent(ScreenBuffer &buffer)
     }
 
     // Row 0: Month/Year header centered, e.g. "< January 2025  >"
-    const QString monthName = QLocale().monthName(m_displayMonth, QLocale::LongFormat);
-    const QString header = QStringLiteral("< %1 %2 >").arg(monthName).arg(m_displayYear);
+    const QString header = headerText();
     const int headerLen = static_cast<int>(header.length());
     const int headerX = x0 + qMax(0, (w - headerLen) / 2);
     writeString(headerX, y0, header, fg, bg, true);
 
     // Row 1: Weekday header, 2 characters per day from the locale
     // ("Mo Tu We Th Fr Sa Su" in English), like the month name above
-    QStringList days;
-    for (int day = Qt::Monday; day <= Qt::Sunday; ++day)
-        days.append(QLocale().dayName(day, QLocale::ShortFormat).left(2));
-    const QString weekdays = days.join(QLatin1Char(' '));
+    const QString weekdays = weekdayText();
     const int weekdaysLen = static_cast<int>(weekdays.length());
     const int weekdayX = x0 + qMax(0, (w - weekdaysLen) / 2);
     writeString(weekdayX, y0 + 1, weekdays, fg, bg, false, true);
@@ -305,7 +315,36 @@ void QTuiCalendarWidget::mousePressEvent(TuiMouseEvent *event)
     if (event->mouseType() != TuiMouseEvent::Press)
         return;
 
-    // Simplified: select the cursor date (same as Enter)
+    // Use the same positions as paintEvent()
+    const QRect geo = geometry();
+    const int col = event->x() - geo.x();
+    const int row = event->y() - geo.y();
+
+    // Row 0: "<" shows the previous month, ">" shows the next month
+    if (row == 0) {
+        const int headerLen = static_cast<int>(headerText().length());
+        const int headerCol = qMax(0, (geo.width() - headerLen) / 2);
+        if (col == headerCol)
+            showPreviousMonth();
+        else if (col == headerCol + headerLen - 1)
+            showNextMonth();
+        return;
+    }
+
+    // Rows 2-7: each day has 2 columns and a 1-column gap
+    const int gridCol = col - qMax(0, (geo.width() - static_cast<int>(weekdayText().length())) / 2);
+    const int gridRow = row - 2;
+    if (gridCol < 0 || gridCol % 3 == 2 || gridCol / 3 > 6 || gridRow < 0 || gridRow > 5)
+        return;
+    const QDate firstOfMonth(m_displayYear, m_displayMonth, 1);
+    const int dayNum = gridRow * 7 + gridCol / 3 - firstOfMonth.dayOfWeek() + 2;
+    if (dayNum < 1 || dayNum > firstOfMonth.daysInMonth())
+        return;
+    const QDate date(m_displayYear, m_displayMonth, dayNum);
+    if (clampDate(date) != date)
+        return;
+    m_cursorDate = date;
+    markDirty();
     selectCursorDate();
 }
 
