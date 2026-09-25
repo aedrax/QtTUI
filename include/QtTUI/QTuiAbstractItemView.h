@@ -143,9 +143,9 @@ protected:
     // Moves m_scrollOffset to show `row` of `rowCount` rows in
     // `visibleRows` lines, as the hint says
     void scrollToRow(int row, int visibleRows, int rowCount, ScrollHint hint);
-    // Marks the rows from `row` to the bottom of the view as dirty. The
-    // first row of the view is `top` lines below the top of the widget.
-    void markDirtyFromRowToBottom(int row, int top = 0);
+    // Marks the visible rows from `first` to `last` as dirty. The first row
+    // of the view is `top` lines below the top of the widget.
+    void markRowsDirty(int first, int last, int top = 0);
     // Moves the editor to the item after the rows of the view change, or
     // closes it (with commit) if the item is no longer visible
     void updateEditorGeometry();

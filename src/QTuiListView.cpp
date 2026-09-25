@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiListView.h>
+#include <climits>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/RenderUtils.h>
@@ -196,28 +197,8 @@ void QTuiListView::onDataChanged(const QModelIndex &topLeft, const QModelIndex &
     if (!m_model)
         return;
 
-    const QRect geo = geometry();
-    const int viewHeight = geo.height();
-    if (viewHeight <= 0)
-        return;
-
-    const int firstVisibleRow = m_scrollOffset;
-    const int lastVisibleRow = m_scrollOffset + viewHeight - 1;
-
-    int top = qBound(0, topLeft.row(), m_model->rowCount() - 1);
-    int bottom = qBound(0, bottomRight.row(), m_model->rowCount() - 1);
-
-    // Filter out signals entirely outside the visible viewport
-    if (top > lastVisibleRow || bottom < firstVisibleRow)
-        return;
-
-    // Compute the visible dirty rows relative to the widget geometry
-    int dirtyTop = qMax(top, firstVisibleRow) - m_scrollOffset;
-    int dirtyBottom = qMin(bottom, lastVisibleRow) - m_scrollOffset;
-
-    QRect dirtyRect(geo.x(), geo.y() + dirtyTop,
-                    geo.width(), dirtyBottom - dirtyTop + 1);
-    markDirty(dirtyRect);
+    const int lastRow = m_model->rowCount() - 1;
+    markRowsDirty(qBound(0, topLeft.row(), lastRow), qBound(0, bottomRight.row(), lastRow));
 }
 
 void QTuiListView::onRowsInserted(const QModelIndex &parent, int first, int last)
@@ -229,7 +210,7 @@ void QTuiListView::onRowsInserted(const QModelIndex &parent, int first, int last
         return;
 
     // Mark from the insertion point to the bottom of the view
-    markDirtyFromRowToBottom(first);
+    markRowsDirty(first, INT_MAX);
     clampCurrentIndex();
 }
 
@@ -242,7 +223,7 @@ void QTuiListView::onRowsRemoved(const QModelIndex &parent, int first, int last)
         return;
 
     // Mark from the removal point to the bottom of the view
-    markDirtyFromRowToBottom(first);
+    markRowsDirty(first, INT_MAX);
     clampCurrentIndex();
     ensureCurrentVisible();
 }

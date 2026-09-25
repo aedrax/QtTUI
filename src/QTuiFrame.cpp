@@ -1,6 +1,4 @@
 #include <QtTUI/QTuiFrame.h>
-#include <QtTUI/RenderUtils.h>
-#include <QtTUI/Theme_Engine.h>
 
 namespace QtTUI {
 
@@ -31,14 +29,6 @@ QRect QTuiFrame::contentsRect() const
 {
     const int w = frameWidth();
     return geometry().adjusted(w, w, -w, -w);
-}
-
-void QTuiFrame::drawFrame(ScreenBuffer &buffer) const
-{
-    if (m_shape == NoFrame)
-        return;
-    const auto theme = themeProperties();
-    drawBorder(buffer, geometry(), theme.borderStyle, cellStyle(theme.foreground, theme.background));
 }
 
 } // namespace QtTUI

@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiTreeView.h>
+#include <climits>
 #include <QtTUI/QTuiItemDelegate.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
@@ -93,7 +94,7 @@ void QTuiTreeView::expand(const QModelIndex &index)
     scrollToVisible();
 
     // Mark from toggled row to bottom of visible area as dirty
-    markDirtyFromRowToBottom(toggledRow >= 0 ? toggledRow : 0);
+    markRowsDirty(toggledRow >= 0 ? toggledRow : 0, INT_MAX);
 
     emit expanded(index);
 }
@@ -121,7 +122,7 @@ void QTuiTreeView::collapse(const QModelIndex &index)
     scrollToVisible();
 
     // Mark from toggled row to bottom of visible area as dirty
-    markDirtyFromRowToBottom(toggledRow >= 0 ? toggledRow : 0);
+    markRowsDirty(toggledRow >= 0 ? toggledRow : 0, INT_MAX);
 
     emit collapsed(index);
 }
@@ -365,46 +366,24 @@ void QTuiTreeView::selectAll()
 
 void QTuiTreeView::onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)
 {
-    Q_UNUSED(bottomRight);
-
     if (!m_model)
         return;
 
-    const QRect geo = geometry();
-    const int viewHeight = geo.height();
-    if (viewHeight <= 0)
-        return;
-
-    const int firstVisibleRow = m_scrollOffset;
-    const int lastVisibleRow = m_scrollOffset + viewHeight - 1;
-
-    // Map model indices to flat rows and mark visible ones dirty
+    // Find the visible flat rows of the changed indexes
+    const int lastVisibleRow = qMin(int(m_flatList.size()), m_scrollOffset + geometry().height()) - 1;
     int dirtyTop = -1;
     int dirtyBottom = -1;
-
-    for (int i = 0; i < m_flatList.size(); ++i) {
+    for (int i = m_scrollOffset; i <= lastVisibleRow; ++i) {
         const QModelIndex &idx = m_flatList.at(i).index;
-        // Check if this flat row corresponds to a changed index
         if (idx.parent() == topLeft.parent() &&
             idx.row() >= topLeft.row() && idx.row() <= bottomRight.row()) {
-            // This flat row is affected by the data change
-            if (i >= firstVisibleRow && i <= lastVisibleRow) {
-                if (dirtyTop < 0)
-                    dirtyTop = i;
-                dirtyBottom = i;
-            }
+            if (dirtyTop < 0)
+                dirtyTop = i;
+            dirtyBottom = i;
         }
     }
-
-    if (dirtyTop < 0)
-        return; // No visible rows affected
-
-    int screenTop = dirtyTop - m_scrollOffset;
-    int screenBottom = dirtyBottom - m_scrollOffset;
-
-    QRect dirtyRect(geo.x(), geo.y() + screenTop,
-                    geo.width(), screenBottom - screenTop + 1);
-    markDirty(dirtyRect);
+    if (dirtyTop >= 0)
+        markRowsDirty(dirtyTop, dirtyBottom);
 }
 
 void QTuiTreeView::onRowsInserted(const QModelIndex &parent, int first, int last)
@@ -439,7 +418,7 @@ void QTuiTreeView::onRowsInserted(const QModelIndex &parent, int first, int last
     scrollToVisible();
 
     // Mark from the affected row to the bottom of the view
-    markDirtyFromRowToBottom(qMax(0, affectedFlatRow));
+    markRowsDirty(qMax(0, affectedFlatRow), INT_MAX);
 }
 
 void QTuiTreeView::onRowsAboutToBeRemoved(const QModelIndex &parent, int first, int last)
@@ -478,7 +457,7 @@ void QTuiTreeView::onRowsRemoved(const QModelIndex &parent, int first, int last)
     scrollToVisible();
 
     // Mark from the affected row to the bottom of the view
-    markDirtyFromRowToBottom(qMax(0, affectedFlatRow));
+    markRowsDirty(qMax(0, affectedFlatRow), INT_MAX);
 }
 
 void QTuiTreeView::onLayoutChanged()

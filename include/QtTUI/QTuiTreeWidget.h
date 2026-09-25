@@ -59,7 +59,6 @@ protected:
     void keyPressEvent(TuiKeyEvent *event) override;
 private:
     friend class QTuiTreeWidgetItem;
-    void syncFromItems();
     // Targeted notification forwarders used by QTuiTreeWidgetItem
     void notifyItemDataChanged(QTuiTreeWidgetItem *item, int column);
     void beginInsertItem(QTuiTreeWidgetItem *parent, int row);

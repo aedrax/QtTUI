@@ -358,13 +358,6 @@ void QTuiTreeWidget::keyPressEvent(TuiKeyEvent *event)
     }
 }
 
-void QTuiTreeWidget::syncFromItems()
-{
-    // Full model reset: only for operations that genuinely restructure
-    // everything. Item-level mutations use the targeted helpers below.
-    m_internalModel->rebuild();
-}
-
 void QTuiTreeWidget::notifyItemDataChanged(QTuiTreeWidgetItem *item, int column)
 {
     m_internalModel->itemDataChanged(item, column);

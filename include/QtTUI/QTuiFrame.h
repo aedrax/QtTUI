@@ -27,10 +27,6 @@ public:
     // The geometry without the frame
     QRect contentsRect() const;
 
-protected:
-    // Draws the frame of this widget if it has one
-    void drawFrame(ScreenBuffer &buffer) const;
-
 private:
     Shape m_shape = NoFrame;
 };
