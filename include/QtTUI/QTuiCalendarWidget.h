@@ -26,7 +26,7 @@ public:
 
     void paintEvent(ScreenBuffer &buffer) override;
     QSize minimumSize() const override;
-    // Digit keys must not fire shortcuts while the user edits the year
+    // Digit keys must not fire shortcuts while the year list is open
     bool acceptsTextInput() const override { return m_yearEditing; }
 
 signals:
@@ -47,7 +47,8 @@ private:
     void selectCursorDate();
     // Shows a month and moves the cursor to the same day in it
     void showMonth(int year, int month);
-    // The year edit: a click on the year starts it
+    // The year combo box: a click on the year, F4 or Alt+Down opens its
+    // list
     void startYearEdit();
     void stepEditYear(int years);
     void finishYearEdit(bool apply);
@@ -56,6 +57,9 @@ private:
     QString yearText() const;
     int gridColumn() const;
     int yearColumn() const;
+    // The box of the open year list, in screen coordinates
+    QRect yearListRect() const;
+    static constexpr int YearListRows = 6;
     // The weekday names on row 1, for example "Mo Tu We Th Fr Sa Su"
     QString weekdayText() const;
 

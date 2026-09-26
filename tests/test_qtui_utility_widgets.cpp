@@ -390,7 +390,7 @@ private slots:
         QLocale::setDefault(QLocale::system());
     }
 
-    void calendar_clickOnTheYearEditsIt()
+    void calendar_yearComboBox()
     {
         QLocale::setDefault(QLocale(QLocale::English));
         QTuiCalendarWidget cal;
@@ -424,16 +424,42 @@ private slots:
         QCOMPARE(cal.monthShown(), 3);
         QVERIFY(!cal.acceptsTextInput());
 
-        // Up and Down step the year; Escape cancels the edit
+        // Up and Down move in the list; Escape closes it with no change
         clickYear();
         sendKey(cal, Qt::Key_Up);
         sendKey(cal, Qt::Key_Up);
         sendKey(cal, Qt::Key_Escape);
         QCOMPARE(cal.yearShown(), 1999);
         clickYear();
-        sendKey(cal, Qt::Key_Down);
+        sendKey(cal, Qt::Key_Up);
         sendKey(cal, Qt::Key_Return);
         QCOMPARE(cal.yearShown(), 1998);
+
+        // The open list shows the years around the current one, earlier
+        // years at the top; a click on a year applies it
+        clickYear();
+        cal.paintEvent(buffer);
+        auto listYear = [&](int row) {
+            QString text;
+            for (int col = yearCol; col < yearCol + 4; ++col)
+                text += buffer.backCell(col, row).text();
+            return text;
+        };
+        QCOMPARE(listYear(2), QStringLiteral("1995"));
+        QCOMPARE(listYear(4), QStringLiteral("1997"));
+        QCOMPARE(listYear(7), QStringLiteral("2000"));
+        TuiMouseEvent press(TuiMouseEvent::Press, Qt::LeftButton, QPoint(yearCol + 1, 7));
+        QCoreApplication::sendEvent(&cal, &press);
+        QCOMPARE(cal.yearShown(), 2000);
+        QVERIFY(!cal.acceptsTextInput());
+
+        // F4 opens the list too; a click outside it closes it with no change
+        sendKey(cal, Qt::Key_F4);
+        QVERIFY(cal.acceptsTextInput());
+        TuiMouseEvent outside(TuiMouseEvent::Press, Qt::LeftButton, QPoint(1, 8));
+        QCoreApplication::sendEvent(&cal, &outside);
+        QVERIFY(!cal.acceptsTextInput());
+        QCOMPARE(cal.yearShown(), 2000);
 
         // The selected date does not change, only the month shown
         QCOMPARE(cal.selectedDate(), QDate(2025, 3, 15));
