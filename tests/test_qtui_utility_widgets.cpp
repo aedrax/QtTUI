@@ -359,11 +359,84 @@ private slots:
         QCOMPARE(cal.selectedDate(), QDate(2025, 3, 20));
         QCOMPARE(activatedSpy.count(), 1);
 
-        // The arrows in the header change the month: "< March 2025 >" is
-        // 14 columns, centered at column 4
-        click(4 + 13, 0);
+        // ">" is above Sunday, in the last column of the grid
+        click(20, 0);
         click(4 + 5 * 3 + 1, 2);
         QCOMPARE(cal.selectedDate(), QDate(2025, 4, 6));
+        QLocale::setDefault(QLocale::system());
+    }
+
+    void calendar_arrowsDoNotMoveWithTheMonth()
+    {
+        QLocale::setDefault(QLocale(QLocale::English));
+        QTuiCalendarWidget cal;
+        cal.setGeometry(QRect(0, 0, 22, 9));
+        auto headerRow = [&](const QDate &date) {
+            cal.setSelectedDate(date);
+            ScreenBuffer buffer(22, 9);
+            cal.paintEvent(buffer);
+            QString row;
+            for (int col = 0; col < 22; ++col)
+                row += buffer.backCell(col, 0).text();
+            return row;
+        };
+        // "May" and "September" have different lengths
+        const QString may = headerRow(QDate(2025, 5, 1));
+        const QString september = headerRow(QDate(2025, 9, 1));
+        QCOMPARE(may.indexOf(QLatin1Char('<')), 1);
+        QCOMPARE(september.indexOf(QLatin1Char('<')), 1);
+        QCOMPARE(may.indexOf(QLatin1Char('>')), 20);
+        QCOMPARE(september.indexOf(QLatin1Char('>')), 20);
+        QLocale::setDefault(QLocale::system());
+    }
+
+    void calendar_clickOnTheYearEditsIt()
+    {
+        QLocale::setDefault(QLocale(QLocale::English));
+        QTuiCalendarWidget cal;
+        cal.setGeometry(QRect(0, 0, 22, 9));
+        cal.setSelectedDate(QDate(2025, 3, 15));
+        ScreenBuffer buffer(22, 9);
+        cal.paintEvent(buffer);
+        QString row;
+        for (int col = 0; col < 22; ++col)
+            row += buffer.backCell(col, 0).text();
+        const int yearCol = row.indexOf(QStringLiteral("2025"));
+        QVERIFY(yearCol > 0);
+        auto clickYear = [&]() {
+            TuiMouseEvent ev(TuiMouseEvent::Press, Qt::LeftButton, QPoint(yearCol + 1, 0));
+            QCoreApplication::sendEvent(&cal, &ev);
+        };
+        auto type = [&](const QString &text) {
+            for (const QChar c : text) {
+                TuiKeyEvent ev(c.unicode(), Qt::NoModifier, QString(c));
+                QCoreApplication::sendEvent(&cal, &ev);
+            }
+        };
+
+        // Type a year and apply it with Enter: the month stays
+        clickYear();
+        QVERIFY(cal.acceptsTextInput());
+        type(QStringLiteral("1999"));
+        QCOMPARE(cal.yearShown(), 2025);
+        sendKey(cal, Qt::Key_Return);
+        QCOMPARE(cal.yearShown(), 1999);
+        QCOMPARE(cal.monthShown(), 3);
+        QVERIFY(!cal.acceptsTextInput());
+
+        // Up and Down step the year; Escape cancels the edit
+        clickYear();
+        sendKey(cal, Qt::Key_Up);
+        sendKey(cal, Qt::Key_Up);
+        sendKey(cal, Qt::Key_Escape);
+        QCOMPARE(cal.yearShown(), 1999);
+        clickYear();
+        sendKey(cal, Qt::Key_Down);
+        sendKey(cal, Qt::Key_Return);
+        QCOMPARE(cal.yearShown(), 1998);
+
+        // The selected date does not change, only the month shown
+        QCOMPARE(cal.selectedDate(), QDate(2025, 3, 15));
         QLocale::setDefault(QLocale::system());
     }
 

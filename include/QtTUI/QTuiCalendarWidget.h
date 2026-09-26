@@ -3,6 +3,7 @@
 
 #include <QtTUI/QTuiWidget.h>
 #include <QDate>
+#include <QString>
 
 namespace QtTUI {
 
@@ -25,6 +26,8 @@ public:
 
     void paintEvent(ScreenBuffer &buffer) override;
     QSize minimumSize() const override;
+    // Digit keys must not fire shortcuts while the user edits the year
+    bool acceptsTextInput() const override { return m_yearEditing; }
 
 signals:
     void activated(const QDate &date);
@@ -42,8 +45,17 @@ private:
     void moveCursor(int days);
     // Selects the cursor date if it is in the range, and emits activated()
     void selectCursorDate();
-    // "< <month> <year> >" on row 0
-    QString headerText() const;
+    // Shows a month and moves the cursor to the same day in it
+    void showMonth(int year, int month);
+    // The year edit: a click on the year starts it
+    void startYearEdit();
+    void stepEditYear(int years);
+    void finishYearEdit(bool apply);
+    // The parts of row 0 and their columns, relative to the widget
+    QString monthText() const;
+    QString yearText() const;
+    int gridColumn() const;
+    int yearColumn() const;
     // The weekday names on row 1, for example "Mo Tu We Th Fr Sa Su"
     QString weekdayText() const;
 
@@ -53,6 +65,10 @@ private:
     QDate m_maximumDate;
     int m_displayYear;
     int m_displayMonth;
+    bool m_yearEditing = false;
+    int m_editYear = 0;
+    // The digits the user typed in the year edit
+    QString m_yearInput;
 };
 
 } // namespace QtTUI

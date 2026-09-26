@@ -15,6 +15,7 @@ QTuiCalendarWidget::QTuiCalendarWidget(QTuiWidget *parent)
 {
     setFocusPolicy(Qt::StrongFocus);
     setGeometry(QRect(0, 0, 22, 9));
+    connect(this, &QTuiWidget::focusLost, this, [this]() { finishYearEdit(true); });
 }
 
 QDate QTuiCalendarWidget::selectedDate() const
@@ -126,35 +127,87 @@ QSize QTuiCalendarWidget::minimumSize() const
     return QSize(22, 9);
 }
 
+void QTuiCalendarWidget::showMonth(int year, int month)
+{
+    m_displayYear = year;
+    m_displayMonth = month;
+    // Move cursor to same day in new month, or last day if month is shorter
+    const int day = qMin(m_cursorDate.day(), QDate(year, month, 1).daysInMonth());
+    m_cursorDate = clampDate(QDate(year, month, day));
+    markDirty();
+}
+
+void QTuiCalendarWidget::startYearEdit()
+{
+    m_yearEditing = true;
+    m_editYear = m_displayYear;
+    m_yearInput.clear();
+    markDirty();
+}
+
+void QTuiCalendarWidget::stepEditYear(int years)
+{
+    const int year = m_yearInput.isEmpty() ? m_editYear : m_yearInput.toInt();
+    m_editYear = qBound(1, year + years, 9999);
+    m_yearInput.clear();
+    markDirty();
+}
+
+void QTuiCalendarWidget::finishYearEdit(bool apply)
+{
+    if (!m_yearEditing)
+        return;
+    m_yearEditing = false;
+    const int year = m_yearInput.isEmpty() ? m_editYear : m_yearInput.toInt();
+    m_yearInput.clear();
+    if (apply && year >= 1)
+        showMonth(year, m_displayMonth);
+    else
+        markDirty();
+}
+
 void QTuiCalendarWidget::showPreviousMonth()
 {
-    m_displayMonth--;
-    if (m_displayMonth < 1) {
-        m_displayMonth = 12;
-        m_displayYear--;
-    }
-    // Move cursor to same day in new month, or last day if month is shorter
-    int day = qMin(m_cursorDate.day(), QDate(m_displayYear, m_displayMonth, 1).daysInMonth());
-    m_cursorDate = clampDate(QDate(m_displayYear, m_displayMonth, day));
-    markDirty();
+    if (m_displayMonth == 1)
+        showMonth(m_displayYear - 1, 12);
+    else
+        showMonth(m_displayYear, m_displayMonth - 1);
 }
 
 void QTuiCalendarWidget::showNextMonth()
 {
-    m_displayMonth++;
-    if (m_displayMonth > 12) {
-        m_displayMonth = 1;
-        m_displayYear++;
-    }
-    int day = qMin(m_cursorDate.day(), QDate(m_displayYear, m_displayMonth, 1).daysInMonth());
-    m_cursorDate = clampDate(QDate(m_displayYear, m_displayMonth, day));
-    markDirty();
+    if (m_displayMonth == 12)
+        showMonth(m_displayYear + 1, 1);
+    else
+        showMonth(m_displayYear, m_displayMonth + 1);
 }
 
-QString QTuiCalendarWidget::headerText() const
+QString QTuiCalendarWidget::monthText() const
 {
-    const QString monthName = QLocale().monthName(m_displayMonth, QLocale::LongFormat);
-    return QStringLiteral("< %1 %2 >").arg(monthName).arg(m_displayYear);
+    return QLocale().monthName(m_displayMonth, QLocale::LongFormat);
+}
+
+QString QTuiCalendarWidget::yearText() const
+{
+    if (!m_yearEditing)
+        return QString::number(m_displayYear);
+    // While the user types, show the typed digits in the 4 year columns
+    return (m_yearInput.isEmpty() ? QString::number(m_editYear) : m_yearInput)
+        .leftJustified(4, QLatin1Char(' '));
+}
+
+int QTuiCalendarWidget::gridColumn() const
+{
+    return qMax(0, (geometry().width() - static_cast<int>(weekdayText().length())) / 2);
+}
+
+int QTuiCalendarWidget::yearColumn() const
+{
+    // The month and the year are centered between the two arrows, with 4
+    // columns for the year, so the text does not move while the user types
+    const int monthLen = static_cast<int>(monthText().length());
+    const int space = static_cast<int>(weekdayText().length()) - 2;
+    return gridColumn() + 1 + qMax(0, (space - monthLen - 5) / 2) + monthLen + 1;
 }
 
 QString QTuiCalendarWidget::weekdayText() const
@@ -208,26 +261,29 @@ void QTuiCalendarWidget::paintEvent(ScreenBuffer &buffer)
         }
     }
 
-    // Row 0: Month/Year header centered, e.g. "< January 2025  >"
-    const QString header = headerText();
-    const int headerLen = static_cast<int>(header.length());
-    const int headerX = x0 + qMax(0, (w - headerLen) / 2);
-    writeString(headerX, y0, header, fg, bg, true);
+    // Row 0: "<" above Monday, ">" above Sunday, the month and the year
+    // centered between them. These columns do not depend on the month.
+    const int gridX = x0 + gridColumn();
+    const int gridW = static_cast<int>(weekdayText().length());
+    writeString(gridX, y0, QStringLiteral("<"), fg, bg, true);
+    writeString(gridX + gridW - 1, y0, QStringLiteral(">"), fg, bg, true);
+    const QString month = monthText();
+    const int yearX = x0 + yearColumn();
+    writeString(yearX - static_cast<int>(month.length()) - 1, y0, month, fg, bg, true);
+    // The year is a field the user can edit: it shows in the focus colors
+    // while the user edits it
+    writeString(yearX, y0, yearText(), m_yearEditing ? theme.focusForeground : fg,
+                m_yearEditing ? theme.focusBackground : bg, true, m_yearEditing);
 
     // Row 1: Weekday header, 2 characters per day from the locale
     // ("Mo Tu We Th Fr Sa Su" in English), like the month name above
-    const QString weekdays = weekdayText();
-    const int weekdaysLen = static_cast<int>(weekdays.length());
-    const int weekdayX = x0 + qMax(0, (w - weekdaysLen) / 2);
-    writeString(weekdayX, y0 + 1, weekdays, fg, bg, false, true);
+    writeString(gridX, y0 + 1, weekdayText(), fg, bg, false, true);
 
     // Rows 2-7: Day grid (6 rows of 7 columns, each cell 3 chars wide)
     const QDate firstOfMonth(m_displayYear, m_displayMonth, 1);
     // dayOfWeek(): Monday=1 ... Sunday=7
     const int startDow = firstOfMonth.dayOfWeek(); // 1-based, Monday=1
     const int daysInMonth = firstOfMonth.daysInMonth();
-
-    const int gridX = weekdayX; // Align grid with weekday header
 
     for (int gridRow = 0; gridRow < 6; ++gridRow) {
         for (int gridCol = 0; gridCol < 7; ++gridCol) {
@@ -281,6 +337,39 @@ void QTuiCalendarWidget::paintEvent(ScreenBuffer &buffer)
 
 void QTuiCalendarWidget::keyPressEvent(TuiKeyEvent *event)
 {
+    // While the user edits the year: Up and Down step it, digits type it,
+    // Enter applies it and Escape cancels it. Other keys apply it first.
+    if (m_yearEditing) {
+        const QString text = event->text();
+        switch (event->key()) {
+        case Qt::Key_Up:
+            stepEditYear(1);
+            return;
+        case Qt::Key_Down:
+            stepEditYear(-1);
+            return;
+        case Qt::Key_Return:
+        case Qt::Key_Enter:
+            finishYearEdit(true);
+            return;
+        case Qt::Key_Escape:
+            finishYearEdit(false);
+            return;
+        case Qt::Key_Backspace:
+            m_yearInput.chop(1);
+            markDirty();
+            return;
+        default:
+            if (text.size() == 1 && text.at(0).isDigit()) {
+                if (m_yearInput.size() < 4)
+                    m_yearInput += text;
+                markDirty();
+                return;
+            }
+            finishYearEdit(true);
+        }
+    }
+
     switch (event->key()) {
     case Qt::Key_Left:
         moveCursor(-1);
@@ -312,6 +401,11 @@ void QTuiCalendarWidget::keyPressEvent(TuiKeyEvent *event)
 
 void QTuiCalendarWidget::mousePressEvent(TuiMouseEvent *event)
 {
+    // The wheel steps the year while the user edits it
+    if (event->mouseType() == TuiMouseEvent::Wheel && m_yearEditing) {
+        stepEditYear(event->wheelDelta() > 0 ? 1 : -1);
+        return;
+    }
     if (event->mouseType() != TuiMouseEvent::Press)
         return;
 
@@ -319,20 +413,27 @@ void QTuiCalendarWidget::mousePressEvent(TuiMouseEvent *event)
     const QRect geo = geometry();
     const int col = event->x() - geo.x();
     const int row = event->y() - geo.y();
+    const int gridCol = col - gridColumn();
 
-    // Row 0: "<" shows the previous month, ">" shows the next month
+    // Row 0: "<" shows the previous month, ">" shows the next month, and a
+    // click on the year starts the year edit
     if (row == 0) {
-        const int headerLen = static_cast<int>(headerText().length());
-        const int headerCol = qMax(0, (geo.width() - headerLen) / 2);
-        if (col == headerCol)
+        const int yearCol = yearColumn() + geo.x();
+        if (event->x() >= yearCol && event->x() < yearCol + 4) {
+            if (!m_yearEditing)
+                startYearEdit();
+            return;
+        }
+        finishYearEdit(true);
+        if (gridCol == 0)
             showPreviousMonth();
-        else if (col == headerCol + headerLen - 1)
+        else if (gridCol == static_cast<int>(weekdayText().length()) - 1)
             showNextMonth();
         return;
     }
+    finishYearEdit(true);
 
     // Rows 2-7: each day has 2 columns and a 1-column gap
-    const int gridCol = col - qMax(0, (geo.width() - static_cast<int>(weekdayText().length())) / 2);
     const int gridRow = row - 2;
     if (gridCol < 0 || gridCol % 3 == 2 || gridCol / 3 > 6 || gridRow < 0 || gridRow > 5)
         return;
