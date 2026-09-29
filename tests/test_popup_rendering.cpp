@@ -1116,6 +1116,47 @@ private slots:
         QVERIFY(!QTuiToolTip::isVisible());
     }
 
+    // The widget under the mouse gets a lighter background if a click on
+    // it does something (it takes the focus on a click); a label does not
+    void hoverHighlightsClickableWidgets()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 40, 10));
+        app.setMainWindow(&mainWindow);
+        auto *central = new QTuiWidget;
+        mainWindow.setCentralWidget(central);
+        auto *combo = new QTuiComboBox(central);
+        combo->addItem(QStringLiteral("Red"));
+        combo->setGeometry(QRect(2, 1, 12, 3));
+        auto *label = new QTuiLabel(QStringLiteral("Text"), central);
+        label->setGeometry(QRect(2, 6, 10, 1));
+        mainWindow.show();
+        auto move = [&mainWindow](const QPoint &pos) {
+            TuiMouseEvent ev(TuiMouseEvent::Move, Qt::NoButton, pos);
+            QCoreApplication::sendEvent(&mainWindow, &ev);
+        };
+        auto background = [&app](int x, int y) { return app.screenBuffer()->backCell(x, y).background; };
+
+        app.triggerRender();
+        const Color comboNormal = background(5, 2);
+        const Color labelNormal = background(3, 6);
+
+        // The repaint after a hover change is an incremental pass
+        move(QPoint(5, 2));
+        QCoreApplication::processEvents();
+        QVERIFY(background(5, 2) != comboNormal);
+        QVERIFY(background(2, 1) != comboNormal); // the border too
+
+        move(QPoint(3, 6));
+        QCoreApplication::processEvents();
+        QCOMPARE(background(5, 2), comboNormal);
+        QCOMPARE(background(3, 6), labelNormal);
+    }
+
     // After a left press, drag motion and the release go to the pressed
     // widget, also outside it
     void mouseGrabDuringDrag()
