@@ -14,7 +14,8 @@ namespace QtTUI {
 // Shows that a click on the widget under the mouse does something: the
 // cells with the normal background of the widget get a lighter
 // background. Cells with other colors (focus, selection) do not change.
-// Only an enabled widget that takes the focus on a click gets it.
+// Only an enabled widget that takes the focus on a click gets it, and only
+// in its hoverRect().
 static void paintHover(ScreenBuffer &buffer, const QTuiWidget *widget, const QRect &clip)
 {
     if (!(widget->focusPolicy() & Qt::ClickFocus) || !widget->isEffectivelyEnabled())
@@ -25,7 +26,8 @@ static void paintHover(ScreenBuffer &buffer, const QTuiWidget *widget, const QRe
     // 15% of the way from the background to the foreground
     auto mix = [](uint8_t from, uint8_t to) { return uint8_t(from + (to - from) * 15 / 100); };
     const Color hover(mix(bg.r, fg.r), mix(bg.g, fg.g), mix(bg.b, fg.b));
-    const QRect area = clip.intersected(QRect(0, 0, buffer.width(), buffer.height()));
+    const QRect area = clip.intersected(widget->hoverRect())
+                           .intersected(QRect(0, 0, buffer.width(), buffer.height()));
     for (int y = area.top(); y <= area.bottom(); ++y) {
         for (int x = area.left(); x <= area.right(); ++x) {
             Cell &cell = buffer.backCell(x, y);

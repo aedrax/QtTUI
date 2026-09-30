@@ -181,4 +181,14 @@ void QTuiUndoView::scrollToVisible()
         m_scrollOffset = m_currentIndex - visibleRows + 1;
 }
 
+QRect QTuiUndoView::hoverRect() const
+{
+    // Only the row under the mouse, if it has a command
+    const QRect geo = geometry();
+    const int row = hoverPos().y() - geo.y() + m_scrollOffset;
+    if (!m_stack || row < 0 || row >= m_stack->count())
+        return QRect();
+    return QRect(geo.x(), hoverPos().y(), geo.width(), 1);
+}
+
 } // namespace QtTUI

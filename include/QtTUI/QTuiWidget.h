@@ -94,6 +94,12 @@ public:
 
     // True while the mouse is over the widget (the main window sets it)
     bool underMouse() const;
+    // The mouse position in screen coordinates, while underMouse() is true
+    QPoint hoverPos() const;
+    // The area that the hover highlight covers, in screen coordinates. The
+    // default is the whole widget. A view gives only the row under the
+    // mouse, and an empty rectangle if no item is there.
+    virtual QRect hoverRect() const;
 
     // Layout direction, as in QWidget. A widget without its own direction
     // uses its parent's, and a top-level widget uses
@@ -194,6 +200,7 @@ protected:
 private:
     friend class QTuiMainWindow;
     void setUnderMouse(bool under);
+    void setHoverPos(const QPoint &pos);
 
     static void setFocusWidget(QTuiWidget *widget);
     static QTuiWidget *s_focusWidget;
@@ -211,6 +218,7 @@ private:
     QTuiSizePolicy m_sizePolicy;
     Qt::ContextMenuPolicy m_contextMenuPolicy = Qt::DefaultContextMenu;
     bool m_underMouse = false;
+    QPoint m_hoverPos;
     Qt::LayoutDirection m_layoutDirection = Qt::LayoutDirectionAuto; // Auto: inherit
     QList<QPointer<QTuiAction>> m_actions;
     Qt::FocusPolicy m_focusPolicy = Qt::NoFocus;

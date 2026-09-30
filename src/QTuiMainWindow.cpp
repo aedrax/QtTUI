@@ -529,7 +529,7 @@ void QTuiMainWindow::mousePressEvent(TuiMouseEvent *event)
 
     // Motion only moves the hover; widgets do not use it
     if (event->mouseType() == TuiMouseEvent::Move && event->button() == Qt::NoButton) {
-        setHovered(target);
+        setHovered(target, event->pos());
         return;
     }
 
@@ -708,10 +708,12 @@ void QTuiMainWindow::relayoutChildren()
 // Hover time before the tooltip of the widget under the mouse shows
 static constexpr int kHoverToolTipMs = 700;
 
-void QTuiMainWindow::setHovered(QTuiWidget *widget)
+void QTuiMainWindow::setHovered(QTuiWidget *widget, const QPoint &pos)
 {
     if (widget == this)
         widget = nullptr;
+    if (widget)
+        widget->setHoverPos(pos);
     if (m_hovered == widget)
         return;
     if (m_hovered) {

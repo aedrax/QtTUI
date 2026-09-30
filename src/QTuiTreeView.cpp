@@ -577,4 +577,14 @@ int QTuiTreeView::flatRowForIndex(const QModelIndex &index) const
     return -1;
 }
 
+QRect QTuiTreeView::hoverRect() const
+{
+    // Only the row under the mouse, if it has an item
+    const QRect geo = geometry();
+    const int row = hoverPos().y() - geo.y() + m_scrollOffset;
+    if (row < 0 || row >= m_flatList.size())
+        return QRect();
+    return QRect(geo.x(), hoverPos().y(), geo.width(), 1);
+}
+
 } // namespace QtTUI

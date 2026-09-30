@@ -236,6 +236,32 @@ void QTuiWidget::setUnderMouse(bool under)
     markDirty();
 }
 
+QPoint QTuiWidget::hoverPos() const
+{
+    return m_hoverPos;
+}
+
+QRect QTuiWidget::hoverRect() const
+{
+    return geometry();
+}
+
+void QTuiWidget::setHoverPos(const QPoint &pos)
+{
+    if (m_hoverPos == pos)
+        return;
+    const QRect before = hoverRect();
+    m_hoverPos = pos;
+    const QRect after = hoverRect();
+    // Repaint only the old and the new highlight
+    if (m_underMouse && before != after) {
+        if (!before.isEmpty())
+            markDirty(before);
+        if (!after.isEmpty())
+            markDirty(after);
+    }
+}
+
 Qt::ContextMenuPolicy QTuiWidget::contextMenuPolicy() const
 {
     return m_contextMenuPolicy;

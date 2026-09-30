@@ -697,4 +697,17 @@ void QTuiTableView::clampCurrentIndex()
     m_currentCol = qBound(0, m_currentCol, qMax(0, m_model->columnCount() - 1));
 }
 
+QRect QTuiTableView::hoverRect() const
+{
+    // The header, or only the row under the mouse if it has an item
+    const QRect geo = geometry();
+    const int line = hoverPos().y() - geo.y();
+    if (line >= 0 && line < m_headerHeight)
+        return QRect(geo.x(), geo.y(), geo.width(), m_headerHeight);
+    const int row = line - m_headerHeight + m_scrollOffset;
+    if (!m_model || row < 0 || row >= m_model->rowCount())
+        return QRect();
+    return QRect(geo.x(), hoverPos().y(), geo.width(), 1);
+}
+
 } // namespace QtTUI

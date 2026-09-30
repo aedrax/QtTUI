@@ -1157,6 +1157,51 @@ private slots:
         QCOMPARE(background(3, 6), labelNormal);
     }
 
+    // A list view highlights only the row under the mouse, and a move to
+    // another row moves the highlight
+    void hoverHighlightsOnlyTheRowInAView()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 40, 10));
+        app.setMainWindow(&mainWindow);
+        auto *central = new QTuiWidget;
+        mainWindow.setCentralWidget(central);
+        QStringListModel model(QStringList{QStringLiteral("a"), QStringLiteral("b"), QStringLiteral("c")});
+        auto *list = new QTuiListView(central);
+        list->setModel(&model);
+        list->setGeometry(QRect(2, 1, 12, 6));
+        mainWindow.show();
+        auto move = [&mainWindow](const QPoint &pos) {
+            TuiMouseEvent ev(TuiMouseEvent::Move, Qt::NoButton, pos);
+            QCoreApplication::sendEvent(&mainWindow, &ev);
+        };
+        auto background = [&app](int x, int y) { return app.screenBuffer()->backCell(x, y).background; };
+
+        app.triggerRender();
+        // Row 0 is the current row; rows 1 and 2 have the normal colors
+        const Color normal = background(5, 2);
+
+        move(QPoint(5, 2));
+        QCoreApplication::processEvents();
+        QVERIFY(background(5, 2) != normal);
+        QCOMPARE(background(5, 3), normal);
+
+        move(QPoint(5, 3));
+        QCoreApplication::processEvents();
+        QCOMPARE(background(5, 2), normal);
+        QVERIFY(background(5, 3) != normal);
+
+        // Below the last item: no highlight
+        move(QPoint(5, 5));
+        QCoreApplication::processEvents();
+        QCOMPARE(background(5, 3), normal);
+        QCOMPARE(background(5, 5), normal);
+    }
+
     // After a left press, drag motion and the release go to the pressed
     // widget, also outside it
     void mouseGrabDuringDrag()

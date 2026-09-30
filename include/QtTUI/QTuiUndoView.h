@@ -16,6 +16,7 @@ public:
     QTuiUndoStack *stack() const;
 
     void paintEvent(ScreenBuffer &buffer) override;
+    QRect hoverRect() const override;
 
 protected:
     void keyPressEvent(TuiKeyEvent *event) override;
