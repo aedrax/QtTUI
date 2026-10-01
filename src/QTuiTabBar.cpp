@@ -226,39 +226,62 @@ void QTuiTabBar::keyPressEvent(TuiKeyEvent *event)
     }
 }
 
-void QTuiTabBar::mousePressEvent(TuiMouseEvent *event)
+int QTuiTabBar::tabAt(int x, QRect *rect) const
 {
-    if (event->mouseType() != TuiMouseEvent::Press)
-        return;
-
     if (m_tabs.isEmpty())
-        return;
+        return -1;
 
     const QRect geo = geometry();
     QList<QPair<int, int>> tabRanges;
     const QString line = tabLine(&tabRanges);
     const int offset = scrollOffset(tabRanges, line.length(), geo.width());
-    const int col = event->x() - geo.x();
+    const int col = x - geo.x();
 
-    // A click on a scroll indicator moves to the previous or next tab
     if (offset > 0 && col == 0) {
-        setCurrentIndex(qMax(0, m_currentIndex - 1));
-        return;
+        if (rect)
+            *rect = QRect(geo.x(), geo.y(), 1, 1);
+        return PreviousIndicator;
     }
     if (line.length() - offset > geo.width() && col == geo.width() - 1) {
-        setCurrentIndex(qMin(int(m_tabs.size()) - 1, m_currentIndex + 1));
-        return;
+        if (rect)
+            *rect = QRect(geo.x() + col, geo.y(), 1, 1);
+        return NextIndicator;
     }
 
-    // Convert click position to a column in the full tab row
+    // Convert the column to a column in the full tab row
     const int lineCol = col + offset;
     for (int i = 0; i < tabRanges.size(); ++i) {
         if (lineCol >= tabRanges.at(i).first
             && lineCol < tabRanges.at(i).first + tabRanges.at(i).second) {
-            setCurrentIndex(i);
-            return;
+            if (rect)
+                *rect = QRect(geo.x() + tabRanges.at(i).first - offset, geo.y(),
+                              tabRanges.at(i).second, 1).intersected(geo);
+            return i;
         }
     }
+    return -1;
+}
+
+QRect QTuiTabBar::hoverRect() const
+{
+    // Only the tab or the scroll indicator under the mouse
+    QRect rect;
+    return tabAt(hoverPos().x(), &rect) == -1 ? QRect() : rect;
+}
+
+void QTuiTabBar::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+
+    // A click on a scroll indicator moves to the previous or next tab
+    const int i = tabAt(event->x());
+    if (i == PreviousIndicator)
+        setCurrentIndex(qMax(0, m_currentIndex - 1));
+    else if (i == NextIndicator)
+        setCurrentIndex(qMin(int(m_tabs.size()) - 1, m_currentIndex + 1));
+    else if (i >= 0)
+        setCurrentIndex(i);
 }
 
 } // namespace QtTUI

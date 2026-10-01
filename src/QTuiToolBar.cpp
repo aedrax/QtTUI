@@ -162,19 +162,12 @@ void QTuiToolBar::keyPressEvent(TuiKeyEvent *event)
     }
 }
 
-void QTuiToolBar::mousePressEvent(TuiMouseEvent *event)
+int QTuiToolBar::itemAt(int x, int *start, int *width, int *navigableIndex) const
 {
-    if (event->mouseType() != TuiMouseEvent::Press)
-        return;
-
-    const QRect geo = geometry();
-    int clickX = event->x() - geo.x();
-    if (clickX < 0)
-        return;
-
-    // Walk through items accumulating width to find which was clicked
+    // Walk through items accumulating width, as paintEvent() does
+    const int col = x - geometry().x();
     int xPos = 0;
-    int navigableIndex = 0;
+    int navigable = 0;
     for (int i = 0; i < m_items.size(); ++i) {
         const auto &item = m_items.at(i);
         int itemWidth = 0;
@@ -187,20 +180,46 @@ void QTuiToolBar::mousePressEvent(TuiMouseEvent *event)
             itemWidth = item.widget->minimumSize().width();
         }
 
-        if (clickX >= xPos && clickX < xPos + itemWidth) {
-            if (!item.isSeparator) {
-                m_focusedItem = navigableIndex;
-                markDirty();
-                if (item.action)
-                    item.action->trigger();
-            }
-            return;
+        if (col >= xPos && col < xPos + itemWidth) {
+            if (start)
+                *start = geometry().x() + xPos;
+            if (width)
+                *width = itemWidth;
+            if (navigableIndex)
+                *navigableIndex = navigable;
+            return i;
         }
 
         xPos += itemWidth;
         if (!item.isSeparator)
-            navigableIndex++;
+            navigable++;
     }
+    return -1;
+}
+
+QRect QTuiToolBar::hoverRect() const
+{
+    // Only the action under the mouse; not a separator
+    int start = 0;
+    int width = 0;
+    const int i = itemAt(hoverPos().x(), &start, &width);
+    if (i < 0 || m_items.at(i).isSeparator)
+        return QRect();
+    return QRect(start, geometry().y(), width, 1);
+}
+
+void QTuiToolBar::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+    int navigableIndex = 0;
+    const int i = itemAt(event->x(), nullptr, nullptr, &navigableIndex);
+    if (i < 0 || m_items.at(i).isSeparator)
+        return;
+    m_focusedItem = navigableIndex;
+    markDirty();
+    if (m_items.at(i).action)
+        m_items.at(i).action->trigger();
 }
 
 } // namespace QtTUI

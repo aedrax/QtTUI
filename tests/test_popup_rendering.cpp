@@ -36,6 +36,7 @@
 #include <QtTUI/QTuiMenu.h>
 #include <QtTUI/QTuiMenuBar.h>
 #include <QtTUI/QTuiPushButton.h>
+#include <QtTUI/QTuiTabBar.h>
 #include <QtTUI/QTuiToolTip.h>
 #include <QtTUI/QTuiWidget.h>
 #include <QtTUI/ScreenBuffer.h>
@@ -1200,6 +1201,47 @@ private slots:
         QCoreApplication::processEvents();
         QCOMPARE(background(5, 3), normal);
         QCOMPARE(background(5, 5), normal);
+    }
+
+    // A tab bar highlights only the tab under the mouse, not the
+    // separators or the other tabs
+    void hoverHighlightsOnlyTheTabInATabBar()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 40, 10));
+        app.setMainWindow(&mainWindow);
+        auto *central = new QTuiWidget;
+        mainWindow.setCentralWidget(central);
+        auto *tabs = new QTuiTabBar(central);
+        tabs->addTab(QStringLiteral("One"));
+        tabs->addTab(QStringLiteral("Two"));
+        tabs->setGeometry(QRect(0, 2, 30, 1));
+        mainWindow.show();
+        auto move = [&mainWindow](const QPoint &pos) {
+            TuiMouseEvent ev(TuiMouseEvent::Move, Qt::NoButton, pos);
+            QCoreApplication::sendEvent(&mainWindow, &ev);
+        };
+        auto background = [&app](int x) { return app.screenBuffer()->backCell(x, 2).background; };
+
+        app.triggerRender();
+        // "One | Two": "Two" is at columns 6 to 8
+        const Color normal = background(7);
+        move(QPoint(7, 2));
+        QCoreApplication::processEvents();
+        QVERIFY(background(6) != normal);
+        QVERIFY(background(8) != normal);
+        QCOMPARE(background(4), normal); // the separator
+        QCOMPARE(background(9), normal);
+
+        // On the separator: no highlight
+        move(QPoint(4, 2));
+        QCoreApplication::processEvents();
+        QCOMPARE(background(7), normal);
+        QCOMPARE(background(4), normal);
     }
 
     // After a left press, drag motion and the release go to the pressed

@@ -31,8 +31,12 @@ public:
 protected:
     void keyPressEvent(TuiKeyEvent *event) override;
     void mousePressEvent(TuiMouseEvent *event) override;
+    QRect hoverRect() const override;
 
 private:
+    // The item at a screen column, its columns and its index among the
+    // items that are not separators; -1 if none
+    int itemAt(int x, int *start = nullptr, int *width = nullptr, int *navigableIndex = nullptr) const;
     struct ToolBarItem {
         QTuiAction *action = nullptr;
         QTuiWidget *widget = nullptr;

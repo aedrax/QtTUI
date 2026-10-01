@@ -209,31 +209,45 @@ void QTuiMenuBar::keyPressEvent(TuiKeyEvent *event)
     }
 }
 
-void QTuiMenuBar::mousePressEvent(TuiMouseEvent *event)
+int QTuiMenuBar::menuAt(int x, int *start, int *width) const
 {
-    if (event->mouseType() != TuiMouseEvent::Press)
-        return;
-    if (m_menus.isEmpty())
-        return;
-
-    const QRect geo = geometry();
-    int clickX = event->x() - geo.x();
-    if (clickX < 0)
-        return;
-
-    // Walk through menus accumulating widths to find which was clicked
+    // Walk through menus accumulating widths, as paintEvent() does
+    const int col = x - geometry().x();
     int xPos = 0;
     for (int i = 0; i < m_menus.size(); ++i) {
         QString displayTitle = m_menus.at(i)->title();
         displayTitle.remove(QLatin1Char('&'));
-        int itemWidth = QtTuiUnicode::stringWidth(displayTitle) + 2; // leading + trailing space
-
-        if (clickX >= xPos && clickX < xPos + itemWidth) {
-            m_activeMenuIndex = i;
-            openMenu(i);
-            return;
+        const int itemWidth = QtTuiUnicode::stringWidth(displayTitle) + 2; // leading + trailing space
+        if (col >= xPos && col < xPos + itemWidth) {
+            if (start)
+                *start = geometry().x() + xPos;
+            if (width)
+                *width = itemWidth;
+            return i;
         }
         xPos += itemWidth;
+    }
+    return -1;
+}
+
+QRect QTuiMenuBar::hoverRect() const
+{
+    // Only the menu title under the mouse
+    int start = 0;
+    int width = 0;
+    if (menuAt(hoverPos().x(), &start, &width) < 0)
+        return QRect();
+    return QRect(start, geometry().y(), width, 1);
+}
+
+void QTuiMenuBar::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+    const int i = menuAt(event->x());
+    if (i >= 0) {
+        m_activeMenuIndex = i;
+        openMenu(i);
     }
 }
 

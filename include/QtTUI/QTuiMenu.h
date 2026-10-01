@@ -47,6 +47,7 @@ signals:
 protected:
     void keyPressEvent(TuiKeyEvent *event) override;
     void mousePressEvent(TuiMouseEvent *event) override;
+    QRect hoverRect() const override;
 
 private:
     struct MenuItem {

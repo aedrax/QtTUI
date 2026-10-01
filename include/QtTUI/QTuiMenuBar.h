@@ -32,8 +32,11 @@ public:
 protected:
     void keyPressEvent(TuiKeyEvent *event) override;
     void mousePressEvent(TuiMouseEvent *event) override;
+    QRect hoverRect() const override;
 
 private:
+    // The menu title at a screen column, and its columns; -1 if none
+    int menuAt(int x, int *start = nullptr, int *width = nullptr) const;
     void registerMenu(QTuiMenu *menu);
     void openMenu(int index);
     void closeCurrentMenu();

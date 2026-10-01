@@ -36,8 +36,13 @@ signals:
 protected:
     void keyPressEvent(TuiKeyEvent *event) override;
     void mousePressEvent(TuiMouseEvent *event) override;
+    QRect hoverRect() const override;
 
 private:
+    // What is at a screen column: a tab index, PreviousIndicator,
+    // NextIndicator or -1. *rect gets its cells.
+    enum { PreviousIndicator = -2, NextIndicator = -3 };
+    int tabAt(int x, QRect *rect = nullptr) const;
     // The full tab row "Tab1 | Tab2 | Tab3", with the start column and
     // length of each tab label in it
     QString tabLine(QList<QPair<int, int>> *ranges) const;

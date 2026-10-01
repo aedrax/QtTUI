@@ -283,6 +283,16 @@ void QTuiMenu::keyPressEvent(TuiKeyEvent *event)
     }
 }
 
+QRect QTuiMenu::hoverRect() const
+{
+    // Only the item under the mouse, inside the border; not a separator
+    const QRect geo = geometry();
+    const int itemIdx = hoverPos().y() - geo.y() - 1;
+    if (itemIdx < 0 || itemIdx >= m_menuItems.size() || m_menuItems.at(itemIdx).isSeparator)
+        return QRect();
+    return QRect(geo.x() + 1, hoverPos().y(), geo.width() - 2, 1);
+}
+
 void QTuiMenu::mousePressEvent(TuiMouseEvent *event)
 {
     if (!isVisible() || event->mouseType() != TuiMouseEvent::Press)
