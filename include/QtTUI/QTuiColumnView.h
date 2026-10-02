@@ -34,6 +34,8 @@ signals:
 
 protected:
     void keyPressEvent(TuiKeyEvent *event) override;
+    void mousePressEvent(TuiMouseEvent *event) override;
+    QRect hoverRect() const override;
 
 private slots:
     void onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight);
@@ -49,6 +51,9 @@ private:
     };
 
     void rebuildColumns();
+    // The item at a screen position and its column; an invalid index if
+    // no item is there
+    QModelIndex indexAt(const QPoint &pos, int *column = nullptr) const;
     // Scrolls so that the column (the active column if -1) is visible
     void scrollToVisible(int column = -1);
     void connectModel();

@@ -128,6 +128,69 @@ QRect QTuiColumnView::visualRect(const QModelIndex &index) const
     return QRect();
 }
 
+QModelIndex QTuiColumnView::indexAt(const QPoint &pos, int *column) const
+{
+    if (!m_model)
+        return QModelIndex();
+    const QRect geo = geometry();
+    const int row = pos.y() - geo.y();
+    // The same column positions as paintEvent
+    int x = 0;
+    for (int ci = m_scrollOffset; ci < m_columns.size() && x < geo.width(); ++ci) {
+        const int width = qMin(columnWidth(ci), geo.width() - x);
+        const int col = pos.x() - geo.x() - x;
+        if (col >= 0 && col < width) {
+            const QModelIndex root = m_columns.at(ci).rootIndex;
+            if (row < 0 || row >= m_model->rowCount(root))
+                return QModelIndex();
+            if (column)
+                *column = ci;
+            return m_model->index(row, 0, root);
+        }
+        x += width + 1;
+    }
+    return QModelIndex();
+}
+
+QRect QTuiColumnView::hoverRect() const
+{
+    // Only the item under the mouse
+    return visualRect(indexAt(hoverPos()));
+}
+
+void QTuiColumnView::mousePressEvent(TuiMouseEvent *event)
+{
+    // The Press before the DoubleClick already made the item current
+    if (event->mouseType() == TuiMouseEvent::DoubleClick) {
+        const QModelIndex index = currentIndex();
+        if (!index.isValid())
+            return;
+        emit doubleClicked(index);
+        if ((editTriggers() & DoubleClicked) && edit(index))
+            return;
+        emit activated(index);
+        return;
+    }
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+
+    // A click makes the item current and shows its children in the next
+    // column, as Up and Down do
+    int column = 0;
+    const QModelIndex index = indexAt(event->pos(), &column);
+    if (!index.isValid())
+        return;
+    m_activeColumn = column;
+    m_columns[column].currentRow = index.row();
+    rebuildColumns();
+    markDirty();
+    // Another button keeps a selection that contains the item
+    if (event->button() == Qt::LeftButton)
+        selectCurrent(event->modifiers(), true);
+    else if (!isSelected(currentIndex()))
+        selectCurrent(Qt::NoModifier, true);
+}
+
 int QTuiColumnView::defaultColumnWidth() const
 {
     return m_defaultColumnWidth;

@@ -379,6 +379,32 @@ private slots:
         delete model;
     }
 
+    void columnViewClickMakesTheItemCurrent()
+    {
+        auto *model = buildTreeModel();
+        QTuiColumnView cv;
+        cv.setGeometry(QRect(0, 0, 80, 20));
+        cv.setModel(model);
+        auto click = [&cv](int x, int y) {
+            TuiMouseEvent ev(TuiMouseEvent::Press, Qt::LeftButton, QPoint(x, y));
+            QCoreApplication::sendEvent(&cv, &ev);
+        };
+
+        // The second column starts after the first column (20) and a separator
+        click(22, 1);
+        QCOMPARE(cv.currentIndex(), model->index(1, 0, model->index(0, 0)));
+
+        // A click in the first column shows the children of that item
+        click(1, 1);
+        QCOMPARE(cv.currentIndex(), model->index(1, 0));
+        QCOMPARE(cv.visualRect(model->index(0, 0, model->index(1, 0))), QRect(21, 0, 20, 1));
+
+        // A click below the last item does nothing
+        click(1, 5);
+        QCOMPARE(cv.currentIndex(), model->index(1, 0));
+        delete model;
+    }
+
     void columnViewModelReset()
     {
         SimpleTreeModel model;
