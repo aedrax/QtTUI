@@ -36,6 +36,7 @@
 #include <QtTUI/QTuiMenu.h>
 #include <QtTUI/QTuiMenuBar.h>
 #include <QtTUI/QTuiPushButton.h>
+#include <QtTUI/QTuiCalendarWidget.h>
 #include <QtTUI/QTuiTabBar.h>
 #include <QtTUI/QTuiToolTip.h>
 #include <QtTUI/QTuiWidget.h>
@@ -1242,6 +1243,49 @@ private slots:
         QCoreApplication::processEvents();
         QCOMPARE(background(7), normal);
         QCOMPARE(background(4), normal);
+    }
+
+    // A calendar highlights only the day, arrow or year under the mouse
+    void hoverHighlightsOnlyThePartOfACalendar()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 40, 12));
+        app.setMainWindow(&mainWindow);
+        auto *central = new QTuiWidget;
+        mainWindow.setCentralWidget(central);
+        auto *cal = new QTuiCalendarWidget(central);
+        cal->setGeometry(QRect(0, 0, 22, 9));
+        cal->setSelectedDate(QDate(2025, 3, 15));
+        mainWindow.show();
+        auto move = [&mainWindow](const QPoint &pos) {
+            TuiMouseEvent ev(TuiMouseEvent::Move, Qt::NoButton, pos);
+            QCoreApplication::sendEvent(&mainWindow, &ev);
+        };
+        auto background = [&app](int x, int y) { return app.screenBuffer()->backCell(x, y).background; };
+
+        app.triggerRender();
+        // March 2025 starts on a Saturday: 3 March is at columns 1-2 of row 3
+        const Color normal = background(1, 3);
+        move(QPoint(2, 3));
+        QCoreApplication::processEvents();
+        QVERIFY(background(1, 3) != normal);
+        QVERIFY(background(2, 3) != normal);
+        QCOMPARE(background(3, 3), normal); // the gap
+        QCOMPARE(background(4, 3), normal); // 4 March
+
+        // The "<" arrow, and nothing on the gap
+        move(QPoint(1, 0));
+        QCoreApplication::processEvents();
+        QVERIFY(background(1, 0) != normal);
+        QCOMPARE(background(2, 3), normal);
+        move(QPoint(3, 3));
+        QCoreApplication::processEvents();
+        QCOMPARE(background(1, 0), normal);
+        QCOMPARE(background(3, 3), normal);
     }
 
     // After a left press, drag motion and the release go to the pressed

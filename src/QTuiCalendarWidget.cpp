@@ -441,6 +441,66 @@ void QTuiCalendarWidget::keyPressEvent(TuiKeyEvent *event)
     }
 }
 
+QTuiCalendarWidget::Part QTuiCalendarWidget::partAt(const QPoint &pos, QRect *rect, int *value) const
+{
+    // Use the same positions as paintEvent()
+    const QRect geo = geometry();
+    const int row = pos.y() - geo.y();
+    const int gridCol = pos.x() - geo.x() - gridColumn();
+    const int gridX = geo.x() + gridColumn();
+    const int yearX = geo.x() + yearColumn();
+    auto result = [&](Part part, const QRect &cells, int v = 0) {
+        if (rect)
+            *rect = cells;
+        if (value)
+            *value = v;
+        return part;
+    };
+
+    if (row == 0 && pos.x() >= yearX && pos.x() < yearX + 5)
+        return result(YearField, QRect(yearX, geo.y(), 5, 1));
+
+    // While the year list is open, only its years are parts
+    if (m_yearEditing) {
+        const QRect box = yearListRect();
+        const int i = pos.y() - box.y() - 1;
+        const int year = m_editYear - YearListRows / 2 + i;
+        if (pos.x() > box.x() && pos.x() < box.right() && i >= 0 && i < YearListRows
+            && year >= 1 && year <= 9999)
+            return result(YearListItem, QRect(box.x() + 1, pos.y(), 4, 1), year);
+        return result(None, QRect());
+    }
+
+    // Row 0: "<" above Monday, ">" above Sunday
+    const int gridW = static_cast<int>(weekdayText().length());
+    if (row == 0 && gridCol == 0)
+        return result(PreviousArrow, QRect(gridX, geo.y(), 1, 1));
+    if (row == 0 && gridCol == gridW - 1)
+        return result(NextArrow, QRect(gridX + gridW - 1, geo.y(), 1, 1));
+
+    // Rows 2-7: each day has 2 columns and a 1-column gap. A blank cell and
+    // a date outside the range are not parts.
+    const int gridRow = row - 2;
+    if (gridCol < 0 || gridCol % 3 == 2 || gridCol / 3 > 6 || gridRow < 0 || gridRow > 5)
+        return result(None, QRect());
+    const QDate firstOfMonth(m_displayYear, m_displayMonth, 1);
+    const int dayNum = gridRow * 7 + gridCol / 3 - firstOfMonth.dayOfWeek() + 2;
+    if (dayNum < 1 || dayNum > firstOfMonth.daysInMonth())
+        return result(None, QRect());
+    const QDate date(m_displayYear, m_displayMonth, dayNum);
+    if (clampDate(date) != date)
+        return result(None, QRect());
+    return result(Day, QRect(gridX + gridCol / 3 * 3, pos.y(), 2, 1), dayNum);
+}
+
+QRect QTuiCalendarWidget::hoverRect() const
+{
+    // Only the arrow, the year field, the listed year or the day under the
+    // mouse
+    QRect rect;
+    return partAt(hoverPos(), &rect) == None ? QRect() : rect;
+}
+
 void QTuiCalendarWidget::mousePressEvent(TuiMouseEvent *event)
 {
     // The wheel scrolls the open year list
@@ -451,58 +511,40 @@ void QTuiCalendarWidget::mousePressEvent(TuiMouseEvent *event)
     if (event->mouseType() != TuiMouseEvent::Press)
         return;
 
-    // Use the same positions as paintEvent()
-    const QRect geo = geometry();
-    const int col = event->x() - geo.x();
-    const int row = event->y() - geo.y();
-    const int gridCol = col - gridColumn();
-    const int yearCol = yearColumn() + geo.x();
-    const bool onYear = row == 0 && event->x() >= yearCol && event->x() < yearCol + 5;
+    int value = 0;
+    const Part part = partAt(event->pos(), nullptr, &value);
 
     // While the year list is open, a click on a year applies it. A click on
     // the field or outside the list closes the list.
     if (m_yearEditing) {
-        const QRect box = yearListRect();
-        const int i = event->y() - box.y() - 1;
-        if (!onYear && box.contains(event->x(), event->y()) && i >= 0 && i < YearListRows) {
-            const int year = m_editYear - YearListRows / 2 + i;
-            if (year >= 1 && year <= 9999) {
-                m_editYear = year;
-                m_yearInput.clear();
-                finishYearEdit(true);
-            }
-            return;
+        if (part == YearListItem) {
+            m_editYear = value;
+            m_yearInput.clear();
+            finishYearEdit(true);
+        } else {
+            finishYearEdit(false);
         }
-        finishYearEdit(false);
         return;
     }
 
-    // Row 0: "<" shows the previous month, ">" shows the next month, and a
-    // click on the year opens the year list
-    if (row == 0) {
-        if (onYear)
-            startYearEdit();
-        else if (gridCol == 0)
-            showPreviousMonth();
-        else if (gridCol == static_cast<int>(weekdayText().length()) - 1)
-            showNextMonth();
-        return;
+    switch (part) {
+    case YearField:
+        startYearEdit();
+        break;
+    case PreviousArrow:
+        showPreviousMonth();
+        break;
+    case NextArrow:
+        showNextMonth();
+        break;
+    case Day:
+        m_cursorDate = QDate(m_displayYear, m_displayMonth, value);
+        markDirty();
+        selectCursorDate();
+        break;
+    default:
+        break;
     }
-
-    // Rows 2-7: each day has 2 columns and a 1-column gap
-    const int gridRow = row - 2;
-    if (gridCol < 0 || gridCol % 3 == 2 || gridCol / 3 > 6 || gridRow < 0 || gridRow > 5)
-        return;
-    const QDate firstOfMonth(m_displayYear, m_displayMonth, 1);
-    const int dayNum = gridRow * 7 + gridCol / 3 - firstOfMonth.dayOfWeek() + 2;
-    if (dayNum < 1 || dayNum > firstOfMonth.daysInMonth())
-        return;
-    const QDate date(m_displayYear, m_displayMonth, dayNum);
-    if (clampDate(date) != date)
-        return;
-    m_cursorDate = date;
-    markDirty();
-    selectCursorDate();
 }
 
 } // namespace QtTUI

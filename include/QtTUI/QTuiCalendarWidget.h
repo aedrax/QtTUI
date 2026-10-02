@@ -28,6 +28,7 @@ public:
     QSize minimumSize() const override;
     // Digit keys must not fire shortcuts while the year list is open
     bool acceptsTextInput() const override { return m_yearEditing; }
+    QRect hoverRect() const override;
 
 signals:
     void activated(const QDate &date);
@@ -38,6 +39,11 @@ protected:
     void mousePressEvent(TuiMouseEvent *event) override;
 
 private:
+    // The parts of the calendar that a click acts on
+    enum Part { None, PreviousArrow, NextArrow, YearField, YearListItem, Day };
+    // The part at a screen position, its cells and its value: the year of
+    // a YearListItem or the day number of a Day
+    Part partAt(const QPoint &pos, QRect *rect = nullptr, int *value = nullptr) const;
     void showPreviousMonth();
     void showNextMonth();
     QDate clampDate(const QDate &date) const;
