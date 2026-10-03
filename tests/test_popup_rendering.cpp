@@ -1159,6 +1159,33 @@ private slots:
         QCOMPARE(background(3, 6), labelNormal);
     }
 
+    // F1 shows the tooltip of the focus widget, so the tooltip does not
+    // need a mouse
+    void f1ShowsTheToolTipOfTheFocusWidget()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 40, 10));
+        app.setMainWindow(&mainWindow);
+        auto *central = new QTuiWidget;
+        mainWindow.setCentralWidget(central);
+        auto *button = new QTuiPushButton(QStringLiteral("OK"), central);
+        button->setGeometry(QRect(2, 2, 8, 3));
+        button->setToolTip(QStringLiteral("Saves the file"));
+        mainWindow.show();
+        button->setFocus();
+        QTuiToolTip::hideText();
+
+        TuiKeyEvent f1(Qt::Key_F1, Qt::NoModifier);
+        QCoreApplication::sendEvent(&mainWindow, &f1);
+        QVERIFY(QTuiToolTip::isVisible());
+        QCOMPARE(QTuiToolTip::text(), QStringLiteral("Saves the file"));
+        QTuiToolTip::hideText();
+    }
+
     // A list view highlights only the row under the mouse, and a move to
     // another row moves the highlight
     void hoverHighlightsOnlyTheRowInAView()
