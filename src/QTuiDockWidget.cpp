@@ -107,4 +107,15 @@ void QTuiDockWidget::keyPressEvent(TuiKeyEvent *event)
     QTuiWidget::keyPressEvent(event);
 }
 
+void QTuiDockWidget::mousePressEvent(TuiMouseEvent *event)
+{
+    // "[X]" is in the 3 columns before the top-right corner
+    const QRect geo = geometry();
+    if (event->mouseType() == TuiMouseEvent::Press && event->button() == Qt::LeftButton
+        && event->y() == geo.y() && event->x() >= geo.right() - 3 && event->x() < geo.right()) {
+        setVisible(false);
+        emit visibilityChanged(false);
+    }
+}
+
 } // namespace QtTUI

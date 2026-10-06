@@ -36,6 +36,8 @@ signals:
     void visibilityChanged(bool visible);
 
 protected:
+    // A click on [X] closes the dock, as Escape does
+    void mousePressEvent(TuiMouseEvent *event) override;
     void keyPressEvent(TuiKeyEvent *event) override;
 
 private:

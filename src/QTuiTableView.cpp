@@ -202,6 +202,28 @@ void QTuiTableView::keyPressEvent(TuiKeyEvent *event)
     if (editKeyPressEvent(event) || selectionKeyPressEvent(event))
         return;
 
+    // Alt+Left and Alt+Right make the current column narrower or wider,
+    // as a drag on the header does. Alt+Up and Alt+Down sort by it, as a
+    // header click does.
+    if (event->modifiers() == Qt::AltModifier) {
+        switch (event->key()) {
+        case Qt::Key_Left:
+            setColumnWidth(m_currentCol, columnWidth(m_currentCol) - 1);
+            return;
+        case Qt::Key_Right:
+            setColumnWidth(m_currentCol, columnWidth(m_currentCol) + 1);
+            return;
+        case Qt::Key_Up:
+        case Qt::Key_Down:
+            if (m_sortingEnabled)
+                sortByColumn(m_currentCol, event->key() == Qt::Key_Up ? Qt::AscendingOrder
+                                                                      : Qt::DescendingOrder);
+            return;
+        default:
+            break;
+        }
+    }
+
     const int rowCount = m_model->rowCount();
     const int colCount = m_model->columnCount();
     const QModelIndex previous = currentIndex();

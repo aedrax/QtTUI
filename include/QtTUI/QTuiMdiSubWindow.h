@@ -36,6 +36,8 @@ signals:
     void aboutToActivate();
 
 protected:
+    // The focus in the window, or in a widget in it, makes it the active window
+    void focusEntered(QTuiWidget *focus) override;
     void keyPressEvent(TuiKeyEvent *event) override;
     // Mouse: a press activates the window. On the title bar, [X] closes
     // it, [□] maximizes or restores it, and a drag moves it; a drag on

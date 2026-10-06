@@ -96,6 +96,15 @@ bool QTuiMenuBar::triggerMnemonic(QChar ch)
     return true;
 }
 
+bool QTuiMenuBar::openFirstMenu()
+{
+    if (m_menus.isEmpty())
+        return false;
+    m_activeMenuIndex = 0;
+    openMenu(0);
+    return true;
+}
+
 int QTuiMenuBar::findMnemonicIndex(QChar ch) const
 {
     QChar upper = ch.toUpper();

@@ -409,6 +409,11 @@ void QTuiMainWindow::keyPressEvent(TuiKeyEvent *event)
         }
     }
 
+    // F10 opens the first menu of the menu bar, as in many programs
+    if (event->key() == Qt::Key_F10 && event->modifiers() == Qt::NoModifier
+        && m_menuBar && m_menuBar->isVisible() && !activeModalDialog() && m_menuBar->openFirstMenu())
+        return;
+
     // F1 shows the tooltip of the focus widget again, so the tooltip text
     // is not only for the mouse
     if (event->key() == Qt::Key_F1 && event->modifiers() == Qt::NoModifier) {

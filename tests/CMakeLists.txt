@@ -181,6 +181,9 @@ qttui_add_test(test_focus_rendering test_focus_rendering.cpp)
 qttui_add_test(test_ellipsis_truncation test_ellipsis_truncation.cpp)
 qttui_add_test(test_render_utils test_render_utils.cpp)
 
+# A key for each action that the mouse can do
+qttui_add_test(test_keyboard_access test_keyboard_access.cpp)
+
 # Clip-rect enforcement and dirty-only repaint property tests (Properties 3, 5)
 qttui_add_test(test_clip_rect test_clip_rect.cpp)
 

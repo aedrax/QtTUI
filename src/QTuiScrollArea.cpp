@@ -41,6 +41,9 @@ void QTuiScrollArea::setWidget(QTuiWidget *widget)
         m_widget->setPaintedByParent(false);
     m_widget = widget;
     if (m_widget) {
+        // The scroll area owns its content, as in Qt
+        if (m_widget->parent() != this)
+            m_widget->setParent(this);
         // The content geometry is relative to the scroll area, and
         // paintEvent() paints the content through a separate buffer
         m_widget->setPaintedByParent(true);
@@ -426,6 +429,26 @@ void QTuiScrollArea::mousePressEvent(TuiMouseEvent *event)
     TuiMouseEvent local(event->mouseType(), event->button(), content, event->modifiers(),
                         event->wheelDelta());
     QCoreApplication::sendEvent(target, &local);
+}
+
+void QTuiScrollArea::ensureWidgetVisible(QTuiWidget *child)
+{
+    if (!m_widget || !child || (child != m_widget && !m_widget->isAncestorOf(child)))
+        return;
+    // The content buffer starts at the top-left of the content widget, as
+    // in paintEvent()
+    const QRect content = m_widget->geometry();
+    const QRect rect = child->geometry().translated(-qMax(0, content.x()), -qMax(0, content.y()));
+    updateScrollBars();
+    ensureVisible(rect.right(), rect.bottom());
+    ensureVisible(rect.left(), rect.top());
+    markDirty();
+}
+
+void QTuiScrollArea::focusEntered(QTuiWidget *focus)
+{
+    if (focus != this)
+        ensureWidgetVisible(focus);
 }
 
 } // namespace QtTUI

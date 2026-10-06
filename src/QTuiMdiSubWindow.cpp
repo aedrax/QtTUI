@@ -221,6 +221,12 @@ void QTuiMdiSubWindow::keyPressEvent(TuiKeyEvent *event)
         }
     }
 
+    // M: maximize or restore, as the [□] button does
+    if (key == Qt::Key_M && !(mods & (Qt::ControlModifier | Qt::AltModifier))) {
+        m_maximized ? showNormal() : showMaximized();
+        return;
+    }
+
     // Escape or Q: close the subwindow
     if (key == Qt::Key_Escape || key == Qt::Key_Q) {
         close();
@@ -228,6 +234,13 @@ void QTuiMdiSubWindow::keyPressEvent(TuiKeyEvent *event)
     }
 
     QTuiWidget::keyPressEvent(event);
+}
+
+void QTuiMdiSubWindow::focusEntered(QTuiWidget *focus)
+{
+    Q_UNUSED(focus);
+    if (auto *area = qobject_cast<QTuiMdiArea *>(parentWidget()))
+        area->setActiveSubWindow(this);
 }
 
 } // namespace QtTUI

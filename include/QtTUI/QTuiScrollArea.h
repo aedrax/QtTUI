@@ -20,6 +20,8 @@ public:
     QTuiScrollBar *horizontalScrollBar() const;
 
     void ensureVisible(int x, int y);
+    // Scrolls so that a widget in the content is visible, as in Qt
+    void ensureWidgetVisible(QTuiWidget *child);
 
     QRect contentArea() const;
 
@@ -32,6 +34,8 @@ protected:
     // content coordinates; the wheel scrolls
     void mousePressEvent(TuiMouseEvent *event) override;
     void resizeEvent(TuiResizeEvent *event) override;
+    // Tab to a widget in the content scrolls to it
+    void focusEntered(QTuiWidget *focus) override;
 
 private:
     void updateScrollBars();

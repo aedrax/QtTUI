@@ -25,6 +25,8 @@ public:
     // Alt+letter handling and by QTuiMainWindow's global Alt+mnemonic
     // dispatch, which works without the bar having focus.
     bool triggerMnemonic(QChar ch);
+    // Opens the first menu, for F10
+    bool openFirstMenu();
 
     void paintEvent(ScreenBuffer &buffer) override;
     QSize minimumSize() const override;

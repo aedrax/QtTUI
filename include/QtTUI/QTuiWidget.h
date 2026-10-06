@@ -196,6 +196,10 @@ protected:
     virtual void resizeEvent(TuiResizeEvent *event);
     // Pasted text for the focus widget. The default ignores it.
     virtual void pasteEvent(TuiPasteEvent *event);
+    // Called on a widget that gets the focus and on each of its ancestors,
+    // so that a container can show the focus widget. The default does
+    // nothing.
+    virtual void focusEntered(QTuiWidget *focus);
 
 private:
     friend class QTuiMainWindow;

@@ -354,7 +354,14 @@ void QTuiWidget::setFocusWidget(QTuiWidget *widget)
         widget->m_hasFocus = true;
         widget->markDirty();
         emit widget->focusGained();
+        for (QTuiWidget *w = widget; w; w = w->parentWidget())
+            w->focusEntered(widget);
     }
+}
+
+void QTuiWidget::focusEntered(QTuiWidget *focus)
+{
+    Q_UNUSED(focus);
 }
 
 QTuiWidget *QTuiWidget::parentWidget() const

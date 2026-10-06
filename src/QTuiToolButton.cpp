@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiToolButton.h>
+#include <QtTUI/QTuiMenu.h>
 #include <QtTUI/RenderUtils.h>
 #include <QtTUI/QtTuiUnicode.h>
 #include <QtTUI/Theme_Engine.h>
@@ -51,15 +52,7 @@ void QTuiToolButton::paintEvent(ScreenBuffer &buffer)
     // Clear the entire area with background (no border)
     fillRect(buffer, geo, style);
 
-    // Build content string: icon + text + optional dropdown indicator
-    QString content;
-    if (!icon().isEmpty())
-        content = icon() + QLatin1Char(' ') + text();
-    else
-        content = text();
-
-    if (m_menu)
-        content += QStringLiteral(" \u25BC"); // " ▼"
+    const QString content = label();
 
     // Render content centered vertically, with 1 char left padding
     int contentRow = geo.y() + geo.height() / 2;
@@ -74,12 +67,31 @@ void QTuiToolButton::paintEvent(ScreenBuffer &buffer)
     renderText(buffer, startCol, contentRow, content, textLen, textStyle);
 }
 
+QString QTuiToolButton::label() const
+{
+    QString content = icon().isEmpty() ? text() : icon() + QLatin1Char(' ') + text();
+    if (m_menu)
+        content += QStringLiteral(" \u25BC"); // " ▼"
+    return content;
+}
+
+void QTuiToolButton::mousePressEvent(TuiMouseEvent *event)
+{
+    // The label starts after 1 column of padding, so "▼" is at the column
+    // after the label width
+    if (m_menu && event->mouseType() == TuiMouseEvent::Press && event->button() == Qt::LeftButton
+        && event->x() == geometry().x() + QtTuiUnicode::stringWidth(label())) {
+        m_menu->popup(geometry().bottomLeft() + QPoint(0, 1));
+        return;
+    }
+    QTuiPushButton::mousePressEvent(event);
+}
+
 void QTuiToolButton::keyPressEvent(TuiKeyEvent *event)
 {
-    // If menu is set and Down arrow pressed, open the menu
+    // If menu is set and Down arrow pressed, open the menu below the button
     if (m_menu && event->key() == Qt::Key_Down) {
-        // QTuiMenu doesn't exist yet - menu opening will be wired
-        // when QTuiMenu is implemented
+        m_menu->popup(geometry().bottomLeft() + QPoint(0, 1));
         return;
     }
 
