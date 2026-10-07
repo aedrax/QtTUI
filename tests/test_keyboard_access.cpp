@@ -12,6 +12,7 @@
 #include <QtTUI/QTuiPushButton.h>
 #include <QtTUI/QTuiToolButton.h>
 #include <QtTUI/QTuiDockWidget.h>
+#include <QtTUI/QTuiLabel.h>
 #include <QtTUI/TuiEvents.h>
 
 using namespace QtTUI;
@@ -74,6 +75,32 @@ private slots:
         QVERIFY(first->isMaximized());
         sendKey(*first, Qt::Key_M);
         QVERIFY(!first->isMaximized());
+    }
+
+    void clickInASubWindowPutsItOnTop()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 60, 20));
+        app.setMainWindow(&mainWindow);
+        auto *area = new QTuiMdiArea;
+        mainWindow.setCentralWidget(area);
+        mainWindow.show();
+        // The label takes no focus, but a click on it activates its window
+        QTuiMdiSubWindow *back = area->addSubWindow(new QTuiLabel(QStringLiteral("Back")));
+        QTuiMdiSubWindow *front = area->addSubWindow(new QTuiWidget);
+        back->setGeometry(QRect(0, 0, 20, 8));
+        front->setGeometry(QRect(10, 0, 20, 8));
+        back->widget()->setGeometry(QRect(1, 1, 18, 6));
+        QCOMPARE(area->childWidgets().constLast(), front);
+
+        TuiMouseEvent press(TuiMouseEvent::Press, Qt::LeftButton, QPoint(2, 2));
+        QCoreApplication::sendEvent(&mainWindow, &press);
+        QCOMPARE(area->activeSubWindow(), back);
+        QCOMPARE(area->childWidgets().constLast(), back);
     }
 
     void scrollAreaScrollsToTheFocusWidget()

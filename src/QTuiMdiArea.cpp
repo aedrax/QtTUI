@@ -80,8 +80,10 @@ void QTuiMdiArea::setActiveSubWindow(QTuiMdiSubWindow *window)
     if (m_activeWindow == window)
         return;
 
-    if (window)
+    if (window) {
+        window->raise();
         emit window->aboutToActivate();
+    }
 
     m_activeWindow = window;
     emit subWindowActivated(m_activeWindow);

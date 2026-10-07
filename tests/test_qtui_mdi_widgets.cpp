@@ -141,6 +141,21 @@ private slots:
         QCOMPARE(spy.at(0).at(0).value<QTuiMdiSubWindow *>(), sub1);
     }
 
+    void activeSubWindowIsOnTop()
+    {
+        QTuiMdiArea area;
+        area.setGeometry(QRect(0, 0, 40, 20));
+        QTuiMdiSubWindow *sub1 = area.addSubWindow(new MdiContentWidget());
+        QTuiMdiSubWindow *sub2 = area.addSubWindow(new MdiContentWidget());
+        QCOMPARE(area.childWidgets().constLast(), sub2);
+
+        // The last child paints last and gets the mouse first
+        area.setActiveSubWindow(sub1);
+        QCOMPARE(area.childWidgets().constLast(), sub1);
+        QCOMPARE(sub1->parentWidget(), &area);
+        QCOMPARE(area.subWindowList(), (QList<QTuiMdiSubWindow *>{sub1, sub2}));
+    }
+
     void cascadeSubWindowsArrangesWithOffset()
     {
         QTuiMdiArea area;

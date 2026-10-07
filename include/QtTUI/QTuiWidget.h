@@ -142,6 +142,9 @@ public:
 
     QTuiWidget *parentWidget() const;
     QList<QTuiWidget *> childWidgets() const;
+    // Puts the widget on top of its siblings, as in Qt: it paints last and
+    // gets the mouse first
+    void raise();
 
     // The default minimum size is the layout's minimum size, or 0x0 if the
     // widget has no layout.

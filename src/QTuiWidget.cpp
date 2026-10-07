@@ -369,6 +369,18 @@ QTuiWidget *QTuiWidget::parentWidget() const
     return qobject_cast<QTuiWidget *>(parent());
 }
 
+void QTuiWidget::raise()
+{
+    QObject *p = parent();
+    if (!p || p->children().constLast() == this)
+        return;
+    // QObject cannot change the order of its children: remove the widget
+    // and add it again at the end
+    setParent(nullptr);
+    setParent(p);
+    markDirty();
+}
+
 QList<QTuiWidget *> QTuiWidget::childWidgets() const
 {
     QList<QTuiWidget *> result;

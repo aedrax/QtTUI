@@ -13,6 +13,8 @@
 #include <QtTUI/QTuiToolTip.h>
 #include <QtTUI/QTuiDialog.h>
 #include <QtTUI/QTuiMenu.h>
+#include <QtTUI/QTuiMdiArea.h>
+#include <QtTUI/QTuiMdiSubWindow.h>
 #include <QTimer>
 #include <QCoreApplication>
 #include <QDebug>
@@ -559,6 +561,15 @@ void QTuiMainWindow::mousePressEvent(TuiMouseEvent *event)
             && target->isEffectivelyEnabled()) {
             target->setFocus();
             QTuiToolTip::showFor(target);
+        }
+        // A press anywhere in an MDI sub-window activates it, as in Qt,
+        // also on a widget in it that takes no focus
+        if (event->mouseType() == TuiMouseEvent::Press) {
+            for (QTuiWidget *w = target; w; w = w->parentWidget()) {
+                auto *sub = qobject_cast<QTuiMdiSubWindow *>(w);
+                if (auto *area = sub ? qobject_cast<QTuiMdiArea *>(sub->parentWidget()) : nullptr)
+                    area->setActiveSubWindow(sub);
+            }
         }
         QCoreApplication::sendEvent(target, event);
 
