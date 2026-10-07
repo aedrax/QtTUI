@@ -538,7 +538,7 @@ static QTuiWidget *createModelViewTab(QTuiWidget *parent, QTuiStatusBar *statusB
     });
     // Right click (or Shift+F10) opens a menu with the list actions
     listView->setContextMenuPolicy(Qt::ActionsContextMenu);
-    listView->setToolTip("Shift+arrows select more; Shift+F10 or a right click opens a menu");
+    listView->setToolTip("Shift+arrows or a drag select more; Shift+F10 or a right click opens a menu");
     auto *addItem = new QTuiAction("Add item", listView);
     QObject::connect(addItem, &QTuiAction::triggered, [listModel, statusBar]() {
         const int row = listModel->rowCount();

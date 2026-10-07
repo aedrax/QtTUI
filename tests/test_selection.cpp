@@ -171,6 +171,37 @@ private slots:
         QCOMPARE(selectedRows(view), QList<int>{4});
     }
 
+    void dragSelectsARange()
+    {
+        // Some terminals keep Shift+click for their own text selection
+        auto drag = [](QTuiWidget &w, int x, int y) {
+            TuiMouseEvent ev(TuiMouseEvent::Move, Qt::LeftButton, QPoint(x, y));
+            QCoreApplication::sendEvent(&w, &ev);
+        };
+        QTuiListView view;
+        setUpList(view, QTuiAbstractItemView::ExtendedSelection);
+        QSignalSpy activated(&view, &QTuiListView::activated);
+        click(view, 0, 3);
+        drag(view, 0, 2);
+        drag(view, 0, 1);
+        QCOMPARE(selectedRows(view), (QList<int>{1, 2, 3}));
+        QCOMPARE(view.currentIndex().row(), 1);
+        QCOMPARE(activated.count(), 1);
+
+        QTuiTableWidget table(4, 2);
+        table.setGeometry(QRect(0, 0, 30, 6));
+        table.setSelectionMode(QTuiAbstractItemView::ExtendedSelection);
+        table.setSelectionBehavior(QTuiAbstractItemView::SelectRows);
+        table.setSortingEnabled(true);
+        click(table, 1, 1);
+        drag(table, 1, 3);
+        QCOMPARE(table.selectionModel()->selectedRows().size(), 3);
+        // A drag over the header does not sort
+        drag(table, 1, 0);
+        QCOMPARE(table.sortColumn(), -1);
+        QCOMPARE(table.selectionModel()->selectedRows().size(), 3);
+    }
+
     void selectionModelMovesTheCurrentItem()
     {
         QTuiListView view;

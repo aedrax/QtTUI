@@ -321,7 +321,11 @@ void QTuiTreeView::mousePressEvent(TuiMouseEvent *event)
         emit activated(index);
         return;
     }
-    if (event->mouseType() != TuiMouseEvent::Press)
+    // A left drag selects from the pressed item to the item under the
+    // mouse, as Shift+click does. Some terminals, for example Konsole, keep
+    // Shift+click for their own text selection.
+    const bool drag = event->mouseType() == TuiMouseEvent::Move && event->button() == Qt::LeftButton;
+    if (event->mouseType() != TuiMouseEvent::Press && !drag)
         return;
     if (!m_model || m_flatList.isEmpty())
         return;
@@ -333,7 +337,7 @@ void QTuiTreeView::mousePressEvent(TuiMouseEvent *event)
         m_currentRow = clickedRow;
         markDirty();
         if (event->button() == Qt::LeftButton)
-            selectCurrent(event->modifiers(), true);
+            selectCurrent(drag ? Qt::ShiftModifier : event->modifiers(), !drag);
         else if (!isSelected(currentIndex()))
             selectCurrent(Qt::NoModifier, true);
     }

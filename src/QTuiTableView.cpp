@@ -340,7 +340,11 @@ void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
             return;
         }
     }
-    if (event->mouseType() != TuiMouseEvent::Press)
+    // A left drag selects from the pressed item to the item under the
+    // mouse, as Shift+click does. Some terminals, for example Konsole, keep
+    // Shift+click for their own text selection.
+    const bool drag = event->mouseType() == TuiMouseEvent::Move && event->button() == Qt::LeftButton;
+    if (event->mouseType() != TuiMouseEvent::Press && !drag)
         return;
     if (!m_model || m_model->rowCount() == 0 || m_model->columnCount() == 0)
         return;
@@ -352,6 +356,8 @@ void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
     // Calculate clicked row (subtract 1 for header)
     const bool onHeader = event->y() - geo.y() < m_headerHeight;
     int clickedRow = (event->y() - geo.y() - m_headerHeight) + m_scrollOffset;
+    if (drag && onHeader)
+        return;
     if (!onHeader && (clickedRow < 0 || clickedRow >= rows))
         return;
 
@@ -400,7 +406,7 @@ void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
     m_currentCol = clickedCol;
     markDirty();
     if (event->button() == Qt::LeftButton)
-        selectCurrent(event->modifiers(), true);
+        selectCurrent(drag ? Qt::ShiftModifier : event->modifiers(), !drag);
     else if (!isSelected(currentIndex()))
         selectCurrent(Qt::NoModifier, true);
 }
