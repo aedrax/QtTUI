@@ -650,12 +650,15 @@ static QTuiWidget *createPanesTab(QTuiWidget *parent)
     // -- QTuiScrollArea section --
     page->addWidget(sectionLabel("QTuiScrollArea", page));
     auto *scrollArea = new QTuiScrollArea(page);
-    auto *scrollContent = new QTuiLabel(
-        "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n"
-        "Line 6\nLine 7\nLine 8\nLine 9\nLine 10",
-        scrollArea);
+    // One check box on each line: the hover highlights the line under the
+    // mouse, because a click on it does something
+    auto *scrollContent = new QTuiWidget(scrollArea);
+    for (int i = 0; i < 10; ++i) {
+        auto *line = new QTuiCheckBox(QStringLiteral("Line %1").arg(i + 1), scrollContent);
+        line->setGeometry(QRect(0, i, 12, 1));
+    }
     // The scroll area does not size its content, so set the size here
-    scrollContent->setGeometry(QRect(QPoint(0, 0), scrollContent->minimumSize()));
+    scrollContent->setGeometry(QRect(0, 0, 12, 10));
     scrollArea->setWidget(scrollContent);
     page->addWidget(scrollArea, 1);
 
