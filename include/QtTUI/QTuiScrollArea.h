@@ -27,6 +27,7 @@ public:
 
     void paintEvent(ScreenBuffer &buffer) override;
     QSize minimumSize() const override;
+    QRect hoverRect() const override;
 
 protected:
     void keyPressEvent(TuiKeyEvent *event) override;
@@ -39,6 +40,10 @@ protected:
 
 private:
     void updateScrollBars();
+    // A screen position in content coordinates
+    QPoint contentPos(const QPoint &pos) const;
+    // The deepest visible content widget at a content position, or null
+    QTuiWidget *contentWidgetAt(const QPoint &content) const;
 
     QTuiWidget *m_widget = nullptr;
     QTuiScrollBar *m_verticalScrollBar;

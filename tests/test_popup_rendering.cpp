@@ -38,6 +38,8 @@
 #include <QtTUI/QTuiPushButton.h>
 #include <QtTUI/QTuiCalendarWidget.h>
 #include <QtTUI/QTuiTabBar.h>
+#include <QtTUI/QTuiScrollArea.h>
+#include <QtTUI/QTuiScrollBar.h>
 #include <QtTUI/QTuiToolTip.h>
 #include <QtTUI/QTuiWidget.h>
 #include <QtTUI/ScreenBuffer.h>
@@ -1313,6 +1315,47 @@ private slots:
         QCoreApplication::processEvents();
         QCOMPARE(background(1, 0), normal);
         QCOMPARE(background(3, 3), normal);
+    }
+
+    void hoverHighlightsOnlyTheClickableWidgetInAScrollArea()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 40, 12));
+        app.setMainWindow(&mainWindow);
+        auto *central = new QTuiWidget;
+        mainWindow.setCentralWidget(central);
+        auto *scrollArea = new QTuiScrollArea(central);
+        scrollArea->setGeometry(QRect(0, 0, 20, 5));
+        auto *content = new QTuiWidget;
+        content->setGeometry(QRect(0, 0, 18, 10));
+        auto *check = new QTuiCheckBox(QStringLiteral("Check"), content);
+        check->setGeometry(QRect(0, 6, 10, 1));
+        scrollArea->setWidget(content);
+        scrollArea->verticalScrollBar()->setValue(4);
+        mainWindow.show();
+        auto move = [&mainWindow](const QPoint &pos) {
+            TuiMouseEvent ev(TuiMouseEvent::Move, Qt::NoButton, pos);
+            QCoreApplication::sendEvent(&mainWindow, &ev);
+        };
+        auto background = [&app](int x, int y) { return app.screenBuffer()->backCell(x, y).background; };
+
+        app.triggerRender();
+        const Color normal = background(15, 0);
+        // The check box is at content row 6, screen row 2
+        move(QPoint(3, 2));
+        QCoreApplication::processEvents();
+        QVERIFY(background(3, 2) != normal);
+        QCOMPARE(background(12, 2), normal);
+        QCOMPARE(background(3, 1), normal);
+        // Nothing to click on an empty row
+        move(QPoint(3, 0));
+        QCoreApplication::processEvents();
+        QCOMPARE(background(3, 0), normal);
+        QCOMPARE(background(3, 2), normal);
     }
 
     // After a left press, drag motion and the release go to the pressed

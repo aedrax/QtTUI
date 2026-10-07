@@ -391,23 +391,15 @@ void QTuiScrollArea::resizeEvent(TuiResizeEvent *event)
     updateScrollBars();
 }
 
-void QTuiScrollArea::mousePressEvent(TuiMouseEvent *event)
+QPoint QTuiScrollArea::contentPos(const QPoint &pos) const
 {
-    if (event->mouseType() == TuiMouseEvent::Wheel) {
-        // 3 lines per notch, as is usual
-        const int lines = event->wheelDelta() > 0 ? -3 : 3;
-        if (m_verticalScrollBar->isVisible())
-            m_verticalScrollBar->setValue(m_verticalScrollBar->value() + lines);
-        return;
-    }
-    if (!m_widget || !m_widget->isVisible())
-        return;
+    return pos - geometry().topLeft() + QPoint(m_scrollX, m_scrollOffset);
+}
 
-    // Viewport position -> content position
-    const QPoint content = event->pos() - geometry().topLeft() + QPoint(m_scrollX, m_scrollOffset);
-    if (!m_widget->geometry().contains(content))
-        return;
-
+QTuiWidget *QTuiScrollArea::contentWidgetAt(const QPoint &content) const
+{
+    if (!m_widget || !m_widget->isVisible() || !m_widget->geometry().contains(content))
+        return nullptr;
     // The deepest visible content widget at that position
     QTuiWidget *target = m_widget;
     for (bool found = true; found;) {
@@ -422,6 +414,34 @@ void QTuiScrollArea::mousePressEvent(TuiMouseEvent *event)
             }
         }
     }
+    return target;
+}
+
+// Only the content widget under the mouse that takes a click, as for the
+// items of a view
+QRect QTuiScrollArea::hoverRect() const
+{
+    const QTuiWidget *target = contentWidgetAt(contentPos(hoverPos()));
+    if (!target || !(target->focusPolicy() & Qt::ClickFocus) || !target->isEffectivelyEnabled())
+        return QRect();
+    return target->geometry()
+        .translated(geometry().topLeft() - QPoint(m_scrollX, m_scrollOffset))
+        .intersected(contentArea());
+}
+
+void QTuiScrollArea::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() == TuiMouseEvent::Wheel) {
+        // 3 lines per notch, as is usual
+        const int lines = event->wheelDelta() > 0 ? -3 : 3;
+        if (m_verticalScrollBar->isVisible())
+            m_verticalScrollBar->setValue(m_verticalScrollBar->value() + lines);
+        return;
+    }
+    const QPoint content = contentPos(event->pos());
+    QTuiWidget *target = contentWidgetAt(content);
+    if (!target)
+        return;
 
     if (event->mouseType() == TuiMouseEvent::Press && (target->focusPolicy() & Qt::ClickFocus)
         && target->isEffectivelyEnabled())
