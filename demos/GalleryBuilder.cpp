@@ -822,8 +822,24 @@ static QTuiWidget *createSpecializedTab(QTuiWidget *parent, QTuiStatusBar *statu
 
     // -- QTuiSizeGrip section --
     page->addWidget(sectionLabel("QTuiSizeGrip", page));
-    auto *sizeGrip = new QTuiSizeGrip(page);
-    page->addWidget(sizeGrip);
+    // The grip resizes the sub-window that it is in: drag it, or give it
+    // the focus and use the arrow keys
+    auto *gripArea = new QTuiMdiArea(page);
+    auto *gripContent = new QTuiWidget;
+    auto *gripColumn = new QTuiBoxLayout(QTuiBoxLayout::TopToBottom);
+    gripColumn->addWidget(new QTuiLabel("Drag the grip", gripContent));
+    gripColumn->addStretch(1);
+    auto *gripRow = new QTuiWidget(gripContent);
+    auto *gripRowLayout = new QTuiBoxLayout(QTuiBoxLayout::LeftToRight);
+    gripRowLayout->addStretch(1);
+    gripRowLayout->addWidget(new QTuiSizeGrip(gripRow));
+    gripRow->setLayout(gripRowLayout);
+    gripColumn->addWidget(gripRow);
+    gripContent->setLayout(gripColumn);
+    QTuiMdiSubWindow *gripWindow = gripArea->addSubWindow(gripContent);
+    gripWindow->setWindowTitle("Resize me");
+    gripWindow->setGeometry(QRect(0, 0, 20, 7));
+    page->addWidget(gripArea, 1);
 
     return page;
 }

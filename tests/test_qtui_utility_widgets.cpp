@@ -7,6 +7,8 @@
 #include <QtTUI/QTuiCalendarWidget.h>
 #include <QtTUI/QTuiWidget.h>
 #include <QtTUI/QTuiMainWindow.h>
+#include <QtTUI/QTuiMdiArea.h>
+#include <QtTUI/QTuiMdiSubWindow.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
 #include <QtTUI/Theme_Engine.h>
@@ -220,6 +222,34 @@ private slots:
         // Up arrow should decrease height
         sendKey(*grip, Qt::Key_Up);
         QCOMPARE(mw.geometry().height(), 20);
+    }
+
+    void sizeGrip_resizesItsSubWindowWithADrag()
+    {
+        QTuiMdiArea area;
+        area.setGeometry(QRect(0, 0, 40, 20));
+        auto *content = new QTuiWidget;
+        QTuiMdiSubWindow *sub = area.addSubWindow(content);
+        sub->setGeometry(QRect(0, 0, 20, 8));
+        auto *grip = new QTuiSizeGrip(content);
+        grip->setGeometry(QRect(16, 4, 3, 3));
+        auto mouse = [grip](TuiMouseEvent::MouseEventType type, const QPoint &pos) {
+            TuiMouseEvent ev(type, Qt::LeftButton, pos);
+            QCoreApplication::sendEvent(grip, &ev);
+        };
+
+        // The sub-window changes, not the area
+        mouse(TuiMouseEvent::Press, QPoint(18, 6));
+        mouse(TuiMouseEvent::Move, QPoint(23, 9));
+        QCOMPARE(sub->geometry(), QRect(0, 0, 25, 11));
+        QCOMPARE(area.geometry(), QRect(0, 0, 40, 20));
+        // The sub-window stays inside the area and above its minimum size
+        mouse(TuiMouseEvent::Move, QPoint(80, 80));
+        QCOMPARE(sub->geometry().size(), QSize(40, 20));
+        mouse(TuiMouseEvent::Move, QPoint(-80, -80));
+        QCOMPARE(sub->geometry().size(), sub->minimumSize());
+        sendKey(*grip, Qt::Key_Right);
+        QCOMPARE(sub->geometry().width(), sub->minimumSize().width() + 1);
     }
 
     // ---------------------------------------------------------------
