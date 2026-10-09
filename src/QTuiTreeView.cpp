@@ -321,9 +321,7 @@ void QTuiTreeView::mousePressEvent(TuiMouseEvent *event)
         emit activated(index);
         return;
     }
-    // A left drag selects from the pressed item to the item under the
-    // mouse, as Shift+click does. Some terminals, for example Konsole, keep
-    // Shift+click for their own text selection.
+    // A left drag selects a range, as Shift+click does (see QTuiListView)
     const bool drag = event->mouseType() == TuiMouseEvent::Move && event->button() == Qt::LeftButton;
     if (event->mouseType() != TuiMouseEvent::Press && !drag)
         return;

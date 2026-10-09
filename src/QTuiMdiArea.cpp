@@ -141,19 +141,10 @@ void QTuiMdiArea::paintEvent(ScreenBuffer &buffer)
     if (!isVisible() || geo.isEmpty())
         return;
 
+    // Only the background: the sub-windows are children, and the render
+    // pass paints them on top in their order (the active one is raised)
     const auto theme = themeProperties();
-    const Color bg = theme.background;
-
-    // Clear the MDI area background
-    fillRect(buffer, geo, cellStyle(theme.foreground, bg));
-
-    // Paint each subwindow; active window is painted last (on top)
-    for (auto *sub : m_subWindows) {
-        if (sub != m_activeWindow && sub->isVisible())
-            sub->paintEvent(buffer);
-    }
-    if (m_activeWindow && m_activeWindow->isVisible())
-        m_activeWindow->paintEvent(buffer);
+    fillRect(buffer, geo, cellStyle(theme.foreground, theme.background));
 }
 
 void QTuiMdiArea::keyPressEvent(TuiKeyEvent *event)

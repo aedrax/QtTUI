@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiSizeGrip.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/QTuiMainWindow.h>
 #include <QtTUI/QTuiDialog.h>
 #include <QtTUI/QTuiMdiSubWindow.h>
@@ -47,22 +48,10 @@ void QTuiSizeGrip::paintEvent(ScreenBuffer &buffer)
     const Color fg = hasFocus() ? theme.focusForeground : theme.foreground;
     const Color bg = hasFocus() ? theme.focusBackground : theme.background;
 
-    auto setCell = [&](int x, int y, char32_t ch) {
-        if (x >= 0 && x < buffer.width() && y >= 0 && y < buffer.height()) {
-            Cell &cell = buffer.backCell(x, y);
-            cell.setChar(ch);
-            cell.foreground = fg;
-            cell.background = bg;
-            cell.bold = theme.bold;
-        }
-    };
-
     // Clear the widget, then draw one "╱" in the bottom-right cell
-    for (int y = geo.top(); y <= geo.bottom(); ++y) {
-        for (int x = geo.left(); x <= geo.right(); ++x)
-            setCell(x, y, U' ');
-    }
-    setCell(geo.right(), geo.bottom(), char32_t(0x2571)); // ╱
+    const Cell style = cellStyle(theme, fg, bg);
+    fillRect(buffer, geo, style);
+    buffer.putChar(geo.right(), geo.bottom(), U'╱', style);
 }
 
 QSize QTuiSizeGrip::minimumSize() const
