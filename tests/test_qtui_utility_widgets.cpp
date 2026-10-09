@@ -175,28 +175,19 @@ private slots:
     void sizeGrip_minimumSize()
     {
         QTuiSizeGrip grip;
-        QCOMPARE(grip.minimumSize(), QSize(3, 3));
+        QCOMPARE(grip.minimumSize(), QSize(1, 1));
     }
 
     void sizeGrip_paintEventRendersGrip()
     {
         QTuiSizeGrip grip;
-        grip.setGeometry(QRect(0, 0, 3, 3));
-
-        ScreenBuffer buffer(3, 3);
+        grip.setGeometry(QRect(0, 0, 2, 2));
+        ScreenBuffer buffer(2, 2);
         grip.paintEvent(buffer);
-
-        // The diagonal pattern should have non-space characters
-        // Pattern: row0 col2, row1 col1, row2 col0
-        bool foundDiag = false;
-        for (int i = 0; i < 3; ++i) {
-            const Cell &cell = buffer.backCell(2 - i, i);
-            if (cell.ch != U' ') {
-                foundDiag = true;
-                break;
-            }
-        }
-        QVERIFY(foundDiag);
+        // Only the bottom-right cell has the "╱"
+        QCOMPARE(buffer.backCell(1, 1).ch, char32_t(0x2571));
+        QCOMPARE(buffer.backCell(0, 0).ch, char32_t(U' '));
+        QCOMPARE(buffer.backCell(1, 0).ch, char32_t(U' '));
     }
 
     void sizeGrip_arrowKeysResizeParent()
@@ -205,7 +196,7 @@ private slots:
         mw.setGeometry(QRect(0, 0, 40, 20));
 
         auto *grip = new QTuiSizeGrip(&mw);
-        grip->setGeometry(QRect(37, 17, 3, 3));
+        grip->setGeometry(QRect(39, 19, 1, 1));
 
         // Right arrow should increase width
         sendKey(*grip, Qt::Key_Right);
@@ -232,7 +223,7 @@ private slots:
         QTuiMdiSubWindow *sub = area.addSubWindow(content);
         sub->setGeometry(QRect(0, 0, 20, 8));
         auto *grip = new QTuiSizeGrip(content);
-        grip->setGeometry(QRect(16, 4, 3, 3));
+        grip->setGeometry(QRect(18, 6, 1, 1));
         auto mouse = [grip](TuiMouseEvent::MouseEventType type, const QPoint &pos) {
             TuiMouseEvent ev(type, Qt::LeftButton, pos);
             QCoreApplication::sendEvent(grip, &ev);

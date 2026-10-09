@@ -12,8 +12,8 @@ QTuiSizeGrip::QTuiSizeGrip(QTuiWidget *parent)
     : QTuiWidget(parent)
 {
     setFocusPolicy(Qt::StrongFocus);
-    // Default size: 3x3 for the diagonal grip pattern
-    setGeometry(QRect(0, 0, 3, 3));
+    // One cell with a "╱"
+    setGeometry(QRect(0, 0, 1, 1));
 }
 
 QTuiWidget *QTuiSizeGrip::findTopLevelWindow() const
@@ -57,33 +57,17 @@ void QTuiSizeGrip::paintEvent(ScreenBuffer &buffer)
         }
     };
 
-    // Render a diagonal resize handle pattern in the widget area
-    // Using slash characters to suggest a draggable corner grip:
-    //   . . /
-    //   . / .
-    //   / . .
-    const int x0 = geo.x();
-    const int y0 = geo.y();
-    const int w = geo.width();
-    const int h = geo.height();
-
-    // Fill background
-    for (int row = 0; row < h; ++row) {
-        for (int col = 0; col < w; ++col) {
-            setCell(x0 + col, y0 + row, U' ');
-        }
+    // Clear the widget, then draw one "╱" in the bottom-right cell
+    for (int y = geo.top(); y <= geo.bottom(); ++y) {
+        for (int x = geo.left(); x <= geo.right(); ++x)
+            setCell(x, y, U' ');
     }
-
-    // Draw diagonal lines from bottom-left to top-right
-    const int diag = qMin(w, h);
-    for (int i = 0; i < diag; ++i) {
-        setCell(x0 + w - 1 - i, y0 + h - 1 - i, char32_t(0x2571)); // ╱
-    }
+    setCell(geo.right(), geo.bottom(), char32_t(0x2571)); // ╱
 }
 
 QSize QTuiSizeGrip::minimumSize() const
 {
-    return QSize(3, 3);
+    return QSize(1, 1);
 }
 
 void QTuiSizeGrip::keyPressEvent(TuiKeyEvent *event)
