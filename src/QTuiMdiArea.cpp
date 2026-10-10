@@ -1,8 +1,6 @@
 #include <QtTUI/QTuiMdiArea.h>
-#include <QtTUI/RenderUtils.h>
 #include <QtTUI/QTuiMdiSubWindow.h>
 #include <QtTUI/Theme_Engine.h>
-#include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
 #include <QCoreApplication>
 #include <QtMath>
@@ -133,18 +131,6 @@ void QTuiMdiArea::tileSubWindows()
         int y = area.y() + row * cellH;
         m_subWindows[i]->setGeometry(QRect(x, y, cellW, cellH));
     }
-}
-
-void QTuiMdiArea::paintEvent(ScreenBuffer &buffer)
-{
-    const QRect geo = geometry();
-    if (!isVisible() || geo.isEmpty())
-        return;
-
-    // Only the background: the sub-windows are children, and the render
-    // pass paints them on top in their order (the active one is raised)
-    const auto theme = themeProperties();
-    fillRect(buffer, geo, cellStyle(theme.foreground, theme.background));
 }
 
 void QTuiMdiArea::keyPressEvent(TuiKeyEvent *event)

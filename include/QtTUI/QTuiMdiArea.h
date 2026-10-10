@@ -24,7 +24,6 @@ public:
     void cascadeSubWindows();
     void tileSubWindows();
 
-    void paintEvent(ScreenBuffer &buffer) override;
 
 signals:
     void subWindowActivated(QTuiMdiSubWindow *window);

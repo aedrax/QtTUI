@@ -19,20 +19,15 @@ QTuiSizeGrip::QTuiSizeGrip(QTuiWidget *parent)
 
 QTuiWidget *QTuiSizeGrip::findTopLevelWindow() const
 {
-    QTuiWidget *w = parentWidget();
-    while (w) {
+    // Without a window, the topmost parent widget
+    QTuiWidget *top = nullptr;
+    for (QTuiWidget *w = parentWidget(); w; w = w->parentWidget()) {
         if (qobject_cast<QTuiMdiSubWindow *>(w) || qobject_cast<QTuiDialog *>(w)
             || qobject_cast<QTuiMainWindow *>(w))
             return w;
-        w = w->parentWidget();
+        top = w;
     }
-    // If no QTuiMainWindow found, return the topmost parent widget
-    w = parentWidget();
-    if (!w)
-        return nullptr;
-    while (w->parentWidget())
-        w = w->parentWidget();
-    return w;
+    return top;
 }
 
 void QTuiSizeGrip::paintEvent(ScreenBuffer &buffer)
