@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiPushButton.h>
+#include <QtTUI/QtTuiUnicode.h>
 #include <QtTUI/RenderUtils.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
@@ -28,9 +29,9 @@ void QTuiPushButton::setIcon(const QString &icon)
 QSize QTuiPushButton::minimumSize() const
 {
     // Content: icon + space + text, surrounded by border (1 char each side)
-    int contentWidth = text().length();
+    int contentWidth = QtTuiUnicode::stringWidth(text());
     if (!m_icon.isEmpty())
-        contentWidth += m_icon.length() + 1; // icon + space
+        contentWidth += QtTuiUnicode::stringWidth(m_icon) + 1; // icon + space
 
     // Add 2 for left/right border, 1 padding each side
     return QSize(contentWidth + 4, 3); // 3 rows: top border, content, bottom border

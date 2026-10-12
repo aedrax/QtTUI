@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiGroupBox.h>
+#include <QtTUI/QtTuiUnicode.h>
 #include <QtTUI/QTuiLayout.h>
 #include <QtTUI/RenderUtils.h>
 #include <QtTUI/Theme_Engine.h>
@@ -74,7 +75,7 @@ QTuiLayout *QTuiGroupBox::layout() const
 QSize QTuiGroupBox::minimumSize() const
 {
     // Border takes 2 cols and 2 rows minimum
-    int titleWidth = m_title.isEmpty() ? 0 : m_title.length() + 2; // space padding
+    int titleWidth = m_title.isEmpty() ? 0 : QtTuiUnicode::stringWidth(m_title) + 2; // space padding
     if (m_checkable)
         titleWidth += 4; // "[x] " prefix
     QSize size(qMax(4, titleWidth + 2), 3);
@@ -176,7 +177,7 @@ void QTuiGroupBox::mousePressEvent(TuiMouseEvent *event)
     if (event->y() != geo.y())
         return;
 
-    const int titleLen = 4 + static_cast<int>(m_title.length()); // "[x] " prefix + title
+    const int titleLen = 4 + QtTuiUnicode::stringWidth(m_title); // "[x] " prefix + title
     const int span = qMin(titleLen, geo.width() - 4);
     const int startX = geo.x() + 2;
     if (event->x() < startX || event->x() >= startX + span)

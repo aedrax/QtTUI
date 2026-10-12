@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiMenu.h>
+#include <QtTUI/QtTuiUnicode.h>
 #include <QtTUI/QTuiMainWindow.h>
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/RenderUtils.h>
@@ -175,10 +176,10 @@ QSize QTuiMenu::minimumSize() const
         if (item.action) {
             QString display = item.action->text();
             display.remove(QLatin1Char('&'));
-            w += display.length();
+            w += QtTuiUnicode::stringWidth(display);
         }
         if (item.action && !item.action->shortcut().isEmpty())
-            w += 2 + item.action->shortcut().length();
+            w += 2 + QtTuiUnicode::stringWidth(item.action->shortcut());
         if (item.submenu)
             w += 2; // " >"
         maxWidth = qMax(maxWidth, w);

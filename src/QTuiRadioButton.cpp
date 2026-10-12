@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiRadioButton.h>
+#include <QtTUI/QtTuiUnicode.h>
 #include <QtTUI/TuiEvents.h>
 
 namespace QtTUI {
@@ -18,7 +19,7 @@ void QTuiRadioButton::nextCheckState()
 QSize QTuiRadioButton::minimumSize() const
 {
     // "(*) " = 4 chars + text length
-    return QSize(4 + text().length(), 1);
+    return QSize(4 + QtTuiUnicode::stringWidth(text()), 1);
 }
 
 void QTuiRadioButton::paintEvent(ScreenBuffer &buffer)

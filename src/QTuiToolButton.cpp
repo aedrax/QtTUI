@@ -26,9 +26,9 @@ QTuiMenu *QTuiToolButton::menu() const
 QSize QTuiToolButton::minimumSize() const
 {
     // Compact: no border, just padding (1 char each side) + content
-    int contentWidth = text().length();
+    int contentWidth = QtTuiUnicode::stringWidth(text());
     if (!icon().isEmpty())
-        contentWidth += icon().length() + 1; // icon + space
+        contentWidth += QtTuiUnicode::stringWidth(icon()) + 1; // icon + space
     if (m_menu)
         contentWidth += 2; // space + dropdown indicator "▼"
 

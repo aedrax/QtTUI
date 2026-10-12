@@ -12,8 +12,8 @@ validators and the completer for `QTuiLineEdit`.
 breaks lines at spaces. The label can read a small subset of Markdown or HTML
 for bold, italic, underline, strikethrough and code.
 
-The label does not paint the frame of `QTuiFrame`. The label does not take
-keys or the mouse.
+With the `Box` frame shape, the label paints a border and shows the text
+inside it. The label does not take keys or the mouse.
 
 ### Text formats
 
@@ -70,7 +70,7 @@ void example(QTuiWidget *parent)
 | `QString displayText() const` | Returns the text as it shows, without the markup. |
 | `QTuiWidget *buddy() const` | Returns the buddy widget, or `nullptr`. |
 | `void setBuddy(QTuiWidget *buddy)` | Keeps a pointer to the buddy widget. QtTUI does not use the buddy, so this function has no effect on focus. |
-| `QSize minimumSize() const override` | Returns the width of the widest line and the number of lines. With word wrap, the width is the width of the longest word. |
+| `QSize minimumSize() const override` | Returns the width of the widest line and the number of lines, plus the frame. With word wrap, the width is the width of the longest word. |
 | `void paintEvent(ScreenBuffer &buffer) override` | Paints the text with the styles of the markup. |
 
 ### Signals

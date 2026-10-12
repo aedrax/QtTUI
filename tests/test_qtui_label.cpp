@@ -97,6 +97,22 @@ private slots:
         QCOMPARE(buffer.backCell(2, 0).ch, U' ');
     }
 
+    void boxFrameIsPaintedAroundTheText()
+    {
+        QTuiLabel label(QStringLiteral("Hi"));
+        label.setFrameShape(QTuiFrame::Box);
+        label.setAlignment(Qt::AlignLeft | Qt::AlignTop);
+        QCOMPARE(label.minimumSize(), QSize(4, 3));
+        label.setGeometry(QRect(0, 0, 4, 3));
+
+        ScreenBuffer buffer(4, 3);
+        label.paintEvent(buffer);
+
+        QVERIFY(buffer.backCell(0, 0).ch != U' ');
+        QCOMPARE(buffer.backCell(1, 1).ch, U'H');
+        QCOMPARE(buffer.backCell(2, 1).ch, U'i');
+    }
+
     void paintRightAligned()
     {
         QTuiLabel label(QStringLiteral("Hi"));

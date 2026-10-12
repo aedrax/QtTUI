@@ -33,6 +33,7 @@ void QTuiButtonGroup::addButton(QTuiWidget *button, int id)
     }
 
     m_buttons.append({button, id});
+    abstractButton->m_group = this;
     connect(abstractButton, &QTuiAbstractButton::toggled, this, &QTuiButtonGroup::onButtonToggled);
     connect(abstractButton, &QTuiAbstractButton::clicked, this, &QTuiButtonGroup::onButtonClicked);
 }
@@ -46,6 +47,8 @@ void QTuiButtonGroup::removeButton(QTuiWidget *button)
         if (m_buttons.at(i).button == button) {
             m_buttons.removeAt(i);
             disconnect(button, nullptr, this, nullptr);
+            if (auto *abstractButton = qobject_cast<QTuiAbstractButton *>(button))
+                abstractButton->m_group = nullptr;
             return;
         }
     }

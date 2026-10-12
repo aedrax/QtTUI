@@ -687,6 +687,38 @@ private slots:
         QCOMPARE(toggled.count(), 3);
     }
 
+    void clickChangesTheCheckStateBeforeClicked()
+    {
+        QTuiCheckBox box(QStringLiteral("A"));
+        bool checkedAtClick = false;
+        QObject::connect(&box, &QTuiAbstractButton::clicked, [&] { checkedAtClick = box.isChecked(); });
+        box.click();
+        QVERIFY(checkedAtClick);
+    }
+
+    void clickDoesNotUncheckInAnExclusiveGroup()
+    {
+        QTuiCheckBox a(QStringLiteral("A"));
+        QTuiButtonGroup group;
+        group.addButton(&a);
+        QCOMPARE(a.group(), &group);
+        a.click();
+        a.click();
+        QVERIFY(a.isChecked());
+        group.setExclusive(false);
+        a.click();
+        QVERIFY(!a.isChecked());
+    }
+
+    void minimumSizeUsesTheColumns()
+    {
+        // A wide character has 2 columns
+        QTuiCheckBox box(QString::fromUtf8("\u4e2d"));
+        QCOMPARE(box.minimumSize().width(), 6);
+        QTuiPushButton button(QString::fromUtf8("\u4e2d"));
+        QCOMPARE(button.minimumSize().width(), 6);
+    }
+
     void onlyLeftButtonClicks()
     {
         QTuiPushButton button(QStringLiteral("OK"));

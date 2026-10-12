@@ -3,6 +3,7 @@
 
 #include <QtTUI/QtTUIGlobal.h>
 #include <QtTUI/QTuiWidget.h>
+#include <QPointer>
 #include <QString>
 
 class QTimer;
@@ -10,6 +11,7 @@ class QTimer;
 namespace QtTUI {
 
 struct Cell;
+class QTuiButtonGroup;
 
 // Base class of the button widgets, like QAbstractButton: text, the
 // checkable and checked state, the pressed look, and click handling.
@@ -33,6 +35,9 @@ public:
 
     bool isChecked() const;
     void setChecked(bool checked);
+
+    // The group that the button is in, or nullptr
+    QTuiButtonGroup *group() const;
 
     // Pressed look. Terminals do not report key releases, so a click shows
     // the pressed look for a short time (see animateClick()).
@@ -78,6 +83,8 @@ private:
     bool m_checked = false;
     bool m_down = false;
     QTimer *m_releaseTimer;
+    QPointer<QTuiButtonGroup> m_group;
+    friend class QTuiButtonGroup;
 };
 
 } // namespace QtTUI

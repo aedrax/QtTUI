@@ -11,9 +11,8 @@ text, the checked state and the click from `QTuiAbstractButton`.
 checkable and checked state, and the pressed look. It does the click for Enter,
 Space and the left mouse button.
 
-A click emits `clicked()` first, then changes the checked state. Qt does the
-opposite: it changes the checked state first. Thus, in a `clicked()` slot,
-`isChecked()` still returns the old state.
+A click changes the checked state first, then emits `clicked()`, as in Qt.
+Thus, in a `clicked()` slot, `isChecked()` returns the new state.
 
 Terminals do not report key releases. Thus a click shows the pressed look for
 150 ms, then releases the button. If `QTuiApplication::reducedMotion()` is
@@ -35,7 +34,7 @@ void example(QTuiWidget *parent)
     QObject::connect(button, &QTuiAbstractButton::toggled, [](bool checked) {
         qDebug() << "Bold is" << checked;
     });
-    button->click(); // emits clicked(), then toggled(true)
+    button->click(); // emits toggled(true), then clicked()
 }
 ```
 
@@ -50,6 +49,7 @@ void example(QTuiWidget *parent)
 | `void setCheckable(bool checkable)` | Sets if the button has a checked state. |
 | `bool isChecked() const` | Returns the checked state. Property `checked`. |
 | `void setChecked(bool checked)` | Sets the checked state. Emits `toggled()` if the state changes. This function works also for a button that is not checkable. |
+| `QTuiButtonGroup *group() const` | Returns the group that the button is in, or `nullptr`. |
 | `bool isDown() const` | Returns true while the button shows the pressed look. |
 | `void setDown(bool down)` | Shows or removes the pressed look. It does not click the button. |
 
@@ -58,7 +58,7 @@ void example(QTuiWidget *parent)
 | Slot | Description |
 | --- | --- |
 | `void animateClick()` | Shows the pressed look for 150 ms, then calls `click()`. Enter, Space and a left click call this slot. |
-| `void click()` | Does the click without the pressed look. Emits `clicked()`, then calls `nextCheckState()` if the button is checkable. Does nothing if the button is disabled. |
+| `void click()` | Does the click without the pressed look. Calls `nextCheckState()` if the button is checkable, then emits `clicked()`. It does not uncheck the checked button of an exclusive group. Does nothing if the button is disabled. |
 | `void toggle()` | Inverts the checked state of a checkable button. Does nothing for a button that is not checkable. It does not emit `clicked()`. |
 
 ### Signals
@@ -346,8 +346,8 @@ The group is not a widget and does not paint.
 `QTuiAbstractButton`. The group ignores a different widget and writes a
 warning.
 
-An exclusive group does not stop a click that unchecks a check box. Thus an
-exclusive group can have no checked button. Qt stops this click.
+In an exclusive group, a click does not uncheck the checked button, as in
+Qt. `setChecked(false)` can still uncheck it.
 
 ### Example
 
@@ -389,5 +389,5 @@ void example(QTuiWidget *parent)
 
 | Signal | Description |
 | --- | --- |
-| `void buttonClicked(int id)` | A button in the group emitted `clicked()`. This signal comes before `buttonToggled()`, so `checkedId()` still returns the old ID. |
+| `void buttonClicked(int id)` | A button in the group emitted `clicked()`. This signal comes after `buttonToggled()`, so `checkedId()` returns the new ID. |
 | `void buttonToggled(int id, bool checked)` | A button in the group changed its checked state. In an exclusive group, the group then unchecks the other buttons, and each of them also emits this signal. |

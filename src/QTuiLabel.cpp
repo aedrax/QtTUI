@@ -264,8 +264,9 @@ void QTuiLabel::parse(QString *shown, QVector<quint8> *styles) const
 QSize QTuiLabel::minimumSize() const
 {
     const QString text = displayText();
+    const int frame = 2 * frameWidth();
     if (text.isEmpty())
-        return QSize(0, 1);
+        return QSize(frame, 1 + frame);
 
     // Each newline starts a new line
     const QStringList textLines = text.split(QLatin1Char('\n'));
@@ -281,7 +282,7 @@ QSize QTuiLabel::minimumSize() const
             width = qMax(width, QtTuiUnicode::stringWidth(w));
     }
 
-    return QSize(width, int(textLines.size()));
+    return QSize(width + frame, int(textLines.size()) + frame);
 }
 
 void QTuiLabel::paintEvent(ScreenBuffer &buffer)
@@ -297,12 +298,17 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
 
     // Clear the label area with background
     fillRect(buffer, geo, cellStyle(theme, fg, bg));
+    if (frameShape() == Box)
+        drawBorder(buffer, geo, theme.borderStyle, cellStyle(theme, fg, bg));
+    const QRect area = contentsRect();
+    if (area.isEmpty())
+        return;
 
     // Get wrapped lines
     QString shown;
     QVector<quint8> styles;
     parse(&shown, &styles);
-    QStringList lines = wrapText(shown, geo.width());
+    QStringList lines = wrapText(shown, area.width());
     // Position in `shown` of the next character to match with the lines;
     // wrapping drops or joins spaces, so spaces in `shown` are skipped
     int src = 0;
@@ -313,9 +319,9 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
     int totalLines = lines.size();
     int startRow = 0;
     if (m_alignment & Qt::AlignVCenter) {
-        startRow = (geo.height() - totalLines) / 2;
+        startRow = (area.height() - totalLines) / 2;
     } else if (m_alignment & Qt::AlignBottom) {
-        startRow = geo.height() - totalLines;
+        startRow = area.height() - totalLines;
     }
     // AlignTop: startRow stays 0
     startRow = qMax(0, startRow);
@@ -323,18 +329,18 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
     // Render each line
     for (int lineIdx = 0; lineIdx < lines.size(); ++lineIdx) {
         int row = startRow + lineIdx;
-        if (row >= geo.height())
+        if (row >= area.height())
             break;
 
         const QString &line = lines.at(lineIdx);
-        const int textCols = qMin(QtTuiUnicode::stringWidth(line), geo.width());
+        const int textCols = qMin(QtTuiUnicode::stringWidth(line), area.width());
 
         // Horizontal alignment: determine starting column (display columns)
         int startCol = 0;
         if (m_alignment & Qt::AlignHCenter) {
-            startCol = (geo.width() - textCols) / 2;
+            startCol = (area.width() - textCols) / 2;
         } else if (m_alignment & Qt::AlignRight) {
-            startCol = geo.width() - textCols;
+            startCol = area.width() - textCols;
         }
         // AlignLeft: startCol stays 0
         startCol = qMax(0, startCol);
@@ -348,7 +354,7 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
         style.italic = theme.italic;
         style.underline = theme.underline;
 
-        const int py = geo.y() + row;
+        const int py = area.y() + row;
         if (py >= buffer.height())
             continue;
         int col = startCol;
@@ -368,7 +374,7 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
                 bits = styles.value(src);
                 src += i - c.index;
             }
-            if (full || col + c.width > geo.width() || geo.x() + col + c.width > buffer.width()) {
+            if (full || col + c.width > area.width() || area.x() + col + c.width > buffer.width()) {
                 full = true; // keep matching, so the next line starts right
                 continue;
             }
@@ -378,7 +384,7 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
             styled.underline = style.underline || (bits & Underline);
             styled.strikethrough = bits & Strike;
             styled.inverse = bits & Code;
-            buffer.putChar(geo.x() + col, py, c.base, c.combining, styled);
+            buffer.putChar(area.x() + col, py, c.base, c.combining, styled);
             col += c.width;
         }
     }

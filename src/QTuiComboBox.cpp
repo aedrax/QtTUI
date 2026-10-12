@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiComboBox.h>
+#include <QtTUI/QtTuiUnicode.h>
 #include <QtTUI/RenderUtils.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
@@ -303,7 +304,7 @@ QSize QTuiComboBox::minimumSize() const
     // Find widest item text
     int maxTextWidth = 5; // minimum reasonable width
     for (const auto &item : m_items) {
-        maxTextWidth = qMax(maxTextWidth, static_cast<int>(item.length()));
+        maxTextWidth = qMax(maxTextWidth, QtTuiUnicode::stringWidth(item));
     }
     // Content: text + " ▼" indicator + borders + padding. The open dropdown
     // is a separate popup widget and does not affect the combo's own size.

@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiCheckBox.h>
+#include <QtTUI/QtTuiUnicode.h>
 #include <QtTUI/TuiEvents.h>
 
 namespace QtTUI {
@@ -57,7 +58,7 @@ void QTuiCheckBox::setTristate(bool tristate)
 QSize QTuiCheckBox::minimumSize() const
 {
     // "[x] " = 4 chars + text length
-    return QSize(4 + text().length(), 1);
+    return QSize(4 + QtTuiUnicode::stringWidth(text()), 1);
 }
 
 void QTuiCheckBox::paintEvent(ScreenBuffer &buffer)

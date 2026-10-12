@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiAbstractButton.h>
+#include <QtTUI/QTuiButtonGroup.h>
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/RenderUtils.h>
 #include <QtTUI/TuiEvents.h>
@@ -61,6 +62,11 @@ void QTuiAbstractButton::setChecked(bool checked)
     markDirty();
 }
 
+QTuiButtonGroup *QTuiAbstractButton::group() const
+{
+    return m_group;
+}
+
 bool QTuiAbstractButton::isDown() const
 {
     return m_down;
@@ -88,9 +94,10 @@ void QTuiAbstractButton::click()
 {
     if (!isEffectivelyEnabled())
         return;
-    emit clicked();
-    if (m_checkable)
+    // A click does not uncheck the checked button of an exclusive group
+    if (m_checkable && !(m_checked && m_group && m_group->exclusive()))
         nextCheckState();
+    emit clicked();
 }
 
 void QTuiAbstractButton::toggle()
