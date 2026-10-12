@@ -1,82 +1,72 @@
-QtTUI 🖥️✨
-==========
+# QtTUI
 
-**QtTUI** is a Text User Interface (TUI) framework built on Qt 6 Core. It brings Qt's Model/View architecture, the event loop, and signals and slots to the terminal, with widgets that follow the Qt Widgets API: `QTuiTableView`, `QTuiLineEdit`, `QTuiDialog`, and more, all in the `QtTUI` namespace.
+QtTUI is a terminal UI library for C++17 and Qt 6. It copies the Qt Widgets
+API for the terminal: `QTuiWidget`, `QTuiLineEdit`, `QTuiTableView`,
+`QTuiDialog` and more, in the `QtTUI` namespace. It uses only the Qt Core
+module, not Qt GUI.
 
-QtTUI needs only the Qt Core module. It does not use Qt GUI.
+The views use standard Qt models (`QAbstractItemModel`) and
+`QItemSelectionModel`. The views do not copy the model data. They read the
+model when they paint, and they repaint only the rows that a model signal
+changes.
 
-🚀 Features
------------
+## Contents
 
-*   **Qt Model/View:** The views work with any `QAbstractItemModel`: the Qt Core models (`QStringListModel`, `QSortFilterProxyModel`, ...) and your own. A model from Qt GUI (such as `QStandardItemModel`) also works if you link `Qt6::Gui` yourself. The views read the model on each paint and do not copy its data. The selection is a `QItemSelectionModel`, with the Qt selection modes (single, multi, extended, contiguous) and behaviors (items, rows, columns): Shift and Ctrl with the arrow keys, Space or a click select more items, and Ctrl+A selects all. Editable items open an editor in place (F2 or a double click, as in Qt), from the item delegate, and `scrollTo()` shows an item.
+- Widgets: buttons, check boxes, radio buttons, line edits, text edits, spin
+  boxes, sliders, combo boxes, progress bars, a calendar, list, table, tree
+  and column views, tabs, splitters, scroll areas, group boxes, MDI windows,
+  dock widgets, menus, tool bars, status bars, tooltips and context menus.
+- Dialogs: `QTuiDialog` with `exec()`, `QTuiMessageBox`, `QTuiInputDialog`,
+  `QTuiProgressDialog`, `QTuiFileDialog` and `QTuiWizard`.
+- Layouts: box, grid, form and stacked layouts, with size policies and
+  right-to-left direction.
+- Terminal: 24-bit color, with 256-color, 16-color and no-color modes. Mouse
+  clicks, drags, the wheel and the hover highlight. Bracketed paste, copy
+  with OSC 52, the kitty keyboard protocol, Ctrl+Z and resize.
+- Themes: a dark theme, a light theme, or your own theme through
+  `Theme_Engine`.
+- `UI_Loader` makes a widget tree from a JSON description.
 
-*   **Widgets:** Buttons, check boxes, radio buttons, line edits (with validators, password mode, completion, undo), text edits, spin boxes, sliders, combo boxes, progress bars (also a busy bar), table, list, tree and column views (sorting, column resizing), tabs, splitters, scroll areas, group boxes, MDI windows, menus, tool bars, status bars, tooltips, and context menus.
+QtTUI is tested on Linux only. The Windows backend is not compiled or tested.
 
-*   **Dialogs:** `QTuiDialog` with `exec()`, `QTuiMessageBox`, `QTuiInputDialog`, `QTuiProgressDialog`, `QTuiFileDialog`, and `QTuiWizard`. Dialogs are modal.
+The [documentation](docs/README.md) has a page for each part of the library,
+with examples.
 
-*   **Layouts:** Box, grid, form and stacked layouts, with stretch, spacing, size hints and size policies. Any `QTuiWidget` can have a layout, as `QWidget` can. Right-to-left layout direction mirrors the layouts.
+## Build
 
-*   **Terminal support:** 24-bit color with 256-color, 16-color and no-color fallback (`NO_COLOR` is respected), mouse clicks, wheel, drag and hover, bracketed paste, copy to the system clipboard (OSC 52), the kitty keyboard protocol, Ctrl+Z suspend, and terminal resizing.
-
-*   **Themes:** A default dark theme and a built-in light theme, or your own themes through `Theme_Engine`.
-
-*   **Other:** Library text goes through `tr()` for translation. Labels can show a small subset of Markdown or HTML. `UI_Loader` builds widget trees from a JSON description.
-
-**Platforms:** QtTUI is developed and tested on Linux. The Windows backend is not compiled or tested yet. macOS is not tested.
-
-🏗️ Architecture
-----------------
-
-QtTUI is a rendering and event bridge between the terminal and Qt's core logic. The data stays in Qt models.
-
-When a model changes, it emits the standard Qt signals (`dataChanged`, `rowsInserted`, ...). The QtTUI views listen to these signals and mark only the affected screen regions for a repaint. A render scheduler collects the changes of one event loop pass into one repaint, and the renderer writes only the cells that changed.
-
-📦 Installation
----------------
-
-### Prerequisites
-
-*   CMake 3.16 or later
-*   Qt 6 (only the Core module)
-*   A C++17 compiler
-
-### Build, test and install
+You must have CMake 3.16 or later, Qt 6 Core and a C++17 compiler.
 
 ```bash
-git clone https://github.com/aedrax/QtTUI.git
-cd QtTUI
 cmake -B build
 cmake --build build -j
 ctest --test-dir build
 sudo cmake --install build
 ```
 
-The tests use Qt Test and RapidCheck. CMake fetches RapidCheck if it is not installed.
+The tests use Qt Test and RapidCheck. If RapidCheck is not installed, CMake
+downloads it.
 
-### Use QtTUI in your project
+## Use
 
-After you install QtTUI, find the package. Use the same Qt that QtTUI was built with; the package checks the Qt version.
+Link the installed package:
 
-```CMake
+```cmake
 find_package(QtTUI REQUIRED)
-
-add_executable(my_tui_app main.cpp)
-target_link_libraries(my_tui_app PRIVATE QtTUI::QtTUI)
+target_link_libraries(my_app PRIVATE QtTUI::QtTUI)
 ```
 
-You can also add the source tree as a subproject. Then the QtTUI tests and demos do not build by default.
+Or add the source tree. The QtTUI tests and demos then do not build.
 
-```CMake
+```cmake
 add_subdirectory(QtTUI)
-target_link_libraries(my_tui_app PRIVATE QtTUI::QtTUI)
+target_link_libraries(my_app PRIVATE QtTUI::QtTUI)
 ```
 
-💻 Quick Start
---------------
+Use the same Qt version that QtTUI was built with.
 
-This example shows a `QStringListModel` (from Qt Core) in a list view.
+## Example
 
-```C++
+```cpp
 #include <QtTUI/QtTUI>
 #include <QStringListModel>
 
@@ -84,16 +74,11 @@ using namespace QtTUI;
 
 int main(int argc, char *argv[])
 {
-    // Use QTuiApplication instead of QApplication or QCoreApplication
     QTuiApplication app(argc, argv);
-
-    // A standard Qt model
     QStringListModel model({"Alice", "Bob", "Carol"});
 
-    // The main window owns the screen
     QTuiMainWindow window;
     app.setMainWindow(&window);
-
     auto *view = new QTuiListView(&window);
     view->setModel(&model);
     window.setCentralWidget(view);
@@ -103,37 +88,43 @@ int main(int argc, char *argv[])
 }
 ```
 
-The demos in `demos/` show more: `demo_hello`, `demo_todo`, `demo_table`, and `demo_gallery`, which shows every widget. After a build, run them from `build/demos/`.
+The `demos/` directory has `demo_hello`, `demo_todo`, `demo_table` and
+`demo_gallery`. The gallery shows all widgets. After a build, the demos are
+in `build/demos/`.
 
-⚙️ Environment variables
-------------------------
+## Keys
+
+Each mouse action also has a key.
+
+| Key | Action |
+| --- | --- |
+| Tab, Shift+Tab | Move the focus |
+| F1 | Show the tooltip of the focus widget |
+| F10 | Open the menu bar |
+| Shift+F10, Menu | Open the context menu |
+| Shift+arrows, Space, Ctrl+A | Select items in a view |
+| F2 | Edit the current item |
+
+Some terminals, for example Konsole, keep Shift+click for their own text
+selection. In a view, drag with the mouse to select a range.
+
+## Environment variables
 
 | Variable | Values | Effect |
 | --- | --- | --- |
-| `QTTUI_COLOR` | `truecolor`, `256`, `16`, `none` | Sets the color depth. Without it, QtTUI uses `NO_COLOR`, `COLORTERM` and `TERM`. |
-| `NO_COLOR` | any non-empty value | No colors. Focus and selection use reverse video. |
-| `QTTUI_MOUSE` | `off`, `click`, `drag`, `all` (default) | Sets the mouse reporting level. Use `off` to keep the terminal's own text selection. |
-| `QTTUI_REDUCE_MOTION` | `1` | No moving busy bar and no pressed-button flash. |
-| `QTTUI_FOCUS_CURSOR` | `1` | The terminal cursor stays on the focused widget, so screen readers and magnifiers that follow the cursor follow the focus. |
+| `QTTUI_COLOR` | `truecolor`, `256`, `16`, `none` | Sets the color mode. Without it, QtTUI reads `NO_COLOR`, `COLORTERM` and `TERM`. |
+| `NO_COLOR` | a value that is not empty | Turns off color. The focus and the selection use reverse video. |
+| `QTTUI_MOUSE` | `off`, `click`, `drag`, `all` (default) | Sets the mouse events that QtTUI gets. A drag needs `drag` or `all`. The hover needs `all`. Use `off` to keep the text selection of the terminal. |
+| `QTTUI_REDUCE_MOTION` | `1` | Stops the busy bar animation and the button flash. |
+| `QTTUI_FOCUS_CURSOR` | `1` | Keeps the terminal cursor on the focus widget, for screen magnifiers. |
 
-Applications can set the same options in code, for example `AnsiRenderer::setColorMode()`, `QTuiApplication::setReducedMotion()` and `QTuiApplication::setFocusCursor()`.
+An application can set the same options in code, for example with
+`AnsiRenderer::setColorMode()`, `QTuiApplication::setReducedMotion()` and
+`QTuiApplication::setFocusCursor()`.
 
-**Not included:** bidirectional text reordering for right-to-left text, and a screen reader interface. Mouse dragging needs `QTTUI_MOUSE` set to `drag` or `all`, and hover needs `all`.
+QtTUI does not reorder bidirectional text and has no screen reader
+interface.
 
-🤝 Contributing
----------------
+## License
 
-Contributions are welcome: new widgets, bug fixes, or better documentation.
-
-1.  Fork the project.
-2.  Create a feature branch (`git checkout -b feature/AmazingFeature`).
-3.  Commit your changes (`git commit -m 'Add some AmazingFeature'`).
-4.  Push the branch (`git push origin feature/AmazingFeature`).
-5.  Open a pull request.
-
-The CI workflow (`.github/workflows/ci.yml`) builds QtTUI with the Qt 6 of Ubuntu 24.04 and runs all tests.
-
-📄 License
-----------
-
-Distributed under the MIT License. See LICENSE for more information.
+MIT. See `LICENSE`.
