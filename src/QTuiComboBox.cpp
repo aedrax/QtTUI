@@ -4,7 +4,7 @@
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
-#include <QAbstractItemModel>
+#include <QStringListModel>
 
 namespace QtTUI {
 
@@ -76,13 +76,12 @@ void QTuiComboBoxPopup::paintEvent(ScreenBuffer &buffer)
 
     // Item rows between the separator and the bottom border
     const int innerWidth = gw - 2;
-    const QStringList &items = m_combo->m_items;
-    for (int i = 0; i < items.size() && 1 + i < gh - 1; ++i) {
+    for (int i = 0; i < m_combo->count() && 1 + i < gh - 1; ++i) {
         const bool highlighted = (i == m_combo->m_dropdownHighlight);
         Cell itemStyle = highlighted ? cellStyle(bg, fg) : cellStyle(fg, bg);
         itemStyle.bold = highlighted;
         fillRect(buffer, QRect(gx + 1, gy + 1 + i, innerWidth, 1), itemStyle);
-        renderText(buffer, gx + 1, gy + 1 + i, items.at(i), innerWidth, itemStyle);
+        renderText(buffer, gx + 1, gy + 1 + i, m_combo->itemText(i), innerWidth, itemStyle);
     }
 }
 
@@ -94,7 +93,7 @@ void QTuiComboBoxPopup::mousePressEvent(TuiMouseEvent *event)
     // Items are rendered one per row starting at geometry().y() + 1 (row 0 is
     // the separator joining the combo body). Clicks on border rows are ignored.
     int itemIdx = event->y() - geometry().y() - 1;
-    if (itemIdx >= 0 && itemIdx < m_combo->m_items.size()) {
+    if (itemIdx >= 0 && itemIdx < m_combo->count()) {
         m_combo->setCurrentIndex(itemIdx);
         m_combo->closeDropdown();
     }
@@ -104,6 +103,8 @@ QTuiComboBox::QTuiComboBox(QTuiWidget *parent)
     : QTuiWidget(parent)
 {
     setFocusPolicy(Qt::StrongFocus);
+    // The items are in a model, as in QComboBox. setModel() replaces it.
+    setModel(new QStringListModel(this));
     // Hiding the combo must not leave its dropdown popup floating on screen
     connect(this, &QTuiWidget::visibilityChanged, this, [this](bool visible) {
         if (!visible)
@@ -113,10 +114,7 @@ QTuiComboBox::QTuiComboBox(QTuiWidget *parent)
 
 void QTuiComboBox::addItem(const QString &text)
 {
-    m_items.append(text);
-    if (m_currentIndex < 0 && !m_items.isEmpty()) {
-        setCurrentIndex(0);
-    }
+    insertItem(count(), text);
 }
 
 void QTuiComboBox::addItems(const QStringList &texts)
@@ -127,63 +125,37 @@ void QTuiComboBox::addItems(const QStringList &texts)
 
 void QTuiComboBox::insertItem(int index, const QString &text)
 {
-    if (index < 0)
-        index = 0;
-    if (index > m_items.size())
-        index = m_items.size();
-    m_items.insert(index, text);
-
-    // Adjust current index if insertion was before it
-    if (m_currentIndex < 0 && !m_items.isEmpty()) {
+    index = qBound(0, index, count());
+    // Select the first item after it has its text
+    m_inserting = true;
+    if (m_model->insertRow(index))
+        m_model->setData(m_model->index(index, 0), text);
+    m_inserting = false;
+    if (m_currentIndex < 0)
         setCurrentIndex(0);
-    } else if (index <= m_currentIndex) {
-        m_currentIndex++;
-    }
 }
 
 void QTuiComboBox::removeItem(int index)
 {
-    if (index < 0 || index >= m_items.size())
-        return;
-
-    m_items.removeAt(index);
-
-    if (m_items.isEmpty()) {
-        m_currentIndex = -1;
-        emit currentIndexChanged(-1);
-        emit currentTextChanged(QString());
-    } else if (index == m_currentIndex) {
-        int newIndex = qMin(m_currentIndex, m_items.size() - 1);
-        m_currentIndex = -1; // force update
-        setCurrentIndex(newIndex);
-    } else if (index < m_currentIndex) {
-        m_currentIndex--;
-    }
+    if (index >= 0 && index < count())
+        m_model->removeRow(index);
 }
 
 void QTuiComboBox::clear()
 {
-    m_items.clear();
-    if (m_currentIndex != -1) {
-        m_currentIndex = -1;
-        m_editText.clear();
-        emit currentIndexChanged(-1);
-        emit currentTextChanged(QString());
-    }
     closeDropdown();
+    m_model->removeRows(0, count());
     m_dropdownHighlight = 0;
 }
 
 int QTuiComboBox::count() const
 {
-    return m_items.size();
+    return m_model->rowCount();
 }
 
 QString QTuiComboBox::itemText(int index) const
 {
-    if (index < 0 || index >= m_items.size())
-        return QString();
-    return m_items.at(index);
+    return m_model->data(m_model->index(index, 0), Qt::DisplayRole).toString();
 }
 
 int QTuiComboBox::currentIndex() const
@@ -195,8 +167,8 @@ void QTuiComboBox::setCurrentIndex(int index)
 {
     if (index < -1)
         index = -1;
-    if (index >= m_items.size())
-        index = m_items.size() - 1;
+    if (index >= count())
+        index = count() - 1;
 
     if (m_currentIndex != index) {
         m_currentIndex = index;
@@ -213,9 +185,7 @@ QString QTuiComboBox::currentText() const
 {
     if (m_editable && !m_editText.isEmpty())
         return m_editText;
-    if (m_currentIndex >= 0 && m_currentIndex < m_items.size())
-        return m_items.at(m_currentIndex);
-    return QString();
+    return itemText(m_currentIndex);
 }
 
 bool QTuiComboBox::isEditable() const
@@ -225,24 +195,35 @@ bool QTuiComboBox::isEditable() const
 
 void QTuiComboBox::setEditable(bool editable)
 {
+    if (m_editable == editable)
+        return;
     m_editable = editable;
-    if (editable && m_currentIndex >= 0 && m_currentIndex < m_items.size())
-        m_editText = m_items.at(m_currentIndex);
+    if (editable)
+        m_editText = itemText(m_currentIndex);
+    markDirty();
 }
 
 void QTuiComboBox::setModel(QAbstractItemModel *model)
 {
+    if (!model || model == m_model)
+        return;
     if (m_model) {
         disconnect(m_model, nullptr, this, nullptr);
+        // Delete the default model
+        if (m_model->parent() == this)
+            delete m_model;
     }
     m_model = model;
-    if (m_model) {
-        connect(m_model, &QAbstractItemModel::dataChanged, this, &QTuiComboBox::syncItemsFromModel);
-        connect(m_model, &QAbstractItemModel::rowsInserted, this, &QTuiComboBox::syncItemsFromModel);
-        connect(m_model, &QAbstractItemModel::rowsRemoved, this, &QTuiComboBox::syncItemsFromModel);
-        connect(m_model, &QAbstractItemModel::modelReset, this, &QTuiComboBox::syncItemsFromModel);
-        syncItemsFromModel();
-    }
+    connect(m_model, &QAbstractItemModel::dataChanged, this, [this] { markDirty(); });
+    connect(m_model, &QAbstractItemModel::rowsInserted, this, &QTuiComboBox::onRowsInserted);
+    connect(m_model, &QAbstractItemModel::rowsRemoved, this, &QTuiComboBox::onRowsRemoved);
+    connect(m_model, &QAbstractItemModel::modelReset, this, &QTuiComboBox::onModelReset);
+    // A deleted model: use an empty default model
+    connect(m_model, &QObject::destroyed, this, [this] {
+        m_model = nullptr;
+        setModel(new QStringListModel(this));
+    });
+    onModelReset();
 }
 
 QAbstractItemModel *QTuiComboBox::model() const
@@ -250,28 +231,53 @@ QAbstractItemModel *QTuiComboBox::model() const
     return m_model;
 }
 
-void QTuiComboBox::syncItemsFromModel()
+void QTuiComboBox::onRowsInserted(const QModelIndex &parent, int first, int last)
 {
-    if (!m_model)
+    if (parent.isValid())
         return;
-
-    m_items.clear();
-    int rows = m_model->rowCount();
-    for (int i = 0; i < rows; ++i) {
-        QModelIndex idx = m_model->index(i, 0);
-        m_items.append(m_model->data(idx, Qt::DisplayRole).toString());
+    if (m_currentIndex < 0) {
+        if (!m_inserting)
+            setCurrentIndex(0);
+    } else if (first <= m_currentIndex) {
+        // The current item moves down
+        m_currentIndex += last - first + 1;
+        emit currentIndexChanged(m_currentIndex);
     }
+    markDirty();
+}
 
-    if (m_currentIndex >= m_items.size()) {
-        setCurrentIndex(m_items.isEmpty() ? -1 : m_items.size() - 1);
-    } else if (m_currentIndex < 0 && !m_items.isEmpty()) {
+void QTuiComboBox::onRowsRemoved(const QModelIndex &parent, int first, int last)
+{
+    if (parent.isValid())
+        return;
+    if (m_currentIndex > last) {
+        // The current item moves up
+        m_currentIndex -= last - first + 1;
+        emit currentIndexChanged(m_currentIndex);
+    } else if (m_currentIndex >= first) {
+        // The current item is removed: the next item becomes current
+        m_currentIndex = -1;
+        setCurrentIndex(qMin(first, count() - 1));
+        if (m_currentIndex < 0) {
+            emit currentIndexChanged(-1);
+            emit currentTextChanged(QString());
+        }
+    }
+    markDirty();
+}
+
+void QTuiComboBox::onModelReset()
+{
+    if (m_currentIndex >= count())
+        setCurrentIndex(count() - 1);
+    else if (m_currentIndex < 0 && count() > 0)
         setCurrentIndex(0);
-    }
+    markDirty();
 }
 
 void QTuiComboBox::openDropdown()
 {
-    if (m_items.isEmpty())
+    if (count() == 0)
         return;
     if (!m_popup)
         m_popup = new QTuiComboBoxPopup(this);
@@ -283,7 +289,7 @@ void QTuiComboBox::openDropdown()
     // the two read as one box. As a popup it paints in the topmost pass, above
     // any sibling widgets.
     const QRect geo = geometry();
-    m_popup->setGeometry(QRect(geo.x(), geo.y() + 2, geo.width(), m_items.size() + 2));
+    m_popup->setGeometry(QRect(geo.x(), geo.y() + 2, geo.width(), count() + 2));
     m_popup->setVisible(true);
     m_popup->setFocus();
     markDirty(); // indicator flips to ▲
@@ -303,9 +309,8 @@ QSize QTuiComboBox::minimumSize() const
 {
     // Find widest item text
     int maxTextWidth = 5; // minimum reasonable width
-    for (const auto &item : m_items) {
-        maxTextWidth = qMax(maxTextWidth, QtTuiUnicode::stringWidth(item));
-    }
+    for (int i = 0; i < count(); ++i)
+        maxTextWidth = qMax(maxTextWidth, QtTuiUnicode::stringWidth(itemText(i)));
     // Content: text + " ▼" indicator + borders + padding. The open dropdown
     // is a separate popup widget and does not affect the combo's own size.
     int width = maxTextWidth + 4 + 2; // 2 for " ▼", 2 for borders, 2 for padding
@@ -365,7 +370,7 @@ void QTuiComboBox::keyPressEvent(TuiKeyEvent *event)
                     m_popup->markDirty();
             }
         } else if (key == Qt::Key_Down) {
-            if (m_dropdownHighlight < m_items.size() - 1) {
+            if (m_dropdownHighlight < count() - 1) {
                 m_dropdownHighlight++;
                 if (m_popup)
                     m_popup->markDirty();
@@ -380,14 +385,15 @@ void QTuiComboBox::keyPressEvent(TuiKeyEvent *event)
         }
     } else {
         // Dropdown is closed
-        if (key == Qt::Key_Return || key == Qt::Key_Enter || key == Qt::Key_Space) {
+        // In an editable combo box, Space types a space
+        if (key == Qt::Key_Return || key == Qt::Key_Enter || (key == Qt::Key_Space && !m_editable)) {
             openDropdown();
         } else if (key == Qt::Key_Up) {
             // Quick navigate without opening dropdown
             if (m_currentIndex > 0)
                 setCurrentIndex(m_currentIndex - 1);
         } else if (key == Qt::Key_Down) {
-            if (m_currentIndex < m_items.size() - 1)
+            if (m_currentIndex < count() - 1)
                 setCurrentIndex(m_currentIndex + 1);
         } else if (m_editable && !event->text().isEmpty()) {
             // Editable mode: printable characters modify the text

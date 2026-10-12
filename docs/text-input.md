@@ -597,9 +597,9 @@ An editable combo box adds typed characters at the end of its text and removes
 them with Backspace. It does not have a cursor, a selection or a
 `QTuiLineEdit`. In Qt, an editable combo box has a `QLineEdit`.
 
-`setModel()` copies column 0 of the model into the item list. The combo box
-copies it again on `dataChanged`, `rowsInserted`, `rowsRemoved` and
-`modelReset`. Do not call `addItem()` or `removeItem()` while a model is set.
+The items are column 0 of a model, as in Qt. The combo box does not copy
+the items. It starts with its own `QStringListModel`. `addItem()`,
+`insertItem()` and `removeItem()` change the rows of the model.
 
 ### Example
 
@@ -636,8 +636,8 @@ void example(QTuiWidget *parent)
 | `QString currentText() const` | Returns the edited text of an editable combo box, or the text of the current item. |
 | `bool isEditable() const` | Returns true if the user can type text. Property `editable`. The default is false. |
 | `void setEditable(bool editable)` | Sets if the user can type text. The edited text starts as the current item text. |
-| `void setModel(QAbstractItemModel *model)` | Copies the items from the model. The combo box does not take ownership of the model. |
-| `QAbstractItemModel *model() const` | Returns the model, or `nullptr`. |
+| `void setModel(QAbstractItemModel *model)` | Uses the model for the items. The combo box does not take ownership of the model. It deletes its own default model. If the model is deleted, the combo box uses an empty default model. `nullptr` has no effect. |
+| `QAbstractItemModel *model() const` | Returns the model. It is never `nullptr`. |
 | `void paintEvent(ScreenBuffer &buffer) override` | Paints the box. A popup child paints the open list. |
 | `QSize minimumSize() const override` | Returns the width of the widest item (minimum 5) plus 6 cells, and a height of 3 rows. |
 | `bool acceptsTextInput() const override` | Returns true for an editable combo box, so single-key shortcuts do not fire. |
@@ -660,7 +660,7 @@ void example(QTuiWidget *parent)
 
 | Key | Action |
 | --- | --- |
-| Enter, Return, Space | Opens the list. In an editable combo box, Space also opens the list. |
+| Enter, Return, Space | Opens the list. In an editable combo box, Space types a space. |
 | Up, Down (list closed) | Selects the previous or the next item. |
 | Up, Down (list open) | Moves the highlight in the list. |
 | Enter, Return (list open) | Selects the highlighted item and closes the list. |

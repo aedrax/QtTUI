@@ -7,6 +7,7 @@
 #include <QStringList>
 
 class QAbstractItemModel;
+class QModelIndex;
 
 namespace QtTUI {
 
@@ -56,12 +57,14 @@ private:
 
     void openDropdown();
     void closeDropdown();
-    void syncItemsFromModel();
+    void onRowsInserted(const QModelIndex &parent, int first, int last);
+    void onRowsRemoved(const QModelIndex &parent, int first, int last);
+    void onModelReset();
 
-    QStringList m_items;
     int m_currentIndex = -1;
     bool m_editable = false;
     bool m_dropdownOpen = false;
+    bool m_inserting = false;
     int m_dropdownHighlight = 0;
     QAbstractItemModel *m_model = nullptr;
     QString m_editText;

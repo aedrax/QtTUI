@@ -278,6 +278,44 @@ private slots:
         QCOMPARE(cb.itemText(2), QStringLiteral("New2"));
     }
 
+    void comboBox_readsTheModelAndFollowsItsRows()
+    {
+        QTuiComboBox cb;
+        QStringListModel model(QStringList{"A", "B", "C"});
+        cb.setModel(&model);
+        cb.setCurrentIndex(1);
+
+        model.insertRow(0);
+        QCOMPARE(cb.currentIndex(), 2);
+        QCOMPARE(cb.currentText(), QStringLiteral("B"));
+        model.removeRow(2);
+        QCOMPARE(cb.currentText(), QStringLiteral("C"));
+        cb.addItem(QStringLiteral("D"));
+        QCOMPARE(model.stringList().last(), QStringLiteral("D"));
+    }
+
+    void comboBox_deletedModelLeavesAnEmptyCombo()
+    {
+        QTuiComboBox cb;
+        auto *model = new QStringListModel(QStringList{"A"});
+        cb.setModel(model);
+        delete model;
+        QCOMPARE(cb.count(), 0);
+        QCOMPARE(cb.currentIndex(), -1);
+        cb.addItem(QStringLiteral("B"));
+        QCOMPARE(cb.currentText(), QStringLiteral("B"));
+    }
+
+    void comboBox_editableSpaceTypesASpace()
+    {
+        QTuiComboBox cb;
+        cb.addItem(QStringLiteral("A"));
+        cb.setEditable(true);
+        TuiKeyEvent ev(Qt::Key_Space, Qt::NoModifier, QStringLiteral(" "));
+        QCoreApplication::sendEvent(&cb, &ev);
+        QCOMPARE(cb.currentText(), QStringLiteral("A "));
+    }
+
     void comboBox_quickNavigateWithoutDropdown()
     {
         QTuiComboBox cb;
