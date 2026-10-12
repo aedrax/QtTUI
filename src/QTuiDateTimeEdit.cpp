@@ -74,6 +74,7 @@ void QTuiDateTimeEdit::setDisplayFormat(const QString &format)
 {
     if (!format.isEmpty() && m_displayFormat != format) {
         m_displayFormat = format;
+        m_currentSection = 0;
         markDirty();
     }
 }
@@ -125,66 +126,59 @@ QList<QTuiDateTimeEdit::Section> QTuiDateTimeEdit::displaySections() const
 
 QList<QTuiDateTimeEdit::SectionRange> QTuiDateTimeEdit::parseSectionRanges() const
 {
+    // The sections in the order of the format, at their positions in the text
+    struct TokenInfo {
+        QString token;
+        Section section;
+    };
+    // Longer tokens first
+    static const TokenInfo tokens[] = {
+        { QStringLiteral("yyyy"), Year },   { QStringLiteral("yy"), Year },
+        { QStringLiteral("MMMM"), Month },  { QStringLiteral("MMM"), Month },
+        { QStringLiteral("MM"), Month },    { QStringLiteral("M"), Month },
+        { QStringLiteral("dddd"), Day },    { QStringLiteral("ddd"), Day },
+        { QStringLiteral("dd"), Day },      { QStringLiteral("d"), Day },
+        { QStringLiteral("HH"), Hour },     { QStringLiteral("H"), Hour },
+        { QStringLiteral("hh"), Hour },     { QStringLiteral("h"), Hour },
+        { QStringLiteral("mm"), Minute },   { QStringLiteral("m"), Minute },
+        { QStringLiteral("ss"), Second },   { QStringLiteral("s"), Second },
+    };
+
     QList<SectionRange> ranges;
     const auto sections = displaySections();
-    const QString formatted = m_dateTime.toString(m_displayFormat);
-
-    // Map format tokens to sections and find their positions in the formatted string
-    // We scan the format string for known tokens and track their output positions
     int outPos = 0;
     int i = 0;
     while (i < m_displayFormat.length()) {
-        // Try to match known format tokens at position i
-        struct TokenInfo {
-            QString token;
-            Section section;
-        };
-        // Order matters: longer tokens first
-        static const TokenInfo tokens[] = {
-            { QStringLiteral("yyyy"), Year },
-            { QStringLiteral("yy"),   Year },
-            { QStringLiteral("MM"),   Month },
-            { QStringLiteral("dd"),   Day },
-            { QStringLiteral("HH"),   Hour },
-            { QStringLiteral("hh"),   Hour },
-            { QStringLiteral("mm"),   Minute },
-            { QStringLiteral("ss"),   Second },
-        };
-
-        bool matched = false;
+        const TokenInfo *match = nullptr;
         for (const auto &tok : tokens) {
             if (m_displayFormat.mid(i, tok.token.length()) == tok.token) {
-                // Check if this section is in our displaySections list
-                if (sections.contains(tok.section)) {
-                    // Determine the output length for this token
-                    int outputLen = tok.token.length();
-                    // yyyy -> 4, yy -> 2, MM -> 2, dd -> 2, HH -> 2, hh -> 2, mm -> 2, ss -> 2
-                    ranges.append({ tok.section, outPos, outputLen });
-                }
-                outPos += tok.token.length();
-                i += tok.token.length();
-                matched = true;
+                match = &tok;
                 break;
             }
         }
-
-        if (!matched) {
-            // Literal character - skip it
+        if (!match) {
+            // A literal character
             ++outPos;
             ++i;
+            continue;
         }
+        // The text length of a token, for example "MMM" gives "Oct"
+        const int outputLen = m_dateTime.toString(match->token).length();
+        if (sections.contains(match->section))
+            ranges.append({ match->section, outPos, outputLen });
+        outPos += outputLen;
+        i += match->token.length();
     }
-
     return ranges;
 }
 
 void QTuiDateTimeEdit::stepSection(int delta)
 {
-    const auto sections = displaySections();
-    if (m_currentSection < 0 || m_currentSection >= sections.size())
+    const auto ranges = parseSectionRanges();
+    if (m_currentSection < 0 || m_currentSection >= ranges.size())
         return;
 
-    Section sec = sections.at(m_currentSection);
+    Section sec = ranges.at(m_currentSection).section;
     QDate d = m_dateTime.date();
     QTime t = m_dateTime.time();
 
@@ -233,8 +227,7 @@ void QTuiDateTimeEdit::stepSection(int delta)
 
 void QTuiDateTimeEdit::nextSection()
 {
-    const auto sections = displaySections();
-    if (m_currentSection < sections.size() - 1) {
+    if (m_currentSection < parseSectionRanges().size() - 1) {
         ++m_currentSection;
         markDirty();
     }
@@ -279,18 +272,10 @@ void QTuiDateTimeEdit::paintEvent(ScreenBuffer &buffer)
         int startCol = 1 + (innerWidth - textLen) / 2; // Center
 
         // Get section ranges for highlighting
-        QList<SectionRange> sectionRanges = parseSectionRanges();
-        const auto sections = displaySections();
+        const QList<SectionRange> sectionRanges = parseSectionRanges();
         SectionRange activeRange = { Year, -1, 0 };
-        if (m_currentSection >= 0 && m_currentSection < sections.size()) {
-            Section activeSec = sections.at(m_currentSection);
-            for (const auto &sr : sectionRanges) {
-                if (sr.section == activeSec) {
-                    activeRange = sr;
-                    break;
-                }
-            }
-        }
+        if (m_currentSection >= 0 && m_currentSection < sectionRanges.size())
+            activeRange = sectionRanges.at(m_currentSection);
 
         const Cell textStyle = cellStyle(theme, fg, bg);
         renderText(buffer, geo.x() + startCol, contentRow, formatted, textLen, textStyle);

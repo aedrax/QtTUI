@@ -518,6 +518,18 @@ private slots:
         QCOMPARE(sl.value(), 9);
     }
 
+    void slider_verticalClickTopIsMaximum()
+    {
+        QTuiSlider sl(Qt::Vertical);
+        sl.setRange(0, 10);
+        sl.setGeometry(QRect(0, 0, 1, 11));
+
+        sendMousePress(sl, QPoint(0, 0));
+        QCOMPARE(sl.value(), 10);
+        sendMousePress(sl, QPoint(0, 10));
+        QCOMPARE(sl.value(), 0);
+    }
+
     void slider_setOrientation()
     {
         QTuiSlider sl(Qt::Horizontal);

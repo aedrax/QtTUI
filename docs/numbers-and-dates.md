@@ -216,7 +216,7 @@ The protected enum `Section` has the values `Year`, `Month`, `Day`, `Hour`, `Min
 
 QTuiDateEdit has the constructors `QTuiDateEdit(QTuiWidget *parent = nullptr)` and `QTuiDateEdit(const QDate &date, QTuiWidget *parent = nullptr)`. The second sets the time to 00:00:00. QTuiTimeEdit has the constructors `QTuiTimeEdit(QTuiWidget *parent = nullptr)` and `QTuiTimeEdit(const QTime &time, QTuiWidget *parent = nullptr)`. The second uses the current date.
 
-The section highlight knows only the format tokens `yyyy`, `yy`, `MM`, `dd`, `HH`, `hh`, `mm` and `ss`. Use only these tokens and literal characters. Left and Right move in the order of `displaySections()` (year to second), not in the order of the format.
+The edit knows the format tokens `yyyy`, `yy`, `MMMM`, `MMM`, `MM`, `M`, `dddd`, `ddd`, `dd`, `d`, `HH`, `H`, `hh`, `h`, `mm`, `m`, `ss` and `s`. Other characters are literal text. Left and Right move through the sections in the order of the format.
 
 ### Signals
 
@@ -319,7 +319,7 @@ The ticks show only if the widget has 2 rows (horizontal) or 3 columns (vertical
 
 ### Mouse
 
-- A click sets the value at the click position with `valueAt()`. A drag does not move the handle.
+- A click sets the value at the click position. On a vertical slider, the top row is the maximum, as in the paint. A drag does not move the handle.
 
 ## QTuiScrollBar
 
@@ -548,12 +548,12 @@ void example(QTuiWidget *parent)
 | --- | --- |
 | `QTuiLCDNumber(int digitCount = 5, QTuiWidget *parent = nullptr)` | Makes an LCD number that shows `0`. A digit count less than 1 becomes 1. |
 | `void display(int value)` | Shows `value` in the current mode. A negative value has a `-` in front. Emits `overflow()` if the value has more digits than `digitCount()`. |
-| `void display(double value)` | Shows `value` in decimal, with a maximum of 6 decimals and no trailing zeros. The mode has no effect. Emits `overflow()` if there are too many digits. |
+| `void display(double value)` | In the `Decimal` mode, shows `value` with a maximum of 6 decimals and no trailing zeros. In the other modes, shows the rounded value. Emits `overflow()` if there are too many digits. |
 | `void display(const QString &text)` | Shows `text` as it is. `intValue()` and `doubleValue()` become `text.toInt()` and `text.toDouble()`. Emits `overflow()` if there are too many characters (`.` and a leading `-` are not counted). |
 | `int digitCount() const` | Returns the number of digits. |
 | `void setDigitCount(int count)` | Sets the number of digits. A value less than 1 becomes 1. This changes `minimumSize()`. |
 | `Mode mode() const` | Returns the mode. The default is `Decimal`. |
-| `void setMode(Mode mode)` | Sets the mode and shows `intValue()` again in the new mode. |
+| `void setMode(Mode mode)` | Sets the mode and shows the last number again in the new mode. |
 | `int intValue() const` | Returns the last value as an integer. |
 | `double doubleValue() const` | Returns the last value as a double. |
 | `bool checkOverflow(int value) const` | Returns true if `value` in the current mode has more digits than `digitCount()`. The sign is not counted. |

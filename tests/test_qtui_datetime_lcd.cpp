@@ -165,6 +165,22 @@ private slots:
         QCOMPARE(dte.dateTime().date().year(), 2026);
     }
 
+    void dateTimeEdit_sectionsFollowTheFormatOrder()
+    {
+        QTuiDateTimeEdit dte(QDateTime(QDate(2025, 6, 15), QTime(10, 30, 45)));
+        dte.setDisplayFormat(QStringLiteral("dd.MMM.yy"));
+
+        // The first section is the day, then the month
+        sendKey(dte, Qt::Key_Up);
+        QCOMPARE(dte.date(), QDate(2025, 6, 16));
+        sendKey(dte, Qt::Key_Right);
+        sendKey(dte, Qt::Key_Up);
+        QCOMPARE(dte.date(), QDate(2025, 7, 16));
+        sendKey(dte, Qt::Key_Right);
+        sendKey(dte, Qt::Key_Up);
+        QCOMPARE(dte.date(), QDate(2026, 7, 16));
+    }
+
     void dateTimeEdit_sectionStepUp()
     {
         QDateTime dt(QDate(2025, 6, 15), QTime(10, 30, 45));
@@ -406,6 +422,17 @@ private slots:
 
         lcd.setMode(QTuiLCDNumber::Binary);
         QCOMPARE(lcd.mode(), QTuiLCDNumber::Binary);
+    }
+
+    void lcdNumber_setModeKeepsTheDoubleValue()
+    {
+        QTuiLCDNumber lcd;
+        lcd.display(2.75);
+        lcd.setMode(QTuiLCDNumber::Hexadecimal);
+        QCOMPARE(lcd.intValue(), 3);
+        QCOMPARE(lcd.doubleValue(), 2.75);
+        lcd.setMode(QTuiLCDNumber::Decimal);
+        QCOMPARE(lcd.doubleValue(), 2.75);
     }
 
     void lcdNumber_hexMode()

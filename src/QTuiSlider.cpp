@@ -186,8 +186,11 @@ void QTuiSlider::keyPressEvent(TuiKeyEvent *event)
 
 void QTuiSlider::mousePressEvent(TuiMouseEvent *event)
 {
-    if (event->mouseType() == TuiMouseEvent::Press)
-        setValue(valueAt(event->x(), event->y()));
+    if (event->mouseType() != TuiMouseEvent::Press)
+        return;
+    // A vertical slider has the maximum at the top
+    const int value = valueAt(event->x(), event->y());
+    setValue(m_orientation == Qt::Horizontal ? value : m_maximum + m_minimum - value);
 }
 
 } // namespace QtTUI
