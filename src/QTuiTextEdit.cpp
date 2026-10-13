@@ -196,6 +196,9 @@ void QTuiTextEdit::insertPastedText(const QString &pasted)
 void QTuiTextEdit::appendLines(const QString &text, int maxLines)
 {
     const bool follow = m_cursorRow == m_lines.size() - 1;
+    const QStringList before = m_lines;
+    const int row = m_cursorRow;
+    const int col = m_cursorCol;
 
     if (!text.isNull()) {
         const QStringList newLines = text.split(QLatin1Char('\n'));
@@ -223,6 +226,9 @@ void QTuiTextEdit::appendLines(const QString &text, int maxLines)
         m_cursorCol = qMin(m_cursorCol, int(m_lines.at(m_cursorRow).length()));
     }
 
+    // An append is an undo step, but not with a line limit, as in Qt
+    if (maxLines == 0)
+        recordEdit(before, row, col, false);
     emit textChanged();
     markDirty();
 }

@@ -1182,6 +1182,21 @@ private slots:
         QCOMPARE(log.toPlainText(), QStringLiteral("line 4\nline 5"));
     }
 
+    void plainTextEditAppendIsAnUndoStep()
+    {
+        QTuiPlainTextEdit edit;
+        edit.setPlainText(QStringLiteral("a"));
+        edit.appendPlainText(QStringLiteral("b"));
+        QVERIFY(edit.isUndoAvailable());
+        edit.undo();
+        QCOMPARE(edit.toPlainText(), QStringLiteral("a"));
+
+        QTuiPlainTextEdit log;
+        log.setMaximumBlockCount(5);
+        log.appendPlainText(QStringLiteral("b"));
+        QVERIFY(!log.isUndoAvailable());
+    }
+
     void plainTextEditFollowsTailOnlyAtTheEnd()
     {
         QTuiPlainTextEdit log;

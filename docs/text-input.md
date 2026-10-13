@@ -354,7 +354,7 @@ void example(QTuiWidget *parent)
 | --- | --- |
 | `explicit QTuiPlainTextEdit(QTuiWidget *parent = nullptr)` | Makes an empty plain text edit. |
 | `explicit QTuiPlainTextEdit(const QString &text, QTuiWidget *parent = nullptr)` | Makes a plain text edit with the text. |
-| `void appendPlainText(const QString &text)` | Adds the text as one or more new lines at the end. The first call on an empty text edit replaces the empty line. It works also if the text edit is read-only. It does not make an undo step. |
+| `void appendPlainText(const QString &text)` | Adds the text as one or more new lines at the end. The first call on an empty text edit replaces the empty line. It works also if the text edit is read-only. It makes an undo step if `maximumBlockCount()` is 0. |
 | `int maximumBlockCount() const` | Returns the maximum number of lines. Property `maximumBlockCount`. The default is 0 (no limit). |
 | `void setMaximumBlockCount(int count)` | Sets the maximum number of lines. If there are more lines, it removes lines from the top immediately. |
 | `int blockCount() const` | Returns the number of lines. |
@@ -543,7 +543,7 @@ void example(QTuiWidget *parent)
 | `explicit QTuiCompleter(const QStringList &list, QObject *parent = nullptr)` | Makes a completer with a `QStringListModel` that holds the list. |
 | `explicit QTuiCompleter(QAbstractItemModel *model = nullptr, QObject *parent = nullptr)` | Makes a completer for the model. The completer does not take ownership of the model. |
 | `QAbstractItemModel *model() const` | Returns the model. |
-| `void setModel(QAbstractItemModel *model)` | Sets the model. |
+| `void setModel(QAbstractItemModel *model)` | Sets the model. If the model changes while the popup is open, the popup shows the new matches. |
 | `Qt::CaseSensitivity caseSensitivity() const` | Returns the case sensitivity. The default is `Qt::CaseSensitive`. |
 | `void setCaseSensitivity(Qt::CaseSensitivity sensitivity)` | Sets the case sensitivity. |
 | `FilterMode filterMode() const` | Returns the filter mode. The default is `StartsWith`. |

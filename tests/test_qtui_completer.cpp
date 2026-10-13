@@ -1,6 +1,7 @@
 // QTuiCompleter: matching rules, and the popup flow inside QTuiLineEdit
 // (typing opens the popup, Down/Enter accepts, Escape closes).
 #include <QtTest/QtTest>
+#include <QStringListModel>
 #include <QSignalSpy>
 #include <QtTUI/QTuiCompleter.h>
 #include <QtTUI/QTuiLineEdit.h>
@@ -77,6 +78,21 @@ private slots:
 
         // No match: no popup
         type(le, QStringLiteral("x"));
+        QVERIFY(!c.isPopupVisible());
+    }
+
+    void popupFollowsTheModel()
+    {
+        QTuiLineEdit le;
+        le.setGeometry(QRect(0, 0, 20, 1));
+        QTuiCompleter c({QStringLiteral("red"), QStringLiteral("green")});
+        le.setCompleter(&c);
+        type(le, QStringLiteral("re"));
+        QVERIFY(c.isPopupVisible());
+
+        // The only match goes away: the popup closes
+        auto *model = qobject_cast<QStringListModel *>(c.model());
+        model->setStringList({QStringLiteral("green")});
         QVERIFY(!c.isPopupVisible());
     }
 };

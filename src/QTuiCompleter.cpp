@@ -87,8 +87,21 @@ QAbstractItemModel *QTuiCompleter::model() const
 
 void QTuiCompleter::setModel(QAbstractItemModel *model)
 {
+    if (m_model)
+        disconnect(m_model, nullptr, this, nullptr);
     m_model = model;
     m_currentRow = -1;
+    if (!m_model)
+        return;
+    // A model change updates the open popup
+    const auto refresh = [this] {
+        if (isPopupVisible() && m_lineEdit)
+            updateForText(m_lineEdit, m_prefix);
+    };
+    connect(m_model, &QAbstractItemModel::dataChanged, this, refresh);
+    connect(m_model, &QAbstractItemModel::rowsInserted, this, refresh);
+    connect(m_model, &QAbstractItemModel::rowsRemoved, this, refresh);
+    connect(m_model, &QAbstractItemModel::modelReset, this, refresh);
 }
 
 Qt::CaseSensitivity QTuiCompleter::caseSensitivity() const
