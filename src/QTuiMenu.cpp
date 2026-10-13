@@ -27,7 +27,12 @@ QString QTuiMenu::title() const
 
 void QTuiMenu::setTitle(const QString &title)
 {
+    if (m_title == title)
+        return;
     m_title = title;
+    // The menu bar or the parent menu paints the title
+    if (auto *owner = qobject_cast<QTuiWidget *>(parent()))
+        owner->markDirty();
 }
 
 QTuiAction *QTuiMenu::addAction(const QString &text)
@@ -174,7 +179,7 @@ QSize QTuiMenu::minimumSize() const
             continue;
         int w = 0;
         if (item.action) {
-            QString display = item.action->text();
+            QString display = itemText(item);
             display.remove(QLatin1Char('&'));
             w += QtTuiUnicode::stringWidth(display);
         }
@@ -225,11 +230,14 @@ void QTuiMenu::paintEvent(ScreenBuffer &buffer)
             continue;
         }
 
+        // A disabled action shows in the disabled colors
+        const bool enabled = !mi.action || mi.action->isEnabled();
+        const Color itemFg = enabled ? fg : theme.disabledForeground;
         bool highlighted = (i == m_highlightedIndex);
-        Cell itemStyle = highlighted ? cellStyle(bg, fg) : cellStyle(fg, bg);
+        Cell itemStyle = highlighted ? cellStyle(bg, itemFg) : cellStyle(itemFg, bg);
         itemStyle.bold = highlighted;
 
-        QString text = mi.action ? mi.action->text() : QString();
+        QString text = itemText(mi);
         text.remove(QLatin1Char('&')); // mnemonic markers are not painted
         QString rightStr;
         if (mi.action && !mi.action->shortcut().isEmpty())
@@ -262,10 +270,8 @@ void QTuiMenu::keyPressEvent(TuiKeyEvent *event)
         if (m_highlightedIndex >= 0 && m_highlightedIndex < m_menuItems.size()) {
             const auto &mi = m_menuItems.at(m_highlightedIndex);
             if (mi.submenu) {
-                QRect geo = geometry();
-                QPoint subPos(geo.x() + geo.width(), geo.y() + 1 + m_highlightedIndex);
-                mi.submenu->popup(subPos);
-            } else if (mi.action && !mi.isSeparator) {
+                openSubmenu(m_highlightedIndex);
+            } else if (mi.action && mi.action->isEnabled()) {
                 mi.action->trigger();
                 close();
             }
@@ -273,15 +279,28 @@ void QTuiMenu::keyPressEvent(TuiKeyEvent *event)
     } else if (key == Qt::Key_Escape) {
         close();
     } else if (key == Qt::Key_Right) {
-        if (m_highlightedIndex >= 0 && m_highlightedIndex < m_menuItems.size()) {
-            const auto &mi = m_menuItems.at(m_highlightedIndex);
-            if (mi.submenu) {
-                QRect geo = geometry();
-                QPoint subPos(geo.x() + geo.width(), geo.y() + 1 + m_highlightedIndex);
-                mi.submenu->popup(subPos);
-            }
-        }
+        if (m_highlightedIndex >= 0 && m_highlightedIndex < m_menuItems.size()
+            && m_menuItems.at(m_highlightedIndex).submenu)
+            openSubmenu(m_highlightedIndex);
+    } else if (key == Qt::Key_Left && m_parentMenu) {
+        // Left closes a submenu
+        close();
     }
+}
+
+QString QTuiMenu::itemText(const MenuItem &item) const
+{
+    if (item.submenu)
+        return item.submenu->title();
+    return item.action ? item.action->text() : QString();
+}
+
+void QTuiMenu::openSubmenu(int index)
+{
+    const QRect geo = geometry();
+    QTuiMenu *submenu = m_menuItems.at(index).submenu;
+    submenu->m_parentMenu = this;
+    submenu->popup(QPoint(geo.x() + geo.width(), geo.y() + 1 + index));
 }
 
 QRect QTuiMenu::hoverRect() const
@@ -306,9 +325,8 @@ void QTuiMenu::mousePressEvent(TuiMouseEvent *event)
         const auto &mi = m_menuItems.at(itemIdx);
         if (!mi.isSeparator) {
             if (mi.submenu) {
-                QPoint subPos(geo.x() + geo.width(), geo.y() + 1 + itemIdx);
-                mi.submenu->popup(subPos);
-            } else if (mi.action) {
+                openSubmenu(itemIdx);
+            } else if (mi.action && mi.action->isEnabled()) {
                 mi.action->trigger();
                 close();
             }

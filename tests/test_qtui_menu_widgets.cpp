@@ -221,6 +221,54 @@ private slots:
         QCOMPARE(sub->isVisible(), true);
     }
 
+    void menu_leftClosesASubmenu()
+    {
+        QTuiMenu menu(QStringLiteral("File"));
+        QTuiMenu *sub = menu.addMenu(QStringLiteral("Recent"));
+        sub->addAction(QStringLiteral("file1.txt"));
+        menu.popup(QPoint(0, 0));
+        sendKey(menu, Qt::Key_Right);
+
+        sendKey(*sub, Qt::Key_Left);
+        QVERIFY(!sub->isVisible());
+        QVERIFY(menu.isVisible());
+        // Left in a menu that is not a submenu does not close it
+        sendKey(menu, Qt::Key_Left);
+        QVERIFY(menu.isVisible());
+    }
+
+    void menu_disabledActionDoesNotTrigger()
+    {
+        QTuiMenu menu(QStringLiteral("File"));
+        QTuiAction *action = menu.addAction(QStringLiteral("Save"));
+        action->setEnabled(false);
+        QSignalSpy triggered(action, &QTuiAction::triggered);
+        menu.popup(QPoint(0, 0));
+
+        ScreenBuffer buffer(20, 3);
+        menu.paintEvent(buffer);
+        // The highlighted item has the colors inverted
+        QCOMPARE(buffer.backCell(2, 1).background, menu.themeProperties().disabledForeground);
+
+        sendKey(menu, Qt::Key_Return);
+        QCOMPARE(triggered.count(), 0);
+        QVERIFY(menu.isVisible());
+    }
+
+    void menu_setTitleChangesTheSubmenuItem()
+    {
+        QTuiMenu menu(QStringLiteral("File"));
+        QTuiMenu *sub = menu.addMenu(QStringLiteral("Recent"));
+        sub->setTitle(QStringLiteral("Old"));
+        menu.popup(QPoint(0, 0));
+        ScreenBuffer buffer(20, 3);
+        menu.paintEvent(buffer);
+        QString row;
+        for (int col = 0; col < 20; ++col)
+            row += buffer.backCell(col, 1).text();
+        QVERIFY(row.contains(QStringLiteral("Old")));
+    }
+
     void menu_minimumSize()
     {
         QTuiMenu menu(QStringLiteral("File"));

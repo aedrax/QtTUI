@@ -5,6 +5,7 @@
 #include <QtTUI/QTuiWidget.h>
 #include <QtTUI/QTuiAction.h>
 #include <QList>
+#include <QPointer>
 #include <QPoint>
 #include <QString>
 
@@ -58,8 +59,13 @@ private:
 
     void navigateToNextItem();
     void navigateToPrevItem();
+    // The text of an item: the submenu title or the action text
+    QString itemText(const MenuItem &item) const;
+    void openSubmenu(int index);
 
     QString m_title;
+    // The menu that opened this menu as a submenu, or nullptr
+    QPointer<QTuiMenu> m_parentMenu;
     QList<MenuItem> m_menuItems;
     int m_highlightedIndex = 0;
 };

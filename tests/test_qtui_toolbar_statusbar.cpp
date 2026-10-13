@@ -95,6 +95,7 @@ private slots:
         QTuiToolBar bar;
         auto *widget = new DummyWidget();
         bar.addWidget(widget);
+        QCOMPARE(widget->parentWidget(), &bar);
 
         QSize ms = bar.minimumSize();
         // DummyWidget minimumSize is 5x1
@@ -257,6 +258,8 @@ private slots:
         auto *label = new QTuiLabel(QStringLiteral("Col 1"));
         bar.addPermanentWidget(label);
         bar.removeWidget(label);
+        // As in Qt, removeWidget() hides the widget
+        QVERIFY(!label->isVisible());
         // After removal, adding again should work without issue
         bar.addPermanentWidget(label);
         QCOMPARE(label->parentWidget(), &bar);

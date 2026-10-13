@@ -46,12 +46,18 @@ void QTuiStatusBar::addPermanentWidget(QTuiWidget *widget, int stretch)
     if (!widget || m_permanentWidgets.contains(widget))
         return;
     widget->setParent(this);
+    widget->setVisible(true);
     m_permanentWidgets.append(widget);
+    markDirty();
 }
 
 void QTuiStatusBar::removeWidget(QTuiWidget *widget)
 {
-    m_permanentWidgets.removeAll(widget);
+    // As in Qt, the widget is hidden, not deleted
+    if (m_permanentWidgets.removeAll(widget) == 0)
+        return;
+    widget->setVisible(false);
+    markDirty();
 }
 
 QSize QTuiStatusBar::minimumSize() const

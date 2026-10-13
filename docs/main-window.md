@@ -296,7 +296,7 @@ void addViewMenu(QTuiMenuBar *bar)
 | --- | --- |
 | `QTuiMenu(const QString &title = QString(), QTuiWidget *parent = nullptr)` | Makes an empty, hidden menu. |
 | `QString title() const` | Returns the title. |
-| `void setTitle(const QString &title)` | Sets the title. The property is `title`. |
+| `void setTitle(const QString &title)` | Sets the title. The property is `title`. The menu bar or the parent menu shows the new title. |
 | `QTuiAction *addAction(const QString &text)` | Makes an action with the text, adds it and returns it. The menu owns the action. |
 | `QTuiAction *addAction(const QString &text, const QString &shortcut)` | Makes an action with the text and a shortcut, for example `"Ctrl+S"`. The menu owns the action. |
 | `void addAction(QTuiAction *action)` | Adds an action that you made. The menu does not take ownership. If the action is deleted, the menu removes its item. |
@@ -326,13 +326,15 @@ void addViewMenu(QTuiMenuBar *bar)
 | Down | Highlights the next item. Separators are skipped. At the bottom, it goes to the top. |
 | Enter, Return | Triggers the highlighted action and closes the menu. On a submenu item, opens the submenu at the right of the menu. |
 | Right | Opens the submenu of the highlighted item. |
+| Left | Closes a submenu. |
 | Escape | Closes the menu. |
 
-A disabled action does not trigger, but Enter closes the menu.
+A disabled action shows in the disabled color. It does not trigger, and the
+menu stays open.
 
 ### Mouse
 
-- A click on an item triggers its action and closes the menu.
+- A click on an item triggers its action and closes the menu. A click on a disabled action does nothing.
 - A click on a submenu item opens the submenu.
 - A click on a separator does nothing.
 
@@ -520,7 +522,7 @@ void addEditToolBar(QTuiMainWindow *window)
 | `QTuiToolBar(const QString &title = QString(), QTuiWidget *parent = nullptr)` | Makes an empty tool bar. It takes strong focus. |
 | `void addAction(QTuiAction *action)` | Adds an action. The tool bar does not take ownership. |
 | `void addSeparator()` | Adds a separator. |
-| `void addWidget(QTuiWidget *widget)` | Adds a widget. The tool bar puts it at its place in the row, as wide as its `minimumSize().width()`. The tool bar does not change the parent of the widget. |
+| `void addWidget(QTuiWidget *widget)` | Adds a widget. The tool bar puts it at its place in the row, as wide as its `minimumSize().width()`. The tool bar becomes the parent of the widget. |
 | `bool isMovable() const` | Returns the `movable` property. |
 | `void setMovable(bool movable)` | Sets the `movable` property. The value has no effect: a tool bar cannot move. |
 | `QString title() const` | Returns the title. The tool bar does not show it. |
@@ -575,8 +577,8 @@ void setUpStatusBar(QTuiMainWindow *window)
 | `void showMessage(const QString &text, int timeout = 0)` | Shows the text on the left. If `timeout` is more than 0, the message goes away after `timeout` ms. |
 | `void clearMessage()` | Removes the message. |
 | `QString currentMessage() const` | Returns the message. |
-| `void addPermanentWidget(QTuiWidget *widget, int stretch = 0)` | Adds a widget on the right side. The status bar becomes its parent. The widget is as wide as its `minimumSize().width()`. The status bar ignores `stretch`. |
-| `void removeWidget(QTuiWidget *widget)` | Removes the widget from the list of permanent widgets. The parent of the widget does not change. |
+| `void addPermanentWidget(QTuiWidget *widget, int stretch = 0)` | Adds a widget on the right side and shows it. The status bar becomes its parent. The widget is as wide as its `minimumSize().width()`. The status bar ignores `stretch`. |
+| `void removeWidget(QTuiWidget *widget)` | Removes the widget from the list of permanent widgets and hides it, as in Qt. The parent of the widget does not change. |
 | `QSize minimumSize() const` | Returns 1 x 1. |
 | `void paintEvent(ScreenBuffer &buffer)` | Paints the message and puts the permanent widgets on the right. |
 

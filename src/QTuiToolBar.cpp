@@ -37,6 +37,7 @@ void QTuiToolBar::addWidget(QTuiWidget *widget)
 {
     if (!widget)
         return;
+    widget->setParent(this);
     ToolBarItem item;
     item.widget = widget;
     m_items.append(item);
