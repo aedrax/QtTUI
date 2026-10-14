@@ -26,6 +26,8 @@ private slots:
     void onStackChanged();
 
 private:
+    // The "<empty>" row and one row for each command
+    int rowCount() const;
     void scrollToVisible();
 
     QTuiUndoStack *m_stack = nullptr;

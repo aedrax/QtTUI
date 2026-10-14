@@ -31,6 +31,8 @@ QTuiUndoStack::~QTuiUndoStack()
 
 void QTuiUndoStack::push(QTuiUndoCommand *cmd)
 {
+    if (!cmd)
+        return;
     // Remove any commands above current index (discard redo history)
     while (m_commands.size() > m_index)
         delete m_commands.takeLast();

@@ -127,6 +127,16 @@ bool QTuiProgressDialog::wasCanceled() const
     return m_canceled;
 }
 
+void QTuiProgressDialog::reset()
+{
+    // As in Qt: hide, go to the minimum, and clear the canceled state
+    if (m_autoClose)
+        setVisible(false);
+    m_bar->setValue(minimum());
+    m_canceled = false;
+    m_timer.invalidate();
+}
+
 void QTuiProgressDialog::cancel()
 {
     if (m_canceled)

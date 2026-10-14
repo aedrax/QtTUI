@@ -73,7 +73,7 @@ void example()
 | --- | --- |
 | `QTuiUndoStack(QObject *parent = nullptr)` | Makes an empty stack. |
 | `~QTuiUndoStack()` | Deletes the stack and all its commands. |
-| `void push(QTuiUndoCommand *cmd)` | Deletes the commands at and above the index, adds `cmd` at the end, calls `cmd->redo()` and moves the index to the end. The stack takes ownership. Do not push `nullptr`. |
+| `void push(QTuiUndoCommand *cmd)` | Deletes the commands at and above the index, adds `cmd` at the end, calls `cmd->redo()` and moves the index to the end. The stack takes ownership. `nullptr` has no effect. |
 | `void undo()` | Moves the index down by one and calls `undo()` on that command. If there is nothing to undo, nothing occurs. |
 | `void redo()` | Calls `redo()` on the command at the index and moves the index up by one. If there is nothing to redo, nothing occurs. |
 | `int count() const` | Returns the number of commands. |
@@ -100,13 +100,12 @@ To connect a menu item to the stack, connect `QTuiAction::triggered` to
 
 `#include <QtTUI/QTuiUndoView.h>` · Inherits: `QTuiWidget`
 
-A list of the commands of an undo stack, like `QUndoView`. Each row shows the
-text of one command, or `<empty>` if the command has no text. Done commands
-use the normal colors, and undone commands use the disabled colors. The
-current row of the view is bold and inverted. When you choose a row, the
-stack goes to the state after that command. Unlike `QUndoView`, there is no
-row for the state before the first command, so the view cannot undo all
-commands.
+A list of the commands of an undo stack, like `QUndoView`. Row 0 shows
+`<empty>`, the state before the first command. Each other row shows the text
+of one command. Done commands use the normal colors, and undone commands use
+the disabled colors. The current row is bold and inverted, and it follows
+the index of the stack. When you choose a row, the stack goes to the state
+after that command. Choose row 0 to undo all commands.
 
 ### Example
 
@@ -129,10 +128,10 @@ void addHistory(QTuiMainWindow *window, QTuiUndoStack *stack)
 | --- | --- |
 | `QTuiUndoView(QTuiWidget *parent = nullptr)` | Makes a view without a stack. It takes strong focus. |
 | `QTuiUndoView(QTuiUndoStack *stack, QTuiWidget *parent = nullptr)` | Makes a view for the stack. |
-| `void setStack(QTuiUndoStack *stack)` | Sets the stack. The current row becomes the last done command. If the stack is deleted, the view becomes empty. |
+| `void setStack(QTuiUndoStack *stack)` | Sets the stack. The current row becomes the row of the stack index. If the stack is deleted, the view becomes empty. |
 | `QTuiUndoStack *stack() const` | Returns the stack, or `nullptr`. |
-| `void paintEvent(ScreenBuffer &buffer)` | Paints one row for each command, and the empty rows below. |
-| `QRect hoverRect() const` | Returns the row under the mouse, if the row has a command. |
+| `void paintEvent(ScreenBuffer &buffer)` | Paints the `<empty>` row, one row for each command, and the empty rows below. |
+| `QRect hoverRect() const` | Returns the row under the mouse, if the row is in the list. |
 
 ### Keys
 
@@ -140,7 +139,7 @@ void addHistory(QTuiMainWindow *window, QTuiUndoStack *stack)
 | --- | --- |
 | Up | Moves the current row up. |
 | Down | Moves the current row down. |
-| Enter, Return | Sets the stack index to the state after the command of the current row. |
+| Enter, Return | Sets the stack index to the row number of the current row. |
 
 The view scrolls to keep the current row visible.
 

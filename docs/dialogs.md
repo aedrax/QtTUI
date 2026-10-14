@@ -234,7 +234,7 @@ The dialog starts a clock at the first `setValue()`. It opens at the first
 `setValue()` after `minimumDuration()` ms, so a short operation never shows
 it. When the value gets to `maximum()`, the dialog closes (if `autoClose()` is
 `true`) and the clock stops. Cancel or Escape sets `wasCanceled()` and emits
-`canceled()`. After that, `setValue()` does nothing.
+`canceled()`. After that, `setValue()` does nothing until you call `reset()`.
 
 ### Example
 
@@ -288,6 +288,7 @@ void copyFiles(int fileCount)
 | Slot | Description |
 | --- | --- |
 | `cancel()` | Sets `wasCanceled()`, closes the dialog with `Rejected` and emits `canceled()`. |
+| `reset()` | Hides the dialog if `autoClose()` is `true`, sets the value to `minimum()` and clears `wasCanceled()`. Call it before a new operation. |
 
 ### Signals
 

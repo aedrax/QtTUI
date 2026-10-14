@@ -506,6 +506,35 @@ private slots:
         QCOMPARE(stack.index(), 1);
     }
 
+    void undoViewEmptyRowUndoesAllAndFollowsTheStack()
+    {
+        QTuiUndoStack stack;
+        stack.push(nullptr); // ignored
+        stack.push(new TestCommand("Cmd0"));
+        stack.push(new TestCommand("Cmd1"));
+        QCOMPARE(stack.count(), 2);
+
+        QTuiUndoView uv;
+        uv.setGeometry(QRect(0, 0, 30, 5));
+        uv.setStack(&stack);
+
+        // Row 0 is "<empty>": Enter on it undoes all commands
+        sendKey(uv, Qt::Key_Up);
+        sendKey(uv, Qt::Key_Up);
+        sendKey(uv, Qt::Key_Return);
+        QCOMPARE(stack.index(), 0);
+
+        // The current row follows the stack: Down from row 1 goes to row 2
+        stack.redo();
+        sendKey(uv, Qt::Key_Down);
+        sendKey(uv, Qt::Key_Return);
+        QCOMPARE(stack.index(), 2);
+
+        ScreenBuffer buf(30, 5);
+        uv.paintEvent(buf);
+        QCOMPARE(buf.backCell(0, 0).ch, U'<');
+    }
+
     void undoViewNavigation()
     {
         rc::check("Up/Down navigate through command list", []() {

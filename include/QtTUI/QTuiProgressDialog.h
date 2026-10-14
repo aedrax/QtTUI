@@ -46,6 +46,9 @@ public:
 
 public slots:
     void cancel();
+    // Hides the dialog if autoClose() is true, sets the value to the
+    // minimum and clears wasCanceled(), so that a new operation can start
+    void reset();
 
 signals:
     void canceled();

@@ -44,10 +44,7 @@ void QTuiUndoView::setStack(QTuiUndoStack *stack)
             m_scrollOffset = 0;
             markDirty();
         });
-        if (m_stack->index() > 0)
-            m_currentIndex = m_stack->index() - 1;
-        else
-            m_currentIndex = 0;
+        m_currentIndex = m_stack->index();
     }
     markDirty();
 }
@@ -66,20 +63,19 @@ void QTuiUndoView::paintEvent(ScreenBuffer &buffer)
     const auto theme = themeProperties();
     const int viewWidth = geo.width();
     const int viewHeight = geo.height();
-    const int commandCount = m_stack ? m_stack->count() : 0;
+    const int rows = rowCount();
     const int stackIndex = m_stack ? m_stack->index() : 0;
 
     for (int vr = 0; vr < viewHeight; ++vr) {
         int itemRow = m_scrollOffset + vr;
         int screenY = geo.y() + vr;
-        bool isCurrent = (itemRow == m_currentIndex && itemRow < commandCount);
+        bool isCurrent = (itemRow == m_currentIndex && itemRow < rows);
 
-        if (itemRow < commandCount) {
-            bool isActive = (itemRow < stackIndex);
+        if (itemRow < rows) {
+            // Row 0 is the state before the first command, as in QUndoView
+            bool isActive = (itemRow <= stackIndex);
 
-            QString text = m_stack->text(itemRow);
-            if (text.isEmpty())
-                text = QStringLiteral("<empty>");
+            QString text = itemRow == 0 ? QStringLiteral("<empty>") : m_stack->text(itemRow - 1);
 
             Color fg, bg;
             if (isCurrent) {
@@ -107,10 +103,8 @@ void QTuiUndoView::paintEvent(ScreenBuffer &buffer)
 
 void QTuiUndoView::keyPressEvent(TuiKeyEvent *event)
 {
-    if (!m_stack || m_stack->count() == 0)
+    if (!m_stack)
         return;
-
-    const int commandCount = m_stack->count();
 
     switch (event->key()) {
     case Qt::Key_Up:
@@ -122,7 +116,7 @@ void QTuiUndoView::keyPressEvent(TuiKeyEvent *event)
         break;
 
     case Qt::Key_Down:
-        if (m_currentIndex < commandCount - 1) {
+        if (m_currentIndex < rowCount() - 1) {
             ++m_currentIndex;
             scrollToVisible();
             markDirty();
@@ -131,7 +125,7 @@ void QTuiUndoView::keyPressEvent(TuiKeyEvent *event)
 
     case Qt::Key_Return:
     case Qt::Key_Enter:
-        m_stack->setIndex(m_currentIndex + 1);
+        m_stack->setIndex(m_currentIndex);
         break;
 
     default:
@@ -143,14 +137,14 @@ void QTuiUndoView::mousePressEvent(TuiMouseEvent *event)
 {
     if (event->mouseType() != TuiMouseEvent::Press)
         return;
-    if (!m_stack || m_stack->count() == 0)
+    if (!m_stack)
         return;
 
     const QRect geo = geometry();
     int clickedRow = (event->y() - geo.y()) + m_scrollOffset;
-    if (clickedRow >= 0 && clickedRow < m_stack->count()) {
+    if (clickedRow >= 0 && clickedRow < rowCount()) {
         m_currentIndex = clickedRow;
-        m_stack->setIndex(m_currentIndex + 1);
+        m_stack->setIndex(m_currentIndex);
         scrollToVisible();
         markDirty();
     }
@@ -161,12 +155,15 @@ void QTuiUndoView::onStackChanged()
     if (!m_stack)
         return;
 
-    const int commandCount = m_stack->count();
-    if (m_currentIndex >= commandCount)
-        m_currentIndex = qMax(0, commandCount - 1);
-
+    // The current row follows the index of the stack
+    m_currentIndex = m_stack->index();
     scrollToVisible();
     markDirty();
+}
+
+int QTuiUndoView::rowCount() const
+{
+    return m_stack ? m_stack->count() + 1 : 0;
 }
 
 void QTuiUndoView::scrollToVisible()
@@ -186,7 +183,7 @@ QRect QTuiUndoView::hoverRect() const
     // Only the row under the mouse, if it has a command
     const QRect geo = geometry();
     const int row = hoverPos().y() - geo.y() + m_scrollOffset;
-    if (!m_stack || row < 0 || row >= m_stack->count())
+    if (row < 0 || row >= rowCount())
         return QRect();
     return QRect(geo.x(), hoverPos().y(), geo.width(), 1);
 }

@@ -972,6 +972,12 @@ private slots:
         QVERIFY(!canceled.isVisible());
         canceled.setValue(2); // ignored after cancel
         QVERIFY(!canceled.isVisible());
+        // reset() starts a new operation
+        canceled.reset();
+        QVERIFY(!canceled.wasCanceled());
+        QCOMPARE(canceled.value(), 0);
+        canceled.setValue(2);
+        QVERIFY(canceled.isVisible());
     }
 
     void fileDialogPicksAFile()
