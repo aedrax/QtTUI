@@ -216,6 +216,13 @@ void TestQTuiListWidget::testItemClickedSignal()
     QCOMPARE(spy.count(), 2);
     clicked = spy.last().at(0).value<QTuiListWidgetItem *>();
     QCOMPARE(clicked, lw.item(1));
+    // A mouse click emits itemClicked() and currentItemChanged()
+    QSignalSpy current(&lw, &QTuiListWidget::currentItemChanged);
+    TuiMouseEvent press(TuiMouseEvent::Press, Qt::LeftButton, QPoint(1, 0));
+    QCoreApplication::sendEvent(&lw, &press);
+    QCOMPARE(spy.count(), 3);
+    QCOMPARE(spy.last().at(0).value<QTuiListWidgetItem *>(), lw.item(0));
+    QCOMPARE(current.count(), 1);
 }
 
 void TestQTuiListWidget::testItemTextSyncsToModel()

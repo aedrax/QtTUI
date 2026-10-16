@@ -29,11 +29,25 @@ QTuiTreeWidgetItemIterator::QTuiTreeWidgetItemIterator(QTuiTreeWidgetItem *item,
     if (!item)
         return;
 
-    m_current = item;
-    // Push children in reverse for depth-first
-    for (int i = item->childCount() - 1; i >= 0; --i)
-        m_stack.append(item->child(i));
+    // As in Qt, the iterator goes on to the items after `item` in the tree.
+    // Push the next siblings of the ancestors first, so they come last.
+    QList<QTuiTreeWidgetItem *> chain;
+    for (QTuiTreeWidgetItem *i = item; i; i = i->parent())
+        chain.prepend(i);
+    for (QTuiTreeWidgetItem *i : chain) {
+        QTuiTreeWidgetItem *parent = i->parent();
+        QTuiTreeWidget *tree = i->treeWidget();
+        const int count = parent ? parent->childCount() : (tree ? tree->topLevelItemCount() : 0);
+        auto at = [&](int n) { return parent ? parent->child(n) : tree->topLevelItem(n); };
+        int index = 0;
+        while (index < count && at(index) != i)
+            ++index;
+        for (int n = count - 1; n > index; --n)
+            m_stack.append(at(n));
+    }
 
+    // advance() pushes the children of the current item
+    m_current = item;
     if (!matchesFlags(m_current))
         advance();
 }
@@ -83,35 +97,22 @@ void QTuiTreeWidgetItemIterator::advance()
 
 bool QTuiTreeWidgetItemIterator::matchesFlags(QTuiTreeWidgetItem *item) const
 {
+    // As in Qt, an item must match all the flags
     if (!item)
         return false;
-
-    if (m_flags == All)
-        return true;
-
-    if (m_flags.testFlag(Checked)) {
-        // Check column 0 check state
-        if (item->checkState(0) == 2) // Qt::Checked
-            return true;
-    }
-
-    if (m_flags.testFlag(Unchecked)) {
-        if (item->checkState(0) == 0) // Qt::Unchecked
-            return true;
-    }
-
-    if (m_flags.testFlag(Selected)) {
-        if (item->flags().testFlag(Qt::ItemIsSelectable))
-            return true;
-    }
-
-    if (m_flags.testFlag(Hidden)) {
-        // Items don't have a hidden property in our implementation,
-        // so Hidden filter matches nothing by default
+    if (m_flags.testFlag(Checked) && item->checkState(0) != Qt::Checked)
         return false;
+    if (m_flags.testFlag(Unchecked) && item->checkState(0) != Qt::Unchecked)
+        return false;
+    if (m_flags.testFlag(Selected)) {
+        QTuiTreeWidget *tree = item->treeWidget();
+        if (!tree || !tree->selectedItems().contains(item))
+            return false;
     }
-
-    return false;
+    // Items cannot be hidden, so Hidden matches no item
+    if (m_flags.testFlag(Hidden))
+        return false;
+    return true;
 }
 
 } // namespace QtTUI

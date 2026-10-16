@@ -318,6 +318,20 @@ void TestQTuiTreeWidget::testItemClickedSignal()
 
     auto *clicked = spy.last().at(0).value<QTuiTreeWidgetItem *>();
     QCOMPARE(clicked, tw.topLevelItem(0));
+
+    // A mouse click emits it too, and a click below the items does not
+    TuiMouseEvent press(TuiMouseEvent::Press, Qt::LeftButton, QPoint(2, 0));
+    QCoreApplication::sendEvent(&tw, &press);
+    QCOMPARE(spy.count(), 2);
+    TuiMouseEvent below(TuiMouseEvent::Press, Qt::LeftButton, QPoint(2, 5));
+    QCoreApplication::sendEvent(&tw, &below);
+    QCOMPARE(spy.count(), 2);
+
+    // The Selected flag finds the selected items
+    QTuiTreeWidgetItemIterator selected(&tw, QTuiTreeWidgetItemIterator::Selected);
+    QCOMPARE(*selected, tw.topLevelItem(0));
+    ++selected;
+    QVERIFY(selected.atEnd());
 }
 
 void TestQTuiTreeWidget::testCurrentItem()
@@ -546,8 +560,17 @@ void TestQTuiTreeWidget::testIteratorFromItem()
         ++it;
     }
 
-    // Should visit child1 only (no children of its own)
-    QCOMPARE(visited, (QStringList{QStringLiteral("Child1")}));
+    // As in Qt, the iterator goes on to the items after child1
+    QCOMPARE(visited, (QStringList{QStringLiteral("Child1"), QStringLiteral("Child2")}));
+
+    // From an item with children: each child once, then the next item
+    auto *other = new QTuiTreeWidgetItem(QStringList{QStringLiteral("Other")});
+    tw.addTopLevelItem(other);
+    visited.clear();
+    for (QTuiTreeWidgetItemIterator it2(root); !it2.atEnd(); ++it2)
+        visited.append((*it2)->text(0));
+    QCOMPARE(visited, (QStringList{QStringLiteral("Root"), QStringLiteral("Child1"),
+                                   QStringLiteral("Child2"), QStringLiteral("Other")}));
 }
 
 void TestQTuiTreeWidget::testIteratorAtEnd()

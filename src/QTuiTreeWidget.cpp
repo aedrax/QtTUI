@@ -204,6 +204,9 @@ QTuiTreeWidget::QTuiTreeWidget(QTuiWidget *parent)
     m_internalModel->m_topLevelItemsRef = &m_topLevelItems;
     m_internalModel->m_columnCount = m_columnCount;
     setModel(m_internalModel);
+    connect(this, &QTuiAbstractItemView::clicked, this, [this](const QModelIndex &index) {
+        emit itemClicked(itemFromIndex(index), index.column());
+    });
 }
 
 QTuiTreeWidget::~QTuiTreeWidget()
@@ -339,6 +342,14 @@ void QTuiTreeWidget::setCurrentItem(QTuiTreeWidgetItem *item)
     QModelIndex idx = findIndex(item, m_topLevelItems, QModelIndex(), findIndex);
     if (idx.isValid())
         setCurrentIndex(idx);
+}
+
+void QTuiTreeWidget::mousePressEvent(TuiMouseEvent *event)
+{
+    QTuiTreeWidgetItem *prevItem = currentItem();
+    QTuiTreeView::mousePressEvent(event);
+    if (currentItem() != prevItem)
+        emit currentItemChanged(currentItem(), prevItem);
 }
 
 void QTuiTreeWidget::keyPressEvent(TuiKeyEvent *event)

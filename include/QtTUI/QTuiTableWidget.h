@@ -21,6 +21,8 @@ public:
     bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole) override;
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
     bool setHeaderData(int section, Qt::Orientation orientation, const QVariant &value, int role = Qt::EditRole) override;
+    // Sorts the rows by the text of the column, as QTableWidget does
+    void sort(int column, Qt::SortOrder order = Qt::AscendingOrder) override;
 
     void setDimensions(int rows, int columns);
     void updateCell(int row, int column);
@@ -63,9 +65,12 @@ signals:
 
 protected:
     void keyPressEvent(TuiKeyEvent *event) override;
+    void mousePressEvent(TuiMouseEvent *event) override;
 
 private:
     friend class QTuiTableWidgetItem;
+    // Emits cellClicked() for a click on a cell
+    void connectClicked();
     void syncItemToModel(int row, int column);
     void resizeItemGrid(int rows, int columns);
 

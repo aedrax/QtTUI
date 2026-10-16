@@ -121,6 +121,8 @@ public:
     virtual QRect visualRect(const QModelIndex &index) const = 0;
 
 signals:
+    // A left click on an item
+    void clicked(const QModelIndex &index);
     // Enter on an item, or a click or double click (it depends on the view)
     void activated(const QModelIndex &index);
     // A double click on an item

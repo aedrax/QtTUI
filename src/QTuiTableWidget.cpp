@@ -1,5 +1,7 @@
 #include <QtTUI/QTuiTableWidget.h>
 #include <QtTUI/TuiEvents.h>
+#include <algorithm>
+#include <numeric>
 
 namespace QtTUI {
 
@@ -98,6 +100,46 @@ void QTuiTableWidgetModel::setDimensions(int rows, int columns)
     endResetModel();
 }
 
+void QTuiTableWidgetModel::sort(int column, Qt::SortOrder order)
+{
+    if (!m_itemsRef || column < 0 || column >= m_columns)
+        return;
+    auto &rows = *m_itemsRef;
+    // Sort the row numbers by the text of the column. Empty cells go last.
+    QList<int> from(m_rows);
+    std::iota(from.begin(), from.end(), 0);
+    auto text = [&](int row) {
+        QTuiTableWidgetItem *item = rows[row][column];
+        return item ? item->text() : QString();
+    };
+    std::stable_sort(from.begin(), from.end(), [&](int a, int b) {
+        const QString ta = text(a), tb = text(b);
+        if (ta.isEmpty() != tb.isEmpty())
+            return tb.isEmpty();
+        return order == Qt::AscendingOrder ? ta < tb : tb < ta;
+    });
+
+    emit layoutAboutToBeChanged({}, QAbstractItemModel::VerticalSortHint);
+    QList<QList<QTuiTableWidgetItem *>> sorted;
+    for (int row : from)
+        sorted.append(rows[row]);
+    rows = sorted;
+    // The items and the persistent indexes (the selection) go to the new rows
+    QList<int> to(m_rows);
+    for (int row = 0; row < m_rows; ++row) {
+        to[from[row]] = row;
+        for (QTuiTableWidgetItem *item : rows[row])
+            if (item)
+                item->m_row = row;
+    }
+    const QModelIndexList old = persistentIndexList();
+    QModelIndexList moved;
+    for (const QModelIndex &index : old)
+        moved.append(this->index(to[index.row()], index.column()));
+    changePersistentIndexList(old, moved);
+    emit layoutChanged({}, QAbstractItemModel::VerticalSortHint);
+}
+
 void QTuiTableWidgetModel::updateCell(int row, int column)
 {
     if (row < 0 || row >= m_rows || column < 0 || column >= m_columns)
@@ -114,6 +156,14 @@ QTuiTableWidget::QTuiTableWidget(QTuiWidget *parent)
 {
     m_internalModel->m_itemsRef = &m_items;
     setModel(m_internalModel);
+    connectClicked();
+}
+
+void QTuiTableWidget::connectClicked()
+{
+    connect(this, &QTuiAbstractItemView::clicked, this, [this](const QModelIndex &index) {
+        emit cellClicked(index.row(), index.column());
+    });
 }
 
 QTuiTableWidget::QTuiTableWidget(int rows, int columns, QTuiWidget *parent)
@@ -124,6 +174,7 @@ QTuiTableWidget::QTuiTableWidget(int rows, int columns, QTuiWidget *parent)
     resizeItemGrid(rows, columns);
     m_internalModel->setDimensions(rows, columns);
     setModel(m_internalModel);
+    connectClicked();
 }
 
 QTuiTableWidget::~QTuiTableWidget()
@@ -275,6 +326,16 @@ void QTuiTableWidget::keyPressEvent(TuiKeyEvent *event)
         if (newRow >= 0 && newCol >= 0)
             emit cellClicked(newRow, newCol);
     }
+}
+
+void QTuiTableWidget::mousePressEvent(TuiMouseEvent *event)
+{
+    const QModelIndex prev = currentIndex();
+    QTuiTableView::mousePressEvent(event);
+    const QModelIndex current = currentIndex();
+    if (current != prev)
+        emit currentCellChanged(current.isValid() ? current.row() : -1, current.isValid() ? current.column() : -1,
+                                prev.isValid() ? prev.row() : -1, prev.isValid() ? prev.column() : -1);
 }
 
 void QTuiTableWidget::syncItemToModel(int row, int column)

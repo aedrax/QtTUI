@@ -20,6 +20,7 @@ class TestQTuiTableWidget : public QObject {
 private slots:
     // Row/column count management (Req 22.1, 22.3)
     void testInitialDimensions();
+    void testSortingSortsTheRows();
     void testSetRowCount();
     void testSetColumnCount();
     void testConstructorWithDimensions();
@@ -237,6 +238,12 @@ void TestQTuiTableWidget::testCellClickedSignal()
     QCOMPARE(spy.count(), 2);
     QCOMPARE(spy.last().at(0).toInt(), 1);
     QCOMPARE(spy.last().at(1).toInt(), 1);
+    // A mouse click on a cell below the header emits it too
+    TuiMouseEvent press(TuiMouseEvent::Press, Qt::LeftButton, QPoint(0, 3));
+    QCoreApplication::sendEvent(&tw, &press);
+    QCOMPARE(spy.count(), 3);
+    QCOMPARE(spy.last().at(0).toInt(), 2);
+    QCOMPARE(spy.last().at(1).toInt(), 0);
 }
 
 void TestQTuiTableWidget::testItemTextAndData()
@@ -345,6 +352,31 @@ void TestQTuiTableWidget::testShrinkDeletesItems()
     tw.setColumnCount(1);
     QCOMPARE(tw.columnCount(), 1);
     QVERIFY(tw.item(0, 0) != nullptr);
+}
+
+void TestQTuiTableWidget::testSortingSortsTheRows()
+{
+    QTuiTableWidget tw(3, 2);
+    tw.setGeometry(QRect(0, 0, 30, 10));
+    const QStringList names{QStringLiteral("Carol"), QStringLiteral("Alice"), QStringLiteral("Bob")};
+    for (int row = 0; row < 3; ++row) {
+        tw.setItem(row, 0, new QTuiTableWidgetItem(names.at(row)));
+        tw.setItem(row, 1, new QTuiTableWidgetItem(QString::number(row)));
+    }
+    QTuiTableWidgetItem *alice = tw.item(1, 0);
+    tw.setCurrentIndex(tw.model()->index(1, 0));
+    tw.setSortingEnabled(true);
+
+    tw.sortByColumn(0, Qt::AscendingOrder);
+    QCOMPARE(tw.item(0, 0)->text(), QStringLiteral("Alice"));
+    QCOMPARE(tw.item(0, 1)->text(), QStringLiteral("1"));
+    QCOMPARE(tw.item(2, 0)->text(), QStringLiteral("Carol"));
+    QCOMPARE(alice->row(), 0);
+    // The current cell stays on the same item
+    QCOMPARE(tw.currentIndex().row(), 0);
+
+    tw.sortByColumn(0, Qt::DescendingOrder);
+    QCOMPARE(tw.item(0, 0)->text(), QStringLiteral("Carol"));
 }
 
 QTEST_MAIN(TestQTuiTableWidget)

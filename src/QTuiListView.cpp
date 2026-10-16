@@ -191,8 +191,10 @@ void QTuiListView::mousePressEvent(TuiMouseEvent *event)
             selectCurrent(drag ? Qt::ShiftModifier : event->modifiers(), !drag);
         else if (!isSelected(currentIndex()))
             selectCurrent(Qt::NoModifier, true);
-        if (event->button() == Qt::LeftButton && !drag)
+        if (event->button() == Qt::LeftButton && !drag) {
+            emit clicked(m_model->index(m_currentRow, 0));
             emit activated(m_model->index(m_currentRow, 0));
+        }
     }
 }
 

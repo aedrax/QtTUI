@@ -18,8 +18,8 @@ icons or check states.
 `#include <QtTUI/QTuiListWidget.h>` · Inherits: `QTuiListView`
 
 A list of `QTuiListWidgetItem` objects. The widget owns its items and
-deletes them when it is deleted. Different from Qt: `itemClicked()` comes
-from Enter on the current item, not from a mouse click.
+deletes them when it is deleted. `itemClicked()` comes from a left click on
+an item, as in Qt, and also from Enter on the current item.
 
 ### Example
 
@@ -81,8 +81,8 @@ int main(int argc, char *argv[])
 
 | Signal | Description |
 | --- | --- |
-| `currentItemChanged(QTuiListWidgetItem *current, QTuiListWidgetItem *previous)` | A key or `setCurrentRow()` made a different item current. A mouse click does not emit it. |
-| `itemClicked(QTuiListWidgetItem *item)` | Enter on the current item. |
+| `currentItemChanged(QTuiListWidgetItem *current, QTuiListWidgetItem *previous)` | A key, a click or `setCurrentRow()` made a different item current. |
+| `itemClicked(QTuiListWidgetItem *item)` | A left click on the item, or Enter on the current item. |
 
 The signals of `QTuiAbstractItemView` (`activated()`, `doubleClicked()`) and
 of the selection model also work. Use them for the mouse.
@@ -145,11 +145,11 @@ void example(QTuiListWidget *list)
 `#include <QtTUI/QTuiTableWidget.h>` · Inherits: `QTuiTableView`
 
 A table of `QTuiTableWidgetItem` objects. A cell can be empty. The widget
-owns its items and deletes them when it is deleted. Different from Qt:
-`cellClicked()` comes from Enter on the current cell, not from a mouse
-click. The vertical header labels are stored, but the table does not show
-them. The internal model does not sort, so `setSortingEnabled()` shows the
-indicator but does not change the order.
+owns its items and deletes them when it is deleted. `cellClicked()` comes
+from a left click on a cell, as in Qt, and also from Enter on the current
+cell. The vertical header labels are stored, but the table does not show
+them. A sort puts the rows in the order of the text in the sort column.
+Empty cells go last.
 
 ### Example
 
@@ -200,8 +200,8 @@ type a value, the table makes a new item for it.
 
 | Signal | Description |
 | --- | --- |
-| `currentCellChanged(int row, int column, int previousRow, int previousColumn)` | A key made a different cell current. A mouse click does not emit it. |
-| `cellClicked(int row, int column)` | Enter on the current cell. |
+| `currentCellChanged(int row, int column, int previousRow, int previousColumn)` | A key or a click made a different cell current. |
+| `cellClicked(int row, int column)` | A left click on the cell, or Enter on the current cell. |
 
 ### Keys
 
@@ -291,8 +291,8 @@ int selectedCellCount(const QTuiTableWidget *table)
 A tree of `QTuiTreeWidgetItem` objects. The widget owns its top-level items
 and deletes them when it is deleted. Different from Qt: the tree shows only
 column 0 and has no header, so the header labels and the other columns are
-stored but not shown. `itemClicked()` comes from Enter on the current item,
-not from a mouse click.
+stored but not shown. `itemClicked()` comes from a left click on an item, as
+in Qt, and also from Enter on the current item.
 
 ### Example
 
@@ -353,8 +353,8 @@ int main(int argc, char *argv[])
 
 | Signal | Description |
 | --- | --- |
-| `currentItemChanged(QTuiTreeWidgetItem *current, QTuiTreeWidgetItem *previous)` | A key made a different item current. A mouse click does not emit it. |
-| `itemClicked(QTuiTreeWidgetItem *item, int column)` | Enter on the current item. The column is always 0. |
+| `currentItemChanged(QTuiTreeWidgetItem *current, QTuiTreeWidgetItem *previous)` | A key or a click made a different item current. |
+| `itemClicked(QTuiTreeWidgetItem *item, int column)` | A left click on the item, or Enter on the current item. The column is always 0. |
 
 ### Keys
 
@@ -452,14 +452,14 @@ QStringList checkedNames(QTuiTreeWidget *tree)
 
 | Enum | Values |
 | --- | --- |
-| `IteratorFlag` (flags `IteratorFlags`) | `All`: all items (the default). `Checked`: the check state of column 0 is 2. `Unchecked`: the check state of column 0 is 0. `Selected`: the item has `Qt::ItemIsSelectable` (not the selection). `Hidden`: matches no item. An item that matches one of the flags is included. |
+| `IteratorFlag` (flags `IteratorFlags`) | `All`: all items (the default). `Checked`: the check state of column 0 is 2. `Unchecked`: the check state of column 0 is 0. `Selected`: the item is selected. `Hidden`: matches no item, because items cannot be hidden. As in Qt, an item must match all the flags. |
 
 ### Functions
 
 | Function | Description |
 | --- | --- |
 | `QTuiTreeWidgetItemIterator(QTuiTreeWidget *widget, IteratorFlags flags = All)` | Starts at the first top-level item that matches the flags. |
-| `QTuiTreeWidgetItemIterator(QTuiTreeWidgetItem *item, IteratorFlags flags = All)` | Starts at the item, or at its first descendant that matches the flags. |
+| `QTuiTreeWidgetItemIterator(QTuiTreeWidgetItem *item, IteratorFlags flags = All)` | Starts at the item, or at the next item that matches the flags. As in Qt, it goes on through the items after `item` in the tree, to the end. |
 | `QTuiTreeWidgetItemIterator &operator++()` | Moves to the next item that matches. |
 | `QTuiTreeWidgetItemIterator operator++(int)` | Moves to the next item that matches and returns the old position. |
 | `QTuiTreeWidgetItem *operator*() const` | Returns the current item, or `nullptr` at the end. |

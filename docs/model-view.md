@@ -233,6 +233,7 @@ Use these functions when you write a view.
 
 | Signal | Description |
 | --- | --- |
+| `clicked(const QModelIndex &index)` | A left click on an item. A drag does not emit it. |
 | `activated(const QModelIndex &index)` | Enter on an item, or a click or double click. Each view section tells which. |
 | `doubleClicked(const QModelIndex &index)` | A double click on an item. |
 
@@ -303,7 +304,7 @@ void example(QTuiWidget *parent)
 
 ### Mouse
 
-- A left click makes the row current, selects it and emits `activated()`.
+- A left click makes the row current, selects it and emits `clicked()` and `activated()`.
 - Ctrl+click and Shift+click change the selection, as the selection mode tells.
 - A left drag selects the range from the pressed row to the row under the mouse.
 - A double click emits `doubleClicked()` and opens the editor (`DoubleClicked`).
@@ -443,7 +444,7 @@ int main(int argc, char *argv[])
 
 ### Mouse
 
-- A left click on a cell makes it current and selects it. A single click does not emit `activated()`.
+- A left click on a cell makes it current, selects it and emits `clicked()`. A single click does not emit `activated()`.
 - A left drag selects the range from the pressed cell to the cell under the mouse.
 - A click on a header sorts by that column, if sorting is enabled. A second click reverses the order.
 - A left drag that starts on the separator after a header sets the width of that column.
@@ -515,7 +516,7 @@ void example(QTuiWidget *parent, QAbstractItemModel *model)
 
 ### Mouse
 
-- A left click makes the item current and selects it.
+- A left click makes the item current, selects it and emits `clicked()`.
 - A left drag selects the range from the pressed item to the item under the mouse.
 - A double click emits `doubleClicked()`. Then it opens the editor (`DoubleClicked`). If no editor opens, it expands or collapses the item and emits `activated()`.
 

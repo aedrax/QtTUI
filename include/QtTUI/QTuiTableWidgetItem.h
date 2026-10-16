@@ -29,6 +29,7 @@ public:
 
 private:
     friend class QTuiTableWidget;
+    friend class QTuiTableWidgetModel;
     QHash<int, QVariant> m_data;
     // Editable by default, as in Qt
     Qt::ItemFlags m_flags = Qt::ItemIsEditable | Qt::ItemIsSelectable | Qt::ItemIsEnabled;

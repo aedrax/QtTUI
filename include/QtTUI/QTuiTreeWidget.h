@@ -57,6 +57,7 @@ signals:
     void itemClicked(QTuiTreeWidgetItem *item, int column);
 protected:
     void keyPressEvent(TuiKeyEvent *event) override;
+    void mousePressEvent(TuiMouseEvent *event) override;
 private:
     friend class QTuiTreeWidgetItem;
     // Targeted notification forwarders used by QTuiTreeWidgetItem

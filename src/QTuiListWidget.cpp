@@ -94,6 +94,9 @@ QTuiListWidget::QTuiListWidget(QTuiWidget *parent)
 {
     m_internalModel->m_itemsRef = &m_items;
     setModel(m_internalModel);
+    connect(this, &QTuiAbstractItemView::clicked, this, [this](const QModelIndex &index) {
+        emit itemClicked(item(index.row()));
+    });
 }
 
 QTuiListWidget::~QTuiListWidget()
@@ -219,6 +222,15 @@ void QTuiListWidget::keyPressEvent(TuiKeyEvent *event)
         if (newRow >= 0 && newRow < m_items.size())
             emit itemClicked(m_items.at(newRow));
     }
+}
+
+void QTuiListWidget::mousePressEvent(TuiMouseEvent *event)
+{
+    const int prevRow = currentRow();
+    QTuiListView::mousePressEvent(event);
+    const int newRow = currentRow();
+    if (newRow != prevRow && newRow >= 0 && newRow < m_items.size())
+        emit currentItemChanged(m_items.at(newRow), item(prevRow));
 }
 
 void QTuiListWidget::syncItemToModel(QTuiListWidgetItem *item)
