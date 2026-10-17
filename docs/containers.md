@@ -227,7 +227,7 @@ void example(QTuiWidget *parent)
 | --- | --- |
 | `QTuiTabWidget(QTuiWidget *parent = nullptr)` | Makes an empty tab widget with its tab bar. |
 | `int addTab(QTuiWidget *page, const QString &label)` | Adds a page with a tab label and makes the tab widget its parent. Returns the index, or -1 if `page` is nullptr. The first page becomes current. |
-| `void removeTab(int index)` | Removes the page at `index` from the tab widget and hides it. It does not delete the page. |
+| `void removeTab(int index)` | Removes the page at `index` from the tab widget and hides it. It does not delete the page. If the page was current, the next page becomes current and shows. |
 | `int count() const` | Returns the number of pages. |
 | `QTuiWidget *widget(int index) const` | Returns the page at `index`, or nullptr. |
 | `int indexOf(QTuiWidget *widget) const` | Returns the index of a page, or -1. |
@@ -745,7 +745,7 @@ void example(QTuiMdiArea *mdi)
 | `bool isMaximized() const` | Returns true if the sub-window is maximized. |
 | `void showMaximized()` | Slot. Keeps the normal geometry and fills the parent area. Emits `windowStateChanged()`. |
 | `void showNormal()` | Slot. Sets the normal geometry again. Emits `windowStateChanged()`. |
-| `void close()` | Slot. Hides the sub-window. It does not delete the sub-window. The sub-window stays in `subWindowList()` and can stay the `activeSubWindow()`. |
+| `void close()` | Slot. Removes the sub-window from the MDI area, as `removeSubWindow()` does, and hides it. It does not delete the sub-window. |
 | `QSize minimumSize() const` | Returns 3 rows, and the width of the title and buttons or of the content widget plus the frame. |
 | `void paintEvent(ScreenBuffer &buffer)` | Paints the frame and the content widget. A maximized sub-window shows `[▫]` in place of `[□]`. |
 | `void focusEntered(QTuiWidget *focus)` | Protected. Makes this sub-window the active window of its MDI area. |
@@ -764,9 +764,9 @@ void example(QTuiMdiArea *mdi)
 | Key | Action |
 | --- | --- |
 | M | Maximizes the sub-window, or sets it back to normal. |
-| Ctrl+Left, Ctrl+Right, Ctrl+Up, Ctrl+Down | Moves the sub-window 1 cell. |
+| Ctrl+Left, Ctrl+Right, Ctrl+Up, Ctrl+Down | Moves the sub-window 1 cell. It stays in the MDI area. |
 | Shift+Left, Shift+Up | Makes the sub-window 1 cell narrower or shorter, down to its minimum size. |
-| Shift+Right, Shift+Down | Makes the sub-window 1 cell wider or taller. |
+| Shift+Right, Shift+Down | Makes the sub-window 1 cell wider or taller, up to the edge of the MDI area. |
 | Escape, Q | Closes the sub-window. |
 
 ### Mouse

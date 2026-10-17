@@ -124,6 +124,9 @@ void QTuiMdiSubWindow::mousePressEvent(TuiMouseEvent *event)
 
 void QTuiMdiSubWindow::close()
 {
+    // As in Qt, a closed window is not in the list of the area
+    if (auto *area = qobject_cast<QTuiMdiArea *>(parentWidget()))
+        area->removeSubWindow(this);
     setVisible(false);
 }
 
@@ -168,57 +171,26 @@ void QTuiMdiSubWindow::keyPressEvent(TuiKeyEvent *event)
     const int key = event->key();
     const Qt::KeyboardModifiers mods = event->modifiers();
 
-    // Ctrl+Arrow: move subwindow within parent
-    if (mods & Qt::ControlModifier) {
-        QRect geo = geometry();
-        switch (key) {
-        case Qt::Key_Left:
-            geo.moveLeft(qMax(0, geo.x() - 1));
-            setGeometry(geo);
-            return;
-        case Qt::Key_Right:
-            geo.moveLeft(geo.x() + 1);
-            setGeometry(geo);
-            return;
-        case Qt::Key_Up:
-            geo.moveTop(qMax(0, geo.y() - 1));
-            setGeometry(geo);
-            return;
-        case Qt::Key_Down:
-            geo.moveTop(geo.y() + 1);
-            setGeometry(geo);
-            return;
-        default:
-            break;
-        }
+    // The window stays in the area of the parent
+    const QRect area = parentWidget() ? parentWidget()->geometry() : QRect(0, 0, 0x7fff, 0x7fff);
+    const int dx = key == Qt::Key_Left ? -1 : key == Qt::Key_Right ? 1 : 0;
+    const int dy = key == Qt::Key_Up ? -1 : key == Qt::Key_Down ? 1 : 0;
+    if ((dx || dy) && (mods & Qt::ControlModifier)) {
+        // Ctrl+Arrow: move the window
+        QRect geo = geometry().translated(dx, dy);
+        geo.moveLeft(qBound(area.left(), geo.left(), qMax(area.left(), area.right() + 1 - geo.width())));
+        geo.moveTop(qBound(area.top(), geo.top(), qMax(area.top(), area.bottom() + 1 - geo.height())));
+        setGeometry(geo);
+        return;
     }
-
-    // Shift+Arrow: resize subwindow
-    if (mods & Qt::ShiftModifier) {
+    if ((dx || dy) && (mods & Qt::ShiftModifier)) {
+        // Shift+Arrow: resize the window, from the minimum size to the area edge
         QRect geo = geometry();
-        QSize minSz = minimumSize();
-        switch (key) {
-        case Qt::Key_Left:
-            if (geo.width() > minSz.width())
-                geo.setWidth(geo.width() - 1);
-            setGeometry(geo);
-            return;
-        case Qt::Key_Right:
-            geo.setWidth(geo.width() + 1);
-            setGeometry(geo);
-            return;
-        case Qt::Key_Up:
-            if (geo.height() > minSz.height())
-                geo.setHeight(geo.height() - 1);
-            setGeometry(geo);
-            return;
-        case Qt::Key_Down:
-            geo.setHeight(geo.height() + 1);
-            setGeometry(geo);
-            return;
-        default:
-            break;
-        }
+        const QSize minSz = minimumSize();
+        geo.setWidth(qBound(qMin(minSz.width(), geo.width()), geo.width() + dx, qMax(geo.width(), area.right() + 1 - geo.x())));
+        geo.setHeight(qBound(qMin(minSz.height(), geo.height()), geo.height() + dy, qMax(geo.height(), area.bottom() + 1 - geo.y())));
+        setGeometry(geo);
+        return;
     }
 
     // M: maximize or restore, as the [□] button does

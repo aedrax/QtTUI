@@ -370,6 +370,21 @@ private slots:
         tw.removeTab(0);
         QCOMPARE(tw.count(), 1);
         QCOMPARE(tw.widget(0), page2);
+        // The removed tab was current: the next page shows
+        QVERIFY(page2->isVisible());
+        QCOMPARE(tw.currentWidget(), page2);
+
+        auto *page3 = new TabTestWidget;
+        tw.addTab(page3, QStringLiteral("P3"));
+        tw.setCurrentIndex(1);
+        QSignalSpy changed(&tw, &QTuiTabWidget::currentChanged);
+        tw.removeTab(0); // before the current tab
+        QCOMPARE(tw.currentIndex(), 0);
+        QCOMPARE(tw.currentWidget(), page3);
+        QVERIFY(page3->isVisible());
+        tw.removeTab(0);
+        QCOMPARE(tw.currentIndex(), -1);
+        QCOMPARE(changed.count(), 2);
     }
 
     void tabWidget_widgetAndIndexOf()

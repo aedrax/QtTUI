@@ -43,16 +43,19 @@ void QTuiTabWidget::removeTab(int index)
 
     QTuiWidget *page = m_pages.takeAt(index);
     page->setVisible(false);
+    // If the current tab changes, the tab bar emits currentChanged(), and
+    // onTabChanged() shows the new current page
+    const int oldIndex = m_currentIndex;
+    m_currentIndex = -1;
     m_tabBar->removeTab(index);
-
-    // Update current index tracking
-    if (m_pages.isEmpty()) {
-        m_currentIndex = -1;
-    } else if (m_currentIndex >= m_pages.size()) {
-        m_currentIndex = m_pages.size() - 1;
+    if (m_currentIndex == -1) {
+        m_currentIndex = m_tabBar->currentIndex();
+        if (m_currentIndex == -1 && oldIndex != -1)
+            emit currentChanged(-1);
     }
 
     updatePageGeometries();
+    markDirty();
 }
 
 int QTuiTabWidget::count() const

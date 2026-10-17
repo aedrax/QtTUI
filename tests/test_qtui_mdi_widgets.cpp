@@ -391,6 +391,38 @@ private slots:
         QCOMPARE(sub.geometry().height(), origH);
     }
 
+    void subWindowStaysInTheArea()
+    {
+        QTuiMdiArea area;
+        area.setGeometry(QRect(10, 5, 30, 12));
+        QTuiMdiSubWindow *sub = area.addSubWindow(nullptr);
+        sub->setGeometry(QRect(10, 5, 20, 8));
+
+        // Ctrl+Arrow stops at the area edge, not at screen column 0
+        sendKey(*sub, Qt::Key_Left, Qt::ControlModifier);
+        sendKey(*sub, Qt::Key_Up, Qt::ControlModifier);
+        QCOMPARE(sub->geometry().topLeft(), QPoint(10, 5));
+        for (int i = 0; i < 20; ++i)
+            sendKey(*sub, Qt::Key_Right, Qt::ControlModifier);
+        QCOMPARE(sub->geometry().right(), area.geometry().right());
+
+        // Shift+Arrow does not grow past the area
+        for (int i = 0; i < 20; ++i)
+            sendKey(*sub, Qt::Key_Down, Qt::ShiftModifier);
+        QCOMPARE(sub->geometry().bottom(), area.geometry().bottom());
+    }
+
+    void subWindowCloseRemovesItFromTheArea()
+    {
+        QTuiMdiArea area;
+        area.setGeometry(QRect(0, 0, 40, 20));
+        QTuiMdiSubWindow *a = area.addSubWindow(nullptr);
+        QTuiMdiSubWindow *b = area.addSubWindow(nullptr);
+        b->close();
+        QCOMPARE(area.subWindowList(), QList<QTuiMdiSubWindow *>{a});
+        QCOMPARE(area.activeSubWindow(), a);
+    }
+
     void subWindowPaintEventRendersTitleAndIndicators()
     {
         QTuiMdiSubWindow sub;
