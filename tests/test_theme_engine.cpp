@@ -106,6 +106,35 @@ private slots:
         engine->setActiveTheme("default");
     }
 
+    void registerActiveThemeEmitsThemeChanged()
+    {
+        auto *engine = Theme_Engine::instance();
+        QHash<QString, ThemeProperties> theme;
+        theme.insert("default", ThemeProperties());
+        engine->registerTheme("again_test", theme);
+        engine->setActiveTheme("again_test");
+
+        QSignalSpy spy(engine, &Theme_Engine::themeChanged);
+        engine->registerTheme("again_test", theme);
+        QCOMPARE(spy.count(), 1);
+        // Another theme does not change the active theme
+        engine->registerTheme("other_test", theme);
+        QCOMPARE(spy.count(), 1);
+
+        engine->setActiveTheme("default");
+    }
+
+    void widgetOverrideMarksTheWidgetDirty()
+    {
+        ThemeTestWidget widget;
+        widget.clearDirtyRegions();
+        Theme_Engine::instance()->setWidgetOverride(&widget, ThemeProperties());
+        QVERIFY(widget.isDirty());
+        widget.clearDirtyRegions();
+        Theme_Engine::instance()->clearWidgetOverride(&widget);
+        QVERIFY(widget.isDirty());
+    }
+
     void setActiveThemeUnknownDoesNothing()
     {
         auto *engine = Theme_Engine::instance();

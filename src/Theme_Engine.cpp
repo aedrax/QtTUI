@@ -80,6 +80,9 @@ void Theme_Engine::registerDefaultTheme()
 void Theme_Engine::registerTheme(const QString &name, const QHash<QString, ThemeProperties> &properties)
 {
     m_themes.insert(name, properties);
+    // A new version of the active theme repaints all widgets
+    if (name == m_activeTheme)
+        emit themeChanged(name);
 }
 
 void Theme_Engine::setActiveTheme(const QString &name)
@@ -135,12 +138,15 @@ void Theme_Engine::setWidgetOverride(QTuiWidget *widget, const ThemeProperties &
         });
     }
     m_overrides.insert(widget, props);
+    widget->markDirty();
 }
 
 void Theme_Engine::clearWidgetOverride(QTuiWidget *widget)
 {
-    if (m_overrides.remove(widget))
+    if (m_overrides.remove(widget)) {
         disconnect(widget, &QObject::destroyed, this, nullptr);
+        widget->markDirty();
+    }
 }
 
 ThemeProperties Theme_Engine::effectiveProperties(const QTuiWidget *widget) const
@@ -323,7 +329,7 @@ bool Theme_Engine::loadTheme(const QString &filePath)
             themeProps.insert(it.key(), parseEntry(it.value().toObject(), defaults));
     }
 
-    m_themes.insert(themeName, themeProps);
+    registerTheme(themeName, themeProps);
     return true;
 }
 

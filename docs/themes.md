@@ -58,7 +58,6 @@ int main(int argc, char *argv[])
     header.foreground = engine->resolveColor(QStringLiteral("#FFD700"));
     header.bold = true;
     engine->setWidgetOverride(title, header);
-    title->markDirty();
 
     window.show();
     app.triggerRender();
@@ -71,13 +70,13 @@ int main(int argc, char *argv[])
 | Function | Description |
 | --- | --- |
 | `static Theme_Engine *instance()` | Returns the engine. The first call makes it, with the `"default"` theme active. |
-| `bool loadTheme(const QString &filePath)` | Reads a theme file and registers the theme under its `"name"`. It does not make the theme active. It returns false and shows a warning if the file cannot be opened, is not valid JSON, or has no `"name"`. |
-| `void registerTheme(const QString &name, const QHash<QString, ThemeProperties> &properties)` | Registers a theme from C++. The keys are widget type names and `"default"`. A theme with the same name is replaced. It does not make the theme active. |
+| `bool loadTheme(const QString &filePath)` | Reads a theme file and registers the theme under its `"name"`, as `registerTheme()` does. It does not make the theme active. It returns false and shows a warning if the file cannot be opened, is not valid JSON, or has no `"name"`. |
+| `void registerTheme(const QString &name, const QHash<QString, ThemeProperties> &properties)` | Registers a theme from C++. The keys are widget type names and `"default"`. A theme with the same name is replaced. It does not make the theme active. If the theme is the active theme, it emits `themeChanged()`. |
 | `void setActiveTheme(const QString &name)` | Makes the theme active and emits `themeChanged()`. An unknown name gives a warning and changes nothing. If the theme is already active, nothing occurs. |
 | `QString activeTheme() const` | Returns the name of the active theme. |
 | `ThemeProperties properties(const QString &widgetType) const` | Returns the properties of a widget type in the active theme. See [Property lookup](#property-lookup). |
-| `void setWidgetOverride(QTuiWidget *widget, const ThemeProperties &props)` | Gives one widget its own properties. They replace the theme properties of that widget in all themes. The engine removes the override when the widget is destroyed. Call `widget->markDirty()` after it, because the function does not repaint. |
-| `void clearWidgetOverride(QTuiWidget *widget)` | Removes the override. The widget uses the theme again. Call `widget->markDirty()` after it. |
+| `void setWidgetOverride(QTuiWidget *widget, const ThemeProperties &props)` | Gives one widget its own properties. They replace the theme properties of that widget in all themes. The engine removes the override when the widget is destroyed. The widget repaints. |
+| `void clearWidgetOverride(QTuiWidget *widget)` | Removes the override. The widget uses the theme again and repaints. |
 | `ThemeProperties effectiveProperties(const QTuiWidget *widget) const` | Returns the override of the widget, or else `properties()` for its class name. A null widget gives the `"default"` properties. `QTuiWidget::themeProperties()` calls this function. |
 | `void setColorAlias(const QString &name, const Color &color)` | Adds a color name for `resolveColor()`. |
 | `Color resolveColor(const QString &nameOrHex) const` | Returns the color of an alias name or of a `"#RRGGBB"` string. Other values give black and a warning. |
@@ -176,6 +175,5 @@ In this file, `QTuiPushButton` gets all colors of the `"default"` entry and bold
 
 ## Notes
 
-- `loadTheme()` and `registerTheme()` do not emit `themeChanged()`. If you replace the active theme, the screen does not change. Call `triggerRender()` on the application to repaint.
 - A color alias in a theme file must be in the same file. Aliases from `setColorAlias()` or from an earlier file do not work in `loadTheme()`.
 - In `AnsiRenderer::NoColor` mode, the renderer uses the `"default"` entry of the active theme to find the focus and selection cells. See [AnsiRenderer](events-and-rendering.md#ansirenderer).
