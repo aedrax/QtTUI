@@ -97,6 +97,11 @@ void QTuiWidget::setVisible(bool visible)
                     setFocusWidget(nullptr);
             }
             m_focusBeforePopup.clear();
+        } else {
+            // As in setEnabled(false): a hidden widget does not keep the focus
+            QTuiWidget *focused = focusWidget();
+            if (focused && (focused == this || isAncestorOf(focused)))
+                setFocusWidget(nullptr);
         }
     }
 
@@ -147,6 +152,8 @@ Qt::FocusPolicy QTuiWidget::focusPolicy() const
 void QTuiWidget::setFocusPolicy(Qt::FocusPolicy policy)
 {
     m_focusPolicy = policy;
+    if (policy == Qt::NoFocus && m_hasFocus)
+        setFocusWidget(nullptr);
 }
 
 bool QTuiWidget::acceptsTextInput() const

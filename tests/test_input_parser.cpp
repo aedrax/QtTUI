@@ -153,8 +153,8 @@ void TestInputParser::property2_modifierKeyPreservation()
         []() {
             // Test xterm-style modifier encoding in CSI sequences
             // CSI 1;{mod+1} {A-D} for arrow keys with modifiers
-            // mod bits: 1=Shift, 2=Alt, 4=Ctrl
-            const int modBits = *rc::gen::inRange(0, 8); // 0-7: all combinations of Shift/Alt/Ctrl
+            // mod bits: 1=Shift, 2=Alt, 4=Ctrl, 8=Meta
+            const int modBits = *rc::gen::inRange(0, 16); // all combinations of Shift/Alt/Ctrl/Meta
             // Pick an arrow key final byte
             const char arrows[] = {'A', 'B', 'C', 'D'};
             const int arrowIdx = *rc::gen::inRange(0, 4);
@@ -164,6 +164,7 @@ void TestInputParser::property2_modifierKeyPreservation()
             if (modBits & 1) expectedMods |= Qt::ShiftModifier;
             if (modBits & 2) expectedMods |= Qt::AltModifier;
             if (modBits & 4) expectedMods |= Qt::ControlModifier;
+            if (modBits & 8) expectedMods |= Qt::MetaModifier;
 
             int modParam = modBits + 1; // xterm encoding: modifier bits + 1
 

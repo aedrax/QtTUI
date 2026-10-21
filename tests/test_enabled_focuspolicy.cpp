@@ -240,6 +240,21 @@ private slots:
         QVERIFY(btn3->hasFocus());
     }
 
+    void hiddenOrNoFocusWidgetLosesTheFocus()
+    {
+        Env env;
+        auto *box = new QTuiWidget(&env.window);
+        auto *btn = new QTuiPushButton(QStringLiteral("One"), box);
+        btn->setFocus();
+        box->setVisible(false);
+        QVERIFY(!btn->hasFocus());
+
+        box->setVisible(true);
+        btn->setFocus();
+        btn->setFocusPolicy(Qt::NoFocus);
+        QVERIFY(!btn->hasFocus());
+    }
+
     void clickingNoFocusWidgetDoesNotStealFocus()
     {
         Env env;

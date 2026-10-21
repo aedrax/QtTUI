@@ -157,8 +157,8 @@ the widget. For the rules, see [Layouts](layouts.md).
 ### Visible and enabled
 
 `setVisible(false)` hides the widget and its children, and marks its area
-dirty. `isVisible()` returns only the flag of the widget, not of its
-parents.
+dirty. If the focus is in the widget, no widget has the focus after it.
+`isVisible()` returns only the flag of the widget, not of its parents.
 
 `setEnabled(false)` disables the widget and all its children.
 `isEnabled()` returns the flag of the widget. `isEffectivelyEnabled()`
@@ -320,12 +320,12 @@ For the event classes, see [Events and rendering](events-and-rendering.md).
 | `QRect geometry() const` | Returns the geometry in absolute screen cells. |
 | `void setGeometry(const QRect &rect)` | Sets the geometry. Marks the old and the new area dirty, applies the layout, and emits `geometryChanged()`. |
 | `bool isVisible() const` | Returns the visible flag of the widget. The default is `true`. |
-| `void setVisible(bool visible)` | Shows or hides the widget, marks its area dirty, and emits `visibilityChanged()`. For a popup, it also keeps and restores the focus. |
+| `void setVisible(bool visible)` | Shows or hides the widget, marks its area dirty, and emits `visibilityChanged()`. For a popup, it also keeps and restores the focus. For other widgets, a hide clears the focus if it is in the widget. |
 | `bool isEnabled() const` | Returns the enabled flag of the widget. |
 | `void setEnabled(bool enabled)` | Enables or disables the widget and its children. Clears the focus if the focus is in the widget. Emits `enabledChanged()`. |
 | `bool isEffectivelyEnabled() const` | Returns `true` if the widget and all its parents are enabled. |
 | `Qt::FocusPolicy focusPolicy() const` | Returns the focus policy. The default is `Qt::NoFocus`. |
-| `void setFocusPolicy(Qt::FocusPolicy policy)` | Sets the focus policy. |
+| `void setFocusPolicy(Qt::FocusPolicy policy)` | Sets the focus policy. With `Qt::NoFocus`, the widget loses the focus. |
 | `virtual bool acceptsTextInput() const` | Returns `true` for a widget that uses printable keys as text. The default is `false`. While such a widget has the focus, a shortcut without a modifier (for example "Q") does not fire, and Ctrl+Z goes to the widget. |
 | `bool hasFocus() const` | Returns `true` if the widget is the focus widget. |
 | `void setFocus()` | Makes the widget the focus widget. Does nothing for `Qt::NoFocus`. |

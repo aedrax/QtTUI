@@ -247,7 +247,7 @@ The parser converts the raw bytes from the terminal into events. It posts each e
 | `ESC O P` to `ESC O S` | F1 to F4. |
 | `CSI Z` | Backtab with Shift. |
 | `CSI n ~` | 1 Home, 2 Insert, 3 Delete, 4 End, 5 PageUp, 6 PageDown, 11-15 F1-F5, 17-21 F6-F10, 23 F11, 24 F12. |
-| xterm modifier parameter (`CSI 1;5A`) | The last parameter minus 1 gives bit 1 Shift, bit 2 Alt, bit 4 Control. |
+| xterm modifier parameter (`CSI 1;5A`) | The last parameter minus 1 gives bit 1 Shift, bit 2 Alt, bit 4 Control, bit 8 Meta. |
 | Kitty keyboard protocol (`CSI code;mods u`) | Tab, Return, Escape, Backspace, letters and other characters. The modifiers are Shift, Alt, Control and Meta. Keypad keys (codes 57399-57426) get `Qt::KeypadModifier`, and keypad Enter is `Qt::Key_Enter`. The parser ignores other private-use codes, for example Caps Lock and F13. |
 | SGR mouse (`CSI < b;x;y M` or `m`) | `M` is a press and `m` is a release. Bit 32 is motion, bit 64 is the wheel. Bits 4, 8 and 16 are Shift, Alt and Control. The parser converts the 1-based position to 0-based and clamps it to the terminal size. |
 | Bracketed paste (`CSI 200~` ... `CSI 201~`) | One `TuiPasteEvent`. The parser changes `"\r\n"` and `"\r"` to `"\n"`. |

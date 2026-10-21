@@ -314,6 +314,7 @@ void InputParser::finishCSI(char finalByte)
         if (modParam & 1) mods |= Qt::ShiftModifier;
         if (modParam & 2) mods |= Qt::AltModifier;
         if (modParam & 4) mods |= Qt::ControlModifier;
+        if (modParam & 8) mods |= Qt::MetaModifier;
     }
 
     switch (finalByte) {
