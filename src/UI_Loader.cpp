@@ -461,14 +461,18 @@ QJsonObject UI_Loader::serializeWidget(const QTuiWidget *widget) const
     if (!widget->isVisible())
         obj.insert(QStringLiteral("visible"), false);
 
-    // Recursively serialize children
+    // Recursively serialize children. The children that the widget makes
+    // itself (a tab bar, scroll bars) come first, and a new widget of the
+    // same type has them too: skip them. Skip popups also.
     const QList<QTuiWidget *> children = widget->childWidgets();
-    if (!children.isEmpty()) {
-        QJsonArray childArray;
-        for (const QTuiWidget *child : children)
-            childArray.append(serializeWidget(child));
-        obj.insert(QStringLiteral("children"), childArray);
+    const int ownChildren = defaults ? int(defaults->childWidgets().size()) : 0;
+    QJsonArray childArray;
+    for (int i = ownChildren; i < children.size(); ++i) {
+        if (!children.at(i)->isPopup())
+            childArray.append(serializeWidget(children.at(i)));
     }
+    if (!childArray.isEmpty())
+        obj.insert(QStringLiteral("children"), childArray);
 
     return obj;
 }

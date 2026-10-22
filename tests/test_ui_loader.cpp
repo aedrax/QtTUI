@@ -1,4 +1,6 @@
 #include <QtTest/QtTest>
+#include <QtTUI/QTuiScrollArea.h>
+#include <QtTUI/QTuiLabel.h>
 #include <QtTUI/UI_Loader.h>
 #include <QRegularExpression>
 #include <memory>
@@ -38,6 +40,7 @@ private slots:
     void testRoundTrip();
     void testLoadFromFile();
     void testSerializeNull();
+    void testSerializeSkipsOwnChildren();
     void testAnyPropertyByName();
     void testPropertiesRoundTrip();
 };
@@ -409,6 +412,23 @@ void TestUILoader::testPropertiesRoundTrip()
     QVERIFY(edit2);
     QCOMPARE(edit2->echoMode(), QTuiLineEdit::NoEcho);
     QCOMPARE(edit2->placeholderText(), QStringLiteral("hint"));
+}
+
+// The scroll bars of a scroll area are not in the output
+void TestUILoader::testSerializeSkipsOwnChildren()
+{
+    UI_Loader loader;
+    QTuiScrollArea area;
+    QVERIFY(!area.childWidgets().isEmpty());
+    QJsonObject obj = QJsonDocument::fromJson(loader.serialize(&area)).object();
+    QVERIFY(!obj.contains(QStringLiteral("children")));
+
+    auto *content = new QTuiLabel(QStringLiteral("Content"));
+    area.setWidget(content);
+    obj = QJsonDocument::fromJson(loader.serialize(&area)).object();
+    QCOMPARE(obj[QStringLiteral("children")].toArray().size(), 1);
+    QCOMPARE(obj[QStringLiteral("children")].toArray()[0].toObject()[QStringLiteral("type")].toString(),
+             QStringLiteral("QTuiLabel"));
 }
 
 QTEST_MAIN(TestUILoader)

@@ -150,7 +150,7 @@ A class without `Q_OBJECT` has only the properties of its nearest base class wit
 - The writable properties that are different from a new widget of the same type. The loader makes the new widget with the factory of the type. For an unregistered type, it writes all writable properties.
 - Enum and flag properties as names. The loader does not write values that JSON cannot hold directly, for example `QRect`.
 - `visible`: only if it is false.
-- `children`: all child widgets, if the widget has children.
+- `children`: the child widgets, if there are any. The widgets that a widget makes itself and popups are not included.
 
 The keys in the output are in alphabetical order.
 
@@ -170,4 +170,4 @@ bool saveForm(const QTuiWidget *root, const QString &filePath)
 }
 ```
 
-`children` includes the widgets that a widget makes itself. For example, a `QTuiTabWidget` makes a `QTuiTabBar`, and a `QTuiScrollArea` makes two `QTuiScrollBar` widgets. If you load the result again, the loader makes these widgets a second time as extra children. A round trip is correct only for widgets without such internal children.
+`children` does not include the widgets that a widget makes itself. For example, a `QTuiTabWidget` makes a `QTuiTabBar`, and a `QTuiScrollArea` makes two `QTuiScrollBar` widgets. A new widget of the same type has these children too, so the loader makes them again. `serialize()` finds them by type: it skips the first children of a widget, one for each child of a new widget of that type.

@@ -12,7 +12,7 @@ public:
     explicit Label(const QString &text, QTuiWidget *parent = nullptr)
         : QTuiWidget(parent), m_text(text) {}
 
-    void setText(const QString &t) { m_text = t; }
+    void setText(const QString &t) { m_text = t; markDirty(); }
 
     QSize minimumSize() const override { return QSize(0, 1); }
 
