@@ -144,6 +144,7 @@ void QTuiComboBox::removeItem(int index)
 void QTuiComboBox::clear()
 {
     closeDropdown();
+    m_editText.clear();
     m_model->removeRows(0, count());
     m_dropdownHighlight = 0;
 }

@@ -337,6 +337,25 @@ private slots:
         delete b;
     }
 
+    // The focus goes away with a widget that the layout hides, and it comes
+    // back when the widget fits again
+    void layoutHiddenWidgetGetsTheFocusBack()
+    {
+        QTuiBoxLayout layout(QTuiBoxLayout::TopToBottom);
+        LayoutTestWidget a(QSize(0, 6));
+        LayoutTestWidget b(QSize(0, 6));
+        b.setFocusPolicy(Qt::StrongFocus);
+        layout.addWidget(&a, 0);
+        layout.addWidget(&b, 0);
+        layout.apply(QRect(0, 0, 20, 12));
+        b.setFocus();
+
+        layout.apply(QRect(0, 0, 20, 6));
+        QVERIFY(!b.hasFocus());
+        layout.apply(QRect(0, 0, 20, 12));
+        QVERIFY(b.hasFocus());
+    }
+
     // User-hidden and layout-hidden widgets must be distinguished: after both
     // kinds of hide, only the layout-hidden one is restored by apply().
     void userHiddenNotRestoredWhileLayoutHiddenIs()

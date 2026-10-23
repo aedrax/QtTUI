@@ -284,7 +284,7 @@ These free functions and aliases are in the same header:
 3. Each item with stretch 0 gets its size hint, if all of these size hints fit. Else it gets its minimum size.
 4. The free space goes to the items with a stretch, in proportion to the stretch. An item never gets less than its minimum size.
 5. Across the direction, a widget fills the area. A widget with the policy `Fixed` or `Maximum` across the direction gets its size hint (at least its minimum size).
-6. If a widget does not fit, the layout hides it. The layout shows the widget again when there is space.
+6. If a widget does not fit, the layout hides it. The layout shows the widget again when there is space. If the widget had the focus, it gets the focus back.
 
 If the layout direction is right-to-left, the layout mirrors the positions horizontally.
 

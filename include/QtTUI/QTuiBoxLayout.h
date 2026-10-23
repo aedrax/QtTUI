@@ -4,6 +4,7 @@
 #include <QtTUI/QtTUIGlobal.h>
 #include <QtTUI/QTuiLayout.h>
 #include <QList>
+#include <QPointer>
 #include <QSet>
 
 namespace QtTUI {
@@ -57,6 +58,8 @@ private:
     // candidates (unlike user-hidden widgets) and are re-shown when space
     // returns.
     QSet<QTuiWidget *> m_layoutHidden;
+    // The focus widget when the layout hid it, to give the focus back
+    QPointer<QTuiWidget> m_hiddenFocus;
 };
 
 // Convenience factory functions

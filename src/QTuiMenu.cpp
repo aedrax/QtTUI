@@ -129,6 +129,8 @@ void QTuiMenu::close()
         }
         emit aboutToHide();
         setVisible(false);
+        // A later popup() can open the menu as a top menu
+        m_parentMenu.clear();
     }
 }
 

@@ -105,6 +105,8 @@ bool QTuiTreeWidgetItemIterator::matchesFlags(QTuiTreeWidgetItem *item) const
     if (m_flags.testFlag(Unchecked) && item->checkState(0) != Qt::Unchecked)
         return false;
     if (m_flags.testFlag(Selected)) {
+        // ponytail: one selectedItems() call per item, O(n^2) for Selected;
+        // ask the selection model per index if large trees need it
         QTuiTreeWidget *tree = item->treeWidget();
         if (!tree || !tree->selectedItems().contains(item))
             return false;

@@ -331,6 +331,10 @@ void QTuiBoxLayout::apply(const QRect &availableArea)
                 qWarning() << "QTuiBoxLayout::apply: widget does not fit, hiding";
                 widget->setGeometry(QRect(0, 0, 0, 0));
                 m_layoutHidden.insert(widget);
+                // A hide clears the focus; keep it for when the widget fits again
+                QTuiWidget *focused = QTuiWidget::focusWidget();
+                if (focused && (focused == widget || widget->isAncestorOf(focused)))
+                    m_hiddenFocus = focused;
                 widget->setVisible(false);
                 continue;
             }
@@ -356,6 +360,11 @@ void QTuiBoxLayout::apply(const QRect &availableArea)
         widget->setGeometry(visualRect(geom, QRect(contentX, contentY, contentW, contentH)));
         widget->setVisible(true);
         m_layoutHidden.remove(widget);
+        if (m_hiddenFocus && !QTuiWidget::focusWidget()
+            && (m_hiddenFocus == widget || widget->isAncestorOf(m_hiddenFocus))) {
+            m_hiddenFocus->setFocus();
+            m_hiddenFocus.clear();
+        }
         pos += alloc;
         consumed += alloc;
     }
