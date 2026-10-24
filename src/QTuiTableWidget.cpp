@@ -156,25 +156,16 @@ QTuiTableWidget::QTuiTableWidget(QTuiWidget *parent)
 {
     m_internalModel->m_itemsRef = &m_items;
     setModel(m_internalModel);
-    connectClicked();
-}
-
-void QTuiTableWidget::connectClicked()
-{
     connect(this, &QTuiAbstractItemView::clicked, this, [this](const QModelIndex &index) {
         emit cellClicked(index.row(), index.column());
     });
 }
 
 QTuiTableWidget::QTuiTableWidget(int rows, int columns, QTuiWidget *parent)
-    : QTuiTableView(parent)
-    , m_internalModel(new QTuiTableWidgetModel(this))
+    : QTuiTableWidget(parent)
 {
-    m_internalModel->m_itemsRef = &m_items;
     resizeItemGrid(rows, columns);
     m_internalModel->setDimensions(rows, columns);
-    setModel(m_internalModel);
-    connectClicked();
 }
 
 QTuiTableWidget::~QTuiTableWidget()
@@ -334,8 +325,7 @@ void QTuiTableWidget::mousePressEvent(TuiMouseEvent *event)
     QTuiTableView::mousePressEvent(event);
     const QModelIndex current = currentIndex();
     if (current != prev)
-        emit currentCellChanged(current.isValid() ? current.row() : -1, current.isValid() ? current.column() : -1,
-                                prev.isValid() ? prev.row() : -1, prev.isValid() ? prev.column() : -1);
+        emit currentCellChanged(current.row(), current.column(), prev.row(), prev.column());
 }
 
 void QTuiTableWidget::syncItemToModel(int row, int column)

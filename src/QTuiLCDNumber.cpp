@@ -115,10 +115,7 @@ void QTuiLCDNumber::setMode(Mode mode)
         return;
     m_mode = mode;
     // Re-display with new mode (marks dirty)
-    if (m_doubleValue == m_intValue)
-        display(m_intValue);
-    else
-        display(m_doubleValue);
+    display(m_doubleValue);
 }
 
 int QTuiLCDNumber::intValue() const

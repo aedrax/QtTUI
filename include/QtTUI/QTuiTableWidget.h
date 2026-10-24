@@ -69,8 +69,6 @@ protected:
 
 private:
     friend class QTuiTableWidgetItem;
-    // Emits cellClicked() for a click on a cell
-    void connectClicked();
     void syncItemToModel(int row, int column);
     void resizeItemGrid(int rows, int columns);
 
