@@ -300,10 +300,7 @@ void QTuiTreeWidget::setColumnCount(int columns)
 
 QTuiTreeWidgetItem *QTuiTreeWidget::currentItem() const
 {
-    QModelIndex idx = currentIndex();
-    if (!idx.isValid())
-        return nullptr;
-    return itemFromIndex(idx);
+    return itemFromIndex(currentIndex());
 }
 
 QList<QTuiTreeWidgetItem *> QTuiTreeWidget::selectedItems() const

@@ -302,21 +302,15 @@ QList<QTuiTableWidgetItem *> QTuiTableWidget::selectedItems() const
 
 void QTuiTableWidget::keyPressEvent(TuiKeyEvent *event)
 {
-    int prevRow = currentIndex().isValid() ? currentIndex().row() : -1;
-    int prevCol = currentIndex().isValid() ? currentIndex().column() : -1;
-
+    const QModelIndex prev = currentIndex();
     QTuiTableView::keyPressEvent(event);
+    const QModelIndex cur = currentIndex();
 
-    int newRow = currentIndex().isValid() ? currentIndex().row() : -1;
-    int newCol = currentIndex().isValid() ? currentIndex().column() : -1;
+    if (cur != prev)
+        emit currentCellChanged(cur.row(), cur.column(), prev.row(), prev.column());
 
-    if (newRow != prevRow || newCol != prevCol)
-        emit currentCellChanged(newRow, newCol, prevRow, prevCol);
-
-    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
-        if (newRow >= 0 && newCol >= 0)
-            emit cellClicked(newRow, newCol);
-    }
+    if (cur.isValid() && (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter))
+        emit cellClicked(cur.row(), cur.column());
 }
 
 void QTuiTableWidget::mousePressEvent(TuiMouseEvent *event)

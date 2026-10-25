@@ -182,8 +182,7 @@ void QTuiListWidget::setCurrentItem(QTuiListWidgetItem *item)
 
 int QTuiListWidget::currentRow() const
 {
-    QModelIndex idx = currentIndex();
-    return idx.isValid() ? idx.row() : -1;
+    return currentIndex().row();
 }
 
 void QTuiListWidget::setCurrentRow(int row)
@@ -194,11 +193,8 @@ void QTuiListWidget::setCurrentRow(int row)
     int prevRow = currentRow();
     setCurrentIndex(m_internalModel->index(row, 0));
 
-    if (prevRow != row) {
-        QTuiListWidgetItem *prev = (prevRow >= 0 && prevRow < m_items.size()) ? m_items.at(prevRow) : nullptr;
-        QTuiListWidgetItem *curr = m_items.at(row);
-        emit currentItemChanged(curr, prev);
-    }
+    if (prevRow != row)
+        emit currentItemChanged(item(row), item(prevRow));
 }
 
 void QTuiListWidget::keyPressEvent(TuiKeyEvent *event)
@@ -211,11 +207,8 @@ void QTuiListWidget::keyPressEvent(TuiKeyEvent *event)
     int newRow = currentRow();
 
     // Emit currentItemChanged if row changed
-    if (newRow != prevRow && newRow >= 0 && newRow < m_items.size()) {
-        QTuiListWidgetItem *prev = (prevRow >= 0 && prevRow < m_items.size()) ? m_items.at(prevRow) : nullptr;
-        QTuiListWidgetItem *curr = m_items.at(newRow);
-        emit currentItemChanged(curr, prev);
-    }
+    if (newRow != prevRow && item(newRow))
+        emit currentItemChanged(item(newRow), item(prevRow));
 
     // Emit itemClicked on Enter/Return
     if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
