@@ -102,13 +102,13 @@ QVariant QTuiTreeWidgetModel::data(const QModelIndex &index, int role) const
 
 Qt::ItemFlags QTuiTreeWidgetModel::flags(const QModelIndex &index) const
 {
-    QTuiTreeWidgetItem *item = index.isValid() ? itemForIndex(index) : nullptr;
+    QTuiTreeWidgetItem *item = itemForIndex(index);
     return item ? item->flags() : Qt::NoItemFlags;
 }
 
 bool QTuiTreeWidgetModel::setData(const QModelIndex &index, const QVariant &value, int role)
 {
-    QTuiTreeWidgetItem *item = index.isValid() ? itemForIndex(index) : nullptr;
+    QTuiTreeWidgetItem *item = itemForIndex(index);
     if (!item)
         return false;
     item->setData(index.column(), role == Qt::EditRole ? Qt::DisplayRole : role, value);
@@ -393,9 +393,7 @@ void QTuiTreeWidget::endRemoveItem()
 
 QTuiTreeWidgetItem *QTuiTreeWidget::itemFromIndex(const QModelIndex &index) const
 {
-    if (!index.isValid())
-        return nullptr;
-    return static_cast<QTuiTreeWidgetItem *>(index.internalPointer());
+    return itemForIndex(index);
 }
 
 } // namespace QtTUI

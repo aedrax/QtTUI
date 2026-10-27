@@ -475,7 +475,7 @@ void QTuiTreeView::onLayoutChanged()
 
     rebuildFlatList();
 
-    int row = currentIdx.isValid() ? flatRowForIndex(currentIdx) : -1;
+    int row = flatRowForIndex(currentIdx);
     if (row >= 0)
         m_currentRow = row;
     if (m_currentRow >= m_flatList.size())
