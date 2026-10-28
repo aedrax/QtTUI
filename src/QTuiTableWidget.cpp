@@ -170,11 +170,8 @@ QTuiTableWidget::QTuiTableWidget(int rows, int columns, QTuiWidget *parent)
 
 QTuiTableWidget::~QTuiTableWidget()
 {
-    for (auto &row : m_items) {
-        for (auto *item : row)
-            delete item;
-    }
-    m_items.clear();
+    for (auto &row : m_items)
+        qDeleteAll(row);
 }
 
 void QTuiTableWidget::setRowCount(int rows)
