@@ -74,21 +74,16 @@ void QTuiDial::paintEvent(ScreenBuffer &buffer)
     //
     // We center this pattern within the widget geometry.
 
-    // Use at least 5 rows and 9 cols for the dial shape
-    int dialW = qMin(geo.width(), qMax(9, geo.width()));
-    int dialH = qMin(geo.height(), qMax(5, geo.height()));
-
-    // Offsets to center the dial in the widget
-    int offX = (geo.width() - dialW) / 2;
-    int offY = (geo.height() - dialH) / 2;
+    const int dialW = geo.width();
+    const int dialH = geo.height();
 
     // Inner width between the side borders (row 2)
     int innerW = dialW - 2; // excluding │ on each side
 
     // Helper to write a character at a position
     auto writeChar = [&](int col, int row, char32_t ch, bool bold = false) {
-        int px = geo.x() + offX + col;
-        int py = geo.y() + offY + row;
+        int px = geo.x() + col;
+        int py = geo.y() + row;
         if (px >= 0 && px < buffer.width() && py >= 0 && py < buffer.height()) {
             Cell &cell = buffer.backCell(px, py);
             cell.setChar(ch);
