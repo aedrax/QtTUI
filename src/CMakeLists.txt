@@ -213,48 +213,50 @@ target_include_directories(QtTUI
 
 target_link_libraries(QtTUI PUBLIC Qt6::Core)
 
-# Install library
-install(TARGETS QtTUI
-    EXPORT QtTUITargets
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    RUNTIME DESTINATION bin
-)
+if(QTTUI_INSTALL)
+    # Install library
+    install(TARGETS QtTUI
+        EXPORT QtTUITargets
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+        RUNTIME DESTINATION bin
+    )
 
-# Install public headers (*.h files)
-install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/QtTUI
-    DESTINATION include
-    FILES_MATCHING PATTERN "*.h"
-)
+    # Install public headers (*.h files)
+    install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/QtTUI
+        DESTINATION include
+        FILES_MATCHING PATTERN "*.h"
+    )
 
-# Install umbrella header (no extension, not matched by *.h glob)
-install(FILES ${PROJECT_SOURCE_DIR}/include/QtTUI/QtTUI
-    DESTINATION include/QtTUI
-)
+    # Install umbrella header (no extension, not matched by *.h glob)
+    install(FILES ${PROJECT_SOURCE_DIR}/include/QtTUI/QtTUI
+        DESTINATION include/QtTUI
+    )
 
-# Install CMake config files for find_package(QtTUI REQUIRED)
-install(EXPORT QtTUITargets
-    FILE QtTUITargets.cmake
-    NAMESPACE QtTUI::
-    DESTINATION lib/cmake/QtTUI
-)
+    # Install CMake config files for find_package(QtTUI REQUIRED)
+    install(EXPORT QtTUITargets
+        FILE QtTUITargets.cmake
+        NAMESPACE QtTUI::
+        DESTINATION lib/cmake/QtTUI
+    )
 
-include(CMakePackageConfigHelpers)
+    include(CMakePackageConfigHelpers)
 
-configure_package_config_file(
-    ${PROJECT_SOURCE_DIR}/cmake/QtTUIConfig.cmake.in
-    ${PROJECT_BINARY_DIR}/QtTUIConfig.cmake
-    INSTALL_DESTINATION lib/cmake/QtTUI
-)
+    configure_package_config_file(
+        ${PROJECT_SOURCE_DIR}/cmake/QtTUIConfig.cmake.in
+        ${PROJECT_BINARY_DIR}/QtTUIConfig.cmake
+        INSTALL_DESTINATION lib/cmake/QtTUI
+    )
 
-write_basic_package_version_file(
-    ${PROJECT_BINARY_DIR}/QtTUIConfigVersion.cmake
-    VERSION ${PROJECT_VERSION}
-    COMPATIBILITY SameMajorVersion
-)
+    write_basic_package_version_file(
+        ${PROJECT_BINARY_DIR}/QtTUIConfigVersion.cmake
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY SameMajorVersion
+    )
 
-install(FILES
-    ${PROJECT_BINARY_DIR}/QtTUIConfig.cmake
-    ${PROJECT_BINARY_DIR}/QtTUIConfigVersion.cmake
-    DESTINATION lib/cmake/QtTUI
-)
+    install(FILES
+        ${PROJECT_BINARY_DIR}/QtTUIConfig.cmake
+        ${PROJECT_BINARY_DIR}/QtTUIConfigVersion.cmake
+        DESTINATION lib/cmake/QtTUI
+    )
+endif()
