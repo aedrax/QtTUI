@@ -478,6 +478,98 @@ private slots:
         QCOMPARE(view.visualRect(model.index(1, 0)).y(), 0);
     }
 
+    // --- Column sizing ---
+
+    void stretchLastSection()
+    {
+        ColorModel model; // cells "r0c0": 4 characters
+        QTuiTableView view;
+        view.setGeometry(QRect(0, 0, 30, 5));
+        view.setModel(&model);
+        QCOMPARE(view.columnWidth(2), 4);
+        view.horizontalHeader()->setStretchLastSection(true);
+        // 30 = 4 + 1 + 4 + 1 + the last column
+        QCOMPARE(view.columnWidth(0), 4);
+        QCOMPARE(view.columnWidth(2), 20);
+    }
+
+    void stretchColumnsShareTheFreeWidth()
+    {
+        ColorModel model;
+        QTuiTableView view;
+        view.setGeometry(QRect(0, 0, 31, 5));
+        view.setModel(&model);
+        view.horizontalHeader()->setSectionResizeMode(0, QTuiHeaderView::Stretch);
+        view.horizontalHeader()->setSectionResizeMode(1, QTuiHeaderView::Stretch);
+        // 31 - 2 separators - 4 (column 2) = 25 for columns 0 and 1
+        QCOMPARE(view.columnWidth(0), 13);
+        QCOMPARE(view.columnWidth(1), 12);
+        QCOMPARE(view.columnWidth(2), 4);
+    }
+
+    void fixedColumnsIgnoreTheContentsAndTheUser()
+    {
+        ColorModel model;
+        QTuiTableView view;
+        view.setGeometry(QRect(0, 0, 40, 5));
+        view.setModel(&model);
+        QTuiHeaderView *header = view.horizontalHeader();
+        header->setSectionResizeMode(QTuiHeaderView::Fixed);
+        header->resizeSection(0, 6);
+        QCOMPARE(view.columnWidth(0), 6);
+        QCOMPARE(view.columnWidth(1), header->sectionSize(1));
+        // Alt+Right does not resize a Fixed column
+        sendKey(view, Qt::Key_Right, Qt::AltModifier);
+        QCOMPARE(view.columnWidth(0), 6);
+        header->setSectionResizeMode(0, QTuiHeaderView::Interactive);
+        sendKey(view, Qt::Key_Right, Qt::AltModifier);
+        QCOMPARE(view.columnWidth(0), 7);
+    }
+
+    void resizeToContentsIgnoresResizes()
+    {
+        ColorModel model;
+        QTuiTableView view;
+        view.setGeometry(QRect(0, 0, 40, 5));
+        view.setModel(&model);
+        view.horizontalHeader()->setSectionResizeMode(QTuiHeaderView::ResizeToContents);
+        view.setColumnWidth(0, 12);
+        QCOMPARE(view.columnWidth(0), 4);
+        sendKey(view, Qt::Key_Right, Qt::AltModifier);
+        QCOMPARE(view.columnWidth(0), 4);
+    }
+
+    // ResizeToContents reads only the visible rows of a large model
+    void resizeToContentsSamplesOnlyTheVisibleRows()
+    {
+        class BigModel : public ColorModel {
+        public:
+            mutable int reads = 0;
+            QVariant data(const QModelIndex &index, int role) const override
+            {
+                if (role != Qt::DisplayRole)
+                    return {};
+                ++reads;
+                // Only row 1000 is wide
+                return index.row() == 1000 ? QStringLiteral("a wide cell") : QStringLiteral("x");
+            }
+        } model;
+        model.rows = 2600000;
+        model.cols = 2;
+        QTuiTableView view;
+        view.setGeometry(QRect(0, 0, 40, 11)); // 10 visible rows
+        view.setModel(&model);
+        view.horizontalHeader()->setSectionResizeMode(QTuiHeaderView::ResizeToContents);
+        QCOMPARE(view.columnWidth(0), 2); // the header "H0"
+        QVERIFY2(model.reads <= 2 * 10, qPrintable(QString::number(model.reads)));
+        view.scrollTo(model.index(1000, 0), QTuiAbstractItemView::PositionAtTop);
+        QCOMPARE(view.columnWidth(0), 11);
+        ScreenBuffer buffer(40, 11);
+        model.reads = 0;
+        view.paintEvent(buffer);
+        QVERIFY2(model.reads <= 4 * 10, qPrintable(QString::number(model.reads)));
+    }
+
     // --- The vim keys in the line edit ---
 
     void lineEditDeleteKeys()

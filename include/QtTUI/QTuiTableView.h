@@ -2,6 +2,7 @@
 #define QTTUI_QTUITABLEVIEW_H
 
 #include <QtTUI/QTuiAbstractItemView.h>
+#include <QtTUI/QTuiHeaderView.h>
 #include <QHash>
 #include <QAbstractItemModel>
 #include <QModelIndex>
@@ -35,12 +36,18 @@ public:
     int sortColumn() const; // -1 if not sorted
     Qt::SortOrder sortOrder() const;
 
-    // Column widths, as in QTableView. A width set here replaces the
-    // natural width (the widest of the header and the visible cells);
-    // columns still shrink if the view is too narrow. Dragging the cell
-    // after a column header with the left button sets its width.
+    // Column widths, as in QTableView. The resize modes of
+    // horizontalHeader() set the widths. In the default mode
+    // (Interactive), a width set here replaces the natural width (the
+    // widest of the header and the visible cells). Columns still shrink if
+    // the view is too narrow. Dragging the cell after a column header with
+    // the left button sets the width of an Interactive column.
     int columnWidth(int column) const;
     void setColumnWidth(int column, int width);
+
+    // The header of the columns. The table paints the header row itself:
+    // this widget stays hidden and keeps the resize modes and the sizes.
+    QTuiHeaderView *horizontalHeader() const;
 
     void paintEvent(ScreenBuffer &buffer) override;
 
@@ -76,7 +83,7 @@ private:
     int m_horizontalScrollOffset = 0;
     static constexpr int m_headerHeight = 1;
     bool m_sortingEnabled = false;
-    QHash<int, int> m_userColumnWidths;
+    QTuiHeaderView *m_header = nullptr;
     int m_resizingColumn = -1; // column that a header drag resizes
     int m_resizeColumnX = 0;   // its left edge, relative to the view
     int m_sortColumn = -1;

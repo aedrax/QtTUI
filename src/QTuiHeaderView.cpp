@@ -86,9 +86,16 @@ void QTuiHeaderView::resizeSection(int logicalIndex, int size)
     if (size < MinSectionSize)
         size = MinSectionSize;
 
+    // The first resize also changes the width of an Interactive column
+    // in a table view, if the size stays the same
+    const bool wasResized = m_resizedSections.contains(logicalIndex);
+    m_resizedSections.insert(logicalIndex);
     int oldSize = m_sectionSizes.at(logicalIndex);
-    if (oldSize == size)
+    if (oldSize == size) {
+        if (!wasResized)
+            emit geometriesChanged();
         return;
+    }
 
     m_sectionSizes[logicalIndex] = size;
     emit sectionResized(logicalIndex, oldSize, size);
@@ -112,6 +119,44 @@ void QTuiHeaderView::setSectionHidden(int logicalIndex, bool hide)
     else
         m_hiddenSections.remove(logicalIndex);
     markDirty();
+}
+
+void QTuiHeaderView::setSectionResizeMode(ResizeMode mode)
+{
+    m_defaultResizeMode = mode;
+    m_resizeModes.clear();
+    emit geometriesChanged();
+}
+
+void QTuiHeaderView::setSectionResizeMode(int logicalIndex, ResizeMode mode)
+{
+    if (logicalIndex < 0)
+        return;
+    m_resizeModes.insert(logicalIndex, mode);
+    emit geometriesChanged();
+}
+
+QTuiHeaderView::ResizeMode QTuiHeaderView::sectionResizeMode(int logicalIndex) const
+{
+    return m_resizeModes.value(logicalIndex, m_defaultResizeMode);
+}
+
+bool QTuiHeaderView::isSectionResized(int logicalIndex) const
+{
+    return m_resizedSections.contains(logicalIndex);
+}
+
+bool QTuiHeaderView::stretchLastSection() const
+{
+    return m_stretchLastSection;
+}
+
+void QTuiHeaderView::setStretchLastSection(bool stretch)
+{
+    if (m_stretchLastSection == stretch)
+        return;
+    m_stretchLastSection = stretch;
+    emit geometriesChanged();
 }
 
 int QTuiHeaderView::count() const
@@ -281,6 +326,12 @@ void QTuiHeaderView::initSections()
             validHidden.insert(idx);
     }
     m_hiddenSections = validHidden;
+    for (auto it = m_resizedSections.begin(); it != m_resizedSections.end();) {
+        if (*it >= n)
+            it = m_resizedSections.erase(it);
+        else
+            ++it;
+    }
     markDirty();
 }
 

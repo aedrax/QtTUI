@@ -12,6 +12,15 @@ QTuiTableView::QTuiTableView(QTuiWidget *parent)
     : QTuiAbstractItemView(parent)
 {
     setFocusPolicy(Qt::StrongFocus);
+    m_header = new QTuiHeaderView(Qt::Horizontal, this);
+    m_header->setFocusPolicy(Qt::NoFocus);
+    m_header->setVisible(false);
+    const auto headerChanged = [this]() {
+        invalidateColumnWidths();
+        markDirty();
+    };
+    connect(m_header, &QTuiHeaderView::sectionResized, this, headerChanged);
+    connect(m_header, &QTuiHeaderView::geometriesChanged, this, headerChanged);
     // Layouts resize views through setGeometry(); no resize events are
     // delivered to child widgets. Re-clamp scrolling whenever our geometry
     // changes so the current cell stays visible after a shrink or grow.
@@ -44,6 +53,7 @@ void QTuiTableView::setModel(QAbstractItemModel *model)
 
     if (m_model)
         connectModel();
+    m_header->setModel(m_model);
     resetSelectionModel();
 }
 
@@ -206,12 +216,13 @@ void QTuiTableView::keyPressEvent(TuiKeyEvent *event)
     // as a drag on the header does. Alt+Up and Alt+Down sort by it, as a
     // header click does.
     if (event->modifiers() == Qt::AltModifier) {
+        const bool resizable = m_header->sectionResizeMode(m_currentCol) == QTuiHeaderView::Interactive;
         switch (event->key()) {
         case Qt::Key_Left:
-            setColumnWidth(m_currentCol, columnWidth(m_currentCol) - 1);
-            return;
         case Qt::Key_Right:
-            setColumnWidth(m_currentCol, columnWidth(m_currentCol) + 1);
+            if (resizable)
+                setColumnWidth(m_currentCol, columnWidth(m_currentCol)
+                                                 + (event->key() == Qt::Key_Left ? -1 : 1));
             return;
         case Qt::Key_Up:
         case Qt::Key_Down:
@@ -289,11 +300,12 @@ int QTuiTableView::columnWidth(int column) const
 
 void QTuiTableView::setColumnWidth(int column, int width)
 {
-    if (column < 0)
-        return;
-    m_userColumnWidths.insert(column, qMax(1, width));
-    invalidateColumnWidths();
-    markDirty();
+    m_header->resizeSection(column, width);
+}
+
+QTuiHeaderView *QTuiTableView::horizontalHeader() const
+{
+    return m_header;
 }
 
 QString QTuiTableView::headerText(int column) const
@@ -380,8 +392,8 @@ void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
             break;
         }
         // A left press on the separator after a header starts a resize
-        if (onHeader && clickX == colEnd && c < cols - 1
-            && event->button() == Qt::LeftButton) {
+        if (onHeader && clickX == colEnd && c < cols - 1 && event->button() == Qt::LeftButton
+            && m_header->sectionResizeMode(c) == QTuiHeaderView::Interactive) {
             m_resizingColumn = c;
             m_resizeColumnX = xOff;
             return;
@@ -649,11 +661,19 @@ const QVector<int> &QTuiTableView::effectiveColumnWidths() const
     const int sampleCount = visibleDataRows > 0 ? visibleDataRows : FallbackSampleRows;
     const int sampleEnd = qMin(rows, sampleFirst + sampleCount);
 
-    // Step 1: Natural width per column = max(header width, widest sampled cell)
+    // Step 1: The width per column from its resize mode. A Fixed column and
+    // a resized Interactive column have the size of the header section.
+    // The other columns have the natural width: the widest of the header
+    // and the sampled cells.
     QVector<int> colWidths(cols, 0);
     for (int c = 0; c < cols; ++c) {
-        QString header = headerText(c);
-        int maxW = header.length();
+        const QTuiHeaderView::ResizeMode mode = m_header->sectionResizeMode(c);
+        if (mode == QTuiHeaderView::Fixed
+            || (mode == QTuiHeaderView::Interactive && m_header->isSectionResized(c))) {
+            colWidths[c] = qMax(1, m_header->sectionSize(c));
+            continue;
+        }
+        int maxW = headerText(c).length();
         for (int r = sampleFirst; r < sampleEnd; ++r) {
             QModelIndex idx = m_model->index(r, c);
             const int len = m_model->data(idx, Qt::DisplayRole).toString().length();
@@ -661,9 +681,6 @@ const QVector<int> &QTuiTableView::effectiveColumnWidths() const
                 maxW = len;
         }
         colWidths[c] = qMax(1, maxW); // at least 1 char per column
-        // A width that the user set replaces the natural width
-        if (m_userColumnWidths.contains(c))
-            colWidths[c] = m_userColumnWidths.value(c);
     }
 
     // Step 2: Constrain total column widths to view width
@@ -711,6 +728,18 @@ const QVector<int> &QTuiTableView::effectiveColumnWidths() const
             }
         }
         colWidths = scaled;
+    } else {
+        // Step 3: The Stretch columns (and the last column with
+        // stretchLastSection) share the free width
+        QVector<int> stretch;
+        for (int c = 0; c < cols; ++c) {
+            if (m_header->sectionResizeMode(c) == QTuiHeaderView::Stretch
+                || (c == cols - 1 && m_header->stretchLastSection()))
+                stretch.append(c);
+        }
+        const int free = availableForCols - totalNatural;
+        for (int i = 0; i < stretch.size(); ++i)
+            colWidths[stretch.at(i)] += free / stretch.size() + (i < free % stretch.size() ? 1 : 0);
     }
 
     m_cachedColumnWidths = colWidths;
