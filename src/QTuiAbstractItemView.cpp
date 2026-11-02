@@ -2,6 +2,7 @@
 #include <QtTUI/TuiEvents.h>
 #include <QtTUI/QTuiStyledItemDelegate.h>
 #include <QtTUI/QTuiLineEdit.h>
+#include <QtTUI/AnsiRenderer.h>
 #include <QCoreApplication>
 #include <QDebug>
 
@@ -195,6 +196,34 @@ bool QTuiAbstractItemView::isSelected(const QModelIndex &index) const
     return m_selectionModel && index.isValid() && m_selectionModel->isSelected(index);
 }
 
+// Reads a color from a value of Qt::ForegroundRole or Qt::BackgroundRole.
+// Returns false if the value is not a color that QtTUI knows.
+static bool colorFromRole(const QVariant &value, Color *color)
+{
+    const int type = value.userType();
+    if (type == qMetaTypeId<Color>()) {
+        *color = value.value<Color>();
+        return true;
+    }
+    if (type == QMetaType::Int || type == QMetaType::UInt
+        || type == QMetaType::LongLong || type == QMetaType::ULongLong) {
+        const qulonglong rgb = value.toULongLong();
+        *color = Color(uint8_t(rgb >> 16), uint8_t(rgb >> 8), uint8_t(rgb));
+        return true;
+    }
+    // A QColor converts to "#rrggbb" if QtGui is in the application
+    if (type == QMetaType::QString || type == QMetaType::QColor) {
+        const QString text = value.toString();
+        bool ok = false;
+        const uint rgb = text.mid(1).toUInt(&ok, 16);
+        if (text.size() != 7 || !text.startsWith(QLatin1Char('#')) || !ok)
+            return false;
+        *color = Color(uint8_t(rgb >> 16), uint8_t(rgb >> 8), uint8_t(rgb));
+        return true;
+    }
+    return false;
+}
+
 Cell QTuiAbstractItemView::itemStyle(const QModelIndex &index, bool isCurrent,
                                      const ThemeProperties &theme) const
 {
@@ -207,6 +236,14 @@ Cell QTuiAbstractItemView::itemStyle(const QModelIndex &index, bool isCurrent,
     style.bold = false;
     style.inverse = false;
     style.underline = cursor && multiple;
+    // The selection and the current item keep the focus colors, as in Qt
+    if (!highlight && index.isValid() && AnsiRenderer::colorMode() != AnsiRenderer::NoColor) {
+        Color color;
+        if (colorFromRole(index.data(Qt::ForegroundRole), &color))
+            style.foreground = color;
+        if (colorFromRole(index.data(Qt::BackgroundRole), &color))
+            style.background = color;
+    }
     // Without focus, the selection stays visible but does not look like
     // focus: half the focus color on the background, and bold text (which
     // also shows without color)

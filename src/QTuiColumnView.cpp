@@ -269,10 +269,7 @@ void QTuiColumnView::paintEvent(ScreenBuffer &buffer)
                 if (hasChildren)
                     text += QStringLiteral(" ▶");
 
-                Cell style = (isCurrent || isSelected(idx))
-                    ? cellStyle(theme.focusForeground, theme.focusBackground)
-                    : cellStyle(theme.foreground, theme.background);
-                style.inverse = isCurrent;
+                const Cell style = itemStyle(idx, isCurrent, theme);
                 fillRect(buffer, QRect(geo.x() + xOffset, screenY, drawWidth, 1), style);
                 renderText(buffer, geo.x() + xOffset, screenY, text, drawWidth, style);
             }

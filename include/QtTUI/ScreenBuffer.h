@@ -3,6 +3,7 @@
 
 #include <QtTUI/QtTUIGlobal.h>
 #include <QtTUI/QtTuiUnicode.h>
+#include <QMetaType>
 #include <QPoint>
 #include <QString>
 #include <QVector>
@@ -146,5 +147,9 @@ private:
 };
 
 } // namespace QtTUI
+
+// A model can return a Color in a QVariant (Qt::ForegroundRole and
+// Qt::BackgroundRole, see QTuiAbstractItemView::itemStyle())
+Q_DECLARE_METATYPE(QtTUI::Color)
 
 #endif // QTTUI_SCREENBUFFER_H

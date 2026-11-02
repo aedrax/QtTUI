@@ -158,7 +158,20 @@ protected:
     // current item of a focused view also has the focus colors in
     // SingleSelection and NoSelection, and an underline in the multiple
     // modes, where it can be current but not selected.
-    Cell itemStyle(const QModelIndex &index, bool isCurrent, const ThemeProperties &theme) const;
+    //
+    // Other items use the theme colors, or the colors that the model gives
+    // for Qt::ForegroundRole and Qt::BackgroundRole. The selection and the
+    // current item keep the focus colors, as in Qt. A role value can be:
+    //   a QtTUI::Color      QVariant::fromValue(Color(255, 0, 0))
+    //   an integer          0xRRGGBB (int, uint, qlonglong or qulonglong)
+    //   a string            "#RRGGBB"; a QColor also works if the
+    //                       application links QtGui, which converts it
+    // The view ignores other values (for example a QBrush) and
+    // Qt::FontRole (QFont is in QtGui). In the NoColor mode of
+    // AnsiRenderer, the view ignores the role colors.
+    // Override this function to use a different rule.
+    virtual Cell itemStyle(const QModelIndex &index, bool isCurrent,
+                           const ThemeProperties &theme) const;
     // The items from `from` to `to` in the order of the view. The default
     // is the rectangle between the two indexes if they have the same parent.
     virtual QItemSelection selectionRange(const QModelIndex &from, const QModelIndex &to) const;

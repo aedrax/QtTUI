@@ -259,3 +259,6 @@ qttui_add_test(test_selection test_selection.cpp)
 # Editing tests: edit triggers, the editor lifetime, scrollTo() and
 # visualRect() of the item views
 qttui_add_test(test_editing test_editing.cpp)
+
+# Item view colors, paging and vim keys, wheel, column resize modes
+qttui_add_test(test_item_view_features test_item_view_features.cpp)
