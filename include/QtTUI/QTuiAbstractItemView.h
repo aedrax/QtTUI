@@ -13,6 +13,7 @@
 namespace QtTUI {
 
 class TuiKeyEvent;
+class TuiMouseEvent;
 class QTuiItemDelegate;
 
 // Base class of the model/view widgets, like QAbstractItemView: the
@@ -44,6 +45,7 @@ class QTuiAbstractItemView : public QTuiAbstractScrollArea {
     Q_PROPERTY(SelectionMode selectionMode READ selectionMode WRITE setSelectionMode)
     Q_PROPERTY(SelectionBehavior selectionBehavior READ selectionBehavior WRITE setSelectionBehavior)
     Q_PROPERTY(EditTriggers editTriggers READ editTriggers WRITE setEditTriggers)
+    Q_PROPERTY(int wheelScrollLines READ wheelScrollLines WRITE setWheelScrollLines)
 public:
     enum SelectionMode {
         NoSelection,
@@ -71,6 +73,14 @@ public:
 
     enum ScrollHint { EnsureVisible, PositionAtTop, PositionAtBottom, PositionAtCenter };
     Q_ENUM(ScrollHint)
+
+    // The moves of the current item, as in Qt, and two vim moves of half
+    // a page
+    enum CursorAction {
+        MoveUp, MoveDown, MoveLeft, MoveRight, MoveHome, MoveEnd,
+        MovePageUp, MovePageDown, MoveHalfPageUp, MoveHalfPageDown
+    };
+    Q_ENUM(CursorAction)
 
     explicit QTuiAbstractItemView(QTuiWidget *parent = nullptr);
 
@@ -113,6 +123,12 @@ public:
     // Closes the editor. With commit, the editor writes its value first.
     void closeEditor(bool commit = true);
 
+    // The rows that one notch of the mouse wheel scrolls (wheelDelta() /
+    // 120 notches). The default is 3. The wheel does not change the
+    // current item, as in Qt.
+    int wheelScrollLines() const;
+    void setWheelScrollLines(int lines);
+
     // Scrolls the view so that the item is visible. A tree view also
     // expands the parents of the item.
     virtual void scrollTo(const QModelIndex &index, ScrollHint hint = EnsureVisible) = 0;
@@ -142,6 +158,22 @@ protected:
     // F2 and typed characters (the key edit triggers). Returns true if the
     // key opened an editor.
     bool editKeyPressEvent(TuiKeyEvent *event);
+    // Reads the move of a navigation key. Returns false for other keys.
+    // The keys are the arrow keys, Page Up, Page Down, Home and End (also
+    // with Ctrl), and the vim keys: h, j, k and l (J and K extend the
+    // selection), g (or gg) and G, Ctrl+F and Ctrl+B (one page), Ctrl+D
+    // and Ctrl+U (half a page). *modifiers gets the modifiers for
+    // selectCurrent(): Shift extends the selection, as with the arrow keys.
+    bool cursorAction(const TuiKeyEvent *event, CursorAction *action,
+                      Qt::KeyboardModifiers *modifiers) const;
+    // The row after a vertical move in a view that shows visibleRows rows
+    // of rowCount rows. A page is visibleRows - 1 rows. MoveLeft and
+    // MoveRight do not change the row.
+    static int movedRow(CursorAction action, int row, int rowCount, int visibleRows);
+    // Scrolls *offset (the first row that shows) for a wheel event, in a
+    // view that shows visibleRows rows of rowCount rows. Returns false if
+    // the event is not a wheel event.
+    bool wheelScroll(const TuiMouseEvent *event, int *offset, int visibleRows, int rowCount);
     // Moves m_scrollOffset to show `row` of `rowCount` rows in
     // `visibleRows` lines, as the hint says
     void scrollToRow(int row, int visibleRows, int rowCount, ScrollHint hint);
@@ -199,6 +231,7 @@ private:
     // Children of the editor that the view watches for focus loss
     QList<QPointer<QTuiWidget>> m_watchedEditorWidgets;
     EditTriggers m_editTriggers = EditTriggers(DoubleClicked | EditKeyPressed);
+    int m_wheelScrollLines = 3;
     QTuiItemDelegate *m_defaultDelegate = nullptr;
     // True while the view follows a current index set on the selection
     // model, so that selectCurrent() does not change the selection

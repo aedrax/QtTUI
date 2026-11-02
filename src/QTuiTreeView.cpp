@@ -233,24 +233,21 @@ void QTuiTreeView::keyPressEvent(TuiKeyEvent *event)
     if (editKeyPressEvent(event) || selectionKeyPressEvent(event))
         return;
     const int previousRow = m_currentRow;
-
-    switch (event->key()) {
-    case Qt::Key_Up:
-        if (m_currentRow > 0) {
-            --m_currentRow;
+    CursorAction action;
+    Qt::KeyboardModifiers modifiers = event->modifiers();
+    int key = event->key();
+    if (cursorAction(event, &action, &modifiers)) {
+        if (action == MoveLeft || action == MoveRight) {
+            key = action == MoveLeft ? Qt::Key_Left : Qt::Key_Right;
+        } else {
+            m_currentRow = movedRow(action, m_currentRow, m_flatList.size(), geometry().height());
             scrollToVisible();
             markDirty();
+            key = 0;
         }
-        break;
+    }
 
-    case Qt::Key_Down:
-        if (m_currentRow < m_flatList.size() - 1) {
-            ++m_currentRow;
-            scrollToVisible();
-            markDirty();
-        }
-        break;
-
+    switch (key) {
     case Qt::Key_Right: {
         const FlattenedItem &item = m_flatList.at(m_currentRow);
         if (m_model->hasChildren(item.index)) {
@@ -302,11 +299,13 @@ void QTuiTreeView::keyPressEvent(TuiKeyEvent *event)
     }
 
     if (m_currentRow != previousRow)
-        selectCurrent(event->modifiers(), false);
+        selectCurrent(modifiers, false);
 }
 
 void QTuiTreeView::mousePressEvent(TuiMouseEvent *event)
 {
+    if (wheelScroll(event, &m_scrollOffset, geometry().height(), m_flatList.size()))
+        return;
     // The Press before the DoubleClick already made the item current
     if (event->mouseType() == TuiMouseEvent::DoubleClick) {
         const QModelIndex index = currentIndex();

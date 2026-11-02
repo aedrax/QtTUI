@@ -224,37 +224,27 @@ void QTuiTableView::keyPressEvent(TuiKeyEvent *event)
         }
     }
 
-    const int rowCount = m_model->rowCount();
-    const int colCount = m_model->columnCount();
     const QModelIndex previous = currentIndex();
-
-    switch (event->key()) {
-    case Qt::Key_Up:
-        m_currentRow = qMax(0, m_currentRow - 1);
-        ensureCurrentVisible();
-        break;
-    case Qt::Key_Down:
-        m_currentRow = qMin(rowCount - 1, m_currentRow + 1);
-        ensureCurrentVisible();
-        break;
-    case Qt::Key_Left:
-        m_currentCol = qMax(0, m_currentCol - 1);
-        ensureColumnVisible(m_currentCol);
-        break;
-    case Qt::Key_Right:
-        m_currentCol = qMin(colCount - 1, m_currentCol + 1);
-        ensureColumnVisible(m_currentCol);
-        break;
-    case Qt::Key_Return:
-    case Qt::Key_Enter:
+    CursorAction action;
+    Qt::KeyboardModifiers modifiers;
+    // Home and End (also with Ctrl) go to the first and the last row and
+    // keep the column: a cell has no text cursor to move
+    if (cursorAction(event, &action, &modifiers)) {
+        if (action == MoveLeft || action == MoveRight) {
+            m_currentCol = qBound(0, m_currentCol + (action == MoveLeft ? -1 : 1),
+                                  m_model->columnCount() - 1);
+            ensureColumnVisible(m_currentCol);
+        } else {
+            m_currentRow = movedRow(action, m_currentRow, m_model->rowCount(),
+                                    geometry().height() - m_headerHeight);
+            ensureCurrentVisible();
+        }
+    } else if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
         emit activated(m_model->index(m_currentRow, m_currentCol));
-        break;
-    default:
-        break;
     }
 
     if (currentIndex() != previous)
-        selectCurrent(event->modifiers(), false);
+        selectCurrent(modifiers, false);
     markDirty();
 }
 
@@ -316,6 +306,19 @@ QString QTuiTableView::headerText(int column) const
 
 void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
 {
+    // Shift+wheel scrolls one column per notch. Some terminals keep
+    // Shift+wheel for their own scrollback.
+    if (m_model && event->mouseType() == TuiMouseEvent::Wheel
+        && (event->modifiers() & Qt::ShiftModifier)) {
+        const int column = m_horizontalScrollOffset - event->wheelDelta() / 120;
+        m_horizontalScrollOffset = qBound(0, column, qMax(0, m_model->columnCount() - 1));
+        updateEditorGeometry();
+        markDirty();
+        return;
+    }
+    if (m_model && wheelScroll(event, &m_scrollOffset, geometry().height() - m_headerHeight,
+                               m_model->rowCount()))
+        return;
     // The Press before the DoubleClick already made the item current
     if (event->mouseType() == TuiMouseEvent::DoubleClick) {
         const QModelIndex index = currentIndex();

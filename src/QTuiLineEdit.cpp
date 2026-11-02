@@ -412,6 +412,25 @@ void QTuiLineEdit::keyPressEvent(TuiKeyEvent *event)
         case Qt::Key_A: selectAll(); return;
         case Qt::Key_Z: undo(); return;
         case Qt::Key_Y: redo(); return;
+        case Qt::Key_W:
+        case Qt::Key_U: {
+            // The vim and shell insert keys: Ctrl+U deletes the text before
+            // the cursor, Ctrl+W the word before the cursor (up to a space)
+            int start = 0;
+            if (key == Qt::Key_W) {
+                start = m_cursorPos;
+                while (start > 0 && m_text.at(start - 1).isSpace())
+                    --start;
+                while (start > 0 && !m_text.at(start - 1).isSpace())
+                    --start;
+            }
+            replaceRange(start, m_cursorPos, QString());
+            adjustScrollToCursor();
+            markDirty();
+            if (m_completer && m_text != oldText)
+                m_completer->updateForText(this, m_text);
+            return;
+        }
         default: break;
         }
     }

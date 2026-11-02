@@ -435,6 +435,68 @@ bool QTuiAbstractItemView::editKeyPressEvent(TuiKeyEvent *event)
     return false;
 }
 
+bool QTuiAbstractItemView::cursorAction(const TuiKeyEvent *event, CursorAction *action,
+                                        Qt::KeyboardModifiers *modifiers) const
+{
+    const Qt::KeyboardModifiers mods = event->modifiers();
+    *modifiers = mods;
+    switch (event->key()) {
+    case Qt::Key_Up:       *action = MoveUp; return true;
+    case Qt::Key_Down:     *action = MoveDown; return true;
+    case Qt::Key_Left:     *action = MoveLeft; return true;
+    case Qt::Key_Right:    *action = MoveRight; return true;
+    case Qt::Key_Home:     *action = MoveHome; return true;
+    case Qt::Key_End:      *action = MoveEnd; return true;
+    case Qt::Key_PageUp:   *action = MovePageUp; return true;
+    case Qt::Key_PageDown: *action = MovePageDown; return true;
+    default: break;
+    }
+
+    // The vim keys: Ctrl+F, Ctrl+B, Ctrl+D and Ctrl+U move as the keys
+    // without Ctrl, so the selection follows
+    if (mods == Qt::ControlModifier) {
+        *modifiers = Qt::NoModifier;
+        switch (event->key()) {
+        case Qt::Key_F: *action = MovePageDown; return true;
+        case Qt::Key_B: *action = MovePageUp; return true;
+        case Qt::Key_D: *action = MoveHalfPageDown; return true;
+        case Qt::Key_U: *action = MoveHalfPageUp; return true;
+        default: return false;
+        }
+    }
+    // A letter without Ctrl, Alt or Meta. J and K have Shift, so they
+    // extend the selection. G goes to the end and does not extend.
+    if (mods & ~Qt::ShiftModifier || event->text().size() != 1)
+        return false;
+    switch (event->text().at(0).unicode()) {
+    case 'h': case 'H': *action = MoveLeft; return true;
+    case 'j': case 'J': *action = MoveDown; return true;
+    case 'k': case 'K': *action = MoveUp; return true;
+    case 'l': case 'L': *action = MoveRight; return true;
+    case 'g':           *action = MoveHome; return true;
+    case 'G':           *action = MoveEnd; *modifiers = Qt::NoModifier; return true;
+    default: return false;
+    }
+}
+
+int QTuiAbstractItemView::movedRow(CursorAction action, int row, int rowCount, int visibleRows)
+{
+    const int page = qMax(1, visibleRows - 1);
+    switch (action) {
+    case MoveUp:           row -= 1; break;
+    case MoveDown:         row += 1; break;
+    case MoveHome:         row = 0; break;
+    case MoveEnd:          row = rowCount - 1; break;
+    case MovePageUp:       row -= page; break;
+    case MovePageDown:     row += page; break;
+    case MoveHalfPageUp:   row -= qMax(1, visibleRows / 2); break;
+    case MoveHalfPageDown: row += qMax(1, visibleRows / 2); break;
+    case MoveLeft:
+    case MoveRight:        break;
+    }
+    return qBound(0, row, qMax(0, rowCount - 1));
+}
+
 bool QTuiAbstractItemView::eventFilter(QObject *watched, QEvent *event)
 {
     if (watched == m_editor && event->type() == TuiEventTypes::keyEventType()) {
@@ -458,6 +520,34 @@ bool QTuiAbstractItemView::eventFilter(QObject *watched, QEvent *event)
         }
     }
     return QTuiAbstractScrollArea::eventFilter(watched, event);
+}
+
+int QTuiAbstractItemView::wheelScrollLines() const
+{
+    return m_wheelScrollLines;
+}
+
+void QTuiAbstractItemView::setWheelScrollLines(int lines)
+{
+    m_wheelScrollLines = qMax(1, lines);
+}
+
+bool QTuiAbstractItemView::wheelScroll(const TuiMouseEvent *event, int *offset,
+                                       int visibleRows, int rowCount)
+{
+    if (event->mouseType() != TuiMouseEvent::Wheel)
+        return false;
+    // A positive delta is away from the user: scroll up
+    const int notches = event->wheelDelta() / 120;
+    // The same limits as scrollToRow()
+    const int newOffset = qBound(0, *offset - notches * m_wheelScrollLines,
+                                 qMax(0, rowCount - visibleRows));
+    if (newOffset != *offset) {
+        *offset = newOffset;
+        markDirty();
+        updateEditorGeometry();
+    }
+    return true;
 }
 
 void QTuiAbstractItemView::scrollToRow(int row, int visibleRows, int rowCount, ScrollHint hint)

@@ -132,33 +132,25 @@ void QTuiListView::keyPressEvent(TuiKeyEvent *event)
     if (editKeyPressEvent(event) || selectionKeyPressEvent(event))
         return;
 
-    const int rowCount = m_model->rowCount();
     const int previousRow = m_currentRow;
-
-    switch (event->key()) {
-    case Qt::Key_Up:
-        m_currentRow = qMax(0, m_currentRow - 1);
+    CursorAction action;
+    Qt::KeyboardModifiers modifiers;
+    if (cursorAction(event, &action, &modifiers)) {
+        m_currentRow = movedRow(action, m_currentRow, m_model->rowCount(), geometry().height());
         ensureCurrentVisible();
-        break;
-    case Qt::Key_Down:
-        m_currentRow = qMin(rowCount - 1, m_currentRow + 1);
-        ensureCurrentVisible();
-        break;
-    case Qt::Key_Return:
-    case Qt::Key_Enter:
+    } else if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
         emit activated(m_model->index(m_currentRow, 0));
-        break;
-    default:
-        break;
     }
 
     if (m_currentRow != previousRow)
-        selectCurrent(event->modifiers(), false);
+        selectCurrent(modifiers, false);
     markDirty();
 }
 
 void QTuiListView::mousePressEvent(TuiMouseEvent *event)
 {
+    if (m_model && wheelScroll(event, &m_scrollOffset, geometry().height(), m_model->rowCount()))
+        return;
     // The Press before the DoubleClick already made the item current
     if (event->mouseType() == TuiMouseEvent::DoubleClick) {
         const QModelIndex index = currentIndex();

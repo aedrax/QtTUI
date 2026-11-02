@@ -48,13 +48,15 @@ private:
     struct Column {
         QModelIndex rootIndex;
         int currentRow;
+        int firstRow = 0; // the first row that shows
     };
 
     void rebuildColumns();
     // The item at a screen position and its column; an invalid index if
     // no item is there
     QModelIndex indexAt(const QPoint &pos, int *column = nullptr) const;
-    // Scrolls so that the column (the active column if -1) is visible
+    // Scrolls so that the column (the active column if -1) is visible, and
+    // so that the current row of each column is visible
     void scrollToVisible(int column = -1);
     void connectModel();
     void disconnectModel();
@@ -62,7 +64,7 @@ private:
 
     QList<Column> m_columns;
     int m_activeColumn = 0;
-    int m_scrollOffset = 0;
+    int m_firstColumn = 0; // the first column that shows
     int m_defaultColumnWidth = 20;
     QList<int> m_columnWidths;
 };

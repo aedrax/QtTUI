@@ -30,7 +30,7 @@ void QTuiColumnView::setModel(QAbstractItemModel *model)
     m_model = model;
     m_columns.clear();
     m_activeColumn = 0;
-    m_scrollOffset = 0;
+    m_firstColumn = 0;
 
     if (m_model) {
         connectModel();
@@ -115,14 +115,16 @@ QRect QTuiColumnView::visualRect(const QModelIndex &index) const
     if (!m_model || index.model() != m_model)
         return QRect();
     const QRect geo = geometry();
-    if (index.row() >= geo.height())
-        return QRect();
     // The same column positions as paintEvent
     int x = 0;
-    for (int ci = m_scrollOffset; ci < m_columns.size() && x < geo.width(); ++ci) {
+    for (int ci = m_firstColumn; ci < m_columns.size() && x < geo.width(); ++ci) {
         const int width = qMin(columnWidth(ci), geo.width() - x);
-        if (m_columns.at(ci).rootIndex == index.parent())
-            return QRect(geo.x() + x, geo.y() + index.row(), width, 1);
+        if (m_columns.at(ci).rootIndex == index.parent()) {
+            const int line = index.row() - m_columns.at(ci).firstRow;
+            if (line < 0 || line >= geo.height())
+                return QRect();
+            return QRect(geo.x() + x, geo.y() + line, width, 1);
+        }
         x += width + 1;
     }
     return QRect();
@@ -133,15 +135,16 @@ QModelIndex QTuiColumnView::indexAt(const QPoint &pos, int *column) const
     if (!m_model)
         return QModelIndex();
     const QRect geo = geometry();
-    const int row = pos.y() - geo.y();
+    const int line = pos.y() - geo.y();
     // The same column positions as paintEvent
     int x = 0;
-    for (int ci = m_scrollOffset; ci < m_columns.size() && x < geo.width(); ++ci) {
+    for (int ci = m_firstColumn; ci < m_columns.size() && x < geo.width(); ++ci) {
         const int width = qMin(columnWidth(ci), geo.width() - x);
         const int col = pos.x() - geo.x() - x;
         if (col >= 0 && col < width) {
             const QModelIndex root = m_columns.at(ci).rootIndex;
-            if (row < 0 || row >= m_model->rowCount(root))
+            const int row = line + m_columns.at(ci).firstRow;
+            if (line < 0 || line >= geo.height() || row >= m_model->rowCount(root))
                 return QModelIndex();
             if (column)
                 *column = ci;
@@ -169,6 +172,16 @@ void QTuiColumnView::mousePressEvent(TuiMouseEvent *event)
         if ((editTriggers() & DoubleClicked) && edit(index))
             return;
         emit activated(index);
+        return;
+    }
+    // The wheel scrolls the column under the mouse, or the active column
+    if (event->mouseType() == TuiMouseEvent::Wheel) {
+        int column = m_activeColumn;
+        indexAt(QPoint(event->x(), geometry().y()), &column);
+        if (m_model && column >= 0 && column < m_columns.size()) {
+            Column &col = m_columns[column];
+            wheelScroll(event, &col.firstRow, geometry().height(), m_model->rowCount(col.rootIndex));
+        }
         return;
     }
     if (event->mouseType() != TuiMouseEvent::Press)
@@ -244,7 +257,7 @@ void QTuiColumnView::paintEvent(ScreenBuffer &buffer)
 
     // Draw each visible column
     int xOffset = 0;
-    for (int ci = m_scrollOffset; ci < m_columns.size(); ++ci) {
+    for (int ci = m_firstColumn; ci < m_columns.size(); ++ci) {
         int colW = columnWidth(ci);
         if (xOffset >= viewWidth)
             break;
@@ -258,12 +271,13 @@ void QTuiColumnView::paintEvent(ScreenBuffer &buffer)
 
         for (int vr = 0; vr < viewHeight; ++vr) {
             int screenY = geo.y() + vr;
+            const int row = col.firstRow + vr;
 
-            if (vr < rowCount) {
-                QModelIndex idx = m_model->index(vr, 0, col.rootIndex);
+            if (row < rowCount) {
+                QModelIndex idx = m_model->index(row, 0, col.rootIndex);
                 QString text = m_model->data(idx, Qt::DisplayRole).toString();
                 bool hasChildren = m_model->hasChildren(idx);
-                bool isCurrent = (isActiveCol && vr == col.currentRow);
+                bool isCurrent = (isActiveCol && row == col.currentRow);
 
                 // Append arrow indicator for items with children
                 if (hasChildren)
@@ -302,27 +316,27 @@ void QTuiColumnView::keyPressEvent(TuiKeyEvent *event)
         return;
 
     Column &activeCol = m_columns[m_activeColumn];
-    int rowCount = m_model->rowCount(activeCol.rootIndex);
     const QModelIndex previous = currentIndex();
-
-    switch (event->key()) {
-    case Qt::Key_Up:
-        if (activeCol.currentRow > 0) {
-            --activeCol.currentRow;
-            // When moving up/down, rebuild child columns for new selection
-            rebuildColumns();
-            markDirty();
+    CursorAction action;
+    Qt::KeyboardModifiers modifiers = event->modifiers();
+    int key = event->key();
+    if (cursorAction(event, &action, &modifiers)) {
+        if (action == MoveLeft || action == MoveRight) {
+            key = action == MoveLeft ? Qt::Key_Left : Qt::Key_Right;
+        } else {
+            const int row = movedRow(action, activeCol.currentRow,
+                                     m_model->rowCount(activeCol.rootIndex), geometry().height());
+            if (row != activeCol.currentRow) {
+                activeCol.currentRow = row;
+                // A different item: rebuild the child columns
+                rebuildColumns();
+                markDirty();
+            }
+            key = 0;
         }
-        break;
+    }
 
-    case Qt::Key_Down:
-        if (activeCol.currentRow < rowCount - 1) {
-            ++activeCol.currentRow;
-            rebuildColumns();
-            markDirty();
-        }
-        break;
-
+    switch (key) {
     case Qt::Key_Right: {
         // Move into child column if current item has children
         QModelIndex idx = currentIndex();
@@ -360,7 +374,7 @@ void QTuiColumnView::keyPressEvent(TuiKeyEvent *event)
     }
 
     if (currentIndex() != previous)
-        selectCurrent(event->modifiers(), false);
+        selectCurrent(modifiers, false);
 }
 
 // --- Model signal slots ---
@@ -403,7 +417,7 @@ void QTuiColumnView::onModelReset()
 {
     m_columns.clear();
     m_activeColumn = 0;
-    m_scrollOffset = 0;
+    m_firstColumn = 0;
     rebuildColumns();
     markDirty();
 }
@@ -501,18 +515,23 @@ void QTuiColumnView::scrollToVisible(int column)
 {
     if (column < 0)
         column = m_activeColumn;
+    const int viewHeight = geometry().height();
+    for (Column &col : m_columns) {
+        if (viewHeight > 0)
+            col.firstRow = qBound(col.currentRow - viewHeight + 1, col.firstRow, col.currentRow);
+    }
     int viewWidth = geometry().width();
     if (viewWidth <= 0)
         return;
 
     // Calculate total width of columns from scrollOffset to activeColumn
     // Ensure the column is visible
-    if (column < m_scrollOffset)
-        m_scrollOffset = column;
+    if (column < m_firstColumn)
+        m_firstColumn = column;
 
     // Check if the column fits in view
     int usedWidth = 0;
-    for (int ci = m_scrollOffset; ci <= column && ci < m_columns.size(); ++ci) {
+    for (int ci = m_firstColumn; ci <= column && ci < m_columns.size(); ++ci) {
         int colW = columnWidth(ci);
         // Add separator width
         if (ci < m_columns.size() - 1)
@@ -521,12 +540,12 @@ void QTuiColumnView::scrollToVisible(int column)
     }
 
     // If the column doesn't fit, scroll right
-    while (usedWidth > viewWidth && m_scrollOffset < column) {
-        int removedW = columnWidth(m_scrollOffset);
-        if (m_scrollOffset < m_columns.size() - 1)
+    while (usedWidth > viewWidth && m_firstColumn < column) {
+        int removedW = columnWidth(m_firstColumn);
+        if (m_firstColumn < m_columns.size() - 1)
             removedW += 1;
         usedWidth -= removedW;
-        ++m_scrollOffset;
+        ++m_firstColumn;
     }
 }
 
