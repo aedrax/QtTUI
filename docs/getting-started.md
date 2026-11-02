@@ -20,13 +20,14 @@ The tests use Qt Test and RapidCheck. If RapidCheck is not installed, CMake
 downloads it. The demos build to `build/demos/demo_hello`, `demo_todo`,
 `demo_table` and `demo_gallery`.
 
-Two CMake options control what builds. Both are `ON` only when QtTUI is the
-top-level project.
+Three CMake options control what builds and installs. All are `ON` only
+when QtTUI is the top-level project.
 
 | Option | Description |
 | --- | --- |
 | `QTTUI_BUILD_TESTS` | Builds the tests in `tests/`. |
 | `QTTUI_BUILD_DEMOS` | Builds the demos in `demos/`. |
+| `QTTUI_INSTALL` | Adds the install rules for the library, the headers and the CMake package. |
 
 QtTUI is a static library only. Do not set `BUILD_SHARED_LIBS` for it: the
 public headers have no export macro. QtTUI is tested on Linux only. The

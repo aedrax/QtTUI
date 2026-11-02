@@ -55,7 +55,8 @@ find_package(QtTUI REQUIRED)
 target_link_libraries(my_app PRIVATE QtTUI::QtTUI)
 ```
 
-Or add the source tree. The QtTUI tests and demos then do not build.
+Or add the source tree. The QtTUI tests and demos then do not build, and
+QtTUI adds no install rules (set `QTTUI_INSTALL` to `ON` to add them).
 
 ```cmake
 add_subdirectory(QtTUI)
@@ -102,11 +103,16 @@ Each mouse action also has a key.
 | F1 | Show the tooltip of the focus widget |
 | F10 | Open the menu bar |
 | Shift+F10, Menu | Open the context menu |
-| Shift+arrows, Space, Ctrl+A | Select items in a view |
+| Page Up, Page Down | Move the current item in a view by one page |
+| Home, End | Go to the first or the last row of a view |
+| j, k, h, l, g, G | Move in a view, as in vim (also Ctrl+F, Ctrl+B, Ctrl+D, Ctrl+U) |
+| Shift+arrows, Shift+Page Up, Shift+Page Down, J, K, Space, Ctrl+A | Select items in a view |
 | F2 | Edit the current item |
+| Ctrl+W, Ctrl+U | Remove the word or the text before the cursor in a line edit |
 
 Some terminals, for example Konsole, keep Shift+click for their own text
-selection. In a view, drag with the mouse to select a range.
+selection. In a view, drag with the mouse to select a range. The mouse wheel
+scrolls a view by 3 rows and does not move the current item.
 
 ## Environment variables
 

@@ -8,7 +8,9 @@ classes. For views that keep their own items, see [item widgets](item-widgets.md
 
 A view does not copy the data of the model. Each paint reads the model again
 with `QAbstractItemModel::data()`. A view shows the `Qt::DisplayRole` text
-of each item. It does not show icons, check states or other roles.
+of each item, in the colors of `Qt::ForegroundRole` and `Qt::BackgroundRole`
+(see [item colors](#item-colors)). It does not show icons, check states or
+other roles.
 
 `setModel()` connects the view to the model signals in the table below. When
 a signal comes, the view marks only the screen rows that changed as dirty,
@@ -31,6 +33,44 @@ model is deleted, the view no longer uses it.
 Use any `QAbstractItemModel`. QtTUI uses Qt Core only, so
 `QStandardItemModel` is not available. Use `QStringListModel`, a
 `QSortFilterProxyModel`, or your own model.
+
+## Item colors
+
+`itemStyle()` reads `Qt::ForegroundRole` (the text color) and
+`Qt::BackgroundRole` of each item. `QColor` is in Qt GUI, so the view
+accepts these values:
+
+| Value | Example |
+| --- | --- |
+| A `QtTUI::Color` | `QVariant::fromValue(Color(255, 0, 0))` |
+| An integer `0xRRGGBB` (`int`, `uint`, `qlonglong` or `qulonglong`) | `0xff0000` |
+| A string `"#RRGGBB"` | `QStringLiteral("#ff0000")` |
+| A `QColor` | Only if the application links Qt GUI, which converts a `QColor` to `"#RRGGBB"`. |
+
+The view ignores other values, for example a `QBrush`. It also ignores
+`Qt::FontRole`, because `QFont` is in Qt GUI.
+
+The selected items and the current item keep the focus colors of the
+theme, as in Qt, where the selection replaces the item colors. In the
+`NoColor` mode (`NO_COLOR`, `QTTUI_COLOR=none`), the view ignores the role
+colors.
+
+`itemStyle()` is virtual. Override it in a subclass of a view to use a
+different rule, for example a color for each log level:
+
+```cpp
+class LogView : public QtTUI::QTuiTableView {
+protected:
+    QtTUI::Cell itemStyle(const QModelIndex &index, bool isCurrent,
+                          const QtTUI::ThemeProperties &theme) const override
+    {
+        QtTUI::Cell style = QTuiTableView::itemStyle(index, isCurrent, theme);
+        if (!isSelected(index) && index.siblingAtColumn(1).data().toString() == QLatin1String("ERROR"))
+            style.foreground = QtTUI::Color(255, 80, 80);
+        return style;
+    }
+};
+```
 
 ## Selection
 
@@ -178,10 +218,11 @@ int main(int argc, char *argv[])
 | `SelectionBehavior` | `SelectItems`, `SelectRows`, `SelectColumns` |
 | `EditTrigger` (flags `EditTriggers`) | `NoEditTriggers`, `DoubleClicked`, `EditKeyPressed`, `AnyKeyPressed`, `AllEditTriggers`. The values are the same as in Qt. |
 | `ScrollHint` | `EnsureVisible`, `PositionAtTop`, `PositionAtBottom`, `PositionAtCenter` |
+| `CursorAction` | `MoveUp`, `MoveDown`, `MoveLeft`, `MoveRight`, `MoveHome`, `MoveEnd`, `MovePageUp`, `MovePageDown` (as in Qt), `MoveHalfPageUp`, `MoveHalfPageDown` |
 
 ### Properties
 
-`selectionMode`, `selectionBehavior`, `editTriggers`.
+`selectionMode`, `selectionBehavior`, `editTriggers`, `wheelScrollLines`.
 
 ### Functions
 
@@ -210,6 +251,8 @@ int main(int argc, char *argv[])
 | `void closeEditor(bool commit = true)` | Closes the editor. With `commit`, the editor writes its value to the model first. |
 | `virtual void scrollTo(const QModelIndex &index, ScrollHint hint = EnsureVisible)` | Scrolls the view so that the item is visible. |
 | `virtual QRect visualRect(const QModelIndex &index) const` | Returns the screen area of the item, or an empty rectangle if the item is not visible. |
+| `int wheelScrollLines() const` | Returns the rows that one notch of the mouse wheel scrolls. The default is 3. |
+| `void setWheelScrollLines(int lines)` | Sets the rows for one notch. The minimum is 1. |
 
 ### Protected functions
 
@@ -221,12 +264,15 @@ Use these functions when you write a view.
 | `void selectCurrent(Qt::KeyboardModifiers modifiers, bool click)` | Updates the selection for the mode and the modifiers. Call it after a key or a click makes a different item current. |
 | `bool selectionKeyPressEvent(TuiKeyEvent *event)` | Handles Space, Ctrl+Space and Ctrl+A. Returns `true` if the key changed the selection. |
 | `bool editKeyPressEvent(TuiKeyEvent *event)` | Handles F2 and typed characters. Returns `true` if the key opened an editor. |
+| `bool cursorAction(const TuiKeyEvent *event, CursorAction *action, Qt::KeyboardModifiers *modifiers) const` | Reads the move of a navigation key (see [keys](#keys)). Returns `false` for other keys. `*modifiers` gets the modifiers to give to `selectCurrent()`. |
+| `static int movedRow(CursorAction action, int row, int rowCount, int visibleRows)` | Returns the row after a vertical move. A page is `visibleRows - 1` rows. |
+| `bool wheelScroll(const TuiMouseEvent *event, int *offset, int visibleRows, int rowCount)` | Scrolls `*offset` for a wheel event, with the limits of `scrollToRow()`. Returns `false` if the event is not a wheel event. |
 | `void scrollToRow(int row, int visibleRows, int rowCount, ScrollHint hint)` | Moves the scroll offset to show the row, as the hint tells. |
 | `void markRowsDirty(int first, int last, int top = 0)` | Marks the visible rows from `first` to `last` as dirty. `top` is the number of lines above the first row (for example a header). |
 | `void updateEditorGeometry()` | Moves the editor to its item. If the item is not visible, it closes the editor and writes the value. |
 | `bool eventFilter(QObject *watched, QEvent *event) override` | Gives Enter and Escape in the editor to the view. |
 | `bool isSelected(const QModelIndex &index) const` | Returns `true` if the item is selected. |
-| `Cell itemStyle(const QModelIndex &index, bool isCurrent, const ThemeProperties &theme) const` | Returns the colors and attributes of an item, as the selection section above tells. |
+| `virtual Cell itemStyle(const QModelIndex &index, bool isCurrent, const ThemeProperties &theme) const` | Returns the colors and attributes of an item, as the selection and [item colors](#item-colors) sections tell. |
 | `virtual QItemSelection selectionRange(const QModelIndex &from, const QModelIndex &to) const` | Returns the items from `from` to `to`. The default is the rectangle between the two items if they have the same parent. |
 
 ### Signals
@@ -239,10 +285,19 @@ Use these functions when you write a view.
 
 ### Keys
 
-These keys work in all views.
+These keys work in all views. Shift with a move key selects a range, as
+Shift+Up and Shift+Down do. Ctrl with a move key (not the vim Ctrl keys)
+moves without a change to the selection (`ExtendedSelection`), as in Qt.
 
 | Key | Action |
 | --- | --- |
+| Page Up, Page Down | Move the current item by one page: the visible rows minus one. The item stays visible. |
+| Home, End (also with Ctrl) | Go to the first or the last row. |
+| j, k | Move down or up (as Down and Up). J and K also select a range. |
+| h, l | As Left and Right. |
+| g (or gg), G | Go to the first or the last row. |
+| Ctrl+F, Ctrl+B | Move one page down or up. |
+| Ctrl+D, Ctrl+U | Move half a page down or up. |
 | Space | Selects the current item. In `MultiSelection`, toggles it. |
 | Ctrl+Space | Toggles the current item in `ExtendedSelection`. |
 | Ctrl+A | Selects all items in the three multiple modes. |
@@ -251,6 +306,19 @@ These keys work in all views.
 | Enter (in the editor) | Writes the value and closes the editor. |
 | Escape (in the editor) | Closes the editor without a change. |
 | Shift+F10, Menu | Asks for the context menu. |
+
+The vim letters move only if they do not open an editor: with the
+`AnyKeyPressed` edit trigger, a letter opens the editor. A shortcut of an
+action also comes before the view.
+
+### Mouse wheel
+
+The wheel scrolls the view by `wheelScrollLines` rows (3) for each notch
+(`wheelDelta() / 120`). It does not change the current item, as in Qt. The
+limits are the same as for `scrollTo()`. In `QTuiTableView`, Shift+wheel
+scrolls by one column. Some terminals keep Shift+wheel for their own
+scrollback. In `QTuiColumnView`, the wheel scrolls the column under the
+mouse. The next key that moves the current item scrolls back to it.
 
 ## QTuiListView
 
@@ -315,12 +383,30 @@ void example(QTuiWidget *parent)
 `#include <QtTUI/QTuiTableView.h>` · Inherits: `QTuiAbstractItemView`
 
 Shows a table model with a header row. A space separates the columns. The
-view paints its own header; it does not use `QTuiHeaderView`, and it does
-not show the vertical header.
+view paints its own header row and does not show the vertical header.
 
-The natural width of a column is the widest of the header and the visible
-cells. If the view is too narrow, the columns shrink. `setColumnWidth()`
-replaces the natural width.
+The view keeps a hidden `QTuiHeaderView` for the columns, which
+`horizontalHeader()` returns. Its resize modes set the column widths:
+
+| Mode | Width of the column |
+| --- | --- |
+| `Interactive` (the default) | The natural width, until `setColumnWidth()`, a drag on the header, Alt+Left or Alt+Right sets a width. |
+| `Fixed` | `sectionSize()` of the header. The user cannot change it. |
+| `Stretch` | The natural width and a part of the free width. The user cannot change it. |
+| `ResizeToContents` | The natural width. The user cannot change it. |
+
+The natural width is the widest of the header and the visible cells. The
+view reads only the visible rows, so a model with millions of rows stays
+fast. With `setStretchLastSection(true)`, the last column also gets the free
+width. If the view is too narrow, all the columns shrink.
+
+```cpp
+QTuiHeaderView *header = table->horizontalHeader();
+header->setSectionResizeMode(0, QTuiHeaderView::Fixed);
+header->resizeSection(0, 8);
+header->setSectionResizeMode(1, QTuiHeaderView::ResizeToContents);
+header->setStretchLastSection(true);
+```
 
 Sorting works as in `QTableView`. The view calls
 `QAbstractItemModel::sort()`, so the model (or a `QSortFilterProxyModel` in
@@ -430,7 +516,8 @@ int main(int argc, char *argv[])
 | `int sortColumn() const` | Returns the sort column, or -1 if the view is not sorted. |
 | `Qt::SortOrder sortOrder() const` | Returns the sort order. |
 | `int columnWidth(int column) const` | Returns the width of the column as the view paints it. |
-| `void setColumnWidth(int column, int width)` | Sets the width of the column. The minimum is 1. |
+| `void setColumnWidth(int column, int width)` | Sets the size of the header section (the minimum is 2). An `Interactive` or a `Fixed` column uses it. |
+| `QTuiHeaderView *horizontalHeader() const` | Returns the hidden header that keeps the resize modes and the sizes of the columns. |
 | `void paintEvent(ScreenBuffer &buffer) override` | Paints the header and the visible rows. |
 
 ### Keys
@@ -438,7 +525,8 @@ int main(int argc, char *argv[])
 | Key | Action |
 | --- | --- |
 | Up, Down, Left, Right | Move the current cell. With Shift, select a range. With Ctrl, move without a change to the selection (`ExtendedSelection`). |
-| Alt+Left, Alt+Right | Make the current column narrower or wider by 1. |
+| Home, End, Ctrl+Home, Ctrl+End | Go to the first or the last row. The column does not change, because a cell has no text cursor. |
+| Alt+Left, Alt+Right | Make the current column narrower or wider by 1. Only an `Interactive` column. |
 | Alt+Up, Alt+Down | Sort by the current column, ascending or descending. Only if sorting is enabled. |
 | Enter | Emits `activated()`. |
 
@@ -447,7 +535,8 @@ int main(int argc, char *argv[])
 - A left click on a cell makes it current, selects it and emits `clicked()`. A single click does not emit `activated()`.
 - A left drag selects the range from the pressed cell to the cell under the mouse.
 - A click on a header sorts by that column, if sorting is enabled. A second click reverses the order.
-- A left drag that starts on the separator after a header sets the width of that column.
+- A left drag that starts on the separator after a header sets the width of that column. Only an `Interactive` column.
+- The wheel scrolls the rows. Shift+wheel scrolls the columns.
 - A double click emits `doubleClicked()`. Then it opens the editor (`DoubleClicked`). If no editor opens, it emits `activated()`.
 
 ## QTuiTreeView
@@ -527,8 +616,8 @@ void example(QTuiWidget *parent, QAbstractItemModel *model)
 Shows a tree model as columns, as in `QColumnView`. The first column shows
 the top-level items. The next column shows the children of the current item
 of the column before it. A "│" line separates the columns. An item with
-children has " ▶" after its text. The view does not scroll vertically: it
-shows only the rows that fit in its height.
+children has " ▶" after its text. Each column scrolls vertically to show its
+current item. The wheel scrolls the column under the mouse.
 
 ### Example
 
@@ -568,7 +657,7 @@ void example(QTuiWidget *parent, QAbstractItemModel *model)
 
 | Key | Action |
 | --- | --- |
-| Up, Down | Move the current item in the active column. The next column shows its children. |
+| Up, Down, Page Up, Page Down, Home, End | Move the current item in the active column. The next column shows its children. |
 | Right | Moves to the child column, if the item has children. |
 | Left | Moves to the column before. |
 | Enter | Emits `activated()`. |
@@ -584,9 +673,11 @@ void example(QTuiWidget *parent, QAbstractItemModel *model)
 `#include <QtTUI/QTuiHeaderView.h>` · Inherits: `QTuiWidget`
 
 A row (horizontal) or a column (vertical) of header labels from a model.
-Different from Qt: it is a separate widget that you put in a layout. The
-views do not use it, and it does not take the mouse. Each section has a
-size. The default size is 10 and the minimum is 2.
+Different from Qt: it is a separate widget that you put in a layout, and it
+does not take the mouse. `QTuiTableView` keeps a hidden header for its
+columns (`horizontalHeader()`) and uses its resize modes and sizes, but
+paints the header row itself. Each section has a size. The default size is
+10 and the minimum is 2.
 
 ### Example
 
@@ -622,6 +713,12 @@ void example(QTuiWidget *parent)
 | `bool isSectionHidden(int logicalIndex) const` | Returns `true` if the section is hidden. |
 | `void setSectionHidden(int logicalIndex, bool hide)` | Hides or shows the section. |
 | `int count() const` | Returns the number of sections: the columns or the rows of the model. |
+| `void setSectionResizeMode(ResizeMode mode)` | Sets the resize mode of all sections: `Interactive` (the default), `Stretch`, `Fixed` or `ResizeToContents`. The values are the same as in Qt. See [QTuiTableView](#qtuitableview). |
+| `void setSectionResizeMode(int logicalIndex, ResizeMode mode)` | Sets the resize mode of one section. |
+| `ResizeMode sectionResizeMode(int logicalIndex) const` | Returns the resize mode of the section. |
+| `bool isSectionResized(int logicalIndex) const` | Returns `true` after `resizeSection()` set the size of the section. |
+| `bool stretchLastSection() const` | Returns `true` if the last section gets the free width. |
+| `void setStretchLastSection(bool stretch)` | Gives the free width also to the last section (also a property). The default is `false`. |
 | `void paintEvent(ScreenBuffer &buffer) override` | Paints the labels. The focused section has the focus colors. |
 | `QSize minimumSize() const override` | Horizontal: the sum of the visible section sizes. Vertical: the longest label and the number of visible sections. |
 
@@ -631,6 +728,7 @@ void example(QTuiWidget *parent)
 | --- | --- |
 | `sectionClicked(int logicalIndex)` | Enter on the focused section. |
 | `sectionResized(int logicalIndex, int oldSize, int newSize)` | The size of a section changed. |
+| `geometriesChanged()` | A resize mode or `stretchLastSection` changed, or `resizeSection()` set a section for the first time. |
 
 ### Keys
 

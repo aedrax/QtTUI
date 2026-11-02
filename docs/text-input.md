@@ -210,6 +210,8 @@ tab to a space. It removes all other control characters. A paste never emits
 | Ctrl+V | Pastes. |
 | Ctrl+Z | Undoes. |
 | Ctrl+Y, Ctrl+Shift+Z | Redoes. |
+| Ctrl+W | Removes the word before the cursor, up to a space (as in vim and in a shell). |
+| Ctrl+U | Removes the text before the cursor (as in vim and in a shell). |
 | A printable character | Inserts the character, or puts it in place of the selection. |
 
 While the completer popup is open, Up, Down, Enter and Escape go to the
