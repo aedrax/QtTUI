@@ -1,7 +1,8 @@
 #ifndef QTTUI_WINDOWSBACKEND_H
 #define QTTUI_WINDOWSBACKEND_H
 
-#ifdef _WIN32
+// No #ifdef _WIN32 here: CMake gives no MSVC macros to moc, so moc skips
+// a class in that block. Only Windows builds compile this header.
 
 #include <QtTUI/TerminalBackend.h>
 #include <windows.h>
@@ -35,5 +36,4 @@ private:
 
 } // namespace QtTUI
 
-#endif // _WIN32
 #endif // QTTUI_WINDOWSBACKEND_H
