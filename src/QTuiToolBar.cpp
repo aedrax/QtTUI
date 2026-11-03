@@ -125,7 +125,7 @@ void QTuiToolBar::paintEvent(ScreenBuffer &buffer)
 
 void QTuiToolBar::keyPressEvent(TuiKeyEvent *event)
 {
-    const int key = event->key();
+    const int key = vimArrowKey(event);
 
     // Count navigable items (non-separator)
     int navigableCount = 0;

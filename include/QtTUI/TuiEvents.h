@@ -111,6 +111,22 @@ private:
     QString m_text;
 };
 
+// Returns the arrow key for the vim keys h, j, k and l without modifiers.
+// Returns event->key() for all other keys. Menus and tool bars use it.
+inline int vimArrowKey(const TuiKeyEvent *event)
+{
+    if (event->modifiers() == Qt::NoModifier && event->text().size() == 1) {
+        switch (event->text().at(0).unicode()) {
+        case 'h': return Qt::Key_Left;
+        case 'j': return Qt::Key_Down;
+        case 'k': return Qt::Key_Up;
+        case 'l': return Qt::Key_Right;
+        default: break;
+        }
+    }
+    return event->key();
+}
+
 } // namespace QtTUI
 
 #endif // QTTUI_TUIEVENTS_H

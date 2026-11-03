@@ -171,7 +171,7 @@ void QTuiMenuBar::paintEvent(ScreenBuffer &buffer)
 
 void QTuiMenuBar::keyPressEvent(TuiKeyEvent *event)
 {
-    const int key = event->key();
+    const int key = vimArrowKey(event);
     const auto mods = event->modifiers();
 
     if (key == Qt::Key_Left) {

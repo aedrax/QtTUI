@@ -262,7 +262,7 @@ void QTuiMenu::keyPressEvent(TuiKeyEvent *event)
     if (!isVisible())
         return;
 
-    const int key = event->key();
+    const int key = vimArrowKey(event);
 
     if (key == Qt::Key_Up) {
         navigateToPrevItem();

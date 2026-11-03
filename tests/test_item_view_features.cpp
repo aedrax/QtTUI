@@ -588,6 +588,56 @@ private slots:
         QCOMPARE(edit.text(), QStringLiteral("two  "));
         QCOMPARE(edit.cursorPosition(), 0);
     }
+
+    // --- The vim keys in the menus and the tool bar ---
+
+    void menuVimKeys()
+    {
+        QTuiMenu menu(QStringLiteral("File"));
+        menu.addAction(QStringLiteral("New"));
+        QTuiAction *open = menu.addAction(QStringLiteral("Open"));
+        menu.addAction(QStringLiteral("Save"));
+        QSignalSpy spy(open, &QTuiAction::triggered);
+        menu.popup(QPoint(0, 0));
+        typeChar(menu, QLatin1Char('j'));
+        typeChar(menu, QLatin1Char('j'));
+        typeChar(menu, QLatin1Char('k'));
+        sendKey(menu, Qt::Key_Return);
+        QCOMPARE(spy.count(), 1);
+    }
+
+    void menuBarVimKeys()
+    {
+        QTuiMenuBar bar;
+        bar.addMenu(QStringLiteral("File"));
+        bar.addMenu(QStringLiteral("Edit"));
+        bar.addMenu(QStringLiteral("View"));
+        bar.setGeometry(QRect(0, 0, 30, 1));
+        typeChar(bar, QLatin1Char('l'));
+        typeChar(bar, QLatin1Char('l'));
+        typeChar(bar, QLatin1Char('h'));
+        typeChar(bar, QLatin1Char('j'));
+        QVERIFY(bar.menus().at(1)->isVisible());
+        QVERIFY(!bar.menus().at(0)->isVisible());
+    }
+
+    void toolBarVimKeys()
+    {
+        QTuiToolBar bar;
+        auto *a = new QTuiAction(QStringLiteral("A"), &bar);
+        auto *b = new QTuiAction(QStringLiteral("B"), &bar);
+        bar.addAction(a);
+        bar.addAction(b);
+        bar.setGeometry(QRect(0, 0, 20, 1));
+        QSignalSpy spy(b, &QTuiAction::triggered);
+        typeChar(bar, QLatin1Char('l'));
+        sendKey(bar, Qt::Key_Return);
+        QCOMPARE(spy.count(), 1);
+        // A letter with Ctrl is not a vim key
+        sendKey(bar, Qt::Key_H, Qt::ControlModifier, QStringLiteral("h"));
+        sendKey(bar, Qt::Key_Return);
+        QCOMPARE(spy.count(), 2);
+    }
 };
 
 QTEST_MAIN(TestItemViewFeatures)

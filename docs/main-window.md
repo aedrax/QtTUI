@@ -247,13 +247,14 @@ void buildMenus(QTuiMainWindow *window)
 
 | Key | Action |
 | --- | --- |
-| Left | Makes the previous title active. If a menu is open, opens the previous menu. |
-| Right | Makes the next title active. If a menu is open, opens the next menu. |
-| Enter, Return, Down | Opens the menu of the active title. |
+| Left, h | Makes the previous title active. If a menu is open, opens the previous menu. |
+| Right, l | Makes the next title active. If a menu is open, opens the next menu. |
+| Enter, Return, Down, j | Opens the menu of the active title. |
 | Escape | Closes the open menu. |
 | Alt+letter | Opens the menu with that mnemonic. |
 
-The bar gets these keys only while it has focus. An open menu has focus, so
+The vim keys h, j, k and l work only without modifiers. The bar gets these
+keys only while it has focus. An open menu has focus, so
 Left and Right do not go to the bar while a menu is open.
 
 ### Mouse
@@ -322,11 +323,11 @@ void addViewMenu(QTuiMenuBar *bar)
 
 | Key | Action |
 | --- | --- |
-| Up | Highlights the previous item. Separators are skipped. At the top, it goes to the bottom. |
-| Down | Highlights the next item. Separators are skipped. At the bottom, it goes to the top. |
+| Up, k | Highlights the previous item. Separators are skipped. At the top, it goes to the bottom. |
+| Down, j | Highlights the next item. Separators are skipped. At the bottom, it goes to the top. |
 | Enter, Return | Triggers the highlighted action and closes the menu. On a submenu item, opens the submenu at the right of the menu. |
-| Right | Opens the submenu of the highlighted item. |
-| Left | Closes a submenu. |
+| Right, l | Opens the submenu of the highlighted item. |
+| Left, h | Closes a submenu. |
 | Escape | Closes the menu. |
 
 A disabled action shows in the disabled color. It does not trigger, and the
@@ -534,8 +535,8 @@ void addEditToolBar(QTuiMainWindow *window)
 
 | Key | Action |
 | --- | --- |
-| Left | Makes the previous item current. At the start, it goes to the end. |
-| Right | Makes the next item current. At the end, it goes to the start. |
+| Left, h | Makes the previous item current. At the start, it goes to the end. |
+| Right, l | Makes the next item current. At the end, it goes to the start. |
 | Enter, Return | Triggers the action of the current item. |
 
 Separators are not items for the keys. Widgets are items, but Enter does
