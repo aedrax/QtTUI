@@ -106,7 +106,7 @@ Each mouse action also has a key.
 | Page Up, Page Down | Move the current item in a view by one page |
 | Home, End | Go to the first or the last row of a view |
 | j, k, h, l, g, G | Move in a view, as in vim (also Ctrl+F, Ctrl+B, Ctrl+D, Ctrl+U) |
-| h, j, k, l | Move in a menu, the menu bar or a tool bar, as the arrow keys |
+| h, j, k, l | Do the same as the arrow keys in a widget that does not type text: menus, tool bars, tabs, sliders, the calendar and more |
 | Shift+arrows, Shift+Page Up, Shift+Page Down, J, K, Space, Ctrl+A | Select items in a view |
 | F2 | Edit the current item |
 | Ctrl+W, Ctrl+U | Remove the word or the text before the cursor in a line edit |

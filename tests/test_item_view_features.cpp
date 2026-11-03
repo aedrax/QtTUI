@@ -638,6 +638,37 @@ private slots:
         sendKey(bar, Qt::Key_Return);
         QCOMPARE(spy.count(), 2);
     }
+
+    void openMenuMovesToNextMenu()
+    {
+        QTuiMenuBar bar;
+        QTuiMenu *file = bar.addMenu(QStringLiteral("File"));
+        file->addAction(QStringLiteral("Open"));
+        QTuiMenu *view = bar.addMenu(QStringLiteral("View"));
+        view->addAction(QStringLiteral("Dark"));
+        bar.setGeometry(QRect(0, 0, 30, 1));
+        sendKey(bar, Qt::Key_Down);
+        QVERIFY(file->isVisible());
+        // The open menu has focus and gives Left and Right to the bar
+        typeChar(*file, QLatin1Char('l'));
+        QVERIFY(!file->isVisible());
+        QVERIFY(view->isVisible());
+        sendKey(*view, Qt::Key_Left);
+        QVERIFY(file->isVisible());
+        QVERIFY(!view->isVisible());
+    }
+
+    void tabBarVimKeys()
+    {
+        QTuiTabBar bar;
+        bar.addTab(QStringLiteral("One"));
+        bar.addTab(QStringLiteral("Two"));
+        bar.addTab(QStringLiteral("Three"));
+        typeChar(bar, QLatin1Char('l'));
+        typeChar(bar, QLatin1Char('l'));
+        typeChar(bar, QLatin1Char('h'));
+        QCOMPARE(bar.currentIndex(), 1);
+    }
 };
 
 QTEST_MAIN(TestItemViewFeatures)

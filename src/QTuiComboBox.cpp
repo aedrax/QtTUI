@@ -359,7 +359,8 @@ void QTuiComboBox::paintEvent(ScreenBuffer &buffer)
 
 void QTuiComboBox::keyPressEvent(TuiKeyEvent *event)
 {
-    const int key = event->key();
+    // An editable combo box types the letters h, j, k and l
+    const int key = m_editable ? event->key() : vimArrowKey(event);
 
     if (m_dropdownOpen) {
         // Dropdown is open: navigate or select. The highlight is rendered by

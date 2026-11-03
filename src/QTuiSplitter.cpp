@@ -113,16 +113,17 @@ void QTuiSplitterHandle::keyPressEvent(TuiKeyEvent *event)
         return;
     }
 
+    const int key = vimArrowKey(event);
     int delta = 0;
     if (m_orientation == Qt::Horizontal) {
-        if (event->key() == Qt::Key_Left)
+        if (key == Qt::Key_Left)
             delta = -1;
-        else if (event->key() == Qt::Key_Right)
+        else if (key == Qt::Key_Right)
             delta = 1;
     } else {
-        if (event->key() == Qt::Key_Up)
+        if (key == Qt::Key_Up)
             delta = -1;
-        else if (event->key() == Qt::Key_Down)
+        else if (key == Qt::Key_Down)
             delta = 1;
     }
 

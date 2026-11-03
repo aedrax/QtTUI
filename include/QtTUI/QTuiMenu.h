@@ -11,6 +11,8 @@
 
 namespace QtTUI {
 
+class QTuiMenuBar;
+
 class QTuiMenu : public QTuiWidget {
     Q_OBJECT
     Q_PROPERTY(QString title READ title WRITE setTitle)
@@ -66,6 +68,9 @@ private:
     QString m_title;
     // The menu that opened this menu as a submenu, or nullptr
     QPointer<QTuiMenu> m_parentMenu;
+    // The menu bar that shows this menu as a title, or nullptr
+    QPointer<QTuiMenuBar> m_menuBar;
+    friend class QTuiMenuBar;
     QList<MenuItem> m_menuItems;
     int m_highlightedIndex = 0;
 };

@@ -90,7 +90,7 @@ void QTuiToolButton::mousePressEvent(TuiMouseEvent *event)
 void QTuiToolButton::keyPressEvent(TuiKeyEvent *event)
 {
     // If menu is set and Down arrow pressed, open the menu below the button
-    if (m_menu && event->key() == Qt::Key_Down) {
+    if (m_menu && vimArrowKey(event) == Qt::Key_Down) {
         m_menu->popup(geometry().bottomLeft() + QPoint(0, 1));
         return;
     }

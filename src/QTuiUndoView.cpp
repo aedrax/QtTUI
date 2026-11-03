@@ -106,7 +106,7 @@ void QTuiUndoView::keyPressEvent(TuiKeyEvent *event)
     if (!m_stack)
         return;
 
-    switch (event->key()) {
+    switch (vimArrowKey(event)) {
     case Qt::Key_Up:
         if (m_currentIndex > 0) {
             --m_currentIndex;

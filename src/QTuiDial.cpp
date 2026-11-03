@@ -169,7 +169,7 @@ void QTuiDial::paintEvent(ScreenBuffer &buffer)
 
 void QTuiDial::keyPressEvent(TuiKeyEvent *event)
 {
-    const int key = event->key();
+    const int key = vimArrowKey(event);
     if (key == Qt::Key_Up || key == Qt::Key_Right) {
         stepUp();
     } else if (key == Qt::Key_Down || key == Qt::Key_Left) {

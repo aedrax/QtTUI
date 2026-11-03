@@ -31,6 +31,7 @@ void QTuiMenuBar::addMenu(QTuiMenu *menu)
 void QTuiMenuBar::registerMenu(QTuiMenu *menu)
 {
     m_menus.append(menu);
+    menu->m_menuBar = this;
     if (m_activeMenuIndex < 0 && !m_menus.isEmpty())
         m_activeMenuIndex = 0;
 

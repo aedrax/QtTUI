@@ -326,7 +326,7 @@ void QTuiScrollArea::paintEvent(ScreenBuffer &buffer)
 
 void QTuiScrollArea::keyPressEvent(TuiKeyEvent *event)
 {
-    const int key = event->key();
+    const int key = vimArrowKey(event);
 
     const QRect geo = geometry();
     const bool needsVScroll = m_verticalScrollBar->isVisible();

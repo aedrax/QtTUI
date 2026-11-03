@@ -205,7 +205,7 @@ void QTuiTabBar::keyPressEvent(TuiKeyEvent *event)
         return;
     }
 
-    switch (event->key()) {
+    switch (vimArrowKey(event)) {
     case Qt::Key_Left:
         if (m_currentIndex > 0)
             setCurrentIndex(m_currentIndex - 1);

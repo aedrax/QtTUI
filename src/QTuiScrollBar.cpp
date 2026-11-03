@@ -75,7 +75,7 @@ void QTuiScrollBar::paintEvent(ScreenBuffer &buffer)
 
 void QTuiScrollBar::keyPressEvent(TuiKeyEvent *event)
 {
-    const int key = event->key();
+    const int key = vimArrowKey(event);
     const bool vertical = m_orientation == Qt::Vertical;
     if (key == Qt::Key_PageUp)
         setValue(m_value - m_pageStep);

@@ -176,7 +176,7 @@ void QTuiSlider::paintEvent(ScreenBuffer &buffer)
 void QTuiSlider::keyPressEvent(TuiKeyEvent *event)
 {
     // Up steps up; Right also steps up on a horizontal slider
-    const int key = event->key();
+    const int key = vimArrowKey(event);
     const bool horizontal = m_orientation == Qt::Horizontal;
     if (key == Qt::Key_Up || (horizontal && key == Qt::Key_Right))
         setValue(m_value + m_singleStep);

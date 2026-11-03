@@ -6,6 +6,7 @@
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
+#include <QtTUI/QTuiMenuBar.h>
 
 namespace QtTUI {
 
@@ -280,13 +281,22 @@ void QTuiMenu::keyPressEvent(TuiKeyEvent *event)
         }
     } else if (key == Qt::Key_Escape) {
         close();
-    } else if (key == Qt::Key_Right) {
-        if (m_highlightedIndex >= 0 && m_highlightedIndex < m_menuItems.size()
-            && m_menuItems.at(m_highlightedIndex).submenu)
-            openSubmenu(m_highlightedIndex);
+    } else if (key == Qt::Key_Right && m_highlightedIndex >= 0
+               && m_highlightedIndex < m_menuItems.size()
+               && m_menuItems.at(m_highlightedIndex).submenu) {
+        openSubmenu(m_highlightedIndex);
     } else if (key == Qt::Key_Left && m_parentMenu) {
         // Left closes a submenu
         close();
+    } else if (key == Qt::Key_Left || key == Qt::Key_Right) {
+        // As in Qt, the menu bar opens the previous or the next menu
+        QTuiMenu *top = this;
+        while (top->m_parentMenu)
+            top = top->m_parentMenu;
+        if (top->m_menuBar) {
+            TuiKeyEvent barEvent(key, Qt::NoModifier);
+            QCoreApplication::sendEvent(top->m_menuBar, &barEvent);
+        }
     }
 }
 

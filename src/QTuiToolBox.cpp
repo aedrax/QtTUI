@@ -174,7 +174,7 @@ void QTuiToolBox::keyPressEvent(TuiKeyEvent *event)
         return;
     }
 
-    switch (event->key()) {
+    switch (vimArrowKey(event)) {
     case Qt::Key_Up:
         if (m_focusedHeader > 0) {
             --m_focusedHeader;

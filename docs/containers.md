@@ -313,8 +313,8 @@ void example(QTuiWidget *parent)
 
 | Key | Action |
 | --- | --- |
-| Left | Selects the previous tab. |
-| Right | Selects the next tab. |
+| Left, h | Selects the previous tab. |
+| Right, l | Selects the next tab. |
 | Enter | Emits `currentChanged()` again for the current tab. |
 
 ### Mouse

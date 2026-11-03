@@ -412,7 +412,7 @@ void QTuiCalendarWidget::keyPressEvent(TuiKeyEvent *event)
         }
     }
 
-    switch (event->key()) {
+    switch (vimArrowKey(event)) {
     case Qt::Key_Left:
         moveCursor(-1);
         break;

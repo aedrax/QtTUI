@@ -254,8 +254,8 @@ void buildMenus(QTuiMainWindow *window)
 | Alt+letter | Opens the menu with that mnemonic. |
 
 The vim keys h, j, k and l work only without modifiers. The bar gets these
-keys only while it has focus. An open menu has focus, so
-Left and Right do not go to the bar while a menu is open.
+keys while it has focus. An open menu has focus, and it gives Left and Right
+to the bar, so these keys also open the previous or the next menu.
 
 ### Mouse
 
@@ -326,8 +326,8 @@ void addViewMenu(QTuiMenuBar *bar)
 | Up, k | Highlights the previous item. Separators are skipped. At the top, it goes to the bottom. |
 | Down, j | Highlights the next item. Separators are skipped. At the bottom, it goes to the top. |
 | Enter, Return | Triggers the highlighted action and closes the menu. On a submenu item, opens the submenu at the right of the menu. |
-| Right, l | Opens the submenu of the highlighted item. |
-| Left, h | Closes a submenu. |
+| Right, l | Opens the submenu of the highlighted item. On an item without a submenu, the menu bar opens the next menu. |
+| Left, h | Closes a submenu. In a menu of the menu bar, the bar opens the previous menu. |
 | Escape | Closes the menu. |
 
 A disabled action shows in the disabled color. It does not trigger, and the
