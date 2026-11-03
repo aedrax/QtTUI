@@ -71,6 +71,20 @@ public:
     }
 };
 
+// A model where only row 30 is wide, and the test can change the cells
+class WideRowModel : public ColorModel {
+public:
+    QString wide = QStringLiteral("a wide cell");
+    QVariant data(const QModelIndex &index, int role) const override
+    {
+        if (role != Qt::DisplayRole)
+            return {};
+        return index.row() == 30 ? wide : QStringLiteral("x");
+    }
+    using QAbstractTableModel::beginInsertRows;
+    using QAbstractTableModel::endInsertRows;
+};
+
 class TestItemViewFeatures : public QObject {
     Q_OBJECT
 
@@ -479,6 +493,65 @@ private slots:
     }
 
     // --- Column sizing ---
+
+    void columnWidthsStayWhenTheViewScrolls()
+    {
+        WideRowModel model;
+        QTuiTableView view;
+        view.setGeometry(QRect(0, 0, 40, 6));
+        view.setModel(&model);
+        QCOMPARE(view.columnWidth(0), 2); // the header "H0"
+        view.scrollTo(model.index(30, 0), QTuiAbstractItemView::PositionAtTop);
+        QCOMPARE(view.columnWidth(0), 2);
+        emit model.dataChanged(model.index(0, 0), model.index(49, 2));
+        QCOMPARE(view.columnWidth(0), 2);
+        // An explicit call measures the visible cells
+        view.resizeColumnsToContents();
+        QCOMPARE(view.columnWidth(0), 11);
+        view.scrollTo(model.index(0, 0), QTuiAbstractItemView::PositionAtTop);
+        QCOMPARE(view.columnWidth(0), 11);
+    }
+
+    void columnWidthsComeFromTheFirstRows()
+    {
+        WideRowModel model;
+        model.rows = 0;
+        QTuiTableView view;
+        view.setGeometry(QRect(0, 0, 40, 6));
+        view.setModel(&model);
+        QCOMPARE(view.columnWidth(0), 2);
+        model.wide = QStringLiteral("x");
+        model.beginInsertRows(QModelIndex(), 0, 0);
+        model.rows = 1;
+        model.endInsertRows();
+        QCOMPARE(view.columnWidth(0), 2);
+        // Wider rows that come later do not change the width
+        model.beginInsertRows(QModelIndex(), 1, 49);
+        model.rows = 50;
+        model.wide = QStringLiteral("a wide cell");
+        model.endInsertRows();
+        view.scrollTo(model.index(30, 0), QTuiAbstractItemView::PositionAtTop);
+        QCOMPARE(view.columnWidth(0), 2);
+    }
+
+    // Columns wider than the view keep their widths, so Alt+Right makes the
+    // column one cell wider and the view scrolls by column
+    void altArrowsResizeInAViewThatIsTooNarrow()
+    {
+        ColorModel model; // 3 columns of 4 cells
+        QTuiTableView view;
+        view.setGeometry(QRect(0, 0, 8, 5));
+        view.setModel(&model);
+        QCOMPARE(view.columnWidth(0), 4);
+        QCOMPARE(view.columnWidth(2), 4);
+        sendKey(view, Qt::Key_Right, Qt::AltModifier);
+        QCOMPARE(view.columnWidth(0), 5);
+        sendKey(view, Qt::Key_Left, Qt::AltModifier);
+        sendKey(view, Qt::Key_Left, Qt::AltModifier);
+        QCOMPARE(view.columnWidth(0), 3);
+        view.setCurrentIndex(model.index(0, 2));
+        QCOMPARE(view.horizontalScrollOffset(), 2);
+    }
 
     void stretchLastSection()
     {

@@ -38,12 +38,19 @@ public:
 
     // Column widths, as in QTableView. The resize modes of
     // horizontalHeader() set the widths. In the default mode
-    // (Interactive), a width set here replaces the natural width (the
-    // widest of the header and the visible cells). Columns still shrink if
-    // the view is too narrow. Dragging the cell after a column header with
-    // the left button sets the width of an Interactive column.
+    // (Interactive), a column starts with its natural width: the widest of
+    // the header and the cells that show when the model has its first rows.
+    // The width then stays the same. A scroll or a change of the data does
+    // not change it. These change it: setColumnWidth(), the two
+    // resizeColumn...ToContents() functions, a model reset, a change of the
+    // column count, and the user (Alt+Left, Alt+Right, or a left-button drag
+    // on the cell after a column header). Columns that do not fit in the
+    // view keep their widths: the view scrolls by column.
     int columnWidth(int column) const;
     void setColumnWidth(int column, int width);
+    // Sets the width to the widest of the header and the visible cells
+    void resizeColumnToContents(int column);
+    void resizeColumnsToContents();
 
     // The header of the columns. The table paints the header row itself:
     // this widget stays hidden and keeps the resize modes and the sizes.
@@ -76,6 +83,9 @@ private:
     void ensureColumnVisible(int column);
     void clampCurrentIndex();
     void invalidateColumnWidths();
+    // Discards the stored natural widths: the next paint measures again
+    void remeasureColumnWidths();
+    int measureColumn(int column) const;
     const QVector<int> &effectiveColumnWidths() const;
 
     int m_currentRow = 0;
@@ -89,9 +99,11 @@ private:
     int m_sortColumn = -1;
     Qt::SortOrder m_sortOrder = Qt::AscendingOrder;
 
-    // Cached final (post-scaling) column widths shared by painting, hit
-    // testing and horizontal scrolling. Recomputed lazily when model content
-    // changes or when the viewport (geometry / vertical scroll) moves.
+    // Natural width per column, measured one time. Empty: not measured.
+    mutable QVector<int> m_naturalWidths;
+
+    // Cached final column widths shared by painting, hit testing and
+    // horizontal scrolling.
     mutable QVector<int> m_cachedColumnWidths;
     mutable bool m_columnWidthsStale = true;
     mutable int m_columnWidthsScrollOffset = -1;

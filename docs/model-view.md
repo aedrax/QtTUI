@@ -390,15 +390,20 @@ The view keeps a hidden `QTuiHeaderView` for the columns, which
 
 | Mode | Width of the column |
 | --- | --- |
-| `Interactive` (the default) | The natural width, until `setColumnWidth()`, a drag on the header, Alt+Left or Alt+Right sets a width. |
+| `Interactive` (the default) | The natural width, until `setColumnWidth()`, `resizeColumnToContents()`, a drag on the header, Alt+Left or Alt+Right sets a width. |
 | `Fixed` | `sectionSize()` of the header. The user cannot change it. |
 | `Stretch` | The natural width and a part of the free width. The user cannot change it. |
-| `ResizeToContents` | The natural width. The user cannot change it. |
+| `ResizeToContents` | The widest of the header and the visible cells. It changes when the view scrolls or the data changes. The user cannot change it. |
 
-The natural width is the widest of the header and the visible cells. The
-view reads only the visible rows, so a model with millions of rows stays
+The natural width is the widest of the header and the cells that show when
+the model has its first rows. The view measures it one time. After that, a
+scroll or a change of the data does not change the width. A model reset, a
+change of the column count and `setSortingEnabled()` make the view measure
+again. Before the model has rows, the width is the width of the header text.
+The view reads only the visible rows, so a model with millions of rows stays
 fast. With `setStretchLastSection(true)`, the last column also gets the free
-width. If the view is too narrow, all the columns shrink.
+width. If the columns do not fit in the view, they keep their widths and the
+view scrolls by column: the view shows the current column.
 
 ```cpp
 QTuiHeaderView *header = table->horizontalHeader();
@@ -517,6 +522,8 @@ int main(int argc, char *argv[])
 | `Qt::SortOrder sortOrder() const` | Returns the sort order. |
 | `int columnWidth(int column) const` | Returns the width of the column as the view paints it. |
 | `void setColumnWidth(int column, int width)` | Sets the size of the header section (the minimum is 2). An `Interactive` or a `Fixed` column uses it. |
+| `void resizeColumnToContents(int column)` | Sets the width of the column to the widest of the header and the visible cells, as `setColumnWidth()` does. |
+| `void resizeColumnsToContents()` | Calls `resizeColumnToContents()` for each column. |
 | `QTuiHeaderView *horizontalHeader() const` | Returns the hidden header that keeps the resize modes and the sizes of the columns. |
 | `void paintEvent(ScreenBuffer &buffer) override` | Paints the header and the visible rows. |
 

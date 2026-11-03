@@ -49,7 +49,7 @@ void QTuiTableView::setModel(QAbstractItemModel *model)
     m_currentCol = 0;
     m_scrollOffset = 0;
     m_horizontalScrollOffset = 0;
-    invalidateColumnWidths();
+    remeasureColumnWidths();
 
     if (m_model)
         connectModel();
@@ -74,6 +74,7 @@ void QTuiTableView::setCurrentIndex(const QModelIndex &index)
         m_currentRow = row;
         m_currentCol = col;
         ensureCurrentVisible();
+        ensureColumnVisible(m_currentCol);
         markDirty();
     }
     selectCurrent(Qt::NoModifier, false);
@@ -269,7 +270,8 @@ void QTuiTableView::setSortingEnabled(bool enable)
     if (m_sortingEnabled == enable)
         return;
     m_sortingEnabled = enable;
-    invalidateColumnWidths();
+    // The natural widths keep space for the sort indicator
+    remeasureColumnWidths();
     markDirty();
 }
 
@@ -471,7 +473,7 @@ void QTuiTableView::onColumnsChanged()
     if (!m_model)
         return;
 
-    invalidateColumnWidths();
+    remeasureColumnWidths();
     clampCurrentIndex();
     m_horizontalScrollOffset = qBound(0, m_horizontalScrollOffset,
                                       qMax(0, m_model->columnCount() - 1));
@@ -513,7 +515,7 @@ void QTuiTableView::onModelReset()
     m_currentCol = 0;
     m_scrollOffset = 0;
     m_horizontalScrollOffset = 0;
-    invalidateColumnWidths();
+    remeasureColumnWidths();
     markDirty();
 }
 
@@ -621,17 +623,59 @@ void QTuiTableView::ensureColumnVisible(int column)
     }
 }
 
+// Makes the next paint calculate the widths again. This does not discard
+// the stored natural widths.
 void QTuiTableView::invalidateColumnWidths()
 {
     m_columnWidthsStale = true;
+}
+
+void QTuiTableView::remeasureColumnWidths()
+{
+    m_naturalWidths.clear();
+    invalidateColumnWidths();
+}
+
+int QTuiTableView::measureColumn(int column) const
+{
+    // Sample only the rows in the viewport, not the full model. If the
+    // geometry has no data rows yet, sample a bounded number of rows from
+    // the top of the model.
+    static constexpr int FallbackSampleRows = 100;
+    const int rows = m_model->rowCount();
+    const int visibleDataRows = geometry().height() - m_headerHeight;
+    const int first = qBound(0, m_scrollOffset, qMax(0, rows - 1));
+    const int end = qMin(rows, first + (visibleDataRows > 0 ? visibleDataRows : FallbackSampleRows));
+
+    // Keep space for the sort indicator, so a sort does not cut the header
+    int width = m_model->headerData(column, Qt::Horizontal, Qt::DisplayRole).toString().length()
+                + (m_sortingEnabled ? 2 : 0);
+    for (int r = first; r < end; ++r)
+        width = qMax(width, int(m_model->data(m_model->index(r, column), Qt::DisplayRole).toString().length()));
+    return qMax(1, width);
+}
+
+void QTuiTableView::resizeColumnToContents(int column)
+{
+    if (m_model && column >= 0 && column < m_model->columnCount())
+        m_header->resizeSection(column, measureColumn(column));
+}
+
+void QTuiTableView::resizeColumnsToContents()
+{
+    if (!m_model)
+        return;
+    for (int c = 0; c < m_model->columnCount(); ++c)
+        resizeColumnToContents(c);
 }
 
 const QVector<int> &QTuiTableView::effectiveColumnWidths() const
 {
     const QRect geo = geometry();
 
-    // The cache is keyed on the viewport: sampling depends on the vertical
-    // scroll offset and the geometry, scaling depends on the view width.
+    // The cache is keyed on the viewport: a ResizeToContents column depends
+    // on the vertical scroll offset, a Stretch column depends on the view
+    // width.
     if (!m_columnWidthsStale
         && m_columnWidthsScrollOffset == m_scrollOffset
         && m_columnWidthsGeometry == geo) {
@@ -647,90 +691,45 @@ const QVector<int> &QTuiTableView::effectiveColumnWidths() const
         return m_cachedColumnWidths;
 
     const int cols = m_model->columnCount();
-    const int rows = m_model->rowCount();
     if (cols == 0)
         return m_cachedColumnWidths;
 
-    // Sample only the header plus the rows currently in the viewport instead
-    // of scanning the entire model on every paint (O(visible) not O(rows)).
-    // If the geometry has no data rows yet, fall back to a bounded sample
-    // from the top of the model.
-    static constexpr int FallbackSampleRows = 100;
-    const int visibleDataRows = geo.height() - m_headerHeight;
-    const int sampleFirst = qBound(0, m_scrollOffset, qMax(0, rows - 1));
-    const int sampleCount = visibleDataRows > 0 ? visibleDataRows : FallbackSampleRows;
-    const int sampleEnd = qMin(rows, sampleFirst + sampleCount);
+    // The view measures the natural widths one time, when the model has its
+    // first rows. After that, a scroll or a change of the data does not
+    // change them. Before the first rows, each paint measures the headers.
+    const bool measureNow = m_naturalWidths.size() != cols && m_model->rowCount() > 0;
+    if (measureNow)
+        m_naturalWidths.resize(cols);
 
     // Step 1: The width per column from its resize mode. A Fixed column and
-    // a resized Interactive column have the size of the header section.
-    // The other columns have the natural width: the widest of the header
-    // and the sampled cells.
+    // a resized Interactive column have the size of the header section. A
+    // ResizeToContents column follows the visible cells. The other columns
+    // have the stored natural width.
     QVector<int> colWidths(cols, 0);
     for (int c = 0; c < cols; ++c) {
         const QTuiHeaderView::ResizeMode mode = m_header->sectionResizeMode(c);
+        const bool measured = m_naturalWidths.size() == cols && !measureNow;
+        if (mode == QTuiHeaderView::ResizeToContents || !measured) {
+            colWidths[c] = measureColumn(c);
+            if (measureNow)
+                m_naturalWidths[c] = colWidths[c];
+        } else {
+            colWidths[c] = m_naturalWidths.at(c);
+        }
         if (mode == QTuiHeaderView::Fixed
-            || (mode == QTuiHeaderView::Interactive && m_header->isSectionResized(c))) {
+            || (mode == QTuiHeaderView::Interactive && m_header->isSectionResized(c)))
             colWidths[c] = qMax(1, m_header->sectionSize(c));
-            continue;
-        }
-        int maxW = headerText(c).length();
-        for (int r = sampleFirst; r < sampleEnd; ++r) {
-            QModelIndex idx = m_model->index(r, c);
-            const int len = m_model->data(idx, Qt::DisplayRole).toString().length();
-            if (len > maxW)
-                maxW = len;
-        }
-        colWidths[c] = qMax(1, maxW); // at least 1 char per column
     }
 
-    // Step 2: Constrain total column widths to view width
-    // Account for separators: 1 space between each pair of columns
-    const int viewWidth = geo.width();
-    int separatorTotal = (cols > 1) ? (cols - 1) : 0;
-    int availableForCols = viewWidth - separatorTotal;
-    if (availableForCols < cols)
-        availableForCols = cols; // ensure at least 1 char per column
-
+    // Step 2: The Stretch columns (and the last column with
+    // stretchLastSection) share the free width. Columns that do not fit
+    // keep their widths: the view scrolls by column.
+    const int availableForCols = geo.width() - (cols - 1); // a separator between columns
     int totalNatural = 0;
     for (int c = 0; c < cols; ++c)
         totalNatural += colWidths[c];
 
-    if (totalNatural > availableForCols) {
-        // Proportionally scale down, ensuring each column gets at least 1 char
-        QVector<int> scaled(cols, 0);
-        for (int c = 0; c < cols; ++c) {
-            int proportional = static_cast<int>(
-                static_cast<double>(colWidths[c]) / totalNatural * availableForCols);
-            if (proportional < 1)
-                proportional = 1;
-            scaled[c] = proportional;
-        }
-        // Adjust to fit exactly in availableForCols
-        int scaledTotal = 0;
-        for (int c = 0; c < cols; ++c)
-            scaledTotal += scaled[c];
-
-        // Distribute remainder or trim excess
-        int diff = availableForCols - scaledTotal;
-        if (diff > 0) {
-            // Add extra chars to leading columns first
-            for (int c = 0; c < cols && diff > 0; ++c) {
-                scaled[c]++;
-                diff--;
-            }
-        } else if (diff < 0) {
-            // Remove chars from trailing columns (but keep minimum 1)
-            for (int c = cols - 1; c >= 0 && diff < 0; --c) {
-                if (scaled[c] > 1) {
-                    scaled[c]--;
-                    diff++;
-                }
-            }
-        }
-        colWidths = scaled;
-    } else {
-        // Step 3: The Stretch columns (and the last column with
-        // stretchLastSection) share the free width
+    if (totalNatural < availableForCols) {
         QVector<int> stretch;
         for (int c = 0; c < cols; ++c) {
             if (m_header->sectionResizeMode(c) == QTuiHeaderView::Stretch
