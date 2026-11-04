@@ -95,7 +95,7 @@ terminal size changes and when you add or remove a part.
 The focus chain is the list of the widgets that take Tab focus. A widget is in
 the chain if it is visible, enabled, and its `focusPolicy()` has the
 `Qt::TabFocus` bit. The order is the order of the widget tree: a parent comes
-before its children. Tab moves to the next widget in the chain and Shift+Tab
+before its children. `QTuiWidget::setTabOrder()` changes the order. Tab moves to the next widget in the chain and Shift+Tab
 moves to the previous one. At the end of the chain, focus goes back to the
 start. When a widget gets focus from Tab or a click, the window shows the
 tooltip of that widget.

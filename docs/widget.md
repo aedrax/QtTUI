@@ -203,8 +203,22 @@ widgets that agree with all these conditions:
 
 The order is the order of the widget tree: a parent comes before its
 children, and the children are in the order that you made them.
-`raise()` moves a widget to the end of this order. There is no
-`setTabOrder()`.
+`raise()` moves a widget to the end of this order.
+
+`setTabOrder(first, second)` changes the order, as in `QWidget`: it puts
+`second` after `first`. Only `second` moves; its children keep their place.
+For a chain, call it in sequence:
+
+```cpp
+QTuiWidget::setTabOrder(name, password);  // name to password
+QTuiWidget::setTabOrder(password, login); // name to password to login
+```
+
+The window applies the pairs before it removes the widgets that do not agree
+with the conditions above. Thus, if `password` is hidden, Tab goes from
+`name` to `login`. A pair applies only while its two widgets are in the same
+chain: the window, or the open dialog. A pair goes away when one of its
+widgets is deleted.
 
 While a modal dialog is open, Tab moves only between the widgets of the
 dialog. While the focus is in a popup (a menu or a dropdown list), Tab does
@@ -330,6 +344,7 @@ For the event classes, see [Events and rendering](events-and-rendering.md).
 | `bool hasFocus() const` | Returns `true` if the widget is the focus widget. |
 | `void setFocus()` | Makes the widget the focus widget. Does nothing for `Qt::NoFocus`. |
 | `static QTuiWidget *focusWidget()` | Returns the focus widget, or `nullptr`. |
+| `static void setTabOrder(QTuiWidget *first, QTuiWidget *second)` | Puts `second` after `first` in the Tab order. Does nothing if a widget is `nullptr` or if the two are the same widget. See [Tab order](#tab-order). |
 | `bool isPopup() const` | Returns `true` if the widget is a popup. |
 | `void setPopup(bool popup)` | Makes the widget a popup. A popup paints last, above all other widgets, clipped only to the screen. When a popup shows, it keeps the current focus widget. When it hides with the focus inside, it gives the focus back. Menus, dropdown lists and dialogs use it. |
 | `bool isPaintedByParent() const` | Returns `true` if the parent paints this widget. |

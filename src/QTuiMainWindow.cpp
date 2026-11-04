@@ -843,20 +843,36 @@ void QTuiMainWindow::rebuildFocusChain()
     collectFocusableWidgets(this, m_focusChain);
 }
 
-void QTuiMainWindow::collectFocusableWidgets(QTuiWidget *widget, QList<QTuiWidget *> &chain)
+// All widgets below root in pre-order: a parent precedes its children
+static void collectWidgets(QTuiWidget *widget, QList<QTuiWidget *> &all)
 {
+    all.append(widget);
+    for (auto *child : widget->childWidgets())
+        collectWidgets(child, all);
+}
+
+void QTuiMainWindow::collectFocusableWidgets(QTuiWidget *root, QList<QTuiWidget *> &chain)
+{
+    // The order is the widget tree order, changed by QTuiWidget::setTabOrder().
+    // The pairs apply before the filter below, so a chain of pairs also
+    // holds through a hidden or disabled widget.
+    QList<QTuiWidget *> all;
+    collectWidgets(root, all);
+    QTuiWidget::applyTabOrder(all);
+
     // Tab stops are widgets that opted in via focusPolicy (TabFocus bit),
-    // are visible, and are effectively enabled — labels, containers without
-    // key handling, and disabled widgets are skipped (backlog #12). Pre-order:
-    // a focusable container precedes its children.
-    if (widget != this && widget->isVisible()
-        && (widget->focusPolicy() & Qt::TabFocus)
-        && widget->isEffectivelyEnabled()) {
-        chain.append(widget);
-    }
-    for (auto *child : widget->childWidgets()) {
-        if (child->isVisible())
-            collectFocusableWidgets(child, chain);
+    // are visible up to the root, and are effectively enabled — labels,
+    // containers without key handling, and disabled widgets are skipped
+    // (backlog #12).
+    for (QTuiWidget *widget : all) {
+        if (widget == this || !(widget->focusPolicy() & Qt::TabFocus)
+            || !widget->isEffectivelyEnabled())
+            continue;
+        bool visible = true;
+        for (QTuiWidget *w = widget; w && w != root && visible; w = w->parentWidget())
+            visible = w->isVisible();
+        if (visible)
+            chain.append(widget);
     }
 }
 

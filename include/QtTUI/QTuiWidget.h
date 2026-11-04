@@ -66,6 +66,15 @@ public:
     void setFocus();
     static QTuiWidget *focusWidget();
 
+    // Puts second after first in the Tab order, as in QWidget: Tab on first
+    // goes to second, and Shift+Tab on second goes to first. Only second
+    // moves; its children keep their place in the order. Tab skips a widget
+    // in the order that is hidden, disabled or without the TabFocus bit.
+    // For a chain, call it in sequence: (a, b), then (b, c). A pair applies
+    // while the two widgets are in the same Tab chain (the window, or the
+    // open dialog), and goes away when one of them is deleted.
+    static void setTabOrder(QTuiWidget *first, QTuiWidget *second);
+
     // Popup layer: a popup widget is skipped by the normal paint recursion and
     // painted by the RenderScheduler in a second, topmost pass clipped only to
     // the screen — not to its parent widget. Menus and dropdown lists use this
@@ -210,6 +219,8 @@ private:
     void setHoverPos(const QPoint &pos);
 
     static void setFocusWidget(QTuiWidget *widget);
+    // Applies the setTabOrder() pairs to a list of widgets in tree order
+    static void applyTabOrder(QList<QTuiWidget *> &widgets);
     static QTuiWidget *s_focusWidget;
 
     QRect m_geometry;

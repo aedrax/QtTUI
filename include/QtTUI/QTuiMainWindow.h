@@ -71,7 +71,7 @@ private:
     // Moves the hover to widget (nullptr: none) and restarts the hover
     // tooltip timer
     void setHovered(QTuiWidget *widget, const QPoint &pos = QPoint());
-    void collectFocusableWidgets(QTuiWidget *widget, QList<QTuiWidget *> &chain);
+    void collectFocusableWidgets(QTuiWidget *root, QList<QTuiWidget *> &chain);
     static QTuiWidget *findFocusedWidget(QTuiWidget *root);
     static QTuiWidget *findWidgetAt(QTuiWidget *root, const QPoint &pos);
 
