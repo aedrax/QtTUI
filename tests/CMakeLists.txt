@@ -252,6 +252,10 @@ qttui_add_test(test_shortcut_dispatch test_shortcut_dispatch.cpp)
 # leaves the field, and QTuiKeySequence::toString()
 qttui_add_test(test_qtui_keysequenceedit test_qtui_keysequenceedit.cpp)
 
+# QTuiColorDialog: the grid, the sliders and the hex text stay in sync,
+# keys and clicks, getColor()
+qttui_add_test(test_qtui_colordialog test_qtui_colordialog.cpp)
+
 # Enabled state + focus policy tests: disabled widgets are inert, Tab chain
 # and mouse focus honor focusPolicy, group box disables children (backlog #12)
 qttui_add_test(test_enabled_focuspolicy test_enabled_focuspolicy.cpp)

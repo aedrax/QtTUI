@@ -107,6 +107,10 @@ private slots:
         QCOMPARE(changed.count(), 2);
         QVERIFY(!env.edit->keySequence().isValid());
         QCOMPARE(env.editText(), QStringLiteral("Enter: record"));
+
+        // Without focus, the empty field shows "None"
+        env.other->setFocus();
+        QCOMPARE(env.editText(), QStringLiteral("None"));
     }
 
     // A shortcut of an action fires while the field only has focus, and

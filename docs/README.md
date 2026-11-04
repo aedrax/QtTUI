@@ -40,7 +40,7 @@ where it is different from Qt.
 - [Main window](main-window.md): the main window, menus, actions,
   shortcuts, tool bars, the status bar and tooltips.
 - [Dialogs](dialogs.md): dialogs, message boxes, input dialogs, progress
-  dialogs, file dialogs and wizards.
+  dialogs, file dialogs, color dialogs and wizards.
 
 ## Internals
 

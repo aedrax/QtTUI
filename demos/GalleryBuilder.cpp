@@ -864,6 +864,7 @@ void buildGallery(QTuiMainWindow &window)
     auto *fileMenu = menuBar->addMenu("&File");
     auto *openAction = fileMenu->addAction("&Open...", "Ctrl+O");
     auto *newAction = fileMenu->addAction("&New project...", "Ctrl+N");
+    auto *colorAction = fileMenu->addAction("&Color...", "Ctrl+L");
     auto *quitAction = fileMenu->addAction("&Quit", "Ctrl+Q");
     QObject::connect(quitAction, &QTuiAction::triggered, qApp, &QCoreApplication::quit);
     // View > Light theme / Dark theme switch between the built-in light
@@ -923,6 +924,13 @@ void buildGallery(QTuiMainWindow &window)
         const QString path = QTuiFileDialog::getOpenFileName(nullptr, "Open a file");
         statusBar->showMessage(path.isEmpty() ? QStringLiteral("Open canceled")
                                               : QStringLiteral("Chosen: %1").arg(path));
+    });
+
+    QObject::connect(colorAction, &QTuiAction::triggered, [statusBar]() {
+        bool ok = false;
+        const Color color = QTuiColorDialog::getColor(Color(59, 130, 246), nullptr, QString(), &ok);
+        statusBar->showMessage(ok ? QStringLiteral("Color: %1, %2, %3").arg(color.r).arg(color.g).arg(color.b)
+                                  : QStringLiteral("Color canceled"));
     });
 
     // Central tab widget with 10 category tabs

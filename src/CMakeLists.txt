@@ -52,6 +52,7 @@ set(QTTUI_SOURCES
     QTuiStackedWidget.cpp
     QTuiSplitter.cpp
     QTuiFileDialog.cpp
+    QTuiColorDialog.cpp
     QTuiFocusFrame.cpp
     QTuiFrame.cpp
     QTuiSizeGrip.cpp
@@ -157,6 +158,7 @@ set(QTTUI_HEADERS
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiStackedWidget.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiSplitter.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiFileDialog.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiColorDialog.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiFocusFrame.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiFrame.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiSizeGrip.h
