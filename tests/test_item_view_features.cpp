@@ -553,6 +553,46 @@ private slots:
         QCOMPARE(view.horizontalScrollOffset(), 2);
     }
 
+    void hiddenColumns()
+    {
+        ColorModel model; // 3 columns of 4 cells
+        QTuiTableView view;
+        view.setGeometry(QRect(0, 0, 30, 5));
+        view.setModel(&model);
+        view.horizontalHeader()->setStretchLastSection(true);
+        view.hideColumn(1);
+        QVERIFY(view.isColumnHidden(1));
+        // 30 = 4 + 1 + the last column
+        QCOMPARE(view.columnWidth(2), 25);
+        QCOMPARE(view.visualRect(model.index(0, 2)), QRect(5, 1, 25, 1));
+        QVERIFY(view.visualRect(model.index(0, 1)).isEmpty());
+
+        ScreenBuffer buffer(30, 5);
+        view.paintEvent(buffer);
+        QString header;
+        for (int x = 0; x < 8; ++x)
+            header += QChar(char16_t(buffer.backCell(x, 0).ch));
+        QCOMPARE(header, QStringLiteral("H0   H2 "));
+
+        // The Right key goes past the hidden column
+        sendKey(view, Qt::Key_Right);
+        QCOMPARE(view.currentIndex().column(), 2);
+        sendKey(view, Qt::Key_Left);
+        QCOMPARE(view.currentIndex().column(), 0);
+
+        // A click goes to the column that shows at that position
+        TuiMouseEvent press(TuiMouseEvent::Press, Qt::LeftButton, QPoint(6, 2), Qt::NoModifier);
+        QCoreApplication::sendEvent(&view, &press);
+        QCOMPARE(view.currentIndex(), model.index(1, 2));
+
+        // The current column becomes hidden: the view moves to one that shows
+        view.hideColumn(2);
+        QCOMPARE(view.currentIndex().column(), 0);
+        view.showColumn(1);
+        view.showColumn(2);
+        QCOMPARE(view.columnWidth(1), 4);
+    }
+
     void stretchLastSection()
     {
         ColorModel model; // cells "r0c0": 4 characters

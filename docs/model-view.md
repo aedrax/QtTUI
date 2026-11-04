@@ -522,6 +522,10 @@ int main(int argc, char *argv[])
 | `Qt::SortOrder sortOrder() const` | Returns the sort order. |
 | `int columnWidth(int column) const` | Returns the width of the column as the view paints it. |
 | `void setColumnWidth(int column, int width)` | Sets the size of the header section (the minimum is 2). An `Interactive` or a `Fixed` column uses it. |
+| `bool isColumnHidden(int column) const` | Returns true if the column is hidden. |
+| `void setColumnHidden(int column, bool hide)` | Hides or shows the column. A hidden column takes no space, and the Left and Right keys go past it. If the current column becomes hidden, the next column that shows becomes current. `horizontalHeader()->setSectionHidden()` does the same. |
+| `void hideColumn(int column)` | Calls `setColumnHidden(column, true)`. |
+| `void showColumn(int column)` | Calls `setColumnHidden(column, false)`. |
 | `void resizeColumnToContents(int column)` | Sets the width of the column to the widest of the header and the visible cells, as `setColumnWidth()` does. |
 | `void resizeColumnsToContents()` | Calls `resizeColumnToContents()` for each column. |
 | `QTuiHeaderView *horizontalHeader() const` | Returns the hidden header that keeps the resize modes and the sizes of the columns. |

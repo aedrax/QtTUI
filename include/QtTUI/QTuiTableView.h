@@ -52,6 +52,14 @@ public:
     void resizeColumnToContents(int column);
     void resizeColumnsToContents();
 
+    // Hidden columns, as in QTableView. A hidden column does not show and
+    // the Left and Right keys go past it. If the current column becomes
+    // hidden, the next column that shows becomes current.
+    bool isColumnHidden(int column) const;
+    void setColumnHidden(int column, bool hide);
+    void hideColumn(int column) { setColumnHidden(column, true); }
+    void showColumn(int column) { setColumnHidden(column, false); }
+
     // The header of the columns. The table paints the header row itself:
     // this widget stays hidden and keeps the resize modes and the sizes.
     QTuiHeaderView *horizontalHeader() const;
@@ -86,6 +94,9 @@ private:
     // Discards the stored natural widths: the next paint measures again
     void remeasureColumnWidths();
     int measureColumn(int column) const;
+    // The next column that shows in the direction of step (1 or -1), or
+    // column if there is none
+    int movedColumn(int column, int step) const;
     const QVector<int> &effectiveColumnWidths() const;
 
     int m_currentRow = 0;

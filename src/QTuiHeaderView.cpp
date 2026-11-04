@@ -118,6 +118,7 @@ void QTuiHeaderView::setSectionHidden(int logicalIndex, bool hide)
         m_hiddenSections.insert(logicalIndex);
     else
         m_hiddenSections.remove(logicalIndex);
+    emit geometriesChanged();
     markDirty();
 }
 
