@@ -240,6 +240,16 @@ static QTuiWidget *createTextInputTab(QTuiWidget *parent, QTuiStatusBar *statusB
     });
     page->addWidget(lineEdit);
 
+    // -- QTuiKeySequenceEdit section --
+    page->addWidget(sectionLabel("QTuiKeySequenceEdit", page));
+    auto *keyEdit = new QTuiKeySequenceEdit(QTuiKeySequence::fromString("Ctrl+K"), page);
+    keyEdit->setToolTip("Enter starts the record; then press a key combination");
+    QObject::connect(keyEdit, &QTuiKeySequenceEdit::keySequenceChanged,
+                     [statusBar](const QTuiKeySequence &sequence) {
+        statusBar->showMessage(QStringLiteral("Key sequence: %1").arg(sequence.toString()));
+    });
+    page->addWidget(keyEdit);
+
     // -- QTuiTextEdit section --
     page->addWidget(sectionLabel("QTuiTextEdit", page));
     auto *textEdit = new QTuiTextEdit(page);

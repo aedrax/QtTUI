@@ -480,6 +480,7 @@ void checkKey(int key, Qt::KeyboardModifiers modifiers)
 | `QTuiKeySequence()` | Makes a sequence that is not valid. |
 | `QTuiKeySequence(int key, Qt::KeyboardModifiers modifiers)` | Makes a sequence from a `Qt::Key` value and modifiers. |
 | `static QTuiKeySequence fromString(const QString &str)` | Parses a string such as `"Ctrl+S"`. |
+| `QString toString() const` | Returns the text that `fromString()` reads, such as `"Ctrl+Shift+Z"`. The modifiers come in the sequence Meta, Ctrl, Alt, Shift. Returns an empty string if the sequence is not valid or `fromString()` cannot read the key (punctuation). |
 | `bool isValid() const` | Returns `true` if the sequence has a key. |
 | `int key() const` | Returns the key, or 0. |
 | `Qt::KeyboardModifiers modifiers() const` | Returns the modifiers. |

@@ -100,6 +100,53 @@ QTuiKeySequence QTuiKeySequence::fromString(const QString &str)
     return QTuiKeySequence(key, mods);
 }
 
+// Returns an empty string for a key that parseKeyName() does not read.
+static QString keyName(int key)
+{
+    if ((key >= Qt::Key_A && key <= Qt::Key_Z) || (key >= Qt::Key_0 && key <= Qt::Key_9))
+        return QString(QChar(key));
+    if (key >= Qt::Key_F1 && key <= Qt::Key_F35)
+        return QLatin1Char('F') + QString::number(key - Qt::Key_F1 + 1);
+
+    switch (key) {
+    case Qt::Key_Escape:    return QStringLiteral("Esc");
+    case Qt::Key_Tab:       return QStringLiteral("Tab");
+    case Qt::Key_Backspace: return QStringLiteral("Backspace");
+    case Qt::Key_Delete:    return QStringLiteral("Del");
+    case Qt::Key_Enter:
+    case Qt::Key_Return:    return QStringLiteral("Enter");
+    case Qt::Key_Space:     return QStringLiteral("Space");
+    case Qt::Key_Home:      return QStringLiteral("Home");
+    case Qt::Key_End:       return QStringLiteral("End");
+    case Qt::Key_PageUp:    return QStringLiteral("PgUp");
+    case Qt::Key_PageDown:  return QStringLiteral("PgDown");
+    case Qt::Key_Insert:    return QStringLiteral("Ins");
+    case Qt::Key_Up:        return QStringLiteral("Up");
+    case Qt::Key_Down:      return QStringLiteral("Down");
+    case Qt::Key_Left:      return QStringLiteral("Left");
+    case Qt::Key_Right:     return QStringLiteral("Right");
+    default:                return QString();
+    }
+}
+
+QString QTuiKeySequence::toString() const
+{
+    const QString name = keyName(m_key);
+    if (name.isEmpty())
+        return QString();
+
+    QString text;
+    if (m_modifiers & Qt::MetaModifier)
+        text += QStringLiteral("Meta+");
+    if (m_modifiers & Qt::ControlModifier)
+        text += QStringLiteral("Ctrl+");
+    if (m_modifiers & Qt::AltModifier)
+        text += QStringLiteral("Alt+");
+    if (m_modifiers & Qt::ShiftModifier)
+        text += QStringLiteral("Shift+");
+    return text + name;
+}
+
 // Keypad Enter and Return are interchangeable for shortcut purposes.
 static int normalizeKey(int key)
 {

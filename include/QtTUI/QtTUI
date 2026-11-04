@@ -62,6 +62,7 @@
 #include <QtTUI/QTuiComboBox.h>
 #include <QtTUI/QTuiProgressBar.h>
 #include <QtTUI/QTuiLineEdit.h>
+#include <QtTUI/QTuiKeySequenceEdit.h>
 #include <QtTUI/QTuiCompleter.h>
 #include <QtTUI/QTuiValidator.h>
 

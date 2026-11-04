@@ -29,6 +29,11 @@ public:
 
     static QTuiKeySequence fromString(const QString &str);
 
+    // The text form that fromString() reads, for example "Ctrl+Shift+Z".
+    // Returns an empty string for an invalid sequence and for a key that
+    // fromString() cannot read (punctuation).
+    QString toString() const;
+
     bool isValid() const { return m_key != 0; }
     int key() const { return m_key; }
     Qt::KeyboardModifiers modifiers() const { return m_modifiers; }

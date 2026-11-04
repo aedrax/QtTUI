@@ -1,7 +1,8 @@
 # Text and input
 
 This page covers the widgets that show text or take text from the user: the
-label, the line edit, the text edits and the combo box. It also covers the
+label, the line edit, the key sequence edit, the text edits and the combo
+box. It also covers the
 validators and the completer for `QTuiLineEdit`.
 
 ## QTuiLabel
@@ -221,6 +222,88 @@ completer.
 
 - A press puts the cursor at the cell and removes the selection.
 - A drag with the left button selects from the cursor to the mouse.
+
+## QTuiKeySequenceEdit
+
+`#include <QtTUI/QTuiKeySequenceEdit.h>` · Inherits: [QTuiWidget](widget.md)
+
+`QTuiKeySequenceEdit` is a one-line field that records a key combination and
+shows it as text, like `QKeySequenceEdit`. The value is a
+[`QTuiKeySequence`](main-window.md#qtuikeysequence): one key with modifiers.
+Unlike `QKeySequenceEdit`, it holds one combination, not a sequence of four.
+
+Unlike `QKeySequenceEdit`, the field does not record while it only has focus.
+Thus the shortcuts, Escape and the menu keys still work when the user moves
+through the field with Tab. Enter, Space or a click starts the record. During
+the record, the field gets each key before the main window does. The next
+combination becomes the value, also if it is the shortcut of an action, F10,
+or Escape in a dialog. Then the record stops.
+
+An empty field shows "None". With focus it shows "Enter: record", and during
+the record it shows "Press a key". The constructor sets the focus policy to
+`Qt::StrongFocus`.
+
+The field ignores a key that `QTuiKeySequence::fromString()` cannot read, for
+example punctuation. Tab, bare Escape, bare Backspace and bare Delete keep
+their function, so the field cannot record them. Many terminals send the same
+bytes for Ctrl+I and Tab, for Ctrl+M and Enter, and for Ctrl+H and Backspace.
+The field then gets the second key of each pair.
+
+### Example
+
+```cpp
+#include <QtTUI/QtTUI>
+
+using namespace QtTUI;
+
+void example(QTuiWidget *parent, QTuiAction *saveAction)
+{
+    auto *edit = new QTuiKeySequenceEdit(saveAction->shortcutSequence(), parent);
+    QObject::connect(edit, &QTuiKeySequenceEdit::keySequenceChanged,
+                     [saveAction](const QTuiKeySequence &sequence) {
+        saveAction->setShortcut(sequence.toString());
+    });
+}
+```
+
+### Functions
+
+| Function | Description |
+| --- | --- |
+| `explicit QTuiKeySequenceEdit(QTuiWidget *parent = nullptr)` | Makes an empty field. |
+| `explicit QTuiKeySequenceEdit(const QTuiKeySequence &keySequence, QTuiWidget *parent = nullptr)` | Makes a field with a key sequence. |
+| `QTuiKeySequence keySequence() const` | Returns the key sequence. It is not valid if the field is empty. |
+| `bool isRecording() const` | Returns `true` while the field waits for a key combination. |
+| `QSize minimumSize() const override` | Returns 18x1. |
+
+### Slots
+
+| Slot | Description |
+| --- | --- |
+| `void setKeySequence(const QTuiKeySequence &keySequence)` | Sets the key sequence. Emits `keySequenceChanged()` if it changes. |
+| `void clear()` | Makes the field empty. Emits `keySequenceChanged()` if it changes. |
+
+### Signals
+
+| Signal | Description |
+| --- | --- |
+| `void keySequenceChanged(const QTuiKeySequence &keySequence)` | The key sequence changed, from the user or from a function. |
+| `void editingFinished()` | The user recorded a combination or cleared the field. |
+
+### Keys
+
+| Key | Action |
+| --- | --- |
+| Enter, Return, Space | Starts the record. |
+| Backspace, Delete | Clears the field, also during the record. |
+| Escape (during the record) | Stops the record and keeps the old value. |
+| Tab, Shift+Tab | Moves the focus, also during the record. The record stops and the old value stays. |
+| Other keys (during the record) | The combination becomes the value and the record stops. |
+
+### Mouse
+
+- A press with the left button gives the field focus and starts the record.
+- A press on a different widget stops the record.
 
 ## QTuiTextEdit
 
