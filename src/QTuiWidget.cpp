@@ -401,6 +401,23 @@ void QTuiWidget::setFocusWidget(QTuiWidget *widget)
     }
 }
 
+bool QTuiWidget::focusNextPrevChild(bool next)
+{
+    // Only the main window knows the focus chain
+    QTuiWidget *parent = parentWidget();
+    return parent && parent->focusNextPrevChild(next);
+}
+
+bool QTuiWidget::focusNextChild()
+{
+    return focusNextPrevChild(true);
+}
+
+bool QTuiWidget::focusPreviousChild()
+{
+    return focusNextPrevChild(false);
+}
+
 void QTuiWidget::focusEntered(QTuiWidget *focus)
 {
     Q_UNUSED(focus);

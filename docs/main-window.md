@@ -103,6 +103,12 @@ tooltip of that widget.
 While focus is in an open popup (for example a menu), Tab does not move focus
 out of the popup.
 
+The window does not move the focus directly. It calls
+`focusNextPrevChild()` on the focus widget, and the call goes up the parents
+to the window. A widget that overrides the function can move the focus
+itself, or return `false` to get Tab as a normal key. See
+[Tab order](widget.md#tab-order).
+
 ### Shortcuts
 
 Each `QTuiAction` with a shortcut is a global shortcut. The window looks at
@@ -173,9 +179,9 @@ matches takes the key.
 | F10 | Opens the first menu of the menu bar. Not while a modal dialog is open. |
 | F1 | Shows the tooltip of the focus widget again, if it has one. |
 | Ctrl+Z | Suspends the program (`QTuiApplication::suspend()`), as in a shell. Not if the focus widget accepts text input. |
-| Tab, Shift+Tab (in a modal dialog) | Moves focus to the next or previous widget in the dialog. |
+| Tab, Shift+Tab (in a modal dialog) | Moves focus to the next or previous widget in the dialog, unless `focusNextPrevChild()` of the focus widget decides. |
 | Escape (in a modal dialog) | Rejects the dialog. |
-| Tab | Moves focus to the next widget in the focus chain. Not while focus is in a popup. |
+| Tab | Moves focus to the next widget in the focus chain. Not while focus is in a popup, and not if `focusNextPrevChild()` of the focus widget decides. |
 | Shift+Tab | Moves focus to the previous widget in the focus chain. Not while focus is in a popup. |
 | All other keys | Go to the focus widget. |
 

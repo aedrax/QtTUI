@@ -220,6 +220,30 @@ with the conditions above. Thus, if `password` is hidden, Tab goes from
 chain: the window, or the open dialog. A pair goes away when one of its
 widgets is deleted.
 
+Before the focus moves, the main window calls `focusNextPrevChild()` on the
+focus widget. The default calls the parent, and thus the call goes up to the
+main window, which moves the focus along the chain. A widget, or a parent of
+the focus widget, can override the function:
+
+- Return `true` after you move the focus, or to keep the focus where it is.
+- Return `false` to get Tab or Shift+Tab in `keyPressEvent()` as a normal
+  key. Use this for a widget that types a tab character.
+- Call `QTuiWidget::focusNextPrevChild()` for the usual move.
+
+```cpp
+class Notes : public QTuiWidget {
+protected:
+    // Tab goes to keyPressEvent(); Shift+Tab moves the focus as usual
+    bool focusNextPrevChild(bool next) override
+    {
+        return next ? false : QTuiWidget::focusNextPrevChild(next);
+    }
+};
+```
+
+`focusNextChild()` and `focusPreviousChild()` move the focus from code as
+Tab and Shift+Tab do.
+
 While a modal dialog is open, Tab moves only between the widgets of the
 dialog. While the focus is in a popup (a menu or a dropdown list), Tab does
 not leave the popup. Tab and a mouse click also show the tooltip of the
@@ -402,6 +426,9 @@ For the event classes, see [Events and rendering](events-and-rendering.md).
 | `virtual void resizeEvent(TuiResizeEvent *event)` | Gets a terminal resize. The default does nothing. |
 | `virtual void pasteEvent(TuiPasteEvent *event)` | Gets pasted text for the focus widget. The default does nothing. |
 | `virtual void focusEntered(QTuiWidget *focus)` | Called on the new focus widget and on each of its parents. The default does nothing. |
+| `virtual bool focusNextPrevChild(bool next)` | Finds the widget that gets the focus for Tab (`next` is `true`) or Shift+Tab. The default calls the parent; the main window moves the focus along the focus chain and returns `true`. A widget without a main window above it returns `false`. See [Tab order](#tab-order). |
+| `bool focusNextChild()` | Calls `focusNextPrevChild(true)`. |
+| `bool focusPreviousChild()` | Calls `focusNextPrevChild(false)`. |
 
 ### Signals
 
@@ -421,8 +448,8 @@ widget gets the key:
 
 | Key | Action |
 | --- | --- |
-| Tab | Move the focus to the next widget in the focus chain. |
-| Shift+Tab | Move the focus to the previous widget. |
+| Tab | Move the focus to the next widget in the focus chain, unless `focusNextPrevChild()` of the focus widget returns `false`. |
+| Shift+Tab | Move the focus to the previous widget, with the same exception. |
 | F1 | Show the tooltip of the focus widget. |
 | Shift+F10, Menu | Ask the focus widget for a context menu. |
 | Ctrl+Z | Suspend the application, if the focus widget does not accept text input. |

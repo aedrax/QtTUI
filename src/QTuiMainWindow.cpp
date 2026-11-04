@@ -444,13 +444,12 @@ void QTuiMainWindow::keyPressEvent(TuiKeyEvent *event)
     // moves focus between its own widgets; a menu has one Tab stop.
     const bool popupHasFocus = focused && insideVisiblePopup(focused);
 
-    if (QTuiDialog *dialog = activeModalDialog()) {
-        if (event->key() == Qt::Key_Tab || event->key() == Qt::Key_Backtab) {
-            const bool forward = event->key() == Qt::Key_Tab
-                && !(event->modifiers() & Qt::ShiftModifier);
-            advanceFocus(forward, dialog);
-            return;
-        }
+    // Terminals send Key_Backtab for Shift+Tab
+    const bool tab = event->key() == Qt::Key_Tab || event->key() == Qt::Key_Backtab;
+    const bool next = event->key() == Qt::Key_Tab && !(event->modifiers() & Qt::ShiftModifier);
+
+    QTuiDialog *dialog = activeModalDialog();
+    if (dialog) {
         // Escape rejects the dialog, unless a popup inside it (a completer
         // or a dropdown) is open, or an item view edits an item: that popup
         // or editor closes first
@@ -462,24 +461,22 @@ void QTuiMainWindow::keyPressEvent(TuiKeyEvent *event)
                 return;
             }
         }
-        // Keys reach only the dialog
-        if (!focused || !dialog->isAncestorOf(focused))
+        // Keys reach only the dialog; Tab moves the focus into it
+        if (!focused || !dialog->isAncestorOf(focused)) {
+            if (tab)
+                focusNextPrevChild(next);
             return;
+        }
     }
 
-    if (!popupHasFocus) {
-        // Tab forward
-        if (event->key() == Qt::Key_Tab && !(event->modifiers() & Qt::ShiftModifier)) {
-            advanceFocus(true);
+    // Tab and Shift+Tab: the focus widget and then its parents, up to this
+    // window, decide where the focus goes (see QTuiWidget::
+    // focusNextPrevChild). A widget that returns false gets the key below.
+    // A dialog is a popup, but Tab moves the focus in it.
+    if (tab && (dialog || !popupHasFocus)) {
+        QTuiWidget *from = focused ? focused : this;
+        if (from->focusNextPrevChild(next))
             return;
-        }
-
-        // Shift+Tab backward (terminals send Key_Backtab for Shift+Tab)
-        if (event->key() == Qt::Key_Backtab
-            || (event->key() == Qt::Key_Tab && (event->modifiers() & Qt::ShiftModifier))) {
-            advanceFocus(false);
-            return;
-        }
     }
 
     // Dispatch to the focused widget
@@ -801,6 +798,12 @@ QTuiDialog *QTuiMainWindow::activeModalDialog() const
             return dialog;
     }
     return nullptr;
+}
+
+bool QTuiMainWindow::focusNextPrevChild(bool next)
+{
+    advanceFocus(next, activeModalDialog());
+    return true;
 }
 
 void QTuiMainWindow::advanceFocus(bool forward, QTuiWidget *root)

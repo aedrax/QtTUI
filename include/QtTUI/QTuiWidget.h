@@ -213,6 +213,23 @@ protected:
     // nothing.
     virtual void focusEntered(QTuiWidget *focus);
 
+    // Finds the widget that gets the focus for Tab (next is true) or
+    // Shift+Tab (next is false), as in QWidget. The main window calls it on
+    // the focus widget before that widget gets the key. The default calls
+    // the parent; the main window at the top moves the focus along the
+    // focus chain and returns true.
+    //
+    // Override it in a widget, or in a parent of the widgets, to control
+    // the two keys:
+    // - Return true after you move the focus (or to keep it where it is).
+    // - Return false to get the key in keyPressEvent() as a normal key,
+    //   for example in an editor that inserts a tab character.
+    // - Call the base function to move the focus along the focus chain.
+    virtual bool focusNextPrevChild(bool next);
+    // The same as focusNextPrevChild(true) and focusNextPrevChild(false)
+    bool focusNextChild();
+    bool focusPreviousChild();
+
 private:
     friend class QTuiMainWindow;
     void setUnderMouse(bool under);
