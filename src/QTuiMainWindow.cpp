@@ -352,14 +352,14 @@ static bool shortcutShadowedByEditor(const QTuiKeySequence &seq, QTuiWidget *foc
 }
 
 // As in Qt, a shortcut works only while the widgets that own its action are
-// visible: an action on a hidden tab page does not take the key. A popup
-// (a closed menu) is hidden by design, so it does not block its actions.
-// An action without a widget owner is global.
+// visible: an action on a hidden tab page or in a closed dialog does not
+// take the key. A closed menu is hidden by design, so it does not block
+// its actions. An action without a widget owner is global.
 static bool actionReachable(const QTuiAction *action)
 {
     for (QObject *o = action->parent(); o; o = o->parent()) {
         auto *w = qobject_cast<QTuiWidget *>(o);
-        if (w && !w->isPopup() && !w->isVisible())
+        if (w && !w->isVisible() && !qobject_cast<QTuiMenu *>(w))
             return false;
     }
     return true;

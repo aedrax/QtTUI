@@ -119,13 +119,17 @@ these conditions are true:
 - The key and the modifiers are the same as the shortcut. Ctrl+S does not
   match Ctrl+Shift+S.
 - The widgets that own the action are visible. A closed menu does not count
-  as hidden. An action without a widget owner is always available.
+  as hidden, but a closed dialog does. An action without a widget owner is
+  always available.
 - The focus widget does not take the key for text. If the focus widget
   accepts text input, it keeps bare text keys (for example `Q` or `Shift+Q`)
   and the edit keys Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y, Ctrl+C, Ctrl+X, Ctrl+V
   and Ctrl+A.
 - If a modal dialog is open, the action belongs to the dialog or to a widget
   in it.
+
+A [`QTuiShortcut`](#qtuishortcut) is a shortcut without an action. The same
+conditions apply to it, with its parent widget as the owner.
 
 If no action takes the key, Alt+letter (without Ctrl) gives the focus to the
 buddy of the [label](text-input.md#buddy-and-mnemonic) with that mnemonic.
@@ -183,7 +187,7 @@ matches takes the key.
 
 | Key | Action |
 | --- | --- |
-| A shortcut of an action | Triggers the action. See "Shortcuts". |
+| A shortcut of an action, or a `QTuiShortcut` | Triggers the action, or emits `activated()`. See "Shortcuts". |
 | Alt+letter | Gives the focus to the buddy of the label with that mnemonic. |
 | Alt+letter | Opens the menu bar menu with that mnemonic. |
 | Shift+F10, Menu | Asks for the context menu of the focus widget. |
@@ -503,6 +507,58 @@ void checkKey(int key, Qt::KeyboardModifiers modifiers)
 | `bool matches(int key, Qt::KeyboardModifiers modifiers) const` | Returns `true` if the key and all modifiers are the same. Enter and Return match each other. |
 | `bool isBareTextKey() const` | Returns `true` if the key types a character and the only modifier is Shift or none. |
 | `bool operator==(const QTuiKeySequence &other) const` | Compares the key and the modifiers. |
+
+## QTuiShortcut
+
+`#include <QtTUI/QTuiShortcut.h>` · Inherits: `QObject`
+
+A key that emits `activated()`, as `QShortcut`. Use it for a key that needs
+no menu item and no button. The parent widget owns the shortcut.
+
+The main window examines a `QTuiShortcut` together with the action
+shortcuts, in the order in which the actions and shortcuts were made. The
+conditions are the same as for an action (see
+["Shortcuts"](#shortcuts)):
+
+- The shortcut is enabled, and the key and the modifiers are the same.
+- The parent widget and its parents are visible. A shortcut with a `nullptr`
+  parent is always available.
+- A key without a modifier, and the standard edit keys, do not fire while
+  the focus widget accepts text input.
+- If a modal dialog is open, the parent widget is the dialog or a widget in
+  it.
+
+### Example
+
+```cpp
+#include <QtTUI/QtTUI>
+
+using namespace QtTUI;
+
+void addSearchKey(QTuiWidget *page, QTuiLineEdit *search)
+{
+    auto *find = new QTuiShortcut(QTuiKeySequence::fromString(QStringLiteral("Ctrl+F")), page);
+    QObject::connect(find, &QTuiShortcut::activated, search, [search]() {
+        search->setFocus();
+    });
+}
+```
+
+### Functions
+
+| Function | Description |
+| --- | --- |
+| `QTuiShortcut(const QTuiKeySequence &key, QTuiWidget *parent)` | Makes a shortcut for the key. The parent widget owns it. |
+| `QTuiKeySequence key() const` | Returns the key. |
+| `void setKey(const QTuiKeySequence &key)` | Sets the key. A sequence that is not valid never fires. |
+| `bool isEnabled() const` | Returns the enabled flag. The default is `true`. |
+| `void setEnabled(bool enabled)` | Enables or disables the shortcut. |
+
+### Signals
+
+| Signal | Description |
+| --- | --- |
+| `activated()` | The user pressed the key, and all the conditions are true. |
 
 ## QTuiToolBar
 

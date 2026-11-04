@@ -1,6 +1,7 @@
-// Focus control: QTuiWidget::setTabOrder(), focusNextPrevChild() and the
-// label buddy.
+// Focus control: QTuiWidget::setTabOrder(), focusNextPrevChild(), the
+// label buddy and QTuiShortcut.
 #include <QtTest/QtTest>
+#include <QtTUI/QTuiAction.h>
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiBoxLayout.h>
 #include <QtTUI/QTuiDialog.h>
@@ -10,6 +11,7 @@
 #include <QtTUI/QTuiMenu.h>
 #include <QtTUI/QTuiMenuBar.h>
 #include <QtTUI/QTuiPushButton.h>
+#include <QtTUI/QTuiShortcut.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
 
@@ -567,6 +569,148 @@ private slots:
         QVERIFY(ok->hasFocus());
         env.alt('n');
         QVERIFY(edit->hasFocus());
+    }
+
+    // -----------------------------------------------------------------------
+    // QTuiShortcut
+    // -----------------------------------------------------------------------
+
+    void shortcutEmitsActivated()
+    {
+        Env env;
+        const QTuiKeySequence ctrlK(Qt::Key_K, Qt::ControlModifier);
+        auto *shortcut = new QTuiShortcut(ctrlK, &env.window);
+        QSignalSpy spy(shortcut, &QTuiShortcut::activated);
+        QCOMPARE(shortcut->key(), ctrlK);
+        QVERIFY(shortcut->isEnabled());
+
+        env.sendKey(Qt::Key_K, Qt::ControlModifier);
+        QCOMPARE(spy.count(), 1);
+        env.sendKey(Qt::Key_K); // other modifiers
+        QCOMPARE(spy.count(), 1);
+
+        shortcut->setEnabled(false);
+        QVERIFY(!shortcut->isEnabled());
+        env.sendKey(Qt::Key_K, Qt::ControlModifier);
+        QCOMPARE(spy.count(), 1);
+        shortcut->setEnabled(true);
+
+        shortcut->setKey(QTuiKeySequence::fromString(QStringLiteral("F5")));
+        env.sendKey(Qt::Key_K, Qt::ControlModifier);
+        QCOMPARE(spy.count(), 1);
+        env.sendKey(Qt::Key_F5);
+        QCOMPARE(spy.count(), 2);
+    }
+
+    void shortcutOfAHiddenWidgetDoesNotFire()
+    {
+        Env env;
+        auto *page = new QTuiWidget(&env.window);
+        auto *inner = new QTuiWidget(page);
+        QTuiShortcut shortcut(QTuiKeySequence(Qt::Key_K, Qt::ControlModifier), inner);
+        QSignalSpy spy(&shortcut, &QTuiShortcut::activated);
+
+        inner->setVisible(false);
+        env.sendKey(Qt::Key_K, Qt::ControlModifier);
+        QCOMPARE(spy.count(), 0);
+        inner->setVisible(true);
+
+        page->setVisible(false); // a parent of the parent widget
+        env.sendKey(Qt::Key_K, Qt::ControlModifier);
+        QCOMPARE(spy.count(), 0);
+        page->setVisible(true);
+
+        env.sendKey(Qt::Key_K, Qt::ControlModifier);
+        QCOMPARE(spy.count(), 1);
+    }
+
+    void bareKeyShortcutDoesNotFireInATextEditor()
+    {
+        Env env;
+        auto *button = env.button("b");
+        auto *edit = new QTuiLineEdit(&env.window);
+        QTuiShortcut bare(QTuiKeySequence(Qt::Key_Q, Qt::NoModifier), &env.window);
+        QTuiShortcut ctrl(QTuiKeySequence(Qt::Key_K, Qt::ControlModifier), &env.window);
+        QSignalSpy bareSpy(&bare, &QTuiShortcut::activated);
+        QSignalSpy ctrlSpy(&ctrl, &QTuiShortcut::activated);
+
+        edit->setFocus();
+        env.sendKey(Qt::Key_Q, Qt::NoModifier, QStringLiteral("q"));
+        QCOMPARE(bareSpy.count(), 0);
+        QCOMPARE(edit->text(), QStringLiteral("q"));
+        env.sendKey(Qt::Key_K, Qt::ControlModifier);
+        QCOMPARE(ctrlSpy.count(), 1);
+
+        button->setFocus();
+        env.sendKey(Qt::Key_Q, Qt::NoModifier, QStringLiteral("q"));
+        QCOMPARE(bareSpy.count(), 1);
+    }
+
+    void modalDialogBlocksTheShortcutsOutOfIt()
+    {
+        Env env;
+        const QTuiKeySequence ctrlK(Qt::Key_K, Qt::ControlModifier);
+        const QTuiKeySequence ctrlL(Qt::Key_L, Qt::ControlModifier);
+        QTuiShortcut outside(ctrlK, &env.window);
+        QSignalSpy outsideSpy(&outside, &QTuiShortcut::activated);
+
+        QTuiDialog dialog;
+        auto *row = new QTuiBoxLayout(QTuiBoxLayout::LeftToRight);
+        auto *ok = env.button("ok", &dialog);
+        row->addWidget(ok);
+        dialog.setLayout(row);
+        QTuiShortcut onDialog(ctrlL, &dialog);
+        QTuiShortcut onButton(ctrlK, ok);
+        QSignalSpy dialogSpy(&onDialog, &QTuiShortcut::activated);
+        QSignalSpy buttonSpy(&onButton, &QTuiShortcut::activated);
+
+        // A closed dialog is hidden: its shortcuts do not fire
+        env.sendKey(Qt::Key_L, Qt::ControlModifier);
+        QCOMPARE(dialogSpy.count(), 0);
+        env.sendKey(Qt::Key_K, Qt::ControlModifier);
+        QCOMPARE(buttonSpy.count(), 0);
+        QCOMPARE(outsideSpy.count(), 1);
+
+        dialog.open();
+        env.sendKey(Qt::Key_K, Qt::ControlModifier);
+        env.sendKey(Qt::Key_L, Qt::ControlModifier);
+        QCOMPARE(outsideSpy.count(), 1);
+        QCOMPARE(buttonSpy.count(), 1);
+        QCOMPARE(dialogSpy.count(), 1);
+
+        dialog.accept();
+        env.sendKey(Qt::Key_L, Qt::ControlModifier);
+        QCOMPARE(dialogSpy.count(), 1);
+    }
+
+    void shortcutLifetime()
+    {
+        Env env;
+        const QTuiKeySequence ctrlK(Qt::Key_K, Qt::ControlModifier);
+        const qsizetype before = QTuiAction::registeredActions().size();
+
+        // Delete the shortcut first: its key is free again
+        auto *widget = new QTuiWidget(&env.window);
+        auto *shortcut = new QTuiShortcut(ctrlK, widget);
+        int count = 0;
+        QObject::connect(shortcut, &QTuiShortcut::activated, [&count]() { ++count; });
+        delete shortcut;
+        QCOMPARE(QTuiAction::registeredActions().size(), before);
+        env.sendKey(Qt::Key_K, Qt::ControlModifier);
+        QCOMPARE(count, 0);
+
+        // Delete the parent widget: it deletes the shortcut
+        QPointer<QTuiShortcut> second = new QTuiShortcut(ctrlK, widget);
+        delete widget;
+        QVERIFY(!second);
+        QCOMPARE(QTuiAction::registeredActions().size(), before);
+        env.sendKey(Qt::Key_K, Qt::ControlModifier);
+
+        // No parent: always available
+        QTuiShortcut global(ctrlK, nullptr);
+        QSignalSpy spy(&global, &QTuiShortcut::activated);
+        env.sendKey(Qt::Key_K, Qt::ControlModifier);
+        QCOMPARE(spy.count(), 1);
     }
 };
 

@@ -112,6 +112,7 @@
 
 // Main window components
 #include <QtTUI/QTuiAction.h>
+#include <QtTUI/QTuiShortcut.h>
 #include <QtTUI/QTuiMenu.h>
 #include <QtTUI/QTuiMenuBar.h>
 #include <QtTUI/QTuiToolBar.h>

@@ -81,6 +81,7 @@ set(QTTUI_SOURCES
     QTuiAbstractSlider.cpp
     QTuiAction.cpp
     QTuiKeySequence.cpp
+    QTuiShortcut.cpp
     QTuiMenu.cpp
     QTuiMenuBar.cpp
     QTuiMessageBox.cpp
@@ -185,6 +186,7 @@ set(QTTUI_HEADERS
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiAbstractSlider.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiAction.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiKeySequence.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiShortcut.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiMenu.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiMenuBar.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiMessageBox.h
