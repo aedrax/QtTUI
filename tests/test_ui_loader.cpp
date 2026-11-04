@@ -101,7 +101,8 @@ void TestUILoader::testAvailableWidgets()
     QVERIFY(widgets.contains(QStringLiteral("QTuiWidget")));
     QVERIFY(widgets.contains(QStringLiteral("QTuiFrame")));
     QVERIFY(widgets.contains(QStringLiteral("QTuiPlainTextEdit")));
-    QCOMPARE(widgets.size(), 49);
+    QVERIFY(widgets.contains(QStringLiteral("QTuiKeySequenceEdit")));
+    QCOMPARE(widgets.size(), 50);
 }
 
 // ---------------------------------------------------------------

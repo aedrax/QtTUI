@@ -1,7 +1,7 @@
 # Dialogs
 
 This page covers the modal dialog and the standard dialogs: message box,
-input dialog, progress dialog, file dialog and wizard.
+input dialog, progress dialog, file dialog, color dialog and wizard.
 
 ## QTuiDialog
 
@@ -371,6 +371,86 @@ Otherwise the dialog stays open.
 ### Mouse
 
 - A left click on an entry of the list activates it, as Enter does.
+
+## QTuiColorDialog
+
+`#include <QtTUI/QTuiColorDialog.h>` · Inherits: `QTuiDialog`
+
+A dialog to choose a color, like `QColorDialog`. The color is a
+`QtTUI::Color` (red, green and blue, each from 0 to 255), because `QColor` is
+in Qt GUI. The static function `getColor()` is the usual way to use it.
+
+The dialog shows these parts, and each part always shows the current color:
+
+- A grid of 48 preset colors: two rows with the 16 basic colors, then four
+  rows with eight hues from light to dark. Each cell has its color as the
+  background. Brackets mark the cell of the current color while the grid has
+  focus, and a dot marks it at other times.
+- A preview area with the current color.
+- A line edit with the text `#RRGGBB`. A validator permits only hex digits.
+  The color changes when the text is complete.
+- One slider for each of red, green and blue, with the value on its right.
+- The buttons OK and Cancel.
+
+`Color` has no state for "not valid". Thus, unlike `QColorDialog`,
+`getColor()` reports a cancel through `ok`, and `selectedColor()` is black
+until the user accepts the dialog. The dialog has no alpha channel, no custom
+colors and no options.
+
+### Example
+
+```cpp
+#include <QtTUI/QtTUI>
+
+using namespace QtTUI;
+
+void chooseBackground(QTuiWidget *parent, Color *background)
+{
+    bool ok = false;
+    const Color color = QTuiColorDialog::getColor(*background, parent,
+                                                  QStringLiteral("Background"), &ok);
+    if (ok)
+        *background = color;
+}
+```
+
+### Functions
+
+| Function | Description |
+| --- | --- |
+| `explicit QTuiColorDialog(QTuiWidget *parent = nullptr)` | Makes a dialog with black as the current color. The title is "Select Color". |
+| `explicit QTuiColorDialog(const Color &initial, QTuiWidget *parent = nullptr)` | Makes a dialog with `initial` as the current color. |
+| `Color currentColor() const` | Returns the color that the dialog shows now. |
+| `void setCurrentColor(const Color &color)` | Sets the current color and shows it in each part. Emits `currentColorChanged()` if the color changes. |
+| `Color selectedColor() const` | Returns the color of the last accept. It is black before the first accept. |
+| `static Color getColor(const Color &initial, QTuiWidget *parent = nullptr, const QString &title = QString(), bool *ok = nullptr)` | Shows the dialog and waits. Returns the chosen color, or `initial` if the user cancels. `*ok` is `true` if the user chose OK. An empty title gives the default title. |
+
+### Signals
+
+| Signal | Description |
+| --- | --- |
+| `void currentColorChanged(const QtTUI::Color &color)` | The current color changed, from the user or from `setCurrentColor()`. |
+| `void colorSelected(const QtTUI::Color &color)` | The user accepted the dialog with this color. |
+
+### Keys
+
+| Key | Action |
+| --- | --- |
+| Tab, Shift+Tab | Moves between the grid, the line edit, the three sliders and the buttons. |
+| Left, Right, Up, Down, or h, l, k, j (in the grid) | Selects the adjacent preset color. |
+| Left, Right, Up, Down (on a slider) | Changes the value by 1. |
+| Page Up, Page Down (on a slider) | Changes the value by 16. |
+| Enter, Return (in the grid, in the line edit, on a slider) | Accepts the dialog. The line edit accepts only complete text. |
+| Escape | Rejects the dialog. |
+
+In the line edit, the keys of [`QTuiLineEdit`](text-input.md#qtuilineedit)
+apply. The text holds six digits at most: remove a digit before you type a
+new one.
+
+### Mouse
+
+- A left click on a cell of the grid selects its color.
+- A left click on a slider sets its value.
 
 ## QTuiWizard
 

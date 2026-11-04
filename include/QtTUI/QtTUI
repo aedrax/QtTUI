@@ -30,6 +30,7 @@
 #include <QtTUI/QTuiInputDialog.h>
 #include <QtTUI/QTuiProgressDialog.h>
 #include <QtTUI/QTuiFileDialog.h>
+#include <QtTUI/QTuiColorDialog.h>
 #include <QtTUI/QTuiWizard.h>
 
 // Layout classes
@@ -62,6 +63,7 @@
 #include <QtTUI/QTuiComboBox.h>
 #include <QtTUI/QTuiProgressBar.h>
 #include <QtTUI/QTuiLineEdit.h>
+#include <QtTUI/QTuiKeySequenceEdit.h>
 #include <QtTUI/QTuiCompleter.h>
 #include <QtTUI/QTuiValidator.h>
 

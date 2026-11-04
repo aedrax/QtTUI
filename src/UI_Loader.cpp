@@ -3,6 +3,7 @@
 #include <QtTUI/QTuiMainWindow.h>
 #include <QtTUI/QTuiLabel.h>
 #include <QtTUI/QTuiLineEdit.h>
+#include <QtTUI/QTuiKeySequenceEdit.h>
 #include <QtTUI/QTuiTableView.h>
 #include <QtTUI/QTuiListView.h>
 #include <QtTUI/QTuiPushButton.h>
@@ -81,6 +82,10 @@ UI_Loader::UI_Loader(QObject *parent)
 
     registerWidget(QStringLiteral("QTuiLineEdit"), [](QTuiWidget *parent) -> QTuiWidget * {
         return new QTuiLineEdit(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiKeySequenceEdit"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiKeySequenceEdit(parent);
     });
 
     registerWidget(QStringLiteral("QTuiTableView"), [](QTuiWidget *parent) -> QTuiWidget * {

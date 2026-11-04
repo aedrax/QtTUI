@@ -52,6 +52,7 @@ set(QTTUI_SOURCES
     QTuiStackedWidget.cpp
     QTuiSplitter.cpp
     QTuiFileDialog.cpp
+    QTuiColorDialog.cpp
     QTuiFocusFrame.cpp
     QTuiFrame.cpp
     QTuiSizeGrip.cpp
@@ -81,6 +82,7 @@ set(QTTUI_SOURCES
     QTuiAbstractSlider.cpp
     QTuiAction.cpp
     QTuiKeySequence.cpp
+    QTuiKeySequenceEdit.cpp
     QTuiMenu.cpp
     QTuiMenuBar.cpp
     QTuiMessageBox.cpp
@@ -156,6 +158,7 @@ set(QTTUI_HEADERS
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiStackedWidget.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiSplitter.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiFileDialog.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiColorDialog.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiFocusFrame.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiFrame.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiSizeGrip.h
@@ -185,6 +188,7 @@ set(QTTUI_HEADERS
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiAbstractSlider.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiAction.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiKeySequence.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiKeySequenceEdit.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiMenu.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiMenuBar.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiMessageBox.h
