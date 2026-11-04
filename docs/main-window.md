@@ -127,9 +127,19 @@ these conditions are true:
 - If a modal dialog is open, the action belongs to the dialog or to a widget
   in it.
 
-If no action takes the key, Alt+letter (without Ctrl) opens the menu with that
-mnemonic in the menu bar. This works also when the menu bar does not have
-focus, but not while a modal dialog is open.
+If no action takes the key, Alt+letter (without Ctrl) gives the focus to the
+buddy of the [label](text-input.md#buddy-and-mnemonic) with that mnemonic.
+All these conditions must be true:
+
+- The label and its parents are visible, and the label is enabled.
+- The buddy and its parents are visible, the buddy is enabled, and its focus
+  policy is not `Qt::NoFocus`.
+- If a modal dialog is open, the label and the buddy are in the dialog.
+- The focus is not in a menu or a dropdown list.
+
+If no label takes the key, Alt+letter opens the menu with that mnemonic in the
+menu bar. This works also when the menu bar does not have focus, but not
+while a modal dialog is open.
 
 ### Context menus
 
@@ -158,7 +168,7 @@ visible, the window is modal:
 - Keys go only to widgets in the dialog.
 - Tab and Shift+Tab move focus only between the widgets of the dialog.
 - Only the shortcuts of actions in the dialog work. F10 and the Alt menu
-  mnemonics do not work.
+  mnemonics do not work. The mnemonics of the labels in the dialog work.
 - Escape rejects the dialog. If a popup in the dialog is open (for example a
   completer or a dropdown), or an item view edits an item, Escape goes to
   that popup or editor first.
@@ -174,6 +184,7 @@ matches takes the key.
 | Key | Action |
 | --- | --- |
 | A shortcut of an action | Triggers the action. See "Shortcuts". |
+| Alt+letter | Gives the focus to the buddy of the label with that mnemonic. |
 | Alt+letter | Opens the menu bar menu with that mnemonic. |
 | Shift+F10, Menu | Asks for the context menu of the focus widget. |
 | F10 | Opens the first menu of the menu bar. Not while a modal dialog is open. |

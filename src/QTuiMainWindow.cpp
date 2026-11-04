@@ -3,6 +3,7 @@
 #include <QtTUI/QTuiAction.h>
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiKeySequence.h>
+#include <QtTUI/QTuiLabel.h>
 #include <QtTUI/QTuiLayout.h>
 #include <QtTUI/QTuiMenuBar.h>
 #include <QtTUI/QTuiToolBar.h>
@@ -296,6 +297,40 @@ void QTuiMainWindow::resizeEvent(TuiResizeEvent *event)
     relayout();
 }
 
+// True if widget and its parents below root are visible
+static bool visibleBelow(const QTuiWidget *widget, const QTuiWidget *root)
+{
+    for (const QTuiWidget *w = widget; w && w != root; w = w->parentWidget()) {
+        if (!w->isVisible())
+            return false;
+    }
+    return true;
+}
+
+// Alt+character: gives the focus to the buddy of the first visible label
+// below widget that has the mnemonic ch. The label and the buddy must be
+// below root, and the buddy must be able to take the focus.
+static bool focusBuddy(QTuiWidget *widget, QChar ch, const QTuiWidget *root)
+{
+    for (auto *child : widget->childWidgets()) {
+        if (!child->isVisible())
+            continue;
+        auto *label = qobject_cast<QTuiLabel *>(child);
+        QTuiWidget *buddy = label ? label->buddy() : nullptr;
+        if (buddy && label->isEffectivelyEnabled()
+            && label->mnemonic().toUpper() == ch.toUpper()
+            && buddy->focusPolicy() != Qt::NoFocus && buddy->isEffectivelyEnabled()
+            && root->isAncestorOf(buddy) && visibleBelow(buddy, root)) {
+            buddy->setFocus();
+            QTuiToolTip::showFor(buddy);
+            return true;
+        }
+        if (focusBuddy(child, ch, root))
+            return true;
+    }
+    return false;
+}
+
 // True if the sequence's key would type text into the focused widget: bare
 // printable-key shortcuts (e.g. "Q") must yield to text editing.
 // The standard edit keys that a focused editor uses before any shortcut,
@@ -363,13 +398,27 @@ bool QTuiMainWindow::dispatchShortcut(TuiKeyEvent *event)
         return true;
     }
 
-    // Menu bar Alt+mnemonics work globally, not only while the bar has focus:
-    // Alt+letter (no Ctrl) opens the matching menu.
-    if (!modal && m_menuBar && m_menuBar->isVisible()
-        && (event->modifiers() & Qt::AltModifier)
+    // The mnemonic character. A terminal with the kitty keyboard protocol
+    // sends Alt+letter without text, so the key gives the character then.
+    QChar ch;
+    if (!event->text().isEmpty())
+        ch = event->text().at(0);
+    else if (event->key() > 0x20 && event->key() < 0x7F)
+        ch = QChar(event->key());
+    if ((event->modifiers() & Qt::AltModifier)
         && !(event->modifiers() & Qt::ControlModifier)
-        && !event->text().isEmpty()) {
-        if (m_menuBar->triggerMnemonic(event->text().at(0)))
+        && !ch.isNull()) {
+        // Alt+letter (no Ctrl) gives the focus to the buddy of the label
+        // with that mnemonic. A label comes before the menu bar, because
+        // the menu bar also takes the first letter of a title. While a menu
+        // or a dropdown has the focus, the key stays with the menu bar.
+        QTuiWidget *root = modal ? static_cast<QTuiWidget *>(modal) : this;
+        if ((modal || !(focused && insideVisiblePopup(focused))) && focusBuddy(root, ch, root))
+            return true;
+
+        // Menu bar Alt+mnemonics work globally, not only while the bar has
+        // focus: Alt+letter opens the matching menu.
+        if (!modal && m_menuBar && m_menuBar->isVisible() && m_menuBar->triggerMnemonic(ch))
             return true;
     }
 
@@ -871,10 +920,7 @@ void QTuiMainWindow::collectFocusableWidgets(QTuiWidget *root, QList<QTuiWidget 
         if (widget == this || !(widget->focusPolicy() & Qt::TabFocus)
             || !widget->isEffectivelyEnabled())
             continue;
-        bool visible = true;
-        for (QTuiWidget *w = widget; w && w != root && visible; w = w->parentWidget())
-            visible = w->isVisible();
-        if (visible)
+        if (visibleBelow(widget, root))
             chain.append(widget);
     }
 }

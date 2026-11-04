@@ -60,7 +60,20 @@ QTuiWidget *QTuiLabel::buddy() const
 
 void QTuiLabel::setBuddy(QTuiWidget *buddy)
 {
+    if (m_buddy == buddy)
+        return;
+    disconnect(m_buddyDestroyed);
     m_buddy = buddy;
+    // The & shows again when the buddy goes away
+    if (buddy)
+        m_buddyDestroyed = connect(buddy, &QObject::destroyed, this, [this]() { markDirty(); });
+    markDirty();
+}
+
+QChar QTuiLabel::mnemonic() const
+{
+    QString shown;
+    return parse(&shown, nullptr);
 }
 
 QStringList QTuiLabel::wrapText(const QString &text, int width) const
@@ -241,7 +254,7 @@ static void parseHtml(const QString &in, QString *out, QVector<quint8> *styles)
     }
 }
 
-void QTuiLabel::parse(QString *shown, QVector<quint8> *styles) const
+QChar QTuiLabel::parse(QString *shown, QVector<quint8> *styles) const
 {
     shown->clear();
     if (styles)
@@ -259,6 +272,25 @@ void QTuiLabel::parse(QString *shown, QVector<quint8> *styles) const
             styles->fill(0, m_text.length());
         break;
     }
+
+    // With a buddy, &x marks the mnemonic x, and && is one &
+    QChar mnemonic;
+    if (!m_buddy || m_textFormat == Qt::RichText)
+        return mnemonic;
+    for (int i = 0; i + 1 < shown->length(); ++i) {
+        if (shown->at(i) != QLatin1Char('&'))
+            continue;
+        // Remove the &; the loop then steps over the character after it
+        shown->remove(i, 1);
+        if (styles)
+            styles->remove(i);
+        if (shown->at(i) != QLatin1Char('&') && mnemonic.isNull()) {
+            mnemonic = shown->at(i);
+            if (styles)
+                (*styles)[i] |= Underline;
+        }
+    }
+    return mnemonic;
 }
 
 QSize QTuiLabel::minimumSize() const

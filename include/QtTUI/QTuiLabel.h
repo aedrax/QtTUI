@@ -39,8 +39,16 @@ public:
     // The text as it shows, without markup
     QString displayText() const;
 
+    // The buddy widget, as in QLabel. With a buddy, an & in the text marks
+    // the next character as the mnemonic: the label does not show the &,
+    // it underlines the character, and Alt+character gives the focus to
+    // the buddy (QTuiMainWindow does this). Only the first mnemonic
+    // counts. && shows one &. Without a buddy, an & is normal text. In
+    // Qt::RichText an & starts an entity, so there is no mnemonic.
     QTuiWidget *buddy() const;
     void setBuddy(QTuiWidget *buddy);
+    // The mnemonic character, or a null QChar if there is none
+    QChar mnemonic() const;
 
     QSize minimumSize() const override;
     void paintEvent(ScreenBuffer &buffer) override;
@@ -58,8 +66,10 @@ private:
 
     // Style bits per UTF-16 unit of displayText()
     enum StyleBit : quint8 { Bold = 1, Italic = 2, Underline = 4, Strike = 8, Code = 16 };
-    void parse(QString *shown, QVector<quint8> *styles) const;
-    QTuiWidget *m_buddy = nullptr;
+    // Returns the mnemonic character
+    QChar parse(QString *shown, QVector<quint8> *styles) const;
+    QPointer<QTuiWidget> m_buddy;
+    QMetaObject::Connection m_buddyDestroyed;
 };
 
 } // namespace QtTUI

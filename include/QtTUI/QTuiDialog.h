@@ -13,7 +13,8 @@ namespace QtTUI {
 //
 // While a dialog is open, it is modal: keys and clicks reach only the
 // dialog, Tab moves focus only between its widgets, other shortcuts and
-// menu mnemonics do not work, and a click outside it does nothing. Escape
+// menu mnemonics do not work (the label mnemonics of the dialog do work),
+// and a click outside it does nothing. Escape
 // rejects the dialog (unless a popup inside it, such as a completer, is
 // open). When the dialog closes, focus goes back to where it was.
 //

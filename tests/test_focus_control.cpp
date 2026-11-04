@@ -1,10 +1,16 @@
-// Focus control: QTuiWidget::setTabOrder() and focusNextPrevChild().
+// Focus control: QTuiWidget::setTabOrder(), focusNextPrevChild() and the
+// label buddy.
 #include <QtTest/QtTest>
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiBoxLayout.h>
 #include <QtTUI/QTuiDialog.h>
+#include <QtTUI/QTuiLabel.h>
+#include <QtTUI/QTuiLineEdit.h>
 #include <QtTUI/QTuiMainWindow.h>
+#include <QtTUI/QTuiMenu.h>
+#include <QtTUI/QTuiMenuBar.h>
 #include <QtTUI/QTuiPushButton.h>
+#include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/TuiEvents.h>
 
 using namespace QtTUI;
@@ -25,6 +31,18 @@ struct Env {
     {
         TuiKeyEvent ev(key, mods, text);
         QCoreApplication::sendEvent(&window, &ev);
+    }
+    void alt(char letter)
+    {
+        sendKey(Qt::Key_A + (letter - 'a'), Qt::AltModifier, QString(QLatin1Char(letter)));
+    }
+    // The text of a screen row after a render pass
+    QString row(int y, int x, int length)
+    {
+        QString text;
+        for (int i = 0; i < length; ++i)
+            text += app.screenBuffer()->backCell(x + i, y).text();
+        return text;
     }
     void tab() { sendKey(Qt::Key_Tab); }
     void backtab() { sendKey(Qt::Key_Backtab, Qt::ShiftModifier); }
@@ -360,6 +378,195 @@ private slots:
         QVERIFY(!QTuiWidget::focusWidget());
         env.tab();
         QVERIFY(a->hasFocus());
+    }
+
+    // -----------------------------------------------------------------------
+    // Label buddy
+    // -----------------------------------------------------------------------
+
+    void ampersandIsTextWithoutABuddy()
+    {
+        Env env;
+        QTuiLabel label(QStringLiteral("&Name"));
+        QCOMPARE(label.displayText(), QStringLiteral("&Name"));
+        QVERIFY(label.mnemonic().isNull());
+        QCOMPARE(label.minimumSize().width(), 5);
+    }
+
+    void buddyHidesTheAmpersandAndUnderlinesTheLetter()
+    {
+        Env env;
+        QTuiLineEdit edit;
+        QTuiLabel label(QStringLiteral("Last &Name"));
+        label.setBuddy(&edit);
+        QCOMPARE(label.buddy(), &edit);
+        QCOMPARE(label.displayText(), QStringLiteral("Last Name"));
+        QCOMPARE(label.mnemonic(), QChar(QLatin1Char('N')));
+        QCOMPARE(label.minimumSize().width(), 9);
+
+        label.setGeometry(QRect(0, 0, 12, 1));
+        ScreenBuffer buffer(12, 1);
+        label.paintEvent(buffer);
+        for (int x = 0; x < 9; ++x) {
+            QCOMPARE(buffer.backCell(x, 0).text(), QStringLiteral("Last Name").mid(x, 1));
+            QCOMPARE(buffer.backCell(x, 0).underline, x == 5);
+        }
+    }
+
+    void doubleAmpersandShowsOne()
+    {
+        Env env;
+        QTuiLineEdit edit;
+        QTuiLabel label(QStringLiteral("Cut && &Paste && &more&"));
+        label.setBuddy(&edit);
+        // Only the first mnemonic counts; an & at the end is text
+        QCOMPARE(label.displayText(), QStringLiteral("Cut & Paste & more&"));
+        QCOMPARE(label.mnemonic(), QChar(QLatin1Char('P')));
+
+        label.setTextFormat(Qt::MarkdownText);
+        label.setText(QStringLiteral("**&Bold**"));
+        QCOMPARE(label.displayText(), QStringLiteral("Bold"));
+        QCOMPARE(label.mnemonic(), QChar(QLatin1Char('B')));
+
+        // In rich text an & starts an entity
+        label.setTextFormat(Qt::RichText);
+        label.setText(QStringLiteral("Tom &amp; &Jerry"));
+        QCOMPARE(label.displayText(), QStringLiteral("Tom & &Jerry"));
+        QVERIFY(label.mnemonic().isNull());
+    }
+
+    void setBuddyRepaintsTheLabel()
+    {
+        Env env;
+        auto *label = new QTuiLabel(QStringLiteral("&Name"), &env.window);
+        label->setGeometry(QRect(2, 1, 8, 1));
+        auto *edit = new QTuiLineEdit(&env.window);
+        edit->setGeometry(QRect(2, 3, 10, 1));
+        QCoreApplication::processEvents();
+        QCOMPARE(env.row(1, 2, 5), QStringLiteral("&Name"));
+
+        label->setBuddy(edit);
+        QVERIFY(label->isDirty());
+        QCoreApplication::processEvents();
+        QCOMPARE(env.row(1, 2, 5), QStringLiteral("Name "));
+        QVERIFY(env.app.screenBuffer()->backCell(2, 1).underline);
+
+        // The same buddy again changes nothing
+        label->setBuddy(edit);
+        QVERIFY(!label->isDirty());
+
+        // A deleted buddy is no buddy
+        delete edit;
+        QVERIFY(!label->buddy());
+        QCoreApplication::processEvents();
+        QCOMPARE(env.row(1, 2, 5), QStringLiteral("&Name"));
+        env.alt('n'); // must not crash
+    }
+
+    void altLetterGivesTheFocusToTheBuddy()
+    {
+        Env env;
+        auto *other = env.button("other");
+        auto *label = new QTuiLabel(QStringLiteral("&Name"), &env.window);
+        auto *edit = new QTuiLineEdit(&env.window);
+        label->setBuddy(edit);
+        other->setFocus();
+
+        env.alt('x');
+        QVERIFY(other->hasFocus());
+        env.alt('n');
+        QVERIFY(edit->hasFocus());
+
+        // The kitty keyboard protocol sends Alt+letter without text
+        other->setFocus();
+        env.sendKey(Qt::Key_N, Qt::AltModifier);
+        QVERIFY(edit->hasFocus());
+
+        // Also while a text editor has the focus, and for the other case
+        auto *label2 = new QTuiLabel(QStringLiteral("&Other"), &env.window);
+        label2->setBuddy(other);
+        env.sendKey(Qt::Key_O, Qt::AltModifier | Qt::ShiftModifier, QStringLiteral("O"));
+        QVERIFY(other->hasFocus());
+    }
+
+    void altLetterNeedsAVisibleLabelAndAUsableBuddy()
+    {
+        Env env;
+        auto *other = env.button("other");
+        auto *box = new QTuiWidget(&env.window);
+        auto *label = new QTuiLabel(QStringLiteral("&Name"), box);
+        auto *edit = new QTuiLineEdit(&env.window);
+        label->setBuddy(edit);
+        other->setFocus();
+
+        box->setVisible(false); // the parent of the label
+        env.alt('n');
+        QVERIFY(other->hasFocus());
+        box->setVisible(true);
+
+        edit->setEnabled(false);
+        env.alt('n');
+        QVERIFY(other->hasFocus());
+        edit->setEnabled(true);
+
+        edit->setVisible(false);
+        env.alt('n');
+        QVERIFY(other->hasFocus());
+        edit->setVisible(true);
+
+        edit->setFocusPolicy(Qt::NoFocus);
+        env.alt('n');
+        QVERIFY(other->hasFocus());
+        edit->setFocusPolicy(Qt::StrongFocus);
+
+        env.alt('n');
+        QVERIFY(edit->hasFocus());
+    }
+
+    void labelMnemonicComesBeforeTheMenuBar()
+    {
+        Env env;
+        auto *bar = new QTuiMenuBar(&env.window);
+        QTuiMenu *menu = bar->addMenu(QStringLiteral("&File"));
+        env.window.setMenuBar(bar);
+        auto *label = new QTuiLabel(QStringLiteral("&Find"), &env.window);
+        auto *edit = new QTuiLineEdit(&env.window);
+        label->setBuddy(edit);
+
+        env.alt('f');
+        QVERIFY(edit->hasFocus());
+        QVERIFY(!menu->isVisible());
+
+        // Without a usable buddy the menu bar gets the key
+        edit->setEnabled(false);
+        env.alt('f');
+        QVERIFY(menu->isVisible());
+    }
+
+    void labelMnemonicWorksInADialog()
+    {
+        Env env;
+        auto *outsideLabel = new QTuiLabel(QStringLiteral("&Outside"), &env.window);
+        auto *outside = env.button("outside");
+        outsideLabel->setBuddy(outside);
+
+        QTuiDialog dialog;
+        auto *row = new QTuiBoxLayout(QTuiBoxLayout::LeftToRight);
+        auto *ok = env.button("ok", &dialog);
+        auto *label = new QTuiLabel(QStringLiteral("&Name"), &dialog);
+        auto *edit = new QTuiLineEdit(&dialog);
+        label->setBuddy(edit);
+        row->addWidget(ok);
+        row->addWidget(label);
+        row->addWidget(edit);
+        dialog.setLayout(row);
+        dialog.open();
+        QVERIFY(ok->hasFocus());
+
+        env.alt('o'); // a label out of the dialog
+        QVERIFY(ok->hasFocus());
+        env.alt('n');
+        QVERIFY(edit->hasFocus());
     }
 };
 
