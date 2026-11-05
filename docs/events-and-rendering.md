@@ -397,6 +397,8 @@ The abstract interface to the terminal. `createTerminalBackend()` returns a `Pos
 
 The POSIX backend turns on mouse reporting (see `mouseEnableSequence()`), bracketed paste (`?2004h`) and level 1 of the kitty keyboard protocol (`>1u`). When it gives the terminal back, it turns all of these off.
 
+`QTuiApplication` writes the window title sequences through `write()`: it saves the title of the shell on start (`CSI 22;0t`), sets the title for `setWindowTitle()` (`OSC 2`), and restores the saved title on exit and during a suspend (`CSI 23;0t`). A terminal without a title stack ignores the save and restore sequences.
+
 ### Functions
 
 | Function | Description |
@@ -476,6 +478,7 @@ void example()
 | --- | --- |
 | `int charWidth(char32_t ch)` | Returns the columns of one code point: 0 for combining marks and other zero-width characters, 2 for wide characters, 1 for all others. U+0000 gives 0. |
 | `bool isZeroWidth(char32_t ch)` | Returns true if `charWidth(ch)` is 0 and `ch` is not 0. |
+| `QString withoutControlChars(const QString &text)` | Returns the text without control characters (U+0000 to U+001F and U+007F to U+009F). Use it for text that goes into an escape sequence. |
 | `int stringWidth(const QString &text)` | Returns the columns of the string. |
 | `bool nextCluster(const QString &text, int &index, Cluster &out)` | Reads the cluster at `index` into `out` and moves `index` after it. Returns false at the end of the string. |
 | `int columnOfIndex(const QString &text, int index)` | Returns the column of the cluster at the code unit `index`. An index after the end gives `stringWidth(text)`. |

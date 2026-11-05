@@ -42,8 +42,9 @@ void restoreTerminalFromSignal()
         (void)r;
     }
     if (g_altScreenActive) {
-        // Mirror exitAlternateScreen()
-        static const char leaveAltScreen[] = "\x1b[?1049l";
+        // Mirror exitAlternateScreen(). First restore the window title
+        // that QTuiApplication saved on start (XTWINOPS 23;0).
+        static const char leaveAltScreen[] = "\x1b[23;0t\x1b[?1049l";
         ssize_t r = ::write(STDOUT_FILENO, leaveAltScreen, sizeof(leaveAltScreen) - 1);
         (void)r;
     }

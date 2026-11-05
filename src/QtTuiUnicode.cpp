@@ -139,6 +139,13 @@ bool isZeroWidth(char32_t ch)
     return ch != 0 && charWidth(ch) == 0;
 }
 
+QString withoutControlChars(const QString &text)
+{
+    QString out = text;
+    out.removeIf([](QChar c) { return c.category() == QChar::Other_Control; });
+    return out;
+}
+
 int stringWidth(const QString &text)
 {
     int cols = 0;

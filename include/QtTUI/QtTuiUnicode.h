@@ -36,6 +36,14 @@ int charWidth(char32_t ch);
 /** True when charWidth(ch) == 0 and ch != 0. */
 bool isZeroWidth(char32_t ch);
 
+/**
+ * The text without control characters (category Cc: U+0000 to U+001F and
+ * U+007F to U+009F). Use it for text that goes into an escape sequence (a
+ * window title, a link URL), so the text cannot end the sequence or start
+ * a new one.
+ */
+QString withoutControlChars(const QString &text);
+
 /** Total columns of a string, iterating by code point (surrogate-aware). */
 int stringWidth(const QString &text);
 

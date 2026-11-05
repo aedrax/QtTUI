@@ -53,6 +53,15 @@ target_link_libraries(test_terminal_backend PRIVATE
 )
 add_test(NAME test_terminal_backend COMMAND test_terminal_backend)
 
+# Tests that give a mock backend to a QTuiApplication and read its output
+function(qttui_add_backend_test TEST_NAME TEST_SOURCE)
+    qttui_add_test(${TEST_NAME} ${TEST_SOURCE})
+    target_link_libraries(${TEST_NAME} PRIVATE mock_terminal_backend)
+endfunction()
+
+# Terminal window title (OSC 2 and the title stack)
+qttui_add_backend_test(test_terminal_title test_terminal_title.cpp)
+
 # QTuiWidget property tests (Properties 10-13)
 qttui_add_test(test_qtui_widget test_qtui_widget.cpp)
 
