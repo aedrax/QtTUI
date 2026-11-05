@@ -56,6 +56,10 @@ protected:
     void keyPressEvent(TuiKeyEvent *event) override;
     void pasteEvent(TuiPasteEvent *event) override;
     void mousePressEvent(TuiMouseEvent *event) override;
+    // Moves the focus along the focus chain, or along the chain of the
+    // open dialog. Returns true also if the chain has no other widget, so
+    // the window always takes Tab that comes up to it.
+    bool focusNextPrevChild(bool next) override;
 
 private:
     void relayoutChildren();
@@ -71,7 +75,7 @@ private:
     // Moves the hover to widget (nullptr: none) and restarts the hover
     // tooltip timer
     void setHovered(QTuiWidget *widget, const QPoint &pos = QPoint());
-    void collectFocusableWidgets(QTuiWidget *widget, QList<QTuiWidget *> &chain);
+    void collectFocusableWidgets(QTuiWidget *root, QList<QTuiWidget *> &chain);
     static QTuiWidget *findFocusedWidget(QTuiWidget *root);
     static QTuiWidget *findWidgetAt(QTuiWidget *root, const QPoint &pos);
 

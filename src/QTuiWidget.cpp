@@ -178,6 +178,41 @@ QTuiWidget *QTuiWidget::focusWidget()
     return s_focusWidget;
 }
 
+// The setTabOrder() pairs, in call order: a later pair moves its second
+// widget again, so the order of the calls gives the result, as in Qt.
+using TabOrderPair = std::pair<QPointer<QTuiWidget>, QPointer<QTuiWidget>>;
+static QList<TabOrderPair> &tabOrderPairs()
+{
+    static QList<TabOrderPair> pairs;
+    return pairs;
+}
+
+void QTuiWidget::setTabOrder(QTuiWidget *first, QTuiWidget *second)
+{
+    if (!first || !second || first == second)
+        return;
+    // Remove the pairs of deleted widgets and an older copy of this pair,
+    // so that the list does not grow without limit
+    auto &pairs = tabOrderPairs();
+    pairs.removeIf([&](const TabOrderPair &p) {
+        return !p.first || !p.second || (p.first == first && p.second == second);
+    });
+    pairs.append(TabOrderPair(first, second));
+}
+
+// ponytail: each Tab key replays all pairs, O(pairs x widgets). Keep a
+// linked focus chain as Qt does if an application has thousands of pairs.
+void QTuiWidget::applyTabOrder(QList<QTuiWidget *> &widgets)
+{
+    for (const TabOrderPair &p : tabOrderPairs()) {
+        // A pair with a deleted widget, or a widget out of this chain, does nothing
+        if (!p.first || !p.second || !widgets.contains(p.first.data())
+            || !widgets.removeOne(p.second.data()))
+            continue;
+        widgets.insert(widgets.indexOf(p.first.data()) + 1, p.second.data());
+    }
+}
+
 QPoint QTuiWidget::terminalCursorPos() const
 {
     return QPoint(-1, -1);
@@ -364,6 +399,23 @@ void QTuiWidget::setFocusWidget(QTuiWidget *widget)
         for (QTuiWidget *w = widget; w; w = w->parentWidget())
             w->focusEntered(widget);
     }
+}
+
+bool QTuiWidget::focusNextPrevChild(bool next)
+{
+    // Only the main window knows the focus chain
+    QTuiWidget *parent = parentWidget();
+    return parent && parent->focusNextPrevChild(next);
+}
+
+bool QTuiWidget::focusNextChild()
+{
+    return focusNextPrevChild(true);
+}
+
+bool QTuiWidget::focusPreviousChild()
+{
+    return focusNextPrevChild(false);
 }
 
 void QTuiWidget::focusEntered(QTuiWidget *focus)

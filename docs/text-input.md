@@ -35,6 +35,26 @@ inside it. The label does not take keys or the mouse.
 
 Code shows in inverted colors.
 
+### Buddy and mnemonic
+
+`setBuddy()` connects the label to a widget, usually the input field that the
+label describes. While the label has a buddy, an `&` in the text marks the
+next character as the mnemonic:
+
+- The label does not show the `&`, and it underlines the character.
+- Alt+character gives the focus to the buddy. See
+  [Shortcuts](main-window.md#shortcuts) for the conditions.
+- Only the first mnemonic counts. `&&` shows one `&`.
+
+Without a buddy, an `&` is normal text. In `Qt::RichText` an `&` starts an
+entity, so a rich text label has no mnemonic.
+
+```cpp
+auto *nameLabel = new QTuiLabel(QStringLiteral("&Name:"), parent);
+auto *name = new QTuiLineEdit(parent);
+nameLabel->setBuddy(name); // shows "Name:" with N underlined; Alt+N goes to name
+```
+
 ### Example
 
 ```cpp
@@ -70,7 +90,8 @@ void example(QTuiWidget *parent)
 | `void setTextFormat(Qt::TextFormat format)` | Sets the text format. See [Text formats](#text-formats). |
 | `QString displayText() const` | Returns the text as it shows, without the markup. |
 | `QTuiWidget *buddy() const` | Returns the buddy widget, or `nullptr`. |
-| `void setBuddy(QTuiWidget *buddy)` | Keeps a pointer to the buddy widget. QtTUI does not use the buddy, so this function has no effect on focus. |
+| `void setBuddy(QTuiWidget *buddy)` | Sets the buddy widget, or removes it with `nullptr`. Marks the label dirty. The label does not take ownership. If the buddy is deleted, the label has no buddy. See "Buddy and mnemonic". |
+| `QChar mnemonic() const` | Returns the mnemonic character, or a null `QChar` if there is none. |
 | `QSize minimumSize() const override` | Returns the width of the widest line and the number of lines, plus the frame. With word wrap, the width is the width of the longest word. |
 | `void paintEvent(ScreenBuffer &buffer) override` | Paints the text with the styles of the markup. |
 

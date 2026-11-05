@@ -203,8 +203,46 @@ widgets that agree with all these conditions:
 
 The order is the order of the widget tree: a parent comes before its
 children, and the children are in the order that you made them.
-`raise()` moves a widget to the end of this order. There is no
-`setTabOrder()`.
+`raise()` moves a widget to the end of this order.
+
+`setTabOrder(first, second)` changes the order, as in `QWidget`: it puts
+`second` after `first`. Only `second` moves; its children keep their place.
+For a chain, call it in sequence:
+
+```cpp
+QTuiWidget::setTabOrder(name, password);  // name to password
+QTuiWidget::setTabOrder(password, login); // name to password to login
+```
+
+The window applies the pairs before it removes the widgets that do not agree
+with the conditions above. Thus, if `password` is hidden, Tab goes from
+`name` to `login`. A pair applies only while its two widgets are in the same
+chain: the window, or the open dialog. A pair goes away when one of its
+widgets is deleted.
+
+Before the focus moves, the main window calls `focusNextPrevChild()` on the
+focus widget. The default calls the parent, and thus the call goes up to the
+main window, which moves the focus along the chain. A widget, or a parent of
+the focus widget, can override the function:
+
+- Return `true` after you move the focus, or to keep the focus where it is.
+- Return `false` to get Tab or Shift+Tab in `keyPressEvent()` as a normal
+  key. Use this for a widget that types a tab character.
+- Call `QTuiWidget::focusNextPrevChild()` for the usual move.
+
+```cpp
+class Notes : public QTuiWidget {
+protected:
+    // Tab goes to keyPressEvent(); Shift+Tab moves the focus as usual
+    bool focusNextPrevChild(bool next) override
+    {
+        return next ? false : QTuiWidget::focusNextPrevChild(next);
+    }
+};
+```
+
+`focusNextChild()` and `focusPreviousChild()` move the focus from code as
+Tab and Shift+Tab do.
 
 While a modal dialog is open, Tab moves only between the widgets of the
 dialog. While the focus is in a popup (a menu or a dropdown list), Tab does
@@ -330,6 +368,7 @@ For the event classes, see [Events and rendering](events-and-rendering.md).
 | `bool hasFocus() const` | Returns `true` if the widget is the focus widget. |
 | `void setFocus()` | Makes the widget the focus widget. Does nothing for `Qt::NoFocus`. |
 | `static QTuiWidget *focusWidget()` | Returns the focus widget, or `nullptr`. |
+| `static void setTabOrder(QTuiWidget *first, QTuiWidget *second)` | Puts `second` after `first` in the Tab order. Does nothing if a widget is `nullptr` or if the two are the same widget. See [Tab order](#tab-order). |
 | `bool isPopup() const` | Returns `true` if the widget is a popup. |
 | `void setPopup(bool popup)` | Makes the widget a popup. A popup paints last, above all other widgets, clipped only to the screen. When a popup shows, it keeps the current focus widget. When it hides with the focus inside, it gives the focus back. Menus, dropdown lists and dialogs use it. |
 | `bool isPaintedByParent() const` | Returns `true` if the parent paints this widget. |
@@ -387,6 +426,9 @@ For the event classes, see [Events and rendering](events-and-rendering.md).
 | `virtual void resizeEvent(TuiResizeEvent *event)` | Gets a terminal resize. The default does nothing. |
 | `virtual void pasteEvent(TuiPasteEvent *event)` | Gets pasted text for the focus widget. The default does nothing. |
 | `virtual void focusEntered(QTuiWidget *focus)` | Called on the new focus widget and on each of its parents. The default does nothing. |
+| `virtual bool focusNextPrevChild(bool next)` | Finds the widget that gets the focus for Tab (`next` is `true`) or Shift+Tab. The default calls the parent; the main window moves the focus along the focus chain and returns `true`. A widget without a main window above it returns `false`. See [Tab order](#tab-order). |
+| `bool focusNextChild()` | Calls `focusNextPrevChild(true)`. |
+| `bool focusPreviousChild()` | Calls `focusNextPrevChild(false)`. |
 
 ### Signals
 
@@ -406,8 +448,8 @@ widget gets the key:
 
 | Key | Action |
 | --- | --- |
-| Tab | Move the focus to the next widget in the focus chain. |
-| Shift+Tab | Move the focus to the previous widget. |
+| Tab | Move the focus to the next widget in the focus chain, unless `focusNextPrevChild()` of the focus widget returns `false`. |
+| Shift+Tab | Move the focus to the previous widget, with the same exception. |
 | F1 | Show the tooltip of the focus widget. |
 | Shift+F10, Menu | Ask the focus widget for a context menu. |
 | Ctrl+Z | Suspend the application, if the focus widget does not accept text input. |

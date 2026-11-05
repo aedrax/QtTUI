@@ -45,6 +45,9 @@ signals:
     void enabledChanged(bool enabled);
 
 private:
+    // QTuiShortcut sets the sequence directly, without a string
+    friend class QTuiShortcut;
+
     QString m_text;
     QString m_shortcut;
     QTuiKeySequence m_shortcutSequence;

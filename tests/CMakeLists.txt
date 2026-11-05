@@ -260,6 +260,10 @@ qttui_add_test(test_qtui_colordialog test_qtui_colordialog.cpp)
 # and mouse focus honor focusPolicy, group box disables children (backlog #12)
 qttui_add_test(test_enabled_focuspolicy test_enabled_focuspolicy.cpp)
 
+# Focus control tests: setTabOrder(), focusNextPrevChild(), the label
+# buddy and QTuiShortcut
+qttui_add_test(test_focus_control test_focus_control.cpp)
+
 # Selection tests: selection model, selection modes and behaviors, and
 # the selected items of the item widgets
 qttui_add_test(test_selection test_selection.cpp)

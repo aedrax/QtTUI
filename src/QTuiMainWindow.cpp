@@ -3,6 +3,7 @@
 #include <QtTUI/QTuiAction.h>
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiKeySequence.h>
+#include <QtTUI/QTuiLabel.h>
 #include <QtTUI/QTuiLayout.h>
 #include <QtTUI/QTuiMenuBar.h>
 #include <QtTUI/QTuiToolBar.h>
@@ -296,6 +297,40 @@ void QTuiMainWindow::resizeEvent(TuiResizeEvent *event)
     relayout();
 }
 
+// True if widget and its parents below root are visible
+static bool visibleBelow(const QTuiWidget *widget, const QTuiWidget *root)
+{
+    for (const QTuiWidget *w = widget; w && w != root; w = w->parentWidget()) {
+        if (!w->isVisible())
+            return false;
+    }
+    return true;
+}
+
+// Alt+character: gives the focus to the buddy of the first visible label
+// below widget that has the mnemonic ch. The label and the buddy must be
+// below root, and the buddy must be able to take the focus.
+static bool focusBuddy(QTuiWidget *widget, QChar ch, const QTuiWidget *root)
+{
+    for (auto *child : widget->childWidgets()) {
+        if (!child->isVisible())
+            continue;
+        auto *label = qobject_cast<QTuiLabel *>(child);
+        QTuiWidget *buddy = label ? label->buddy() : nullptr;
+        if (buddy && label->isEffectivelyEnabled()
+            && label->mnemonic().toUpper() == ch.toUpper()
+            && buddy->focusPolicy() != Qt::NoFocus && buddy->isEffectivelyEnabled()
+            && root->isAncestorOf(buddy) && visibleBelow(buddy, root)) {
+            buddy->setFocus();
+            QTuiToolTip::showFor(buddy);
+            return true;
+        }
+        if (focusBuddy(child, ch, root))
+            return true;
+    }
+    return false;
+}
+
 // True if the sequence's key would type text into the focused widget: bare
 // printable-key shortcuts (e.g. "Q") must yield to text editing.
 // The standard edit keys that a focused editor uses before any shortcut,
@@ -317,14 +352,14 @@ static bool shortcutShadowedByEditor(const QTuiKeySequence &seq, QTuiWidget *foc
 }
 
 // As in Qt, a shortcut works only while the widgets that own its action are
-// visible: an action on a hidden tab page does not take the key. A popup
-// (a closed menu) is hidden by design, so it does not block its actions.
-// An action without a widget owner is global.
+// visible: an action on a hidden tab page or in a closed dialog does not
+// take the key. A closed menu is hidden by design, so it does not block
+// its actions. An action without a widget owner is global.
 static bool actionReachable(const QTuiAction *action)
 {
     for (QObject *o = action->parent(); o; o = o->parent()) {
         auto *w = qobject_cast<QTuiWidget *>(o);
-        if (w && !w->isPopup() && !w->isVisible())
+        if (w && !w->isVisible() && !qobject_cast<QTuiMenu *>(w))
             return false;
     }
     return true;
@@ -363,13 +398,27 @@ bool QTuiMainWindow::dispatchShortcut(TuiKeyEvent *event)
         return true;
     }
 
-    // Menu bar Alt+mnemonics work globally, not only while the bar has focus:
-    // Alt+letter (no Ctrl) opens the matching menu.
-    if (!modal && m_menuBar && m_menuBar->isVisible()
-        && (event->modifiers() & Qt::AltModifier)
+    // The mnemonic character. A terminal with the kitty keyboard protocol
+    // sends Alt+letter without text, so the key gives the character then.
+    QChar ch;
+    if (!event->text().isEmpty())
+        ch = event->text().at(0);
+    else if (event->key() > 0x20 && event->key() < 0x7F)
+        ch = QChar(event->key());
+    if ((event->modifiers() & Qt::AltModifier)
         && !(event->modifiers() & Qt::ControlModifier)
-        && !event->text().isEmpty()) {
-        if (m_menuBar->triggerMnemonic(event->text().at(0)))
+        && !ch.isNull()) {
+        // Alt+letter (no Ctrl) gives the focus to the buddy of the label
+        // with that mnemonic. A label comes before the menu bar, because
+        // the menu bar also takes the first letter of a title. While a menu
+        // or a dropdown has the focus, the key stays with the menu bar.
+        QTuiWidget *root = modal ? static_cast<QTuiWidget *>(modal) : this;
+        if ((modal || !(focused && insideVisiblePopup(focused))) && focusBuddy(root, ch, root))
+            return true;
+
+        // Menu bar Alt+mnemonics work globally, not only while the bar has
+        // focus: Alt+letter opens the matching menu.
+        if (!modal && m_menuBar && m_menuBar->isVisible() && m_menuBar->triggerMnemonic(ch))
             return true;
     }
 
@@ -444,13 +493,12 @@ void QTuiMainWindow::keyPressEvent(TuiKeyEvent *event)
     // moves focus between its own widgets; a menu has one Tab stop.
     const bool popupHasFocus = focused && insideVisiblePopup(focused);
 
-    if (QTuiDialog *dialog = activeModalDialog()) {
-        if (event->key() == Qt::Key_Tab || event->key() == Qt::Key_Backtab) {
-            const bool forward = event->key() == Qt::Key_Tab
-                && !(event->modifiers() & Qt::ShiftModifier);
-            advanceFocus(forward, dialog);
-            return;
-        }
+    // Terminals send Key_Backtab for Shift+Tab
+    const bool tab = event->key() == Qt::Key_Tab || event->key() == Qt::Key_Backtab;
+    const bool next = event->key() == Qt::Key_Tab && !(event->modifiers() & Qt::ShiftModifier);
+
+    QTuiDialog *dialog = activeModalDialog();
+    if (dialog) {
         // Escape rejects the dialog, unless a popup inside it (a completer
         // or a dropdown) is open, or an item view edits an item: that popup
         // or editor closes first
@@ -462,24 +510,22 @@ void QTuiMainWindow::keyPressEvent(TuiKeyEvent *event)
                 return;
             }
         }
-        // Keys reach only the dialog
-        if (!focused || !dialog->isAncestorOf(focused))
+        // Keys reach only the dialog; Tab moves the focus into it
+        if (!focused || !dialog->isAncestorOf(focused)) {
+            if (tab)
+                focusNextPrevChild(next);
             return;
+        }
     }
 
-    if (!popupHasFocus) {
-        // Tab forward
-        if (event->key() == Qt::Key_Tab && !(event->modifiers() & Qt::ShiftModifier)) {
-            advanceFocus(true);
+    // Tab and Shift+Tab: the focus widget and then its parents, up to this
+    // window, decide where the focus goes (see QTuiWidget::
+    // focusNextPrevChild). A widget that returns false gets the key below.
+    // A dialog is a popup, but Tab moves the focus in it.
+    if (tab && (dialog || !popupHasFocus)) {
+        QTuiWidget *from = focused ? focused : this;
+        if (from->focusNextPrevChild(next))
             return;
-        }
-
-        // Shift+Tab backward (terminals send Key_Backtab for Shift+Tab)
-        if (event->key() == Qt::Key_Backtab
-            || (event->key() == Qt::Key_Tab && (event->modifiers() & Qt::ShiftModifier))) {
-            advanceFocus(false);
-            return;
-        }
     }
 
     // Dispatch to the focused widget
@@ -803,6 +849,12 @@ QTuiDialog *QTuiMainWindow::activeModalDialog() const
     return nullptr;
 }
 
+bool QTuiMainWindow::focusNextPrevChild(bool next)
+{
+    advanceFocus(next, activeModalDialog());
+    return true;
+}
+
 void QTuiMainWindow::advanceFocus(bool forward, QTuiWidget *root)
 {
     // With a root (a popup that holds focus), Tab moves only inside it
@@ -843,20 +895,33 @@ void QTuiMainWindow::rebuildFocusChain()
     collectFocusableWidgets(this, m_focusChain);
 }
 
-void QTuiMainWindow::collectFocusableWidgets(QTuiWidget *widget, QList<QTuiWidget *> &chain)
+// All widgets below root in pre-order: a parent precedes its children
+static void collectWidgets(QTuiWidget *widget, QList<QTuiWidget *> &all)
 {
+    all.append(widget);
+    for (auto *child : widget->childWidgets())
+        collectWidgets(child, all);
+}
+
+void QTuiMainWindow::collectFocusableWidgets(QTuiWidget *root, QList<QTuiWidget *> &chain)
+{
+    // The order is the widget tree order, changed by QTuiWidget::setTabOrder().
+    // The pairs apply before the filter below, so a chain of pairs also
+    // holds through a hidden or disabled widget.
+    QList<QTuiWidget *> all;
+    collectWidgets(root, all);
+    QTuiWidget::applyTabOrder(all);
+
     // Tab stops are widgets that opted in via focusPolicy (TabFocus bit),
-    // are visible, and are effectively enabled — labels, containers without
-    // key handling, and disabled widgets are skipped (backlog #12). Pre-order:
-    // a focusable container precedes its children.
-    if (widget != this && widget->isVisible()
-        && (widget->focusPolicy() & Qt::TabFocus)
-        && widget->isEffectivelyEnabled()) {
-        chain.append(widget);
-    }
-    for (auto *child : widget->childWidgets()) {
-        if (child->isVisible())
-            collectFocusableWidgets(child, chain);
+    // are visible up to the root, and are effectively enabled — labels,
+    // containers without key handling, and disabled widgets are skipped
+    // (backlog #12).
+    for (QTuiWidget *widget : all) {
+        if (widget == this || !(widget->focusPolicy() & Qt::TabFocus)
+            || !widget->isEffectivelyEnabled())
+            continue;
+        if (visibleBelow(widget, root))
+            chain.append(widget);
     }
 }
 

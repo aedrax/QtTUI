@@ -66,6 +66,15 @@ public:
     void setFocus();
     static QTuiWidget *focusWidget();
 
+    // Puts second after first in the Tab order, as in QWidget: Tab on first
+    // goes to second, and Shift+Tab on second goes to first. Only second
+    // moves; its children keep their place in the order. Tab skips a widget
+    // in the order that is hidden, disabled or without the TabFocus bit.
+    // For a chain, call it in sequence: (a, b), then (b, c). A pair applies
+    // while the two widgets are in the same Tab chain (the window, or the
+    // open dialog), and goes away when one of them is deleted.
+    static void setTabOrder(QTuiWidget *first, QTuiWidget *second);
+
     // Popup layer: a popup widget is skipped by the normal paint recursion and
     // painted by the RenderScheduler in a second, topmost pass clipped only to
     // the screen — not to its parent widget. Menus and dropdown lists use this
@@ -204,12 +213,31 @@ protected:
     // nothing.
     virtual void focusEntered(QTuiWidget *focus);
 
+    // Finds the widget that gets the focus for Tab (next is true) or
+    // Shift+Tab (next is false), as in QWidget. The main window calls it on
+    // the focus widget before that widget gets the key. The default calls
+    // the parent; the main window at the top moves the focus along the
+    // focus chain and returns true.
+    //
+    // Override it in a widget, or in a parent of the widgets, to control
+    // the two keys:
+    // - Return true after you move the focus (or to keep it where it is).
+    // - Return false to get the key in keyPressEvent() as a normal key,
+    //   for example in an editor that inserts a tab character.
+    // - Call the base function to move the focus along the focus chain.
+    virtual bool focusNextPrevChild(bool next);
+    // The same as focusNextPrevChild(true) and focusNextPrevChild(false)
+    bool focusNextChild();
+    bool focusPreviousChild();
+
 private:
     friend class QTuiMainWindow;
     void setUnderMouse(bool under);
     void setHoverPos(const QPoint &pos);
 
     static void setFocusWidget(QTuiWidget *widget);
+    // Applies the setTabOrder() pairs to a list of widgets in tree order
+    static void applyTabOrder(QList<QTuiWidget *> &widgets);
     static QTuiWidget *s_focusWidget;
 
     QRect m_geometry;

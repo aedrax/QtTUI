@@ -95,13 +95,19 @@ terminal size changes and when you add or remove a part.
 The focus chain is the list of the widgets that take Tab focus. A widget is in
 the chain if it is visible, enabled, and its `focusPolicy()` has the
 `Qt::TabFocus` bit. The order is the order of the widget tree: a parent comes
-before its children. Tab moves to the next widget in the chain and Shift+Tab
+before its children. `QTuiWidget::setTabOrder()` changes the order. Tab moves to the next widget in the chain and Shift+Tab
 moves to the previous one. At the end of the chain, focus goes back to the
 start. When a widget gets focus from Tab or a click, the window shows the
 tooltip of that widget.
 
 While focus is in an open popup (for example a menu), Tab does not move focus
 out of the popup.
+
+The window does not move the focus directly. It calls
+`focusNextPrevChild()` on the focus widget, and the call goes up the parents
+to the window. A widget that overrides the function can move the focus
+itself, or return `false` to get Tab as a normal key. See
+[Tab order](widget.md#tab-order).
 
 ### Shortcuts
 
@@ -113,7 +119,8 @@ these conditions are true:
 - The key and the modifiers are the same as the shortcut. Ctrl+S does not
   match Ctrl+Shift+S.
 - The widgets that own the action are visible. A closed menu does not count
-  as hidden. An action without a widget owner is always available.
+  as hidden, but a closed dialog does. An action without a widget owner is
+  always available.
 - The focus widget does not take the key for text. If the focus widget
   accepts text input, it keeps bare text keys (for example `Q` or `Shift+Q`)
   and the edit keys Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y, Ctrl+C, Ctrl+X, Ctrl+V
@@ -121,9 +128,22 @@ these conditions are true:
 - If a modal dialog is open, the action belongs to the dialog or to a widget
   in it.
 
-If no action takes the key, Alt+letter (without Ctrl) opens the menu with that
-mnemonic in the menu bar. This works also when the menu bar does not have
-focus, but not while a modal dialog is open.
+A [`QTuiShortcut`](#qtuishortcut) is a shortcut without an action. The same
+conditions apply to it, with its parent widget as the owner.
+
+If no action takes the key, Alt+letter (without Ctrl) gives the focus to the
+buddy of the [label](text-input.md#buddy-and-mnemonic) with that mnemonic.
+All these conditions must be true:
+
+- The label and its parents are visible, and the label is enabled.
+- The buddy and its parents are visible, the buddy is enabled, and its focus
+  policy is not `Qt::NoFocus`.
+- If a modal dialog is open, the label and the buddy are in the dialog.
+- The focus is not in a menu or a dropdown list.
+
+If no label takes the key, Alt+letter opens the menu with that mnemonic in the
+menu bar. This works also when the menu bar does not have focus, but not
+while a modal dialog is open.
 
 ### Context menus
 
@@ -152,7 +172,7 @@ visible, the window is modal:
 - Keys go only to widgets in the dialog.
 - Tab and Shift+Tab move focus only between the widgets of the dialog.
 - Only the shortcuts of actions in the dialog work. F10 and the Alt menu
-  mnemonics do not work.
+  mnemonics do not work. The mnemonics of the labels in the dialog work.
 - Escape rejects the dialog. If a popup in the dialog is open (for example a
   completer or a dropdown), or an item view edits an item, Escape goes to
   that popup or editor first.
@@ -167,15 +187,16 @@ matches takes the key.
 
 | Key | Action |
 | --- | --- |
-| A shortcut of an action | Triggers the action. See "Shortcuts". |
+| A shortcut of an action, or a `QTuiShortcut` | Triggers the action, or emits `activated()`. See "Shortcuts". |
+| Alt+letter | Gives the focus to the buddy of the label with that mnemonic. |
 | Alt+letter | Opens the menu bar menu with that mnemonic. |
 | Shift+F10, Menu | Asks for the context menu of the focus widget. |
 | F10 | Opens the first menu of the menu bar. Not while a modal dialog is open. |
 | F1 | Shows the tooltip of the focus widget again, if it has one. |
 | Ctrl+Z | Suspends the program (`QTuiApplication::suspend()`), as in a shell. Not if the focus widget accepts text input. |
-| Tab, Shift+Tab (in a modal dialog) | Moves focus to the next or previous widget in the dialog. |
+| Tab, Shift+Tab (in a modal dialog) | Moves focus to the next or previous widget in the dialog, unless `focusNextPrevChild()` of the focus widget decides. |
 | Escape (in a modal dialog) | Rejects the dialog. |
-| Tab | Moves focus to the next widget in the focus chain. Not while focus is in a popup. |
+| Tab | Moves focus to the next widget in the focus chain. Not while focus is in a popup, and not if `focusNextPrevChild()` of the focus widget decides. |
 | Shift+Tab | Moves focus to the previous widget in the focus chain. Not while focus is in a popup. |
 | All other keys | Go to the focus widget. |
 
@@ -487,6 +508,58 @@ void checkKey(int key, Qt::KeyboardModifiers modifiers)
 | `bool matches(int key, Qt::KeyboardModifiers modifiers) const` | Returns `true` if the key and all modifiers are the same. Enter and Return match each other. |
 | `bool isBareTextKey() const` | Returns `true` if the key types a character and the only modifier is Shift or none. |
 | `bool operator==(const QTuiKeySequence &other) const` | Compares the key and the modifiers. |
+
+## QTuiShortcut
+
+`#include <QtTUI/QTuiShortcut.h>` · Inherits: `QObject`
+
+A key that emits `activated()`, as `QShortcut`. Use it for a key that needs
+no menu item and no button. The parent widget owns the shortcut.
+
+The main window examines a `QTuiShortcut` together with the action
+shortcuts, in the order in which the actions and shortcuts were made. The
+conditions are the same as for an action (see
+["Shortcuts"](#shortcuts)):
+
+- The shortcut is enabled, and the key and the modifiers are the same.
+- The parent widget and its parents are visible. A shortcut with a `nullptr`
+  parent is always available.
+- A key without a modifier, and the standard edit keys, do not fire while
+  the focus widget accepts text input.
+- If a modal dialog is open, the parent widget is the dialog or a widget in
+  it.
+
+### Example
+
+```cpp
+#include <QtTUI/QtTUI>
+
+using namespace QtTUI;
+
+void addSearchKey(QTuiWidget *page, QTuiLineEdit *search)
+{
+    auto *find = new QTuiShortcut(QTuiKeySequence::fromString(QStringLiteral("Ctrl+F")), page);
+    QObject::connect(find, &QTuiShortcut::activated, search, [search]() {
+        search->setFocus();
+    });
+}
+```
+
+### Functions
+
+| Function | Description |
+| --- | --- |
+| `QTuiShortcut(const QTuiKeySequence &key, QTuiWidget *parent)` | Makes a shortcut for the key. The parent widget owns it. |
+| `QTuiKeySequence key() const` | Returns the key. |
+| `void setKey(const QTuiKeySequence &key)` | Sets the key. A sequence that is not valid never fires. |
+| `bool isEnabled() const` | Returns the enabled flag. The default is `true`. |
+| `void setEnabled(bool enabled)` | Enables or disables the shortcut. |
+
+### Signals
+
+| Signal | Description |
+| --- | --- |
+| `activated()` | The user pressed the key, and all the conditions are true. |
 
 ## QTuiToolBar
 
