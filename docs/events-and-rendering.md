@@ -320,6 +320,7 @@ A wide character (East Asian, most emoji) uses two cells. The first cell has `wi
 | `Color foreground` | (255, 255, 255) | The text color. |
 | `Color background` | (0, 0, 0) | The background color. |
 | `bool bold`, `italic`, `underline`, `strikethrough`, `inverse` | false | The text attributes. |
+| `quint16 link` | 0 | The hyperlink of the cell: an id from `ScreenBuffer::linkId()`, or 0 for no link. |
 
 ### Functions
 
@@ -339,6 +340,8 @@ A grid of cells with two buffers. Widgets write into the back buffer. The front 
 
 The back buffer keeps its cells after `swapBuffers()`. Thus a widget that does not repaint keeps its cells on the screen. Access outside the buffer writes to a sentinel cell and shows one warning for each buffer.
 
+The buffer also has the table of hyperlink URLs. A cell holds only a small id (`Cell::link`), so a cell stays small. The ids stay valid for the life of the buffer, also after `resize()`. The table does not remove a URL, so do not make a new URL for each repaint (for example, a URL with a time stamp).
+
 ### Functions
 
 | Function | Description |
@@ -352,7 +355,9 @@ The back buffer keeps its cells after `swapBuffers()`. Thus a widget that does n
 | `const Cell &frontCell(int x, int y) const` | Returns the front buffer cell. |
 | `void putChar(int x, int y, char32_t ch, const Cell &style)` | Writes the character with the colors and attributes of `style`. |
 | `void putChar(int x, int y, char32_t ch, const QString &combining, const Cell &style)` | Writes the character with combining marks. For a wide character, it also writes the continuation cell. If the write breaks an old wide pair, the other half becomes a space. A wide character in the last column becomes a space. |
-| `QVector<QPoint> diff() const` | Returns the positions where the back and front cells are different, row by row. If one half of a wide pair changes, both positions are in the result. |
+| `quint16 linkId(const QString &url)` | Returns the id of the hyperlink to `url`, for `Cell::link`. The same URL always gives the same id. The function removes control characters from the URL. It returns 0 for an empty URL, and when the table has 65535 URLs. |
+| `QString linkUrl(quint16 id) const` | Returns the URL of a link id, or a null string for an unknown id. |
+| `QVector<QPoint> diff() const` | Returns the positions where the back and front cells are different, row by row. A cell is also different if only its link changes. If one half of a wide pair changes, both positions are in the result. |
 | `void swapBuffers()` | Copies the back buffer to the front buffer. |
 | `void invalidateAll()` | Fills the front buffer with an invalid cell, so the next `diff()` returns all positions. |
 | `bool resizedDuringRender() const` | Returns true if `resize()` occurred after the last reset of the flag. |
@@ -363,6 +368,8 @@ The back buffer keeps its cells after `swapBuffers()`. Thus a widget that does n
 `#include <QtTUI/AnsiRenderer.h>`
 
 The renderer converts the changed cells of a `ScreenBuffer` into ANSI escape sequences. It moves the cursor once for each run of adjacent cells and writes an SGR sequence only when the attributes change.
+
+For cells with a link, the renderer writes an OSC 8 hyperlink: `ESC ] 8 ; ; URL ESC \` where the link starts in a run, and `ESC ] 8 ; ; ESC \` where it ends. Each run closes its link before the cursor moves. A terminal that does not know OSC 8 ignores the sequences and shows the text only.
 
 ### Color modes
 
@@ -438,6 +445,7 @@ Free functions that draw into a `ScreenBuffer`. All widgets use them. Each funct
 | `void drawBorder(ScreenBuffer &buffer, const QRect &rect, const QString &borderStyle, const Cell &style)` | Draws a border on the edge of `rect` with the characters of `borderStyle` (see [border styles](themes.md#border-styles)). It draws the top row if the height is 1 or more, and the bottom row if the height is 2 or more. It does not fill the interior. |
 | `void drawWindowFrame(ScreenBuffer &buffer, const QRect &rect, const ThemeProperties &theme, const QString &title, const QString &buttons)` | Draws the frame of a dock widget or an MDI sub-window with the theme colors. The frame has a border and a bold title from column 2 of the top row. The `buttons` text (for example `"[X]"`) goes at the right end of the top row, if it fits. The function fills the interior. |
 | `int renderText(ScreenBuffer &buffer, int x, int y, const QString &text, int maxWidth, const Cell &style)` | Writes `text` at (x, y) in `maxWidth` columns or less, and returns the number of columns that it wrote. It stops at `maxWidth` or at the right edge of the buffer. It writes no ellipsis. The function does not write a wide character that does not fit. |
+| `int renderText(ScreenBuffer &buffer, int x, int y, const QString &text, int maxWidth, const Cell &style, const QString &url)` | Writes `text` as a hyperlink to `url`, in other respects as the function above. An empty `url` gives text without a link. For other drawing functions, set the link in the style: `style.link = buffer.linkId(url)`. The link has no style of its own: set `underline` or a color in `style` to show it. |
 | `void renderTextTruncated(ScreenBuffer &buffer, int x, int y, const QString &text, int maxWidth, const Cell &style)` | Writes `text` at (x, y). If the text is wider than `maxWidth`, it writes `maxWidth - 1` columns of text and then `…` (U+2026). With `maxWidth == 1`, it writes only `…`. With `maxWidth <= 0`, it writes nothing. A wide character at the cut becomes a space. |
 
 ## QtTuiUnicode

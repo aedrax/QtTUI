@@ -65,6 +65,9 @@ qttui_add_backend_test(test_terminal_title test_terminal_title.cpp)
 # Synchronized output (mode 2026) around a render pass
 qttui_add_backend_test(test_synchronized_output test_synchronized_output.cpp)
 
+# OSC 8 hyperlinks (link table, diff, renderer output)
+qttui_add_test(test_hyperlinks test_hyperlinks.cpp)
+
 # QTuiWidget property tests (Properties 10-13)
 qttui_add_test(test_qtui_widget test_qtui_widget.cpp)
 

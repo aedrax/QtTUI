@@ -50,6 +50,16 @@ int renderText(ScreenBuffer &buffer, int x, int y, const QString &text,
                int maxWidth, const Cell &style);
 
 /**
+ * Writes text as a hyperlink to url (OSC 8), in other respects as the
+ * function above. A terminal that knows hyperlinks opens the URL when the
+ * user clicks the text. An empty url gives text without a link. The link is
+ * Cell::link of each cell, so other drawing functions can set it too:
+ * style.link = buffer.linkId(url).
+ */
+int renderText(ScreenBuffer &buffer, int x, int y, const QString &text,
+               int maxWidth, const Cell &style, const QString &url);
+
+/**
  * Writes text into the buffer at (x, y) truncated to maxWidth COLUMNS.
  *
  * Width-aware: wide (East Asian / emoji) characters occupy two columns
