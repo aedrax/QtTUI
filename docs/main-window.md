@@ -524,7 +524,7 @@ void addEditToolBar(QTuiMainWindow *window)
 | `void addAction(QTuiAction *action)` | Adds an action. The tool bar does not take ownership. |
 | `void addSeparator()` | Adds a separator. |
 | `void addWidget(QTuiWidget *widget)` | Adds a widget. The tool bar puts it at its place in the row, as wide as its `minimumSize().width()`. The tool bar becomes the parent of the widget. |
-| `QString title() const` | Returns the title. The tool bar does not show it. |
+| `QString title() const` | Returns the title. The tool bar does not show it. QToolBar also does not show it in the bar: Qt uses it in the context menu of the main window, and QtTUI has no such menu. Use the title to identify the tool bar in your code. |
 | `QSize minimumSize() const` | Returns the width of all items and a height of 1. |
 | `void paintEvent(ScreenBuffer &buffer)` | Paints the items. While the tool bar has focus, the current item has inverted colors and bold text. |
 | `QRect hoverRect() const` (protected) | Returns the item under the mouse, but not a separator. |
