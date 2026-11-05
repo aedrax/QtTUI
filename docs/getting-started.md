@@ -248,7 +248,7 @@ int main(int argc, char *argv[])
 | `bool terminalInitialized() const` | Returns `true` if the alternate screen and raw mode both started. Returns `false` with no terminal, for example in a test. |
 | `void setMainWindow(QTuiMainWindow *window)` | Sets the main window. The application sends all key, mouse, resize and paste events to it, and the render pass paints only its tree. The application does not take ownership. |
 | `QTuiMainWindow *mainWindow() const` | Returns the main window, or `nullptr`. |
-| `void triggerRender()` | Paints the full screen now, not from the event loop. Usually you do not need it: `markDirty()` schedules a render pass. |
+| `void triggerRender()` | Paints the full screen now, not from the event loop. Usually you do not need it: `markDirty()` schedules a render pass. Each render pass that changes cells writes them as one block of synchronized output (mode 2026). |
 | `static QTuiClipboard *clipboard()` | Returns the application clipboard. The function makes it on the first call. See [QTuiClipboard](widget.md#qtuiclipboard). |
 | `static Qt::LayoutDirection layoutDirection()` | Returns the default layout direction of the widgets. The default is `Qt::LeftToRight`. |
 | `static void setLayoutDirection(Qt::LayoutDirection direction)` | Sets the default layout direction. `Qt::LayoutDirectionAuto` becomes `Qt::LeftToRight`. Call it before you make the widgets. |

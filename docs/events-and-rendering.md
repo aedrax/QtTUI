@@ -22,7 +22,7 @@ Render path:
 2. The `RenderScheduler` adds the region to a union and starts one render pass on the next event loop pass. Many changes in one event loop pass give one repaint.
 3. The render pass walks the widget tree and calls `paintEvent(ScreenBuffer &)` of each widget that needs a repaint.
 4. The widgets write `Cell` values into the back buffer of the `ScreenBuffer`. `ScreenBuffer::diff()` returns the cells that are different from the front buffer.
-5. `AnsiRenderer` converts the changed cells into ANSI escape sequences. The `TerminalBackend` writes them to the terminal.
+5. `AnsiRenderer` converts the changed cells into ANSI escape sequences. The `TerminalBackend` writes them to the terminal in one block of synchronized output.
 
 Any state change that changes the output must call `markDirty()`. If a widget does not call it, the screen does not change.
 
@@ -278,6 +278,7 @@ The scheduler collects the dirty regions and runs one render pass on the next ev
 - Popups (menus, combo box lists, tooltips) paint last, clipped to the screen and not to their parent.
 - If the terminal size changes during the pass, the pass stops and a new full pass starts.
 - A theme change marks all visible widgets dirty.
+- The pass writes its bytes between `CSI ? 2026 h` and `CSI ? 2026 l` (synchronized output). The terminal then shows all changed cells at the same time, so a large repaint does not tear. A terminal that does not know the mode ignores the two sequences. If no cell changed, the pass does not write them.
 - After the pass, the terminal cursor goes to `terminalCursorPos()` of the focus widget. If that is (-1, -1), the cursor is hidden. In focus cursor mode, the cursor goes to the top-left cell of the focus widget.
 
 ### Hover highlight
