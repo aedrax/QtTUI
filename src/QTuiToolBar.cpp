@@ -44,16 +44,6 @@ void QTuiToolBar::addWidget(QTuiWidget *widget)
     markDirty();
 }
 
-bool QTuiToolBar::isMovable() const
-{
-    return m_movable;
-}
-
-void QTuiToolBar::setMovable(bool movable)
-{
-    m_movable = movable;
-}
-
 QString QTuiToolBar::title() const
 {
     return m_title;

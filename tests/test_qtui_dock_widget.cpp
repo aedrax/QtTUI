@@ -46,8 +46,6 @@ private slots:
     {
         QTuiDockWidget dock;
         QCOMPARE(dock.windowTitle(), QString());
-        QCOMPARE(dock.isFloatable(), true);
-        QCOMPARE(dock.allowedAreas(), Qt::AllDockWidgetAreas);
         QVERIFY(dock.widget() == nullptr);
     }
 
@@ -110,34 +108,6 @@ private slots:
     }
 
 
-    void defaultAllowedAreasIsAll()
-    {
-        QTuiDockWidget dock;
-        QCOMPARE(dock.allowedAreas(), Qt::AllDockWidgetAreas);
-    }
-
-    void setAllowedAreasLeftRight()
-    {
-        QTuiDockWidget dock;
-        dock.setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-        QCOMPARE(dock.allowedAreas(), Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-    }
-
-    void setAllowedAreasSingle()
-    {
-        QTuiDockWidget dock;
-        dock.setAllowedAreas(Qt::BottomDockWidgetArea);
-        QCOMPARE(dock.allowedAreas(), Qt::BottomDockWidgetArea);
-    }
-
-    void setAllowedAreasTopBottom()
-    {
-        QTuiDockWidget dock;
-        dock.setAllowedAreas(Qt::TopDockWidgetArea | Qt::BottomDockWidgetArea);
-        Qt::DockWidgetAreas expected = Qt::TopDockWidgetArea | Qt::BottomDockWidgetArea;
-        QCOMPARE(dock.allowedAreas(), expected);
-    }
-
     void escapeHidesDockAndEmitsSignal()
     {
         QTuiDockWidget dock(QStringLiteral("Panel"));
@@ -168,28 +138,6 @@ private slots:
         QVERIFY(!dock.isVisible());
         QCOMPARE(spy.count(), 1);
         QCOMPARE(spy.at(0).at(0).toBool(), false);
-    }
-
-    void defaultFloatableIsTrue()
-    {
-        QTuiDockWidget dock;
-        QCOMPARE(dock.isFloatable(), true);
-    }
-
-    void setFloatableFalse()
-    {
-        QTuiDockWidget dock;
-        dock.setFloatable(false);
-        QCOMPARE(dock.isFloatable(), false);
-    }
-
-    void setFloatableToggle()
-    {
-        QTuiDockWidget dock;
-        dock.setFloatable(false);
-        QCOMPARE(dock.isFloatable(), false);
-        dock.setFloatable(true);
-        QCOMPARE(dock.isFloatable(), true);
     }
 
     // --- minimumSize ---

@@ -524,8 +524,6 @@ void addEditToolBar(QTuiMainWindow *window)
 | `void addAction(QTuiAction *action)` | Adds an action. The tool bar does not take ownership. |
 | `void addSeparator()` | Adds a separator. |
 | `void addWidget(QTuiWidget *widget)` | Adds a widget. The tool bar puts it at its place in the row, as wide as its `minimumSize().width()`. The tool bar becomes the parent of the widget. |
-| `bool isMovable() const` | Returns the `movable` property. |
-| `void setMovable(bool movable)` | Sets the `movable` property. The value has no effect: a tool bar cannot move. |
 | `QString title() const` | Returns the title. The tool bar does not show it. |
 | `QSize minimumSize() const` | Returns the width of all items and a height of 1. |
 | `void paintEvent(ScreenBuffer &buffer)` | Paints the items. While the tool bar has focus, the current item has inverted colors and bold text. |

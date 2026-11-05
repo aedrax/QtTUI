@@ -812,10 +812,6 @@ void example(QTuiMainWindow *window)
 | `QTuiWidget *widget() const` | Returns the content widget, or nullptr. |
 | `QString windowTitle() const` | Returns the title. Property: `windowTitle`. |
 | `void setWindowTitle(const QString &title)` | Sets the title. |
-| `Qt::DockWidgetAreas allowedAreas() const` | Returns the allowed areas. The default is `Qt::AllDockWidgetAreas`. |
-| `void setAllowedAreas(Qt::DockWidgetAreas areas)` | Keeps the allowed areas. No other part of QtTUI reads this value. |
-| `bool isFloatable() const` | Returns the floatable flag. Property: `floatable`. The default is true. |
-| `void setFloatable(bool floatable)` | Keeps the floatable flag. A dock widget cannot float in QtTUI. |
 | `QRect contentArea() const` | Returns the area inside the frame. Returns an empty rect if the dock widget is smaller than 3 x 3 cells. |
 | `QSize minimumSize() const` | Returns 3 rows, and the width of the title and `[X]` or of the content widget plus the frame. |
 | `void paintEvent(ScreenBuffer &buffer)` | Paints the frame and the content widget. |

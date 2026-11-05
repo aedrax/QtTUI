@@ -36,26 +36,6 @@ void QTuiDockWidget::setWindowTitle(const QString &title)
     markDirty();
 }
 
-Qt::DockWidgetAreas QTuiDockWidget::allowedAreas() const
-{
-    return m_allowedAreas;
-}
-
-void QTuiDockWidget::setAllowedAreas(Qt::DockWidgetAreas areas)
-{
-    m_allowedAreas = areas;
-}
-
-bool QTuiDockWidget::isFloatable() const
-{
-    return m_floatable;
-}
-
-void QTuiDockWidget::setFloatable(bool floatable)
-{
-    m_floatable = floatable;
-}
-
 QSize QTuiDockWidget::minimumSize() const
 {
     // Title bar row + at least 1 content row + bottom border = 3 rows

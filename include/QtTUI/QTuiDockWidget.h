@@ -11,7 +11,6 @@ namespace QtTUI {
 class QTuiDockWidget : public QTuiWidget {
     Q_OBJECT
     Q_PROPERTY(QString windowTitle READ windowTitle WRITE setWindowTitle)
-    Q_PROPERTY(bool floatable READ isFloatable WRITE setFloatable)
 public:
     explicit QTuiDockWidget(const QString &title = QString(), QTuiWidget *parent = nullptr);
 
@@ -20,12 +19,6 @@ public:
 
     QString windowTitle() const;
     void setWindowTitle(const QString &title);
-
-    Qt::DockWidgetAreas allowedAreas() const;
-    void setAllowedAreas(Qt::DockWidgetAreas areas);
-
-    bool isFloatable() const;
-    void setFloatable(bool floatable);
 
     QRect contentArea() const;
 
@@ -43,8 +36,6 @@ protected:
 private:
     QTuiWidget *m_widget = nullptr;
     QString m_windowTitle;
-    Qt::DockWidgetAreas m_allowedAreas = Qt::AllDockWidgetAreas;
-    bool m_floatable = true;
 };
 
 } // namespace QtTUI

@@ -61,7 +61,6 @@ private slots:
     {
         QTuiToolBar bar;
         QCOMPARE(bar.title(), QString());
-        QCOMPARE(bar.isMovable(), true);
     }
 
     void toolBar_addAction()
@@ -166,16 +165,6 @@ private slots:
         QSignalSpy spy(act1, &QTuiAction::triggered);
         sendKey(bar, Qt::Key_Return);
         QCOMPARE(spy.count(), 1);
-    }
-
-    void toolBar_movableProperty()
-    {
-        QTuiToolBar bar;
-        QCOMPARE(bar.isMovable(), true);
-        bar.setMovable(false);
-        QCOMPARE(bar.isMovable(), false);
-        bar.setMovable(true);
-        QCOMPARE(bar.isMovable(), true);
     }
 
     void toolBar_paintEventNoCrash()

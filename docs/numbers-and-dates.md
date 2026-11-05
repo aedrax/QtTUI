@@ -405,7 +405,7 @@ void example(QTuiWidget *parent)
 
 | Function | Description |
 | --- | --- |
-| `QTuiDial(QTuiWidget *parent = nullptr)` | Makes a dial. The orientation is horizontal and has no effect. |
+| `QTuiDial(QTuiWidget *parent = nullptr)` | Makes a dial. A dial is round: `orientation()` and `setOrientation()` of QTuiAbstractSlider have no effect on it. |
 | `bool wrapping() const` | Returns true if the value wraps at the ends of the range. The default is false. |
 | `void setWrapping(bool wrapping)` | If true, a step past the maximum goes to the minimum, and a step past the minimum goes to the maximum. |
 | `void paintEvent(ScreenBuffer &buffer) override` | Paints the dial, the value and the indicator. |

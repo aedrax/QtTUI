@@ -12,16 +12,12 @@ class QTuiAction;
 
 class QTuiToolBar : public QTuiWidget {
     Q_OBJECT
-    Q_PROPERTY(bool movable READ isMovable WRITE setMovable)
 public:
     explicit QTuiToolBar(const QString &title = QString(), QTuiWidget *parent = nullptr);
 
     void addAction(QTuiAction *action);
     void addSeparator();
     void addWidget(QTuiWidget *widget);
-
-    bool isMovable() const;
-    void setMovable(bool movable);
 
     QString title() const;
 
@@ -45,7 +41,6 @@ private:
     QString m_title;
     QList<ToolBarItem> m_items;
     int m_focusedItem = 0;
-    bool m_movable = true;
 };
 
 } // namespace QtTUI
