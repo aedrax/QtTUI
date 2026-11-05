@@ -129,6 +129,15 @@ QByteArray AnsiRenderer::render(const ScreenBuffer &buffer)
                     continue;
                 }
                 const Cell &next = buffer.backCell(x + 1, runY);
+                // Terminals do not agree on the width of a cluster with
+                // joined code points (an emoji sequence). Thus clear the
+                // two columns first, and end the run after the cluster, so
+                // the next cell gets its own cursor position.
+                const bool unsureWidth = !c.combining.isEmpty();
+                if (unsureWidth) {
+                    output.append("  ");
+                    output.append(cursorPosition(x, runY));
+                }
                 appendCellChar(output, c);
                 if (next.isContinuation()) {
                     // The terminal advanced 2 columns by itself: consume the
@@ -140,6 +149,8 @@ QByteArray AnsiRenderer::render(const ScreenBuffer &buffer)
                         ++i;
                     }
                     prevX = x + 1;
+                    if (unsureWidth)
+                        break;
                     continue;
                 }
                 // Broken pair (direct write of a wide char without a

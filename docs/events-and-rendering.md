@@ -308,7 +308,7 @@ A 24-bit RGB color, with the fields `r`, `g` and `b` (`uint8_t`). The default is
 
 One terminal cell: one character with its colors and text attributes.
 
-A wide character (East Asian, most emoji) uses two cells. The first cell has `width == 2`. The cell to its right is a continuation cell with `ch == 0` and `width == 0`. Use `ScreenBuffer::putChar()` for text that can have wide characters, because it writes both cells.
+A wide character (East Asian, most emoji, an emoji sequence) uses two cells. The first cell has `width == 2`. The cell to its right is a continuation cell with `ch == 0` and `width == 0`. Use `ScreenBuffer::putChar()` for text that can have wide characters, because it writes both cells.
 
 ### Fields
 
@@ -316,7 +316,7 @@ A wide character (East Asian, most emoji) uses two cells. The first cell has `wi
 | --- | --- | --- |
 | `char32_t ch` | `U' '` | The base code point. 0 in a continuation cell. |
 | `quint8 width` | 1 | 0 for a continuation cell, 1 for a narrow character, 2 for a wide character. |
-| `QString combining` | null | The zero-width marks after `ch`, for example accents. |
+| `QString combining` | null | The code points that join `ch`: accents and other zero-width marks, and the other parts of an emoji sequence (see [Cluster](#cluster)). |
 | `Color foreground` | (255, 255, 255) | The text color. |
 | `Color background` | (0, 0, 0) | The background color. |
 | `bool bold`, `italic`, `underline`, `strikethrough`, `inverse` | false | The text attributes. |
@@ -354,7 +354,7 @@ The buffer also has the table of hyperlink URLs. A cell holds only a small id (`
 | `const Cell &backCell(int x, int y) const` | Returns the back buffer cell. |
 | `const Cell &frontCell(int x, int y) const` | Returns the front buffer cell. |
 | `void putChar(int x, int y, char32_t ch, const Cell &style)` | Writes the character with the colors and attributes of `style`. |
-| `void putChar(int x, int y, char32_t ch, const QString &combining, const Cell &style)` | Writes the character with combining marks. For a wide character, it also writes the continuation cell. If the write breaks an old wide pair, the other half becomes a space. A wide character in the last column becomes a space. |
+| `void putChar(int x, int y, char32_t ch, const QString &combining, const Cell &style)` | Writes the character with the code points that join it. The width is `QtTuiUnicode::clusterWidth(ch, combining)`. For a wide character, it also writes the continuation cell. If the write breaks an old wide pair, the other half becomes a space. A wide character in the last column becomes a space. |
 | `quint16 linkId(const QString &url)` | Returns the id of the hyperlink to `url`, for `Cell::link`. The same URL always gives the same id. The function removes control characters from the URL. It returns 0 for an empty URL, and when the table has 65535 URLs. |
 | `QString linkUrl(quint16 id) const` | Returns the URL of a link id, or a null string for an unknown id. |
 | `QVector<QPoint> diff() const` | Returns the positions where the back and front cells are different, row by row. A cell is also different if only its link changes. If one half of a wide pair changes, both positions are in the result. |
@@ -368,6 +368,8 @@ The buffer also has the table of hyperlink URLs. A cell holds only a small id (`
 `#include <QtTUI/AnsiRenderer.h>`
 
 The renderer converts the changed cells of a `ScreenBuffer` into ANSI escape sequences. It moves the cursor once for each run of adjacent cells and writes an SGR sequence only when the attributes change.
+
+Terminals do not agree on the width of a wide cluster with joined code points (an emoji sequence, a wide character with an accent). For such a cell, the renderer writes two spaces, moves the cursor back, writes the cluster, and ends the run. Thus the next cell gets its own cursor position, also when the terminal gives the cluster a different width.
 
 For cells with a link, the renderer writes an OSC 8 hyperlink: `ESC ] 8 ; ; URL ESC \` where the link starts in a run, and `ESC ] 8 ; ; ESC \` where it ends. Each run closes its link before the cursor moves. A terminal that does not know OSC 8 ignores the sequences and shows the text only.
 
@@ -454,11 +456,23 @@ Free functions that draw into a `ScreenBuffer`. All widgets use them. Each funct
 
 Free functions in the namespace `QtTUI::QtTuiUnicode` that measure text in terminal columns. A code point uses 0, 1 or 2 columns. The width function is wcwidth with the East Asian Wide and Fullwidth ranges and the emoji ranges.
 
+Text is a sequence of clusters, and a cluster uses 1 or 2 columns. These emoji sequences are one cluster of 2 columns:
+
+- A ZWJ sequence, for example a family or a profession.
+- A flag (two regional indicators).
+- An emoji with a skin tone modifier.
+- A text-default emoji with variation selector 16 (U+FE0F), for example U+2764 U+FE0F.
+
+All functions that take a string use clusters, so the widths, the text cells and the cursor steps of all widgets agree.
+
 Known limits:
 
-- A ZWJ emoji sequence (for example a family) is not one cluster. Each emoji gets two columns.
-- A flag (two regional indicators) uses two 1-column cells.
+- Terminals do not agree on the width of emoji sequences. A terminal without grapheme clusters shows a ZWJ sequence as separate emoji, wider than the 2 columns that QtTUI gives it. The cells to the right of the sequence can then be wrong until they repaint.
+- A keycap sequence (a digit, U+FE0F, U+20E3) is narrow (1 column).
+- One regional indicator without a partner is narrow (1 column).
+- The test for an emoji base uses Unicode blocks, not the exact `Extended_Pictographic` property.
 - Characters with the "Ambiguous" East Asian width are narrow (1 column).
+- QtTUI does not reorder text for right-to-left scripts (no bidi).
 
 ### Example
 
@@ -487,22 +501,23 @@ void example()
 | --- | --- |
 | `int charWidth(char32_t ch)` | Returns the columns of one code point: 0 for combining marks and other zero-width characters, 2 for wide characters, 1 for all others. U+0000 gives 0. |
 | `bool isZeroWidth(char32_t ch)` | Returns true if `charWidth(ch)` is 0 and `ch` is not 0. |
+| `int clusterWidth(char32_t base, const QString &combining)` | Returns the columns of a cluster: `charWidth(base)`, but 2 for an emoji sequence with a narrow base (a flag, a text-default emoji with U+FE0F, a narrow emoji with a skin tone or a ZWJ sequence). The result is 1 or 2. |
 | `QString withoutControlChars(const QString &text)` | Returns the text without control characters (U+0000 to U+001F and U+007F to U+009F). Use it for text that goes into an escape sequence. |
-| `int stringWidth(const QString &text)` | Returns the columns of the string. |
+| `int stringWidth(const QString &text)` | Returns the columns of the string: the sum of its cluster widths. |
 | `bool nextCluster(const QString &text, int &index, Cluster &out)` | Reads the cluster at `index` into `out` and moves `index` after it. Returns false at the end of the string. |
 | `int columnOfIndex(const QString &text, int index)` | Returns the column of the cluster at the code unit `index`. An index after the end gives `stringWidth(text)`. |
 | `int indexOfColumn(const QString &text, int column)` | Returns the code unit index of the cluster at `column`. A column in a wide character gives the start of that character. A column after the end gives `text.size()`. |
-| `int nextClusterIndex(const QString &text, int index)` | Returns the start of the next cluster. |
-| `int prevClusterIndex(const QString &text, int index)` | Returns the start of the previous cluster. |
+| `int nextClusterIndex(const QString &text, int index)` | Returns the start of the next cluster. An emoji sequence is one step. |
+| `int prevClusterIndex(const QString &text, int index)` | Returns the start of the previous cluster. An emoji sequence is one step. |
 
 ### Cluster
 
-A base code point and the zero-width code points after it (combining marks, variation selectors, ZWJ).
+A base code point and the code points that join it: the zero-width code points after it (combining marks, variation selectors, ZWJ), the emoji after a ZWJ, a skin tone modifier, and the second regional indicator of a flag.
 
 | Field | Description |
 | --- | --- |
 | `char32_t base` | The base code point. |
-| `QString combining` | The zero-width code points after the base, in UTF-16. It can be empty. |
+| `QString combining` | The joined code points after the base, in UTF-16. It can be empty. |
 | `int index` | The start in the source string, in code units. |
 | `int length` | The length in the source string, in code units. |
 | `int width` | The columns: 1 or 2. |

@@ -35,8 +35,9 @@ struct Color {
  *
  * Unicode model (notcurses/tmux style): a cell stores one base code point
  * (`ch`), the number of terminal columns it occupies (`width`), and an
- * optional string of zero-width combining code points that attach to the
- * base (`combining`, null for the overwhelmingly common case).
+ * optional string of the code points that join the base (`combining`, null
+ * for the overwhelmingly common case). These are combining marks and the
+ * other parts of an emoji sequence (see QtTuiUnicode::Cluster).
  *
  * Wide glyphs (width == 2) occupy their own cell plus a CONTINUATION cell
  * immediately to the right: ch == 0, width == 0 (see isContinuation()).
@@ -50,7 +51,7 @@ struct Color {
 struct Cell {
     char32_t ch = U' ';
     quint8 width = 1;    ///< 0 = continuation of a wide glyph, 1 = narrow, 2 = wide
-    QString combining;   ///< zero-width marks following ch (rare; null by default)
+    QString combining;   ///< code points that join ch (rare; null by default)
     Color foreground = Color(255, 255, 255);
     Color background = Color(0, 0, 0);
     bool bold = false;
@@ -119,7 +120,8 @@ public:
      * back buffer with the colors/attributes of `style`.
      *
      * This is the sanctioned path for characters that may be wide: it sets
-     * the continuation cell for width-2 glyphs, and when either the target
+     * the continuation cell for width-2 glyphs (the width is
+     * QtTuiUnicode::clusterWidth(ch, combining)), and when either the target
      * cell or the continuation cell half-overwrites an existing wide pair,
      * the orphaned half is reset to a space (classic cell-grid correctness
      * rule). A wide glyph that would straddle the right buffer edge is

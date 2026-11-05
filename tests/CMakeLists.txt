@@ -68,6 +68,9 @@ qttui_add_backend_test(test_synchronized_output test_synchronized_output.cpp)
 # OSC 8 hyperlinks (link table, diff, renderer output)
 qttui_add_test(test_hyperlinks test_hyperlinks.cpp)
 
+# Emoji clusters (ZWJ sequences, flags, VS16, skin tones)
+qttui_add_test(test_unicode_clusters test_unicode_clusters.cpp)
+
 # QTuiWidget property tests (Properties 10-13)
 qttui_add_test(test_qtui_widget test_qtui_widget.cpp)
 

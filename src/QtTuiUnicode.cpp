@@ -100,6 +100,54 @@ bool inWideRanges(char32_t ch)
     return it != end && ch >= it->first;
 }
 
+constexpr char32_t kZwj = 0x200D;
+constexpr char32_t kVs16 = 0xFE0F; // variation selector 16: emoji presentation
+
+bool isRegionalIndicator(char32_t ch)
+{
+    return ch >= 0x1F1E6 && ch <= 0x1F1FF;
+}
+
+bool isEmojiModifier(char32_t ch)
+{
+    return ch >= 0x1F3FB && ch <= 0x1F3FF; // skin tones
+}
+
+// True for a code point that can be the base of an emoji sequence.
+// ponytail: these are the blocks that contain the Extended_Pictographic
+// code points, not the exact property. A symbol of these blocks that is
+// not an emoji also joins a VS16, a skin tone or a ZWJ sequence, but valid
+// text has no such sequence. Use the table of emoji-data.txt if this
+// matters.
+bool isEmojiBase(char32_t ch)
+{
+    if (ch >= 0x1F000 && ch <= 0x1FAFF)
+        return true;
+    if (ch < 0x2190)
+        return ch == 0x00A9 || ch == 0x00AE || ch == 0x203C || ch == 0x2049
+            || ch == 0x2122 || ch == 0x2139;
+    return ch <= 0x21FF                      // arrows
+        || (ch >= 0x2300 && ch <= 0x23FF)    // miscellaneous technical
+        || ch == 0x24C2
+        || (ch >= 0x25A0 && ch <= 0x27BF)    // shapes, symbols, dingbats
+        || (ch >= 0x2900 && ch <= 0x297F)    // supplemental arrows
+        || (ch >= 0x2B00 && ch <= 0x2BFF)    // symbols and arrows
+        || ch == 0x3030 || ch == 0x303D || ch == 0x3297 || ch == 0x3299;
+}
+
+// Decodes the code point at index i (surrogate-aware) and sets len to its
+// number of code units
+char32_t codePointAt(const QString &text, int i, int &len)
+{
+    char32_t cp = text.at(i).unicode();
+    len = 1;
+    if (QChar::isHighSurrogate(cp) && i + 1 < text.size() && text.at(i + 1).isLowSurrogate()) {
+        cp = QChar::surrogateToUcs4(static_cast<char16_t>(cp), text.at(i + 1).unicode());
+        len = 2;
+    }
+    return cp;
+}
+
 } // namespace
 
 int charWidth(char32_t ch)
@@ -146,6 +194,22 @@ QString withoutControlChars(const QString &text)
     return out;
 }
 
+int clusterWidth(char32_t base, const QString &combining)
+{
+    const int width = std::max(1, charWidth(base)); // a stray zero-width base uses 1 column
+    if (width == 2 || combining.isEmpty() || !isEmojiBase(base))
+        return width;
+    // A narrow emoji base: VS16 asks for the emoji presentation, and a
+    // joined code point with a width (a second regional indicator, a skin
+    // tone, an emoji after a ZWJ) makes an emoji sequence. Both are wide.
+    for (int i = 0, len = 0; i < combining.size(); i += len) {
+        const char32_t cp = codePointAt(combining, i, len);
+        if (cp == kVs16 || !isZeroWidth(cp))
+            return 2;
+    }
+    return width;
+}
+
 int stringWidth(const QString &text)
 {
     int cols = 0;
@@ -166,29 +230,42 @@ bool nextCluster(const QString &text, int &index, Cluster &out)
     out.combining.clear();
 
     // Decode the base code point (surrogate-aware)
-    char32_t base = text.at(index).unicode();
-    int i = index + 1;
-    if (QChar::isHighSurrogate(base) && i < size && text.at(i).isLowSurrogate()) {
-        base = QChar::surrogateToUcs4(static_cast<char16_t>(base), text.at(i).unicode());
-        ++i;
-    }
+    int cpLen = 0;
+    const char32_t base = codePointAt(text, index, cpLen);
+    int i = index + cpLen;
     out.base = base;
-    out.width = std::max(1, charWidth(base)); // stray zero-width base degrades to 1 column
 
-    // Absorb trailing zero-width code points (combining marks, VS, ZWJ)
+    const bool emoji = isEmojiBase(base);
+    // A flag is two regional indicators. A third one starts a new cluster.
+    bool flagOpen = isRegionalIndicator(base);
+
+    // Absorb the code points that join the base
     while (i < size) {
-        char32_t cp = text.at(i).unicode();
-        int cpLen = 1;
-        if (QChar::isHighSurrogate(cp) && i + 1 < size && text.at(i + 1).isLowSurrogate()) {
-            cp = QChar::surrogateToUcs4(static_cast<char16_t>(cp), text.at(i + 1).unicode());
-            cpLen = 2;
+        const char32_t cp = codePointAt(text, i, cpLen);
+        int joinLen = 0;
+        if (cp == kZwj && emoji && i + cpLen < size) {
+            // An emoji ZWJ sequence: the ZWJ joins the next emoji
+            int nextLen = 0;
+            if (isEmojiBase(codePointAt(text, i + cpLen, nextLen)))
+                joinLen = cpLen + nextLen;
         }
-        if (!isZeroWidth(cp))
-            break;
-        out.combining.append(text.mid(i, cpLen));
-        i += cpLen;
+        if (joinLen == 0) {
+            if (isZeroWidth(cp)) {
+                joinLen = cpLen; // combining marks, variation selectors, a ZWJ at the end
+            } else if (emoji && isEmojiModifier(cp)) {
+                joinLen = cpLen; // skin tone
+            } else if (flagOpen && isRegionalIndicator(cp)) {
+                joinLen = cpLen;
+            } else {
+                break;
+            }
+        }
+        flagOpen = false;
+        out.combining.append(QStringView(text).mid(i, joinLen));
+        i += joinLen;
     }
 
+    out.width = clusterWidth(base, out.combining);
     out.length = i - index;
     index = i;
     return true;

@@ -134,7 +134,8 @@ void ScreenBuffer::putChar(int x, int y, char32_t ch, const QString &combining,
         return;
     }
 
-    const int w = (ch == 0) ? 1 : std::max(1, QtTuiUnicode::charWidth(ch));
+    // The joined code points can make a narrow base wide (a flag, VS16)
+    const int w = (ch == 0) ? 1 : QtTuiUnicode::clusterWidth(ch, combining);
 
     clearWidePairAt(x, y);
 
