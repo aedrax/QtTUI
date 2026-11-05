@@ -73,6 +73,19 @@ QByteArray AnsiRenderer::render(const ScreenBuffer &buffer)
     Cell lastAttrs;
     bool haveAttrs = false;
 
+    // The hyperlink (OSC 8) that is open in the terminal. A link is open
+    // only in a run: each run closes its link before the cursor moves.
+    quint16 openLink = 0;
+    auto setLink = [&](quint16 link) {
+        if (link == openLink)
+            return;
+        // OSC 8 ; params ; URL ST. An empty URL closes the link.
+        output.append("\x1b]8;;");
+        output.append(buffer.linkUrl(link).toUtf8());
+        output.append("\x1b\\");
+        openLink = link;
+    };
+
     int i = 0;
     while (i < changed.size()) {
         // Start a new run: emit cursor position for the first cell
@@ -94,6 +107,7 @@ QByteArray AnsiRenderer::render(const ScreenBuffer &buffer)
                 lastAttrs = c;
                 haveAttrs = true;
             }
+            setLink(c.link);
 
             if (c.isContinuation()) {
                 // A continuation cell alone (its glyph did not precede it in
@@ -115,6 +129,15 @@ QByteArray AnsiRenderer::render(const ScreenBuffer &buffer)
                     continue;
                 }
                 const Cell &next = buffer.backCell(x + 1, runY);
+                // Terminals do not agree on the width of a cluster with
+                // joined code points (an emoji sequence). Thus clear the
+                // two columns first, and end the run after the cluster, so
+                // the next cell gets its own cursor position.
+                const bool unsureWidth = !c.combining.isEmpty();
+                if (unsureWidth) {
+                    output.append("  ");
+                    output.append(cursorPosition(x, runY));
+                }
                 appendCellChar(output, c);
                 if (next.isContinuation()) {
                     // The terminal advanced 2 columns by itself: consume the
@@ -126,6 +149,8 @@ QByteArray AnsiRenderer::render(const ScreenBuffer &buffer)
                         ++i;
                     }
                     prevX = x + 1;
+                    if (unsureWidth)
+                        break;
                     continue;
                 }
                 // Broken pair (direct write of a wide char without a
@@ -141,6 +166,7 @@ QByteArray AnsiRenderer::render(const ScreenBuffer &buffer)
             prevX = x;
             ++i;
         }
+        setLink(0); // the run ends
     }
 
     // Reset attributes at the end

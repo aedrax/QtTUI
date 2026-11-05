@@ -28,11 +28,19 @@ namespace QtTUI {
 
 QTuiApplication *QTuiApplication::s_instance = nullptr;
 
+// XTWINOPS: save the window title on the title stack of the terminal, and
+// restore it. A terminal without a title stack ignores the sequences.
+static const char kPushTitle[] = "\x1b[22;0t";
+static const char kPopTitle[] = "\x1b[23;0t";
+
 static void atexitHandler()
 {
-    if (QTuiApplication::instance()) {
-        QTuiApplication::instance()->backend()->exitAlternateScreen();
-        QTuiApplication::instance()->backend()->exitRawMode();
+    // The destructor did not run, so restoreTerminal() did not run
+    if (QTuiApplication *app = QTuiApplication::instance()) {
+        if (app->terminalInitialized())
+            app->backend()->write(kPopTitle);
+        app->backend()->exitAlternateScreen();
+        app->backend()->exitRawMode();
     }
 }
 
@@ -99,6 +107,12 @@ static void logFileMessageHandler(QtMsgType type, const QMessageLogContext &cont
 }
 
 QTuiApplication::QTuiApplication(int &argc, char **argv)
+    : QTuiApplication(argc, argv, nullptr)
+{
+}
+
+QTuiApplication::QTuiApplication(int &argc, char **argv,
+                                 std::unique_ptr<TerminalBackend> backend)
     : QCoreApplication(argc, argv)
 {
     s_instance = this;
@@ -109,7 +123,8 @@ QTuiApplication::QTuiApplication(int &argc, char **argv)
 
     // Create subsystems. The QObject-based ones are parented to this
     // application object and deleted through QObject ownership.
-    m_backend = createTerminalBackend(this).release();
+    m_backend = backend ? backend.release() : createTerminalBackend(this).release();
+    m_backend->setParent(this);
     m_inputParser = new InputParser(this, this);
     const QSize termSize = m_backend->terminalSize();
     m_screenBuffer = std::make_unique<ScreenBuffer>(termSize.width(), termSize.height());
@@ -144,6 +159,10 @@ QTuiApplication::QTuiApplication(int &argc, char **argv)
         }
         s_previousMessageHandler = qInstallMessageHandler(logFileMessageHandler);
         m_messageHandlerInstalled = true;
+
+        // Save the window title of the shell. restoreTerminal() restores it.
+        m_backend->write(kPushTitle);
+        m_titlePushed = true;
     }
 
     // Force a full redraw on the first render cycle
@@ -297,10 +316,39 @@ void QTuiApplication::deleteClipboard()
         delete s_clipboard;
 }
 
+void QTuiApplication::setWindowTitle(const QString &title)
+{
+    m_windowTitle = QtTuiUnicode::withoutControlChars(title);
+    if (m_windowTitle.isNull())
+        m_windowTitle = QLatin1String(""); // empty, but set
+    writeWindowTitle();
+}
+
+QString QTuiApplication::windowTitle() const
+{
+    return m_windowTitle;
+}
+
+void QTuiApplication::writeWindowTitle()
+{
+    // OSC 2 ; title ST. Without terminal control (a test without a tty),
+    // the application writes no title.
+    if (m_backend && m_terminalInitialized && !m_windowTitle.isNull())
+        m_backend->write("\x1b]2;" + m_windowTitle.toUtf8() + "\x1b\\");
+}
+
 void QTuiApplication::suspend()
 {
-    if (m_backend)
-        m_backend->suspend();
+    if (!m_backend)
+        return;
+    // The shell gets its own title back while the process is stopped
+    if (m_titlePushed)
+        m_backend->write(kPopTitle);
+    m_backend->suspend();
+    if (m_titlePushed) {
+        m_backend->write(kPushTitle);
+        writeWindowTitle();
+    }
 }
 
 bool QTuiApplication::event(QEvent *event)
@@ -348,6 +396,9 @@ void QTuiApplication::onTerminalResized(QSize newSize)
 void QTuiApplication::restoreTerminal()
 {
     if (m_backend) {
+        if (m_titlePushed)
+            m_backend->write(kPopTitle);
+        m_titlePushed = false;
         m_backend->exitAlternateScreen();
         m_backend->exitRawMode();
     }

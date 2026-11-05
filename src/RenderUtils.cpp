@@ -101,6 +101,14 @@ int renderText(ScreenBuffer &buffer, int x, int y, const QString &text,
     return col;
 }
 
+int renderText(ScreenBuffer &buffer, int x, int y, const QString &text,
+               int maxWidth, const Cell &style, const QString &url)
+{
+    Cell linked = style;
+    linked.link = buffer.linkId(url);
+    return renderText(buffer, x, y, text, maxWidth, linked);
+}
+
 void renderTextTruncated(ScreenBuffer &buffer,
                          int x, int y,
                          const QString &text,

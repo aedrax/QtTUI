@@ -14,14 +14,21 @@ namespace QtTUI {
  * wcwidth plus UAX #11 East Asian Width W/F ranges and emoji presentation
  * ranges) and the string/index/column arithmetic built on top of it.
  *
+ * Emoji sequences are one cluster of 2 columns: a ZWJ sequence (family,
+ * professions), a flag (two regional indicators), an emoji with a skin
+ * tone modifier, and a text-default emoji with variation selector 16.
+ *
  * Known limitations (documented, deliberate):
- * - ZWJ emoji sequences (family, professions) are not merged into a single
- *   cluster; each emoji in the sequence gets its own 2-column cell and the
- *   ZWJ rides along as a zero-width combining suffix.
- * - Regional-indicator flag pairs render as two 1-column cells, not one
- *   2-column flag.
+ * - Terminals do not agree on the width of emoji sequences. A terminal
+ *   without grapheme clusters shows a ZWJ sequence as separate emoji, wider
+ *   than the 2 columns that QtTUI gives it.
+ * - A keycap sequence (a digit, VS16, U+20E3) is narrow (width 1).
+ * - One regional indicator without a partner is narrow (width 1).
+ * - The emoji base test uses Unicode blocks, not the exact
+ *   Extended_Pictographic property.
  * - UAX #11 "Ambiguous" width characters are treated as narrow (width 1),
  *   matching wcwidth and most terminal emulators.
+ * - Text is not reordered for right-to-left scripts (no bidi).
  */
 namespace QtTuiUnicode {
 
@@ -36,18 +43,37 @@ int charWidth(char32_t ch);
 /** True when charWidth(ch) == 0 and ch != 0. */
 bool isZeroWidth(char32_t ch);
 
-/** Total columns of a string, iterating by code point (surrogate-aware). */
+/**
+ * Columns of a cluster: a base code point and the code points that join it
+ * (see Cluster). This is charWidth(base), but 2 for an emoji sequence with a
+ * narrow base: a flag, a text-default emoji with variation selector 16, or
+ * a narrow emoji with a skin tone or a ZWJ sequence. The result is 1 or 2.
+ */
+int clusterWidth(char32_t base, const QString &combining);
+
+/**
+ * The text without control characters (category Cc: U+0000 to U+001F and
+ * U+007F to U+009F). Use it for text that goes into an escape sequence (a
+ * window title, a link URL), so the text cannot end the sequence or start
+ * a new one.
+ */
+QString withoutControlChars(const QString &text);
+
+/** Total columns of a string: the sum of its cluster widths (see nextCluster). */
 int stringWidth(const QString &text);
 
 /**
- * A terminal cluster: one base code point plus any directly following
- * zero-width code points (combining marks, variation selectors, ZWJ).
+ * A terminal cluster: one base code point plus the code points that join
+ * it. These are the zero-width code points directly after it (combining
+ * marks, variation selectors, ZWJ) and the other parts of an emoji
+ * sequence: the emoji after a ZWJ, a skin tone modifier, and the second
+ * regional indicator of a flag.
  * This is a pragmatic approximation of a grapheme cluster that is
  * sufficient for cell-grid rendering.
  */
 struct Cluster {
     char32_t base = 0;   ///< base code point
-    QString combining;   ///< trailing zero-width code points (UTF-16), may be empty
+    QString combining;   ///< the joined code points after the base (UTF-16), may be empty
     int index = 0;       ///< start position in the source string (code units)
     int length = 0;      ///< length in the source string (code units)
     int width = 1;       ///< columns occupied (1 or 2)

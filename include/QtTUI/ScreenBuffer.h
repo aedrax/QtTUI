@@ -3,9 +3,11 @@
 
 #include <QtTUI/QtTUIGlobal.h>
 #include <QtTUI/QtTuiUnicode.h>
+#include <QHash>
 #include <QMetaType>
 #include <QPoint>
 #include <QString>
+#include <QStringList>
 #include <QVector>
 
 #include <algorithm>
@@ -33,8 +35,9 @@ struct Color {
  *
  * Unicode model (notcurses/tmux style): a cell stores one base code point
  * (`ch`), the number of terminal columns it occupies (`width`), and an
- * optional string of zero-width combining code points that attach to the
- * base (`combining`, null for the overwhelmingly common case).
+ * optional string of the code points that join the base (`combining`, null
+ * for the overwhelmingly common case). These are combining marks and the
+ * other parts of an emoji sequence (see QtTuiUnicode::Cluster).
  *
  * Wide glyphs (width == 2) occupy their own cell plus a CONTINUATION cell
  * immediately to the right: ch == 0, width == 0 (see isContinuation()).
@@ -48,7 +51,7 @@ struct Color {
 struct Cell {
     char32_t ch = U' ';
     quint8 width = 1;    ///< 0 = continuation of a wide glyph, 1 = narrow, 2 = wide
-    QString combining;   ///< zero-width marks following ch (rare; null by default)
+    QString combining;   ///< code points that join ch (rare; null by default)
     Color foreground = Color(255, 255, 255);
     Color background = Color(0, 0, 0);
     bool bold = false;
@@ -56,6 +59,11 @@ struct Cell {
     bool underline = false;
     bool strikethrough = false;
     bool inverse = false;
+    /**
+     * The hyperlink of the cell: an id from ScreenBuffer::linkId(), or 0
+     * for no link. The id is valid only in the buffer that gave it.
+     */
+    quint16 link = 0;
 
     /** True for the placeholder cell to the right of a wide glyph. */
     bool isContinuation() const { return width == 0; }
@@ -112,7 +120,8 @@ public:
      * back buffer with the colors/attributes of `style`.
      *
      * This is the sanctioned path for characters that may be wide: it sets
-     * the continuation cell for width-2 glyphs, and when either the target
+     * the continuation cell for width-2 glyphs (the width is
+     * QtTuiUnicode::clusterWidth(ch, combining)), and when either the target
      * cell or the continuation cell half-overwrites an existing wide pair,
      * the orphaned half is reset to a space (classic cell-grid correctness
      * rule). A wide glyph that would straddle the right buffer edge is
@@ -120,6 +129,16 @@ public:
      */
     void putChar(int x, int y, char32_t ch, const Cell &style);
     void putChar(int x, int y, char32_t ch, const QString &combining, const Cell &style);
+
+    /**
+     * Returns the id of the hyperlink to url, for Cell::link. The same URL
+     * always gives the same id, so a repaint with the same link changes no
+     * cell. The function removes control characters from the URL. It
+     * returns 0 (no link) for an empty URL and when the table is full.
+     */
+    quint16 linkId(const QString &url);
+    /** Returns the URL of a link id. Returns a null string for an unknown id. */
+    QString linkUrl(quint16 id) const;
 
     QVector<QPoint> diff() const;
     void swapBuffers();
@@ -137,6 +156,11 @@ private:
     // One-time out-of-bounds warning flag (per buffer): OOB accesses can
     // happen thousands of times per frame, so only the first one warns.
     mutable bool m_oobWarned = false;
+    // Hyperlink table: the URL of id n is m_linkUrls[n - 1]. The table
+    // only grows, because cells and widgets can hold an id for a long
+    // time. Its limit is 65535 different URLs for the life of the buffer.
+    QStringList m_linkUrls;
+    QHash<QString, quint16> m_linkIds;
 
     static Cell s_defaultCell;
 

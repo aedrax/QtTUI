@@ -142,6 +142,7 @@ void RenderScheduler::executeRenderPass()
     // Diff and write only changed cells to the terminal
     AnsiRenderer renderer;
     QByteArray output = renderer.render(*buffer);
+    const bool cellsChanged = !output.isEmpty();
 
     // Park the hardware cursor at the focused editable widget's position (so
     // the terminal shows the edit point), or keep it hidden. The hide prefix
@@ -166,6 +167,15 @@ void RenderScheduler::executeRenderPass()
         output.prepend("\x1b[?25l");
     }
     m_cursorShown = cursorVisible;
+
+    // Synchronized output (mode 2026): the terminal shows the changed cells
+    // of the pass at the same time, so a large repaint does not tear. A
+    // terminal that does not know the mode ignores it. A pass that only
+    // moves the cursor does not need it.
+    if (cellsChanged) {
+        output.prepend("\x1b[?2026h");
+        output.append("\x1b[?2026l");
+    }
 
     if (!output.isEmpty()) {
         m_app->backend()->write(output);

@@ -18,7 +18,8 @@ bool Cell::operator==(const Cell &other) const
         && italic == other.italic
         && underline == other.underline
         && strikethrough == other.strikethrough
-        && inverse == other.inverse;
+        && inverse == other.inverse
+        && link == other.link;
 }
 
 bool Cell::operator!=(const Cell &other) const
@@ -133,7 +134,8 @@ void ScreenBuffer::putChar(int x, int y, char32_t ch, const QString &combining,
         return;
     }
 
-    const int w = (ch == 0) ? 1 : std::max(1, QtTuiUnicode::charWidth(ch));
+    // The joined code points can make a narrow base wide (a flag, VS16)
+    const int w = (ch == 0) ? 1 : QtTuiUnicode::clusterWidth(ch, combining);
 
     clearWidePairAt(x, y);
 
@@ -158,6 +160,28 @@ void ScreenBuffer::putChar(int x, int y, char32_t ch, const QString &combining,
         c.width = 1;
         c.combining = combining;
     }
+}
+
+quint16 ScreenBuffer::linkId(const QString &url)
+{
+    // A control character in the URL would end the OSC 8 sequence
+    const QString clean = QtTuiUnicode::withoutControlChars(url);
+    if (clean.isEmpty())
+        return 0;
+    const auto it = m_linkIds.constFind(clean);
+    if (it != m_linkIds.constEnd())
+        return it.value();
+    if (m_linkUrls.size() >= 0xFFFF)
+        return 0;
+    m_linkUrls.append(clean);
+    const quint16 id = quint16(m_linkUrls.size());
+    m_linkIds.insert(clean, id);
+    return id;
+}
+
+QString ScreenBuffer::linkUrl(quint16 id) const
+{
+    return id >= 1 && id <= m_linkUrls.size() ? m_linkUrls.at(id - 1) : QString();
 }
 
 QVector<QPoint> ScreenBuffer::diff() const

@@ -184,7 +184,8 @@ The constructor does these steps:
 - It sets the color mode from the environment (`QTTUI_COLOR`, `NO_COLOR`,
   `COLORTERM`, `TERM`). Call `AnsiRenderer::setColorMode()` after the
   constructor to change it.
-- It enters the alternate screen and raw mode.
+- It enters the alternate screen and raw mode. If both start, it also
+  saves the terminal window title on the title stack of the terminal.
 - If the terminal starts correctly, it sends all Qt messages (`qDebug()`,
   `qWarning()` and the other functions) to a log file. Text on stderr
   would break the screen. The file is
@@ -195,7 +196,8 @@ The constructor does these steps:
   it writes one warning and continues. `terminalInitialized()` then returns
   `false`.
 
-The destructor leaves the alternate screen and raw mode. A handler from
+The destructor restores the saved window title and leaves the alternate
+screen and raw mode. A handler from
 `std::atexit()` also restores the terminal if the program stops without the
 destructor.
 
@@ -237,6 +239,7 @@ int main(int argc, char *argv[])
 | Function | Description |
 | --- | --- |
 | `QTuiApplication(int &argc, char **argv)` | Makes the application and takes control of the terminal. Make only one at a time. |
+| `QTuiApplication(int &argc, char **argv, std::unique_ptr<TerminalBackend> backend)` | Makes the application with the given backend. The application takes ownership. With a null `backend`, it makes the backend for the platform. Tests use this constructor with a mock backend. |
 | `~QTuiApplication()` | Restores the terminal, puts back the previous Qt message handler, and deletes the QtTUI subsystems. |
 | `static QTuiApplication *instance()` | Returns the application object, or `nullptr` if there is none. |
 | `TerminalBackend *backend() const` | Returns the terminal backend (`PosixBackend` on Linux). |
@@ -245,7 +248,7 @@ int main(int argc, char *argv[])
 | `bool terminalInitialized() const` | Returns `true` if the alternate screen and raw mode both started. Returns `false` with no terminal, for example in a test. |
 | `void setMainWindow(QTuiMainWindow *window)` | Sets the main window. The application sends all key, mouse, resize and paste events to it, and the render pass paints only its tree. The application does not take ownership. |
 | `QTuiMainWindow *mainWindow() const` | Returns the main window, or `nullptr`. |
-| `void triggerRender()` | Paints the full screen now, not from the event loop. Usually you do not need it: `markDirty()` schedules a render pass. |
+| `void triggerRender()` | Paints the full screen now, not from the event loop. Usually you do not need it: `markDirty()` schedules a render pass. Each render pass that changes cells writes them as one block of synchronized output (mode 2026). |
 | `static QTuiClipboard *clipboard()` | Returns the application clipboard. The function makes it on the first call. See [QTuiClipboard](widget.md#qtuiclipboard). |
 | `static Qt::LayoutDirection layoutDirection()` | Returns the default layout direction of the widgets. The default is `Qt::LeftToRight`. |
 | `static void setLayoutDirection(Qt::LayoutDirection direction)` | Sets the default layout direction. `Qt::LayoutDirectionAuto` becomes `Qt::LeftToRight`. Call it before you make the widgets. |
@@ -253,7 +256,9 @@ int main(int argc, char *argv[])
 | `static void setReducedMotion(bool reduced)` | Turns reduced motion on or off. With reduced motion, the busy bar does not move and a pressed button does not flash. |
 | `static bool focusCursor()` | Returns `true` if the focus cursor is on. The start value is `true` if `QTTUI_FOCUS_CURSOR` is a number that is not 0. |
 | `static void setFocusCursor(bool on)` | Turns the focus cursor on or off. If it is on, the terminal cursor stays on the first cell of the focus widget, also if the widget is not editable. Screen magnifiers that follow the cursor then follow the focus. |
-| `void suspend()` | Gives the terminal back to the shell and stops the process, as Ctrl+Z does. On `fg`, the terminal modes start again and the screen paints again. |
+| `void setWindowTitle(const QString &title)` | Sets the title of the terminal window (OSC 2). The function removes control characters from the title, so a title from external data cannot start an escape sequence. The application restores the old title on exit and during a suspend. Without terminal control, the function only keeps the title. |
+| `QString windowTitle() const` | Returns the title from `setWindowTitle()`, without control characters. It is null before the first call. |
+| `void suspend()` | Gives the terminal back to the shell and stops the process, as Ctrl+Z does. The old window title shows while the process is stopped. On `fg`, the terminal modes start again, the window title is set again and the screen paints again. |
 
 ### Protected functions
 

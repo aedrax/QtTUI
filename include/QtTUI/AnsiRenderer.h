@@ -31,6 +31,9 @@ public:
     static void setThemeColors(const Color &foreground, const Color &background,
                                const Color &focusBackground);
 
+    // The escape sequences for buffer.diff(). A cell with a link id gets
+    // its hyperlink: OSC 8 with the URL where the link starts in a run of
+    // cells, and OSC 8 with an empty URL where it ends.
     QByteArray render(const ScreenBuffer &buffer);
 
     // Serialization helpers

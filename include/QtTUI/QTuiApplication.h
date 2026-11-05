@@ -23,6 +23,9 @@ class QTuiApplication : public QCoreApplication {
     Q_OBJECT
 public:
     QTuiApplication(int &argc, char **argv);
+    // Uses the given backend (a mock in a test) and takes ownership. With
+    // a null backend, the application makes the backend for the platform.
+    QTuiApplication(int &argc, char **argv, std::unique_ptr<TerminalBackend> backend);
     ~QTuiApplication() override;
 
     static QTuiApplication *instance();
@@ -41,6 +44,13 @@ public:
     QTuiMainWindow *mainWindow() const;
 
     void triggerRender();
+
+    // The title of the terminal window (OSC 2). The title has no control
+    // characters: setWindowTitle() removes them, so a title from external
+    // data cannot start an escape sequence. The application saves the old
+    // title on start, and restores it on exit and during a suspend.
+    void setWindowTitle(const QString &title);
+    QString windowTitle() const;
 
     // The application clipboard (created on first use)
     static QTuiClipboard *clipboard();
@@ -77,6 +87,7 @@ private slots:
 
 private:
     void restoreTerminal();
+    void writeWindowTitle();
     void deleteClipboard();
 
     // QObject-based subsystems are owned via QObject parenting (parent = this);
@@ -91,6 +102,8 @@ private:
     QTuiMainWindow *m_mainWindow = nullptr;
     bool m_terminalInitialized = false;
     bool m_messageHandlerInstalled = false;
+    bool m_titlePushed = false;
+    QString m_windowTitle; // null until setWindowTitle()
 
     static QTuiApplication *s_instance;
 };
