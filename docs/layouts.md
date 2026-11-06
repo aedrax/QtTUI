@@ -172,7 +172,7 @@ QSize example()
 
 `#include <QtTUI/QTuiLayoutItem.h>` · Inherits: QTuiLayoutItem
 
-QTuiLayoutItemWrapper holds a nested layout as an item. `QTuiGridLayout::addLayout()` uses it. It keeps a guarded pointer to the layout.
+QTuiLayoutItemWrapper holds a nested layout as an item. `QTuiGridLayout::addLayout()` uses it. `QTuiBoxLayout::addLayout()` and `QTuiFormLayout::addRow()` keep the nested layout in their own entries. It keeps a guarded pointer to the layout.
 
 ### Example
 
@@ -251,13 +251,14 @@ int main(int argc, char *argv[])
 | `QTuiBoxLayout(Direction direction, QObject *parent = nullptr)` | Makes an empty box layout. |
 | `void addWidget(QTuiWidget *widget, int stretch = 0)` | Adds a widget with a stretch factor. A nullptr, a widget that is already in the layout, and a negative stretch give a warning. A negative stretch becomes 0. |
 | `void removeWidget(QTuiWidget *widget)` | Removes a widget from the layout. It does not delete or hide the widget. |
+| `void addLayout(QTuiLayout *layout, int stretch = 0)` | Adds a nested layout with a stretch factor. The box layout becomes the parent of the nested layout and deletes it, as in Qt. With stretch 0 the nested layout gets its minimum size along the direction. Across the direction it fills the area. If the nested layout is destroyed, the box layout removes its entry. |
 | `void addSpacing(int size)` | Adds empty space of `size` cells. |
 | `void addStretch(int stretch = 0)` | Adds empty space that takes free space by its stretch factor. A stretch of 0 becomes 1, so it takes free space, as in Qt. |
 | `int spacing() const` | Returns the cells between two items that follow each other. The default is 0. |
 | `void setSpacing(int spacing)` | Sets the spacing. A negative value becomes 0. |
 | `void apply(const QRect &availableArea)` | Sets the geometry of the widgets. See "How the space is divided". |
 | `Direction direction() const` | Returns the direction. |
-| `int count() const` | Returns the number of entries, with the spacings and stretches. |
+| `int count() const` | Returns the number of entries, with the spacings, stretches and nested layouts. |
 | `QSize minimumSize() const` | Returns the sum of the minimum sizes and spacings along the direction, the largest minimum size across it, and the margins. |
 | `const QList<Item> &items() const` | Returns the entries of the layout. Use this function, not `itemAt()`. |
 
@@ -265,9 +266,10 @@ The struct `QTuiBoxLayout::Item` has these fields:
 
 | Field | Description |
 | --- | --- |
-| `QTuiWidget *widget` | The widget, or nullptr for an entry from `addSpacing()` or `addStretch()`. |
+| `QTuiWidget *widget` | The widget, or nullptr for an entry from `addSpacing()`, `addStretch()` or `addLayout()`. |
 | `int stretch` | The stretch factor. |
 | `int spacerSize` | The cells of an entry from `addSpacing()`. 0 for the other entries. |
+| `QTuiLayout *layout` | The nested layout of an entry from `addLayout()`. nullptr for the other entries. |
 
 These free functions and aliases are in the same header:
 
@@ -288,7 +290,7 @@ These free functions and aliases are in the same header:
 
 If the layout direction is right-to-left, the layout mirrors the positions horizontally.
 
-`QTuiBoxLayout` does not override `itemAt()`, so `itemAt()` returns nullptr for each index. `apply()` does not use the items from the base `addItem()`.
+`QTuiBoxLayout` keeps its entries as `Item` structs, not as `QTuiLayoutItem` objects. It does not override `itemAt()`, so `itemAt()` returns nullptr for each index. Use `items()`. `apply()` does not use the items from the base `addItem()`.
 
 ## QTuiGridLayout
 
@@ -377,7 +379,8 @@ void example(QTuiWidget *parent)
 | `~QTuiFormLayout()` | Deletes the labels that the layout made. It does not delete the fields. |
 | `void addRow(const QString &labelText, QTuiWidget *field)` | Makes a `QTuiLabel` with `labelText` and adds a row. The label gets the same parent as the field. If the field has no parent yet, `apply()` sets the parent of the label later. |
 | `void addRow(QTuiWidget *label, QTuiWidget *field)` | Adds a row with your label widget. The layout does not own the label. |
-| `void removeRow(int row)` | Removes a row. It deletes the label if the layout made it. It does not delete the field. |
+| `void addRow(QTuiWidget *label, QTuiLayout *field)` | Adds a row with your label widget and a nested layout as the field. The form layout becomes the parent of the nested layout. A nullptr layout is ignored. If the nested layout is destroyed, the form layout removes its row. If you call `addRow(label, nullptr)`, cast the nullptr to `QTuiWidget *` or `QTuiLayout *`. |
+| `void removeRow(int row)` | Removes a row. It deletes the label if the layout made it, and the nested layout of the row. It does not delete the field or the widgets in the nested layout. |
 | `int rowCount() const` | Returns the number of rows. |
 | `int horizontalSpacing() const` | Returns the cells between the label column and the field column. The default is 0. |
 | `void setHorizontalSpacing(int spacing)` | Sets the horizontal spacing. A negative value becomes 0. |

@@ -81,6 +81,35 @@ void QTuiBoxLayout::removeWidget(QTuiWidget *widget)
     }
 }
 
+void QTuiBoxLayout::addLayout(QTuiLayout *layout, int stretch)
+{
+    if (!layout || layout == this)
+        return;
+    for (const auto &item : m_boxItems) {
+        if (item.layout == layout)
+            return;
+    }
+
+    layout->setParent(this);
+    m_boxItems.append({nullptr, qMax(0, stretch), 0, layout});
+
+    // Drop the entry if the nested layout is destroyed
+    connect(layout, &QObject::destroyed, this, [this, layout]() {
+        for (int i = 0; i < m_boxItems.size(); ++i) {
+            if (m_boxItems[i].layout == layout) {
+                m_boxItems.removeAt(i);
+                break;
+            }
+        }
+        invalidate();
+    });
+
+    if (auto *pw = qobject_cast<QTuiWidget *>(parent())) {
+        pw->markDirty();
+    }
+    invalidate();
+}
+
 QTuiBoxLayout::Direction QTuiBoxLayout::direction() const
 {
     return m_direction;
@@ -108,16 +137,16 @@ bool QTuiBoxLayout::participatesInLayout(const Item &item) const
 
 int QTuiBoxLayout::itemMinimum(const Item &item, bool vertical) const
 {
-    if (!item.widget)
+    if (!item.widget && !item.layout)
         return item.spacerSize;
-    const QSize minSz = item.widget->minimumSize();
+    const QSize minSz = item.layout ? item.layout->minimumSize() : item.widget->minimumSize();
     return vertical ? minSz.height() : minSz.width();
 }
 
 int QTuiBoxLayout::itemHint(const Item &item, bool vertical) const
 {
     if (!item.widget)
-        return item.spacerSize;
+        return itemMinimum(item, vertical); // spacing, stretch or nested layout
     const QSize hint = item.widget->sizeHint().expandedTo(item.widget->minimumSize());
     return vertical ? hint.height() : hint.width();
 }
@@ -178,8 +207,8 @@ QSize QTuiBoxLayout::minimumSize() const
         if (!participatesInLayout(item))
             continue;
         along += itemMinimum(item, vertical);
-        if (item.widget) {
-            const QSize minSz = item.widget->minimumSize();
+        if (item.widget || item.layout) {
+            const QSize minSz = item.layout ? item.layout->minimumSize() : item.widget->minimumSize();
             across = std::max(across, vertical ? minSz.width() : minSz.height());
         }
         ++counted;
@@ -319,7 +348,15 @@ void QTuiBoxLayout::apply(const QRect &availableArea)
         int alloc = allocations[i];
         QTuiWidget *widget = m_boxItems[i].widget;
 
-        // Spacing or stretch: only advances the position
+        // A nested layout fills its part of the area
+        if (QTuiLayout *nested = m_boxItems[i].layout) {
+            alloc = std::clamp(alloc, 0, std::max(0, totalSpace - consumed));
+            const QRect geom = vertical ? QRect(contentX, pos, contentW, alloc)
+                                        : QRect(pos, contentY, alloc, contentH);
+            nested->apply(visualRect(geom, QRect(contentX, contentY, contentW, contentH)));
+        }
+
+        // Spacing, stretch or nested layout: only advances the position
         if (!widget) {
             pos += alloc;
             consumed += alloc;

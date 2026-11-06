@@ -20,6 +20,9 @@ public:
 
     void addWidget(QTuiWidget *widget, int stretch = 0);
     void removeWidget(QTuiWidget *widget);
+    // Adds a nested layout and takes ownership of it, as in Qt. Without a
+    // stretch factor the nested layout gets its minimum size.
+    void addLayout(QTuiLayout *layout, int stretch = 0);
 
     // Empty space: addSpacing() adds a fixed number of cells, addStretch()
     // adds a part that takes free space by its stretch factor.
@@ -36,11 +39,13 @@ public:
     int count() const override;
     QSize minimumSize() const override;
 
-    // widget is nullptr for an item from addSpacing() or addStretch()
+    // widget is nullptr for an item from addSpacing(), addStretch() or
+    // addLayout(). layout is the nested layout of an item from addLayout().
     struct Item {
         QTuiWidget *widget;
         int stretch;
         int spacerSize = 0;
+        QTuiLayout *layout = nullptr;
     };
 
     const QList<Item> &items() const;

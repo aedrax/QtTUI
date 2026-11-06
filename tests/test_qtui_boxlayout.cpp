@@ -490,6 +490,49 @@ private slots:
         QCOMPARE(e.geometry().width(), 36);
     }
 
+    void addLayoutNestsALayout()
+    {
+        LayoutTestWidget top(QSize(4, 2)), left(QSize(3, 1)), right(QSize(3, 1)), bottom(QSize(4, 1));
+        QTuiBoxLayout column(QTuiBoxLayout::TopToBottom);
+        auto *row = new QTuiBoxLayout(QTuiBoxLayout::LeftToRight);
+        row->addWidget(&left, 1);
+        row->addWidget(&right, 1);
+        column.addWidget(&top);
+        column.addLayout(row);
+        column.addWidget(&bottom, 1);
+        QCOMPARE(row->parent(), &column);
+        QCOMPARE(column.count(), 3);
+        // The nested layout counts in the minimum size on the two axes
+        QCOMPARE(column.minimumSize(), QSize(6, 4));
+
+        column.apply(QRect(0, 0, 20, 10));
+        QCOMPARE(top.geometry(), QRect(0, 0, 20, 2));
+        // Without a stretch the nested layout gets its minimum height
+        QCOMPARE(left.geometry(), QRect(0, 2, 10, 1));
+        QCOMPARE(right.geometry(), QRect(10, 2, 10, 1));
+        QCOMPARE(bottom.geometry(), QRect(0, 3, 20, 7));
+
+        // A destroyed nested layout leaves the layout
+        delete row;
+        QCOMPARE(column.count(), 2);
+        column.apply(QRect(0, 0, 20, 10));
+        QCOMPARE(bottom.geometry(), QRect(0, 2, 20, 8));
+    }
+
+    void addLayoutWithStretchSharesFreeSpace()
+    {
+        LayoutTestWidget a(QSize(2, 1)), b(QSize(2, 1));
+        QTuiBoxLayout row(QTuiBoxLayout::LeftToRight);
+        auto *nested = new QTuiBoxLayout(QTuiBoxLayout::TopToBottom);
+        nested->addWidget(&b);
+        row.addWidget(&a, 1);
+        row.addLayout(nested, 3);
+        row.apply(QRect(0, 0, 40, 5));
+        QCOMPARE(a.geometry(), QRect(0, 0, 10, 5));
+        QCOMPARE(b.geometry().x(), 10);
+        QCOMPARE(b.geometry().width(), 30);
+    }
+
     void expandingTakesFreeSpaceAndFixedNeverGrows()
     {
         QTuiBoxLayout layout(QTuiBoxLayout::LeftToRight);

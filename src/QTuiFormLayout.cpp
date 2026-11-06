@@ -56,6 +56,31 @@ void QTuiFormLayout::addRow(QTuiWidget *label, QTuiWidget *field)
     invalidate();
 }
 
+void QTuiFormLayout::addRow(QTuiWidget *label, QTuiLayout *field)
+{
+    if (!field || field == this)
+        return;
+    field->setParent(this);
+    m_rows.append({label, nullptr, false, field});
+    watchRowWidgets(m_rows.last());
+
+    // Remove the row if the nested layout is destroyed
+    connect(field, &QObject::destroyed, this, [this, field]() {
+        for (int i = 0; i < m_rows.size(); ++i) {
+            if (m_rows[i].fieldLayout == field) {
+                m_rows.removeAt(i);
+                break;
+            }
+        }
+        invalidate();
+    });
+
+    if (auto *pw = qobject_cast<QTuiWidget *>(parent())) {
+        pw->markDirty();
+    }
+    invalidate();
+}
+
 int QTuiFormLayout::rowCount() const
 {
     return m_rows.size();
@@ -78,6 +103,10 @@ void QTuiFormLayout::removeRow(int row)
         disconnect(r.label, &QObject::destroyed, this, nullptr);
     if (r.ownsLabel)
         delete r.label;
+    if (r.fieldLayout) {
+        disconnect(r.fieldLayout, &QObject::destroyed, this, nullptr);
+        delete r.fieldLayout; // the form layout owns a nested layout
+    }
 
     m_rows.removeAt(row);
 
@@ -150,7 +179,8 @@ QSize QTuiFormLayout::minimumSize() const
 
     for (const auto &row : m_rows) {
         const QSize labelMin = row.label ? row.label->minimumSize() : QSize(0, 0);
-        const QSize fieldMin = row.field ? row.field->minimumSize() : QSize(0, 0);
+        const QSize fieldMin = row.field ? row.field->minimumSize()
+            : row.fieldLayout ? row.fieldLayout->minimumSize() : QSize(0, 0);
         maxLabelWidth = std::max(maxLabelWidth, labelMin.width());
         maxFieldWidth = std::max(maxFieldWidth, fieldMin.width());
         totalHeight += std::max({1, labelMin.height(), fieldMin.height()});
@@ -205,7 +235,8 @@ void QTuiFormLayout::apply(const QRect &availableArea)
     // Pass 2: lay out each row
     for (const auto &row : m_rows) {
         const int labelH = row.label ? row.label->minimumSize().height() : 0;
-        const int fieldH = row.field ? row.field->minimumSize().height() : 0;
+        const int fieldH = row.field ? row.field->minimumSize().height()
+            : row.fieldLayout ? row.fieldLayout->minimumSize().height() : 0;
         const int rowHeight = std::max({1, labelH, fieldH});
 
         if (row.label)
@@ -213,6 +244,8 @@ void QTuiFormLayout::apply(const QRect &availableArea)
 
         if (row.field)
             row.field->setGeometry(visualRect(QRect(x + maxLabelWidth + gap, currentY, fieldWidth, rowHeight), rect));
+        if (row.fieldLayout)
+            row.fieldLayout->apply(visualRect(QRect(x + maxLabelWidth + gap, currentY, fieldWidth, rowHeight), rect));
 
         currentY += rowHeight;
     }
