@@ -26,6 +26,12 @@ public:
 
     QTuiTabBar *tabBar() const;
 
+    // North (default): the tab bar is the first row, above the pages.
+    // South: the tab bar is the last row, below the pages. The same value
+    // as tabBar()->tabPosition().
+    QTuiTabBar::TabPosition tabPosition() const;
+    void setTabPosition(QTuiTabBar::TabPosition position);
+
     QRect contentArea() const;
 
     QSize minimumSize() const override;

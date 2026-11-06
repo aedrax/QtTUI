@@ -488,6 +488,57 @@ private slots:
         QVERIFY(topRow.contains(QStringLiteral("Tab1")));
     }
 
+    void tabWidget_southPutsTheTabsBelowThePages()
+    {
+        QTuiTabWidget tw;
+        auto *page1 = new TabTestWidget;
+        auto *page2 = new TabTestWidget;
+        tw.addTab(page1, QStringLiteral("Tab1"));
+        tw.addTab(page2, QStringLiteral("Tab2"));
+        tw.setGeometry(QRect(0, 0, 20, 10));
+        QCOMPARE(tw.tabPosition(), QTuiTabBar::North);
+        QCOMPARE(tw.contentArea(), QRect(0, 2, 20, 8));
+
+        tw.clearDirtyRegions();
+        tw.setTabPosition(QTuiTabBar::South);
+        QVERIFY(tw.isDirty());
+        QCOMPARE(tw.tabBar()->tabPosition(), QTuiTabBar::South);
+        QCOMPARE(tw.tabBar()->geometry(), QRect(0, 9, 20, 1));
+        QCOMPARE(tw.contentArea(), QRect(0, 0, 20, 8));
+        QCOMPARE(page1->geometry(), QRect(0, 0, 20, 8));
+
+        ScreenBuffer buffer(20, 10);
+        tw.paintEvent(buffer);
+        auto row = [&](int y) {
+            QString text;
+            for (int col = 0; col < 20; ++col)
+                text += buffer.backCell(col, y).text();
+            return text;
+        };
+        QVERIFY(row(0).startsWith(QStringLiteral("XXXX")));
+        QVERIFY(row(7).startsWith(QStringLiteral("XXXX")));
+        QVERIFY(!row(8).contains(QLatin1Char('X'))); // separator
+        QVERIFY(!row(8).trimmed().isEmpty());
+        QVERIFY(row(9).contains(QStringLiteral("Tab1")));
+
+        // The keys and the mouse work on the bar at its new place
+        sendKey(*tw.tabBar(), Qt::Key_Right);
+        QCOMPARE(tw.currentIndex(), 1);
+        QVERIFY(page2->isVisible());
+        QCOMPARE(page2->geometry(), QRect(0, 0, 20, 8));
+        TuiMouseEvent click(TuiMouseEvent::Press, Qt::LeftButton, QPoint(1, 9));
+        QCoreApplication::sendEvent(tw.tabBar(), &click);
+        QCOMPARE(tw.currentIndex(), 0);
+
+        // A change on the bar itself also moves it, at the next paint
+        tw.clearDirtyRegions();
+        tw.tabBar()->setTabPosition(QTuiTabBar::North);
+        QVERIFY(tw.isDirty());
+        tw.paintEvent(buffer);
+        QCOMPARE(tw.tabBar()->geometry(), QRect(0, 0, 20, 1));
+        QCOMPARE(page1->geometry(), QRect(0, 2, 20, 8));
+    }
+
     // ---------------------------------------------------------------
     // QTuiToolBox tests
     // ---------------------------------------------------------------

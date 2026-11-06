@@ -24,6 +24,9 @@ public:
     int currentIndex() const;
     void setCurrentIndex(int index);
 
+    // The side of the pages that the tabs are on. The bar is always one
+    // row and paints the same; a QTuiTabWidget reads the value and puts
+    // the bar above (North) or below (South) its pages.
     TabPosition tabPosition() const;
     void setTabPosition(TabPosition position);
 

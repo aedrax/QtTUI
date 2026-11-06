@@ -199,7 +199,7 @@ void example(QTuiWidget *parent)
 
 `#include <QtTUI/QTuiTabWidget.h>` · Inherits: QTuiWidget
 
-QTuiTabWidget shows a row of tabs, a separator row and one page below them. The first row is a [QTuiTabBar](#qtuitabbar) and the pages start on row 3. The tab bar takes the keys and the mouse clicks.
+QTuiTabWidget shows a row of tabs, a separator row and one page. By default the first row is a [QTuiTabBar](#qtuitabbar) and the pages start on row 3. With `setTabPosition(QTuiTabBar::South)` the pages start on row 1, and the separator and the tab bar are the last 2 rows. The tab bar takes the keys and the mouse clicks.
 
 ### Example
 
@@ -235,7 +235,9 @@ void example(QTuiWidget *parent)
 | `void setCurrentIndex(int index)` | Shows the page at `index`. An index out of range does nothing. |
 | `QTuiWidget *currentWidget() const` | Returns the current page, or nullptr. |
 | `QTuiTabBar *tabBar() const` | Returns the tab bar. |
-| `QRect contentArea() const` | Returns the page area: the geometry without the first 2 rows. Returns an empty rect if the height is less than 3. |
+| `QTuiTabBar::TabPosition tabPosition() const` | Returns the tab position of the tab bar. The default is `QTuiTabBar::North`. |
+| `void setTabPosition(QTuiTabBar::TabPosition position)` | Puts the tab bar above the pages (`North`) or below them (`South`) and sets the geometry of the bar and the pages again. There is no `West` or `East`. |
+| `QRect contentArea() const` | Returns the page area: the geometry without the 2 rows of the tab bar and the separator. Returns an empty rect if the height is less than 3. |
 | `QSize minimumSize() const` | Returns the width of the tab bar or of the widest page, and 2 rows plus the height of the tallest page (at least 1). |
 | `void paintEvent(ScreenBuffer &buffer)` | Paints the tab bar, the separator and the current page. |
 | `void resizeEvent(TuiResizeEvent *event)` | Protected. Sets the geometry of the tab bar and the pages again. |
@@ -281,7 +283,7 @@ void example(QTuiWidget *parent)
 
 | Enum | Values |
 | --- | --- |
-| `TabPosition` | `North` (default), `South`. |
+| `TabPosition` | `North` (default): the tabs are above the pages. `South`: the tabs are below the pages. Unlike QTabWidget, there is no `West` or `East`. |
 
 ### Functions
 
@@ -296,7 +298,7 @@ void example(QTuiWidget *parent)
 | `int currentIndex() const` | Returns the current tab, or -1. Property: `currentIndex`. |
 | `void setCurrentIndex(int index)` | Sets the current tab. -1 is valid and means no tab. Emits `currentChanged()`. |
 | `TabPosition tabPosition() const` | Returns the tab position. |
-| `void setTabPosition(TabPosition position)` | Keeps the tab position. The tab bar does not use this value when it paints. |
+| `void setTabPosition(TabPosition position)` | Sets the tab position. The bar is always one row and paints the same for the two values. A [QTuiTabWidget](#qtuitabwidget) that owns the bar reads the value and puts the bar above or below its pages at the next paint. `QTuiTabWidget::setTabPosition()` does the same at once. |
 | `QSize minimumSize() const` | Returns the width of all labels and separators, and 1 row. |
 | `void paintEvent(ScreenBuffer &buffer)` | Paints the tab row. |
 | `void keyPressEvent(TuiKeyEvent *event)` | Protected. See "Keys". |
