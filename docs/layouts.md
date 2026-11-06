@@ -280,7 +280,7 @@ These free functions and aliases are in the same header:
 ### How the space is divided
 
 1. The layout skips each widget that you hid. It keeps no space for it and does not show it again.
-2. An item gets stretch 0 if the size policy of its widget along the direction is `Fixed`. An `Expanding` or `MinimumExpanding` widget with stretch 0 gets stretch 1.
+2. An item gets stretch 0 if the size policy of its widget along the direction is `Fixed`. A widget that you add with stretch 0 uses the stretch of its size policy along the direction (`horizontalStretch()` or `verticalStretch()`), as in Qt. If that stretch is also 0, an `Expanding` or `MinimumExpanding` widget gets stretch 1.
 3. Each item with stretch 0 gets its size hint, if all of these size hints fit. Else it gets its minimum size.
 4. The free space goes to the items with a stretch, in proportion to the stretch. An item never gets less than its minimum size.
 5. Across the direction, a widget fills the area. A widget with the policy `Fixed` or `Maximum` across the direction gets its size hint (at least its minimum size).
@@ -491,4 +491,4 @@ void example(QTuiWidget *parent)
 | `int verticalStretch() const` | Returns the vertical stretch. |
 | `void setVerticalStretch(int stretch)` | Sets the vertical stretch, limited to 0 to 255. |
 
-No layout reads the stretch values of a size policy. Give the stretch to `QTuiBoxLayout::addWidget()` or `QTuiGridLayout::setRowStretch()` instead.
+`QTuiBoxLayout` uses the stretch of the size policy along its direction for a widget that you add with stretch 0. A stretch that you give to `addWidget()` has priority. `QTuiGridLayout` does not read these values: use `setRowStretch()` and `setColumnStretch()`.

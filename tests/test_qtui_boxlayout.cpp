@@ -456,6 +456,40 @@ private slots:
         QCOMPARE(b.geometry().width(), 3);
     }
 
+    void sizePolicyStretchUsedWhenAddWidgetStretchIsZero()
+    {
+        LayoutTestWidget a(QSize(1, 1)), b(QSize(1, 1)), c(QSize(1, 1));
+        QTuiSizePolicy policy;
+        policy.setHorizontalStretch(1);
+        a.setSizePolicy(policy);
+        policy.setHorizontalStretch(3);
+        b.setSizePolicy(policy);
+        // The stretch of addWidget() has priority over the policy
+        policy.setHorizontalStretch(200);
+        c.setSizePolicy(policy);
+
+        QTuiBoxLayout layout(QTuiBoxLayout::LeftToRight);
+        layout.addWidget(&a);
+        layout.addWidget(&b);
+        layout.addWidget(&c, 4);
+        layout.apply(QRect(0, 0, 80, 1));
+        QCOMPARE(a.geometry().width(), 10);
+        QCOMPARE(b.geometry().width(), 30);
+        QCOMPARE(c.geometry().width(), 40);
+
+        // The vertical stretch has no effect in a horizontal layout
+        LayoutTestWidget d(QSize(4, 1)), e(QSize(4, 1));
+        QTuiSizePolicy vertical;
+        vertical.setVerticalStretch(5);
+        d.setSizePolicy(vertical);
+        QTuiBoxLayout row(QTuiBoxLayout::LeftToRight);
+        row.addWidget(&d);
+        row.addWidget(&e, 1);
+        row.apply(QRect(0, 0, 40, 1));
+        QCOMPARE(d.geometry().width(), 4);
+        QCOMPARE(e.geometry().width(), 36);
+    }
+
     void expandingTakesFreeSpaceAndFixedNeverGrows()
     {
         QTuiBoxLayout layout(QTuiBoxLayout::LeftToRight);

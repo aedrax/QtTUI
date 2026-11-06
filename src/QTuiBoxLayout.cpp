@@ -122,8 +122,9 @@ int QTuiBoxLayout::itemHint(const Item &item, bool vertical) const
     return vertical ? hint.height() : hint.width();
 }
 
-// The stretch factor used for distribution: a Fixed widget never grows,
-// and an Expanding widget without a stretch factor takes free space
+// The stretch factor used for distribution: a Fixed widget never grows.
+// A widget without a stretch factor uses the stretch of its size policy,
+// as in Qt. If that is also 0, an Expanding widget takes free space.
 int QTuiBoxLayout::effectiveStretch(const Item &item, bool vertical) const
 {
     if (!item.widget)
@@ -132,10 +133,12 @@ int QTuiBoxLayout::effectiveStretch(const Item &item, bool vertical) const
     const auto along = vertical ? policy.verticalPolicy() : policy.horizontalPolicy();
     if (along == QTuiSizePolicy::Fixed)
         return 0;
-    if (item.stretch == 0
-        && (along == QTuiSizePolicy::Expanding || along == QTuiSizePolicy::MinimumExpanding))
-        return 1;
-    return item.stretch;
+    if (item.stretch > 0)
+        return item.stretch;
+    const int policyStretch = vertical ? policy.verticalStretch() : policy.horizontalStretch();
+    if (policyStretch > 0)
+        return policyStretch;
+    return (along == QTuiSizePolicy::Expanding || along == QTuiSizePolicy::MinimumExpanding) ? 1 : 0;
 }
 
 void QTuiBoxLayout::addSpacing(int size)
