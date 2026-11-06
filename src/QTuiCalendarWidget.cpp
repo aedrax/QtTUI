@@ -27,14 +27,20 @@ QDate QTuiCalendarWidget::selectedDate() const
 void QTuiCalendarWidget::setSelectedDate(const QDate &date)
 {
     const QDate clamped = clampDate(date);
-    if (!clamped.isValid() || clamped == m_selectedDate)
+    if (!clamped.isValid())
+        return;
+    // The same date still moves the cursor and the shown month back to it
+    const bool changed = clamped != m_selectedDate;
+    if (!changed && m_cursorDate == clamped && m_displayYear == clamped.year()
+        && m_displayMonth == clamped.month())
         return;
 
     m_selectedDate = clamped;
     m_cursorDate = clamped;
     m_displayYear = clamped.year();
     m_displayMonth = clamped.month();
-    emit selectionChanged();
+    if (changed)
+        emit selectionChanged();
     markDirty();
 }
 

@@ -37,6 +37,7 @@
 #include <QtTUI/QTuiMenuBar.h>
 #include <QtTUI/QTuiPushButton.h>
 #include <QtTUI/QTuiCalendarWidget.h>
+#include <QtTUI/QTuiDateTimeEdit.h>
 #include <QtTUI/QTuiTabBar.h>
 #include <QtTUI/QTuiScrollArea.h>
 #include <QtTUI/QTuiScrollBar.h>
@@ -466,6 +467,67 @@ private slots:
         QCOMPARE(spy.count(), 1);
         QVERIFY(!fileMenu->isVisible());
         QTest::qWait(20);
+    }
+
+    // The calendar popup of a date edit, through the real pipeline: F4 and
+    // a click on "▼" open it above the other widgets, Escape and a click
+    // outside close it, and the content below it returns
+    void dateEditCalendarPopup()
+    {
+        static int argc = 1;
+        static char arg0[] = "test";
+        static char *argv[] = { arg0, nullptr };
+        QTuiApplication app(argc, argv);
+
+        QTuiMainWindow mainWindow;
+        mainWindow.setGeometry(QRect(0, 0, 40, 16));
+        app.setMainWindow(&mainWindow);
+
+        auto *central = new FillWidget(QLatin1Char('C'));
+        mainWindow.setCentralWidget(central);
+        auto *edit = new QTuiDateEdit(QDate(2026, 10, 29), central);
+        edit->setCalendarPopup(true);
+        edit->setGeometry(QRect(2, 1, 16, 3));
+        mainWindow.show();
+        QCoreApplication::processEvents();
+        ScreenBuffer *buf = app.screenBuffer();
+        QCOMPARE(buf->backCell(16, 2).ch, U'\u25BC');
+        QCOMPARE(buf->backCell(3, 6).ch, U'C');
+
+        edit->setFocus();
+        sendKey(mainWindow, Qt::Key_F4);
+        QCoreApplication::processEvents();
+        // The calendar is below the edit and shows its year
+        QVERIFY(rowText(buf, 4, 2, 22).contains(QStringLiteral("2026")));
+        QVERIFY(buf->backCell(3, 6).ch != U'C');
+        QVERIFY(!edit->hasFocus());
+
+        // Left then Enter in the calendar: the day before, and the focus is back
+        sendKey(mainWindow, Qt::Key_Left);
+        sendKey(mainWindow, Qt::Key_Return);
+        QCOMPARE(edit->date(), QDate(2026, 10, 28));
+        QVERIFY(edit->hasFocus());
+        QCoreApplication::processEvents();
+        QVERIFY(regionFilledWith(buf, QRect(2, 4, 22, 9), QLatin1Char('C')));
+        QVERIFY(rowText(buf, 2, 3, 12).contains(QStringLiteral("2026-10-28")));
+
+        // A click on "▼" opens it; Escape closes it without a change
+        sendClick(mainWindow, QPoint(16, 2));
+        QCoreApplication::processEvents();
+        QVERIFY(buf->backCell(3, 6).ch != U'C');
+        sendKey(mainWindow, Qt::Key_Up);
+        sendKey(mainWindow, Qt::Key_Escape);
+        QCOMPARE(edit->date(), QDate(2026, 10, 28));
+        QVERIFY(edit->hasFocus());
+
+        // A click outside closes it
+        sendKey(mainWindow, Qt::Key_Down, Qt::AltModifier);
+        QCoreApplication::processEvents();
+        QVERIFY(buf->backCell(3, 6).ch != U'C');
+        sendClick(mainWindow, QPoint(35, 14));
+        QCoreApplication::processEvents();
+        QVERIFY(regionFilledWith(buf, QRect(2, 4, 22, 9), QLatin1Char('C')));
+        QCOMPARE(edit->date(), QDate(2026, 10, 28));
     }
 
     // Tooltips: Tab shows the focused widget's tooltip below it, in the

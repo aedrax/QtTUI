@@ -2,6 +2,8 @@
 #include <QSignalSpy>
 #include <QCoreApplication>
 #include <QtTUI/QTuiDateTimeEdit.h>
+#include <QtTUI/QTuiCalendarWidget.h>
+#include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/QTuiLCDNumber.h>
 #include <QtTUI/TuiEvents.h>
 
@@ -359,6 +361,177 @@ private slots:
         QTime t(14, 30, 0);
         QTuiTimeEdit te(t);
         QCOMPARE(te.time(), t);
+    }
+
+    // Typed digits, the calendar popup and the mouse
+
+    static void typeDigits(QTuiWidget &w, const QString &digits)
+    {
+        for (const QChar ch : digits) {
+            TuiKeyEvent ev(Qt::Key_0 + ch.digitValue(), Qt::NoModifier, QString(ch));
+            QCoreApplication::sendEvent(&w, &ev);
+        }
+    }
+
+    static void click(QTuiWidget &w, int x, int y)
+    {
+        TuiMouseEvent ev(TuiMouseEvent::Press, Qt::LeftButton, QPoint(x, y));
+        QCoreApplication::sendEvent(&w, &ev);
+    }
+
+    static QTuiCalendarWidget *popupOf(QTuiWidget &edit)
+    {
+        for (QTuiWidget *child : edit.childWidgets()) {
+            if (auto *calendar = qobject_cast<QTuiCalendarWidget *>(child))
+                return calendar;
+        }
+        return nullptr;
+    }
+
+    void dateEdit_typedDigitsChangeTheSection()
+    {
+        QTuiDateEdit edit(QDate(2026, 10, 29));
+        QVERIFY(edit.acceptsTextInput());
+        sendKey(edit, Qt::Key_Right);
+        sendKey(edit, Qt::Key_Right); // day
+
+        typeDigits(edit, QStringLiteral("1"));
+        QCOMPARE(edit.date(), QDate(2026, 10, 1));
+        typeDigits(edit, QStringLiteral("5"));
+        QCOMPARE(edit.date(), QDate(2026, 10, 15));
+
+        // "45" is not a day: the second digit starts again
+        typeDigits(edit, QStringLiteral("45"));
+        QCOMPARE(edit.date(), QDate(2026, 10, 5));
+        // A leading zero waits for the next digit
+        sendKey(edit, Qt::Key_Left);
+        sendKey(edit, Qt::Key_Right);
+        typeDigits(edit, QStringLiteral("0"));
+        QCOMPARE(edit.date(), QDate(2026, 10, 5));
+        typeDigits(edit, QStringLiteral("7"));
+        QCOMPARE(edit.date(), QDate(2026, 10, 7));
+
+        // A year needs 4 digits; then the month is the current section
+        sendKey(edit, Qt::Key_Left);
+        sendKey(edit, Qt::Key_Left);
+        typeDigits(edit, QStringLiteral("202"));
+        QCOMPARE(edit.date(), QDate(2026, 10, 7));
+        typeDigits(edit, QStringLiteral("7"));
+        QCOMPARE(edit.date(), QDate(2027, 10, 7));
+        typeDigits(edit, QStringLiteral("02"));
+        QCOMPARE(edit.date(), QDate(2027, 2, 7));
+        // The full month moved to the day
+        typeDigits(edit, QStringLiteral("28"));
+        QCOMPARE(edit.date(), QDate(2027, 2, 28));
+        // February has no day 30
+        typeDigits(edit, QStringLiteral("30"));
+        QCOMPARE(edit.date(), QDate(2027, 2, 3));
+    }
+
+    void timeEdit_typedDigits()
+    {
+        QTuiTimeEdit edit(QTime(8, 15, 0));
+        typeDigits(edit, QStringLiteral("2359"));
+        QCOMPARE(edit.time(), QTime(23, 59, 0));
+        // 7 then 5 in the seconds: 75 is not valid, so 5 starts again
+        typeDigits(edit, QStringLiteral("75"));
+        QCOMPARE(edit.time(), QTime(23, 59, 5));
+    }
+
+    void dateEdit_clickSelectsTheSection()
+    {
+        QTuiDateEdit edit(QDate(2026, 10, 29));
+        edit.setGeometry(QRect(2, 1, 14, 3)); // "│ 2026-10-29 │", text from x = 4
+        edit.clearDirtyRegions();
+        click(edit, 12, 2); // the "2" of the day
+        QVERIFY(edit.isDirty());
+        sendKey(edit, Qt::Key_Up);
+        QCOMPARE(edit.date(), QDate(2026, 10, 30));
+
+        click(edit, 9, 2); // the "1" of the month
+        sendKey(edit, Qt::Key_Up);
+        QCOMPARE(edit.date(), QDate(2026, 11, 30));
+
+        // A click on a separator or on a different row changes nothing
+        click(edit, 8, 2);
+        click(edit, 5, 1);
+        sendKey(edit, Qt::Key_Down);
+        QCOMPARE(edit.date(), QDate(2026, 10, 30));
+    }
+
+    void dateEdit_calendarPopup()
+    {
+        QTuiDateEdit edit(QDate(2026, 10, 29));
+        const int plainWidth = edit.minimumSize().width();
+
+        // Without the property, F4 opens nothing and the edit has no "▼"
+        sendKey(edit, Qt::Key_F4);
+        QVERIFY(!popupOf(edit));
+
+        edit.clearDirtyRegions();
+        edit.setCalendarPopup(true);
+        QVERIFY(edit.isDirty());
+        QCOMPARE(edit.minimumSize().width(), plainWidth + 2);
+        edit.setGeometry(QRect(0, 0, plainWidth + 2, 3));
+        ScreenBuffer buffer(30, 12);
+        edit.paintEvent(buffer);
+        QCOMPARE(buffer.backCell(plainWidth, 1).ch, U'\u25BC');
+        QCOMPARE(buffer.backCell(2, 1).text(), QStringLiteral("2"));
+
+        // F4 opens the calendar below the edit, on the date of the edit
+        sendKey(edit, Qt::Key_F4);
+        QTuiCalendarWidget *calendar = popupOf(edit);
+        QVERIFY(calendar);
+        QVERIFY(calendar->isVisible());
+        QVERIFY(calendar->isPopup());
+        QVERIFY(calendar->hasFocus());
+        QCOMPARE(calendar->geometry().topLeft(), QPoint(0, 3));
+        QCOMPARE(calendar->selectedDate(), QDate(2026, 10, 29));
+
+        // Escape closes it without a change
+        sendKey(*calendar, Qt::Key_Left);
+        sendKey(*calendar, Qt::Key_Escape);
+        QVERIFY(!calendar->isVisible());
+        QCOMPARE(edit.date(), QDate(2026, 10, 29));
+
+        // Alt+Down opens it and does not step the section; Enter sets the date
+        sendKey(edit, Qt::Key_Down, Qt::AltModifier);
+        QVERIFY(calendar->isVisible());
+        QCOMPARE(edit.date(), QDate(2026, 10, 29));
+        // The calendar starts on the date of the edit again, not on the
+        // cursor of the last time
+        sendKey(*calendar, Qt::Key_Left);
+        sendKey(*calendar, Qt::Key_Return);
+        QVERIFY(!calendar->isVisible());
+        QCOMPARE(edit.date(), QDate(2026, 10, 28));
+
+        // A click on "▼" opens and closes it; a click on a day sets the date
+        click(edit, plainWidth, 1);
+        QVERIFY(calendar->isVisible());
+        click(edit, plainWidth, 1);
+        QVERIFY(!calendar->isVisible());
+        click(edit, plainWidth, 1);
+        // 2026-10-01 is a Thursday: row 2 of the calendar, the fourth day column
+        const QRect cal = calendar->geometry();
+        click(*calendar, cal.x() + 1 + 3 * 3, cal.y() + 2);
+        QVERIFY(!calendar->isVisible());
+        QCOMPARE(edit.date(), QDate(2026, 10, 1));
+
+        // A hidden edit closes its calendar
+        sendKey(edit, Qt::Key_F4);
+        QVERIFY(calendar->isVisible());
+        edit.setVisible(false);
+        QVERIFY(!calendar->isVisible());
+    }
+
+    void timeEdit_hasNoCalendarPopup()
+    {
+        QTuiTimeEdit edit(QTime(8, 15, 0));
+        const int width = edit.minimumSize().width();
+        edit.setCalendarPopup(true);
+        QCOMPARE(edit.minimumSize().width(), width);
+        sendKey(edit, Qt::Key_F4);
+        QVERIFY(!popupOf(edit));
     }
 
     // ---------------------------------------------------------------
