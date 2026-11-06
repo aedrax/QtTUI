@@ -38,6 +38,9 @@ private:
         QTuiWidget *widget = nullptr;
         bool isSeparator = false;
     };
+    // The text of an action, with "[x] " or "[ ] " before it if the
+    // action is checkable
+    static QString actionLabel(const QTuiAction *action);
     QString m_title;
     QList<ToolBarItem> m_items;
     int m_focusedItem = 0;

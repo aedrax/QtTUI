@@ -36,21 +36,39 @@ void QTuiMenu::setTitle(const QString &title)
         owner->markDirty();
 }
 
-QTuiAction *QTuiMenu::addAction(const QString &text)
+void QTuiMenu::appendAction(QTuiAction *action)
 {
-    auto *action = new QTuiAction(text, this);
     MenuItem item;
     item.action = action;
     m_menuItems.append(item);
+    connect(action, &QTuiAction::toggled, this, [this]() {
+        if (isVisible())
+            markDirty();
+    });
+}
+
+QString QTuiMenu::checkPrefix(const MenuItem &item) const
+{
+    if (item.action && !item.submenu && item.action->isCheckable())
+        return item.action->isChecked() ? QStringLiteral("[x] ") : QStringLiteral("[ ] ");
+    for (const auto &other : m_menuItems) {
+        if (other.action && !other.submenu && other.action->isCheckable())
+            return QStringLiteral("    ");
+    }
+    return QString();
+}
+
+QTuiAction *QTuiMenu::addAction(const QString &text)
+{
+    auto *action = new QTuiAction(text, this);
+    appendAction(action);
     return action;
 }
 
 QTuiAction *QTuiMenu::addAction(const QString &text, const QString &shortcut)
 {
     auto *action = new QTuiAction(text, shortcut, this);
-    MenuItem item;
-    item.action = action;
-    m_menuItems.append(item);
+    appendAction(action);
     return action;
 }
 
@@ -58,9 +76,7 @@ void QTuiMenu::addAction(QTuiAction *action)
 {
     if (!action)
         return;
-    MenuItem item;
-    item.action = action;
-    m_menuItems.append(item);
+    appendAction(action);
     // Drop the item if the action goes away first
     connect(action, &QObject::destroyed, this, [this, action]() {
         for (int i = 0; i < m_menuItems.size(); ++i) {
@@ -182,7 +198,7 @@ QSize QTuiMenu::minimumSize() const
             continue;
         int w = 0;
         if (item.action) {
-            QString display = itemText(item);
+            QString display = checkPrefix(item) + itemText(item);
             display.remove(QLatin1Char('&'));
             w += QtTuiUnicode::stringWidth(display);
         }
@@ -242,6 +258,7 @@ void QTuiMenu::paintEvent(ScreenBuffer &buffer)
 
         QString text = itemText(mi);
         text.remove(QLatin1Char('&')); // mnemonic markers are not painted
+        text.prepend(checkPrefix(mi));
         QString rightStr;
         if (mi.action && !mi.action->shortcut().isEmpty())
             rightStr = mi.action->shortcut();

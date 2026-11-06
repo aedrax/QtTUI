@@ -92,10 +92,44 @@ void QTuiAction::setEnabled(bool enabled)
     }
 }
 
+bool QTuiAction::isCheckable() const
+{
+    return m_checkable;
+}
+
+void QTuiAction::setCheckable(bool checkable)
+{
+    if (m_checkable == checkable)
+        return;
+    // As in QAction: the action keeps the stored state, but isChecked() is
+    // true only while the action is checkable
+    const bool wasChecked = isChecked();
+    m_checkable = checkable;
+    if (wasChecked != isChecked())
+        emit toggled(isChecked());
+}
+
+bool QTuiAction::isChecked() const
+{
+    return m_checkable && m_checked;
+}
+
+void QTuiAction::setChecked(bool checked)
+{
+    if (m_checked == checked)
+        return;
+    m_checked = checked;
+    if (m_checkable)
+        emit toggled(m_checked);
+}
+
 void QTuiAction::trigger()
 {
-    if (m_enabled)
-        emit triggered();
+    if (!m_enabled)
+        return;
+    if (m_checkable)
+        setChecked(!m_checked);
+    emit triggered(isChecked());
 }
 
 } // namespace QtTUI

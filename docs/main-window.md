@@ -325,7 +325,7 @@ void addViewMenu(QTuiMenuBar *bar)
 | --- | --- |
 | Up, k | Highlights the previous item. Separators are skipped. At the top, it goes to the bottom. |
 | Down, j | Highlights the next item. Separators are skipped. At the bottom, it goes to the top. |
-| Enter, Return | Triggers the highlighted action and closes the menu. On a submenu item, opens the submenu at the right of the menu. |
+| Enter, Return | Triggers the highlighted action (a checkable action changes its checked state) and closes the menu. On a submenu item, opens the submenu at the right of the menu. |
 | Right, l | Opens the submenu of the highlighted item. On an item without a submenu, the menu bar opens the next menu. |
 | Left, h | Closes a submenu. In a menu of the menu bar, the bar opens the previous menu. |
 | Escape | Closes the menu. |
@@ -346,7 +346,12 @@ menu stays open.
 A command that menus, tool bars, context menus and shortcuts use. Each live
 action is in a global list, and the main window uses that list to find
 shortcuts. The shortcut is a string that `QTuiKeySequence` parses. Unlike
-`QAction`, an action has no check state, icon or tooltip.
+`QAction`, an action has no icon or tooltip.
+
+A checkable action has an on/off state. A menu shows `[x] ` or `[ ] ` before
+the text of a checkable action, and gives the other items of that menu the
+same indent. A tool bar shows the same mark before the text. Each trigger
+(Enter, a click or the shortcut) inverts the state.
 
 ### Example
 
@@ -380,13 +385,18 @@ void addSaveAction(QTuiMainWindow *window, QTuiToolBar *toolBar)
 | `static QList<QTuiAction *> registeredActions()` | Returns all live actions, in the order that they were made. |
 | `bool isEnabled() const` | Returns `true` if the action is enabled. The default is `true`. |
 | `void setEnabled(bool enabled)` | Enables or disables the action. The property is `enabled`. |
-| `void trigger()` | Emits `triggered()` if the action is enabled. |
+| `bool isCheckable() const` | Returns `true` if the action has an on/off state. The default is `false`. The property is `checkable`. |
+| `void setCheckable(bool checkable)` | Makes the action checkable or not. If this changes `isChecked()`, the action emits `toggled()`. |
+| `bool isChecked() const` | Returns `true` if the action is checkable and checked. The property is `checked`. |
+| `void setChecked(bool checked)` | Sets the checked state and emits `toggled()` if a checkable action changes. As in `QAction`, an action that is not checkable keeps the value, but `isChecked()` stays `false` and no signal is emitted. |
+| `void trigger()` | Does nothing if the action is disabled. Else it inverts the checked state of a checkable action, then emits `triggered()`. |
 
 ### Signals
 
 | Signal | Description |
 | --- | --- |
-| `triggered()` | The action triggered. |
+| `triggered(bool checked = false)` | The action triggered. `checked` is the new state of a checkable action, else `false`. A slot without a parameter also connects. |
+| `toggled(bool checked)` | The checked state of a checkable action changed. |
 | `textChanged(const QString &text)` | The text changed. |
 | `enabledChanged(bool enabled)` | The action became enabled or disabled. |
 
@@ -493,7 +503,8 @@ void checkKey(int key, Qt::KeyboardModifiers modifiers)
 
 A one-row bar of actions, separators and widgets. Give it to
 `QTuiMainWindow::addToolBar()`. Each action shows as its text with one space
-on each side. A separator shows as ` | `.
+on each side. A separator shows as ` | `. A checkable action shows `[x] ` or
+`[ ] ` before its text.
 
 ### Example
 
@@ -535,7 +546,7 @@ void addEditToolBar(QTuiMainWindow *window)
 | --- | --- |
 | Left, h | Makes the previous item current. At the start, it goes to the end. |
 | Right, l | Makes the next item current. At the end, it goes to the start. |
-| Enter, Return | Triggers the action of the current item. |
+| Enter, Return | Triggers the action of the current item. A checkable action changes its checked state. |
 
 Separators are not items for the keys. Widgets are items, but Enter does
 nothing on a widget.

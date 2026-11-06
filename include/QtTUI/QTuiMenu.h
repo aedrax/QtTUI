@@ -63,6 +63,11 @@ private:
     void navigateToPrevItem();
     // The text of an item: the submenu title or the action text
     QString itemText(const MenuItem &item) const;
+    // The check column: "[x] " or "[ ] " for a checkable action. If the
+    // menu has a checkable action, the other items get spaces. Else empty.
+    QString checkPrefix(const MenuItem &item) const;
+    // Adds the item and repaints the open menu when the action toggles
+    void appendAction(QTuiAction *action);
     void openSubmenu(int index);
 
     QString m_title;
