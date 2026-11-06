@@ -78,10 +78,11 @@ void QTuiDockWidget::paintEvent(ScreenBuffer &buffer)
 
 void QTuiDockWidget::keyPressEvent(TuiKeyEvent *event)
 {
-    // 'q' or Escape activates the close indicator: hides dock and emits visibilityChanged
+    // 'q' or Escape activates the close indicator: closes the dock and
+    // emits visibilityChanged, unless closeEvent() ignores the close
     if (event->key() == Qt::Key_Escape || event->key() == Qt::Key_Q) {
-        setVisible(false);
-        emit visibilityChanged(false);
+        if (close())
+            emit visibilityChanged(false);
         return;
     }
     QTuiWidget::keyPressEvent(event);
@@ -93,8 +94,8 @@ void QTuiDockWidget::mousePressEvent(TuiMouseEvent *event)
     const QRect geo = geometry();
     if (event->mouseType() == TuiMouseEvent::Press && event->button() == Qt::LeftButton
         && event->y() == geo.y() && event->x() >= geo.right() - 3 && event->x() < geo.right()) {
-        setVisible(false);
-        emit visibilityChanged(false);
+        if (close())
+            emit visibilityChanged(false);
     }
 }
 

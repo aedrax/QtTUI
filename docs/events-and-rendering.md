@@ -105,6 +105,7 @@ The class gives the `QEvent::Type` values of the QtTUI events. QtTUI registers t
 | `static QEvent::Type mouseEventType()` | Returns the type of `TuiMouseEvent`. |
 | `static QEvent::Type resizeEventType()` | Returns the type of `TuiResizeEvent`. |
 | `static QEvent::Type pasteEventType()` | Returns the type of `TuiPasteEvent`. |
+| `static QEvent::Type closeEventType()` | Returns the type of `TuiCloseEvent`. |
 
 ## TuiKeyEvent
 
@@ -202,6 +203,19 @@ The line endings are `"\n"`. A pasted line break is text, not an Enter key. Thus
 | --- | --- |
 | `explicit TuiPasteEvent(const QString &text)` | Makes a paste event. |
 | `QString text() const` | Returns the pasted text. |
+
+## TuiCloseEvent
+
+`#include <QtTUI/TuiEvents.h>` · Inherits: `QEvent`
+
+A request to close a widget. `QTuiWidget::close()` makes the event and gives it to `closeEvent()` of the widget. The event starts accepted. If the handler calls `ignore()`, the widget stays open and `close()` returns `false`. The event does not come from the terminal, and it is not posted: `close()` delivers it at once.
+
+### Functions
+
+| Function | Description |
+| --- | --- |
+| `TuiCloseEvent()` | Makes an accepted close event. |
+| `void accept()`, `void ignore()`, `bool isAccepted() const` | From `QEvent`. |
 
 ## InputParser
 

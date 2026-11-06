@@ -3,6 +3,7 @@
 #include <QtTUI/QTuiLayout.h>
 #include <QtTUI/QTuiAction.h>
 #include <QtTUI/QTuiApplication.h>
+#include <QtTUI/QTuiMainWindow.h>
 #include <QtTUI/RenderScheduler.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/TuiEvents.h>
@@ -654,6 +655,10 @@ bool QTuiWidget::event(QEvent *event)
         pasteEvent(static_cast<TuiPasteEvent *>(event));
         return true;
     }
+    if (event->type() == TuiEventTypes::closeEventType()) {
+        closeEvent(static_cast<TuiCloseEvent *>(event));
+        return true;
+    }
     return QObject::event(event);
 }
 
@@ -662,6 +667,22 @@ void QTuiWidget::mousePressEvent(TuiMouseEvent * /*event*/) {}
 void QTuiWidget::resizeEvent(TuiResizeEvent * /*event*/) {}
 
 void QTuiWidget::pasteEvent(TuiPasteEvent * /*event*/) {}
+void QTuiWidget::closeEvent(TuiCloseEvent * /*event*/) {}
+
+bool QTuiWidget::close()
+{
+    TuiCloseEvent closeEvent;
+    event(&closeEvent);
+    if (!closeEvent.isAccepted())
+        return false;
+
+    auto *app = QTuiApplication::instance();
+    if (app && app->mainWindow() == this)
+        QCoreApplication::quit();
+    else
+        setVisible(false);
+    return true;
+}
 
 bool QTuiWidget::hasDirtyRegions() const
 {

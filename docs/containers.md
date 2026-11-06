@@ -747,7 +747,8 @@ void example(QTuiMdiArea *mdi)
 | `bool isMaximized() const` | Returns true if the sub-window is maximized. |
 | `void showMaximized()` | Slot. Keeps the normal geometry and fills the parent area. Emits `windowStateChanged()`. |
 | `void showNormal()` | Slot. Sets the normal geometry again. Emits `windowStateChanged()`. |
-| `void close()` | Slot. Removes the sub-window from the MDI area, as `removeSubWindow()` does, and hides it. It does not delete the sub-window. |
+| `bool close()` | From QTuiWidget. Calls `closeEvent()` and hides the sub-window if the event stays accepted. It does not delete the sub-window. Before, QTuiMdiSubWindow had its own `void close()` slot. |
+| `void closeEvent(TuiCloseEvent *event)` | Protected. Removes the sub-window from the MDI area, as `removeSubWindow()` does. In an override, call `event->ignore()` to keep the sub-window open, else call this implementation. |
 | `QSize minimumSize() const` | Returns 3 rows, and the width of the title and buttons or of the content widget plus the frame. |
 | `void paintEvent(ScreenBuffer &buffer)` | Paints the frame and the content widget. A maximized sub-window shows `[▫]` in place of `[□]`. |
 | `void focusEntered(QTuiWidget *focus)` | Protected. Makes this sub-window the active window of its MDI area. |
@@ -830,11 +831,11 @@ void example(QTuiMainWindow *window)
 
 | Key | Action |
 | --- | --- |
-| Escape, Q | Hides the dock widget and emits `visibilityChanged(false)`. |
+| Escape, Q | Closes the dock widget with `close()` and emits `visibilityChanged(false)`. If `closeEvent()` ignores the event, the dock widget stays open and emits nothing. |
 
 ### Mouse
 
-- A left click on `[X]` hides the dock widget and emits `visibilityChanged(false)`.
+- A left click on `[X]` closes the dock widget, as Escape does.
 
 ## QTuiSizeGrip
 

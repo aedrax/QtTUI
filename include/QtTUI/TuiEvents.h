@@ -17,6 +17,7 @@ public:
     static QEvent::Type mouseEventType();
     static QEvent::Type resizeEventType();
     static QEvent::Type pasteEventType();
+    static QEvent::Type closeEventType();
 };
 
 // Lightweight key event for TUI (no Qt::Gui dependency)
@@ -109,6 +110,16 @@ public:
 
 private:
     QString m_text;
+};
+
+// Asks a widget to close; QTuiWidget::close() sends it. The event starts
+// accepted. A closeEvent() handler calls ignore() to keep the widget open.
+class TuiCloseEvent : public QEvent {
+public:
+    TuiCloseEvent()
+        : QEvent(TuiEventTypes::closeEventType())
+    {
+    }
 };
 
 // Returns the arrow key for the vim keys h, j, k and l without modifiers.

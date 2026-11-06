@@ -21,6 +21,7 @@ class TuiKeyEvent;
 class TuiMouseEvent;
 class TuiResizeEvent;
 class TuiPasteEvent;
+class TuiCloseEvent;
 
 class QTuiWidget : public QObject {
     Q_OBJECT
@@ -185,6 +186,16 @@ public:
     QSize effectiveMinimumSize() const;
     // sizeHint(), from effectiveMinimumSize() to maximumSize()
     QSize effectiveSizeHint() const;
+
+    // Closes the widget, as QWidget::close(): calls closeEvent(), and hides
+    // the widget if the event stays accepted. Returns false if the handler
+    // ignored the event. A close of the application's main window quits the
+    // application and does not hide the window.
+    bool close();
+protected:
+    // The default accepts the event. Call event->ignore() to stay open.
+    virtual void closeEvent(TuiCloseEvent *event);
+public:
 
     // The default paintEvent() clears the background, so a plain QTuiWidget
     // works as a container. The render pass paints the children.

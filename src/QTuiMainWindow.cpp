@@ -451,14 +451,14 @@ void QTuiMainWindow::keyPressEvent(TuiKeyEvent *event)
             advanceFocus(forward, dialog);
             return;
         }
-        // Escape rejects the dialog, unless a popup inside it (a completer
-        // or a dropdown) is open, or an item view edits an item: that popup
-        // or editor closes first
+        // Escape closes the dialog (its closeEvent() rejects it), unless a
+        // popup inside it (a completer or a dropdown) is open, or an item
+        // view edits an item: that popup or editor closes first
         if (event->key() == Qt::Key_Escape) {
             QList<QTuiWidget *> inner;
             collectVisiblePopupsIn(dialog, inner);
             if (inner.isEmpty() && !insideItemEditor(focused)) {
-                dialog->reject();
+                dialog->close();
                 return;
             }
         }

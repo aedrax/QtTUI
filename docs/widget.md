@@ -391,6 +391,7 @@ For the event classes, see [Events and rendering](events-and-rendering.md).
 | `virtual QTuiLayout *layout() const` | Returns the layout, or `nullptr`. |
 | `void clearBackground(ScreenBuffer &buffer, const QRect &clipRect)` | Fills the geometry, clipped to `clipRect`, with spaces in the theme colors. If the widget became smaller, it also clears the old area with the colors of the parent. |
 | `ThemeProperties themeProperties() const` | Returns the theme properties of the widget: a per-widget override, or the entry for its class name. See [Themes](themes.md). |
+| `bool close()` | Closes the widget, as `QWidget::close()`. It calls `closeEvent()`. If the event stays accepted, it hides the widget and returns `true`. Else it returns `false`. If the widget is the main window of the application, it calls `QCoreApplication::quit()` and does not hide the window. Dialogs, MDI sub-windows and dock widgets close through this function when the user closes them. `QTuiMenu` has its own `close()`, which does not call `closeEvent()`. |
 | `void markDirty()` | Marks the full geometry for a repaint. |
 | `void markDirty(const QRect &region)` | Marks an area in screen cells for a repaint. |
 | `bool hasDirtyRegions() const` | Returns `true` after a geometry change, until `clearDirtyRegions()`. |
@@ -409,6 +410,7 @@ For the event classes, see [Events and rendering](events-and-rendering.md).
 | `virtual void mousePressEvent(TuiMouseEvent *event)` | Gets all mouse events: press, release, move, wheel and double click. The default does nothing. |
 | `virtual void resizeEvent(TuiResizeEvent *event)` | Gets a terminal resize. The default does nothing. |
 | `virtual void pasteEvent(TuiPasteEvent *event)` | Gets pasted text for the focus widget. The default does nothing. |
+| `virtual void closeEvent(TuiCloseEvent *event)` | `close()` calls it. The default does nothing, so the event stays accepted. Call `event->ignore()` to keep the widget open. |
 | `virtual void focusEntered(QTuiWidget *focus)` | Called on the new focus widget and on each of its parents. The default does nothing. |
 
 ### Signals

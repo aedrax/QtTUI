@@ -14,8 +14,9 @@ namespace QtTUI {
 // While a dialog is open, it is modal: keys and clicks reach only the
 // dialog, Tab moves focus only between its widgets, other shortcuts and
 // menu mnemonics do not work, and a click outside it does nothing. Escape
-// rejects the dialog (unless a popup inside it, such as a completer, is
-// open). When the dialog closes, focus goes back to where it was.
+// closes the dialog with close() (unless a popup inside it, such as a
+// completer, is open), and the default closeEvent() rejects it. When the
+// dialog closes, focus goes back to where it was.
 //
 // Put the content in a layout with setLayout(); the dialog applies it
 // inside the border and sizes itself from the layout's minimum size.
@@ -62,6 +63,9 @@ protected:
     // The widget that gets focus when the dialog opens. The default is the
     // first widget that takes Tab focus.
     virtual QTuiWidget *initialFocusWidget() const;
+    // Rejects the dialog, as in QDialog. To keep the dialog open, call
+    // event->ignore() and do not call this implementation.
+    void closeEvent(TuiCloseEvent *event) override;
 
 private:
     void placeInMainWindow();

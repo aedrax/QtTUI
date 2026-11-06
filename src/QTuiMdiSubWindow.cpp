@@ -122,12 +122,13 @@ void QTuiMdiSubWindow::mousePressEvent(TuiMouseEvent *event)
         m_drag = Drag::Resize;
 }
 
-void QTuiMdiSubWindow::close()
+void QTuiMdiSubWindow::closeEvent(TuiCloseEvent *event)
 {
-    // As in Qt, a closed window is not in the list of the area
+    Q_UNUSED(event);
+    // As in Qt, a closed window is not in the list of the area. close()
+    // hides the window after this call.
     if (auto *area = qobject_cast<QTuiMdiArea *>(parentWidget()))
         area->removeSubWindow(this);
-    setVisible(false);
 }
 
 QSize QTuiMdiSubWindow::minimumSize() const
