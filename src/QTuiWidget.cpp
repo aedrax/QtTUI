@@ -400,7 +400,101 @@ QList<QTuiWidget *> QTuiWidget::childWidgets() const
 
 QSize QTuiWidget::minimumSize() const
 {
-    return m_layout ? m_layout->minimumSize() : QSize(0, 0);
+    const QSize size = m_layout ? m_layout->minimumSize() : QSize(0, 0);
+    return QSize(m_minimumSize.width() > 0 ? m_minimumSize.width() : size.width(),
+                 m_minimumSize.height() > 0 ? m_minimumSize.height() : size.height());
+}
+
+QSize QTuiWidget::effectiveMinimumSize() const
+{
+    // minimumSize() is virtual, so read it only for an axis without a set value
+    QSize size = m_minimumSize;
+    if (size.width() <= 0 || size.height() <= 0) {
+        const QSize own = minimumSize();
+        if (size.width() <= 0)
+            size.setWidth(own.width());
+        if (size.height() <= 0)
+            size.setHeight(own.height());
+    }
+    return size.boundedTo(m_maximumSize);
+}
+
+QSize QTuiWidget::effectiveSizeHint() const
+{
+    return sizeHint().expandedTo(effectiveMinimumSize()).boundedTo(m_maximumSize);
+}
+
+QSize QTuiWidget::maximumSize() const
+{
+    return m_maximumSize;
+}
+
+void QTuiWidget::setMinimumSize(const QSize &size)
+{
+    const QSize minimum = size.expandedTo(QSize(0, 0));
+    if (m_minimumSize == minimum)
+        return;
+    m_minimumSize = minimum;
+
+    // As in QWidget, bring the current size inside the limits. setGeometry()
+    // marks the old and the new area dirty.
+    const QSize bounded = m_geometry.size().expandedTo(m_minimumSize).boundedTo(m_maximumSize);
+    if (bounded != m_geometry.size())
+        setGeometry(QRect(m_geometry.topLeft(), bounded));
+    if (auto *parent = parentWidget(); parent && parent->layout())
+        parent->layout()->invalidate();
+}
+
+void QTuiWidget::setMaximumSize(const QSize &size)
+{
+    const QSize maximum = size.expandedTo(QSize(0, 0)).boundedTo(QSize(16777215, 16777215));
+    if (m_maximumSize == maximum)
+        return;
+    m_maximumSize = maximum;
+
+    const QSize bounded = m_geometry.size().expandedTo(m_minimumSize).boundedTo(m_maximumSize);
+    if (bounded != m_geometry.size())
+        setGeometry(QRect(m_geometry.topLeft(), bounded));
+    if (auto *parent = parentWidget(); parent && parent->layout())
+        parent->layout()->invalidate();
+}
+
+void QTuiWidget::setMinimumWidth(int width)
+{
+    setMinimumSize(QSize(width, m_minimumSize.height()));
+}
+
+void QTuiWidget::setMinimumHeight(int height)
+{
+    setMinimumSize(QSize(m_minimumSize.width(), height));
+}
+
+void QTuiWidget::setMaximumWidth(int width)
+{
+    setMaximumSize(QSize(width, m_maximumSize.height()));
+}
+
+void QTuiWidget::setMaximumHeight(int height)
+{
+    setMaximumSize(QSize(m_maximumSize.width(), height));
+}
+
+void QTuiWidget::setFixedSize(const QSize &size)
+{
+    setMinimumSize(size);
+    setMaximumSize(size);
+}
+
+void QTuiWidget::setFixedWidth(int width)
+{
+    setMinimumWidth(width);
+    setMaximumWidth(width);
+}
+
+void QTuiWidget::setFixedHeight(int height)
+{
+    setMinimumHeight(height);
+    setMaximumHeight(height);
 }
 
 QSize QTuiWidget::sizeHint() const

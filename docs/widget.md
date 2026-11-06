@@ -154,6 +154,20 @@ geometry.
 `minimumSize()`, `sizeHint()` and `sizePolicy()` tell a layout how to size
 the widget. For the rules, see [Layouts](layouts.md).
 
+`setMinimumSize()`, `setMaximumSize()` and `setFixedSize()` set size limits,
+as in QWidget. A minimum that you set replaces `minimumSize()` on that axis.
+This is also true for a widget class that overrides `minimumSize()`: the
+box, grid, form and stacked layouts read `effectiveMinimumSize()`, not
+`minimumSize()`. A layout gives a widget no more than its maximum size; the
+widget then stays at the start of its cell. A setter also changes the
+current size of the widget if it is outside the limits. `setGeometry()` does
+not check the limits.
+
+The containers that are not layouts (for example QTuiSplitter, QTuiTabWidget,
+QTuiDockWidget, QTuiToolBar and QTuiStatusBar) call `minimumSize()` of their
+children. They see a minimum that you set only on a widget class that does
+not override `minimumSize()`, and they do not read the maximum size.
+
 ### Visible and enabled
 
 `setVisible(false)` hides the widget and its children, and marks its area
@@ -358,7 +372,16 @@ For the event classes, see [Events and rendering](events-and-rendering.md).
 | `QTuiWidget *parentWidget() const` | Returns the parent widget, or `nullptr`. |
 | `QList<QTuiWidget *> childWidgets() const` | Returns the child widgets in their order. |
 | `void raise()` | Moves the widget to the end of its siblings. It then paints last and gets the mouse first. |
-| `virtual QSize minimumSize() const` | Returns the minimum size. The default is the minimum size of the layout, or 0x0 with no layout. |
+| `virtual QSize minimumSize() const` | Returns the minimum size. The default is the value from `setMinimumSize()` on each axis where it is above 0, else the minimum size of the layout, or 0x0 with no layout. |
+| `void setMinimumSize(const QSize &size)`, `void setMinimumSize(int width, int height)` | Sets the minimum size. 0 on an axis removes the set value for that axis. Marks the layout of the parent for a new calculation. |
+| `void setMinimumWidth(int width)`, `void setMinimumHeight(int height)` | Sets the minimum on one axis. |
+| `QSize maximumSize() const` | Returns the maximum size. The default is 16777215 x 16777215 (no limit). |
+| `void setMaximumSize(const QSize &size)`, `void setMaximumSize(int width, int height)` | Sets the maximum size. Marks the layout of the parent for a new calculation. |
+| `void setMaximumWidth(int width)`, `void setMaximumHeight(int height)` | Sets the maximum on one axis. |
+| `void setFixedSize(const QSize &size)`, `void setFixedSize(int width, int height)` | Sets the minimum and the maximum to the same size. |
+| `void setFixedWidth(int width)`, `void setFixedHeight(int height)` | Sets the minimum and the maximum on one axis. |
+| `QSize effectiveMinimumSize() const` | Returns the minimum that the layouts use: the value from `setMinimumSize()` on each axis where it is above 0, else `minimumSize()`. The result is not larger than `maximumSize()`. |
+| `QSize effectiveSizeHint() const` | Returns the size hint that the layouts use: `sizeHint()`, not smaller than `effectiveMinimumSize()` and not larger than `maximumSize()`. |
 | `virtual QSize sizeHint() const` | Returns the preferred size. The default is `minimumSize()`. |
 | `QTuiSizePolicy sizePolicy() const` | Returns the size policy. The default is `Preferred` on the two axes. |
 | `void setSizePolicy(const QTuiSizePolicy &policy)` | Sets the size policy, and marks the layout of the parent for a new calculation. |

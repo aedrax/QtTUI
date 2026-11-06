@@ -298,6 +298,18 @@ private slots:
         QCOMPARE(form.rowCount(), 1);
     }
 
+    void sizeLimitsOfTheField()
+    {
+        FormTestWidget label(QSize(5, 1)), field(QSize(3, 1));
+        field.setMinimumHeight(2);
+        field.setMaximumWidth(8);
+        QTuiFormLayout form;
+        form.addRow(&label, &field);
+        QCOMPARE(form.minimumSize(), QSize(8, 2));
+        form.apply(QRect(0, 0, 30, 5));
+        QCOMPARE(field.geometry(), QRect(5, 0, 8, 2));
+    }
+
     void horizontalSpacingSeparatesColumns()
     {
         QTuiFormLayout form;

@@ -127,10 +127,10 @@ void example(QTuiWidget *parent)
 | Function | Description |
 | --- | --- |
 | `QTuiWidgetItem(QTuiWidget *widget)` | Makes an item for `widget`. |
-| `QSize sizeHint() const` | Returns the size hint of the widget, at least its minimum size. |
-| `QSize minimumSize() const` | Returns the minimum size of the widget. |
-| `QSize maximumSize() const` | Returns 16777215 x 16777215. |
-| `void setGeometry(const QRect &rect)` | Sets the geometry of the widget. |
+| `QSize sizeHint() const` | Returns `effectiveSizeHint()` of the widget. |
+| `QSize minimumSize() const` | Returns `effectiveMinimumSize()` of the widget. |
+| `QSize maximumSize() const` | Returns `maximumSize()` of the widget. |
+| `void setGeometry(const QRect &rect)` | Sets the geometry of the widget. If the maximum size of the widget is smaller than `rect`, the widget gets its maximum size at the top-left corner of `rect`. |
 | `QRect geometry() const` | Returns the geometry of the widget. |
 | `bool isEmpty() const` | Returns true if the widget is destroyed or hidden. |
 | `QTuiWidget *widget() const` | Returns the widget, or nullptr if it is destroyed. |
@@ -284,9 +284,11 @@ These free functions and aliases are in the same header:
 1. The layout skips each widget that you hid. It keeps no space for it and does not show it again.
 2. An item gets stretch 0 if the size policy of its widget along the direction is `Fixed`. A widget that you add with stretch 0 uses the stretch of its size policy along the direction (`horizontalStretch()` or `verticalStretch()`), as in Qt. If that stretch is also 0, an `Expanding` or `MinimumExpanding` widget gets stretch 1.
 3. Each item with stretch 0 gets its size hint, if all of these size hints fit. Else it gets its minimum size.
-4. The free space goes to the items with a stretch, in proportion to the stretch. An item never gets less than its minimum size.
-5. Across the direction, a widget fills the area. A widget with the policy `Fixed` or `Maximum` across the direction gets its size hint (at least its minimum size).
+4. The free space goes to the items with a stretch, in proportion to the stretch. An item never gets less than its minimum size or more than the maximum size of its widget. If each item is at its maximum, the rest of the area stays empty.
+5. Across the direction, a widget fills the area, up to its maximum size. A widget with the policy `Fixed` or `Maximum` across the direction gets its size hint (at least its minimum size).
 6. If a widget does not fit, the layout hides it. The layout shows the widget again when there is space. If the widget had the focus, it gets the focus back.
+
+The minimum size is `QTuiWidget::effectiveMinimumSize()` and the size hint is `QTuiWidget::effectiveSizeHint()`, so the limits from `setMinimumSize()`, `setMaximumSize()` and `setFixedSize()` apply.
 
 If the layout direction is right-to-left, the layout mirrors the positions horizontally.
 
@@ -388,7 +390,7 @@ void example(QTuiWidget *parent)
 | `QSize minimumSize() const` | Returns the widest label plus the spacing plus the widest field, the sum of the row heights, and the margins. |
 | `void apply(const QRect &availableArea)` | Sets the geometry of the labels and fields. The field column always keeps at least 1 cell. |
 
-If a field is destroyed, the layout removes its row. The form layout does not use the size policy of the widgets. `QTuiFormLayout` does not override `itemAt()`, so `itemAt()` returns nullptr for each index.
+If a field is destroyed, the layout removes its row. The form layout does not use the size policy of the widgets. It uses their size limits: a label or field never gets more than its maximum size. `QTuiFormLayout` does not override `itemAt()`, so `itemAt()` returns nullptr for each index.
 
 ## QTuiStackedLayout
 

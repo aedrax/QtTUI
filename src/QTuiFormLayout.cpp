@@ -178,8 +178,8 @@ QSize QTuiFormLayout::minimumSize() const
     int totalHeight = 0;
 
     for (const auto &row : m_rows) {
-        const QSize labelMin = row.label ? row.label->minimumSize() : QSize(0, 0);
-        const QSize fieldMin = row.field ? row.field->minimumSize()
+        const QSize labelMin = row.label ? row.label->effectiveMinimumSize() : QSize(0, 0);
+        const QSize fieldMin = row.field ? row.field->effectiveMinimumSize()
             : row.fieldLayout ? row.fieldLayout->minimumSize() : QSize(0, 0);
         maxLabelWidth = std::max(maxLabelWidth, labelMin.width());
         maxFieldWidth = std::max(maxFieldWidth, fieldMin.width());
@@ -215,7 +215,7 @@ void QTuiFormLayout::apply(const QRect &availableArea)
     int maxLabelWidth = 0;
     for (const auto &row : m_rows) {
         if (row.label) {
-            const int w = row.label->minimumSize().width();
+            const int w = row.label->effectiveMinimumSize().width();
             maxLabelWidth = std::max(maxLabelWidth, w);
         }
     }
@@ -234,16 +234,19 @@ void QTuiFormLayout::apply(const QRect &availableArea)
 
     // Pass 2: lay out each row
     for (const auto &row : m_rows) {
-        const int labelH = row.label ? row.label->minimumSize().height() : 0;
-        const int fieldH = row.field ? row.field->minimumSize().height()
+        const int labelH = row.label ? row.label->effectiveMinimumSize().height() : 0;
+        const int fieldH = row.field ? row.field->effectiveMinimumSize().height()
             : row.fieldLayout ? row.fieldLayout->minimumSize().height() : 0;
         const int rowHeight = std::max({1, labelH, fieldH});
 
+        // A widget with a maximum size stays at the start of its cell
         if (row.label)
-            row.label->setGeometry(visualRect(QRect(x, currentY, maxLabelWidth, rowHeight), rect));
+            row.label->setGeometry(visualRect(QRect(QPoint(x, currentY),
+                QSize(maxLabelWidth, rowHeight).boundedTo(row.label->maximumSize())), rect));
 
         if (row.field)
-            row.field->setGeometry(visualRect(QRect(x + maxLabelWidth + gap, currentY, fieldWidth, rowHeight), rect));
+            row.field->setGeometry(visualRect(QRect(QPoint(x + maxLabelWidth + gap, currentY),
+                QSize(fieldWidth, rowHeight).boundedTo(row.field->maximumSize())), rect));
         if (row.fieldLayout)
             row.fieldLayout->apply(visualRect(QRect(x + maxLabelWidth + gap, currentY, fieldWidth, rowHeight), rect));
 
