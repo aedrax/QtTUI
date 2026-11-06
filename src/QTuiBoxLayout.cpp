@@ -291,27 +291,36 @@ void QTuiBoxLayout::apply(const QRect &availableArea)
     int flexSpace = std::max(0, totalSpace - fixedSpace - totalSpacing);
 
     // Phase 2: a stretch item whose proportional share is below its minimum
-    // or above its maximum gets that limit instead; iterate until stable
+    // or above its maximum gets that limit instead; iterate until stable.
+    // Each pass locks only one kind of limit, so the result does not depend
+    // on the item order: if the minimums need more space than the maximums
+    // give back, the pass locks the items below their minimum; else it
+    // locks the items above their maximum.
     bool changed = true;
     while (changed) {
         changed = false;
+        QVector<int> share(m_boxItems.size(), 0);
+        QVector<int> limited(m_boxItems.size(), 0);
+        int correction = 0;
         for (int i = 0; i < m_boxItems.size(); ++i) {
             if (locked[i])
                 continue;
-
-            const int minDim = itemMinimum(m_boxItems[i], vertical);
-            int proportional = 0;
             if (totalStretch > 0)
-                proportional = (flexSpace * stretch[i]) / totalStretch;
-
-            const int maxDim = itemMaximum(m_boxItems[i], vertical);
-            if (proportional < minDim || proportional > maxDim) {
-                allocations[i] = proportional < minDim ? minDim : maxDim;
-                locked[i] = true;
-                flexSpace = std::max(0, flexSpace - allocations[i]);
-                totalStretch -= stretch[i];
-                changed = true;
-            }
+                share[i] = (flexSpace * stretch[i]) / totalStretch;
+            limited[i] = std::max(itemMinimum(m_boxItems[i], vertical),
+                                  std::min(share[i], itemMaximum(m_boxItems[i], vertical)));
+            correction += limited[i] - share[i];
+        }
+        for (int i = 0; i < m_boxItems.size(); ++i) {
+            if (locked[i] || limited[i] == share[i])
+                continue;
+            if ((correction > 0 && limited[i] < share[i]) || (correction < 0 && limited[i] > share[i]))
+                continue;
+            allocations[i] = limited[i];
+            locked[i] = true;
+            flexSpace = std::max(0, flexSpace - limited[i]);
+            totalStretch -= stretch[i];
+            changed = true;
         }
     }
 

@@ -284,7 +284,7 @@ These free functions and aliases are in the same header:
 1. The layout skips each widget that you hid. It keeps no space for it and does not show it again.
 2. An item gets stretch 0 if the size policy of its widget along the direction is `Fixed`. A widget that you add with stretch 0 uses the stretch of its size policy along the direction (`horizontalStretch()` or `verticalStretch()`), as in Qt. If that stretch is also 0, an `Expanding` or `MinimumExpanding` widget gets stretch 1.
 3. Each item with stretch 0 gets its size hint, if all of these size hints fit. Else it gets its minimum size.
-4. The free space goes to the items with a stretch, in proportion to the stretch. An item never gets less than its minimum size or more than the maximum size of its widget. If each item is at its maximum, the rest of the area stays empty.
+4. The free space goes to the items with a stretch, in proportion to the stretch. An item never gets less than its minimum size or more than the maximum size of its widget; the other items share the difference. If each item is at its maximum, the rest of the area stays empty.
 5. Across the direction, a widget fills the area, up to its maximum size. A widget with the policy `Fixed` or `Maximum` across the direction gets its size hint (at least its minimum size).
 6. If a widget does not fit, the layout hides it. The layout shows the widget again when there is space. If the widget had the focus, it gets the focus back.
 

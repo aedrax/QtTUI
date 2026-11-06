@@ -587,6 +587,56 @@ private slots:
         QCOMPARE(c.geometry(), QRect(11, 0, 7, 4));
     }
 
+    void minimumAndMaximumLimitsDoNotDependOnTheOrder()
+    {
+        // The maximum of a must not take space that the minimum of b needs
+        {
+            LayoutTestWidget a(QSize(1, 1)), b(QSize(20, 1));
+            a.setMaximumWidth(12);
+            QTuiBoxLayout layout(QTuiBoxLayout::LeftToRight);
+            layout.addWidget(&a, 1);
+            layout.addWidget(&b, 1);
+            layout.apply(QRect(0, 0, 30, 1));
+            QCOMPARE(a.geometry().width(), 10);
+            QCOMPARE(b.geometry().width(), 20);
+        }
+        // a gets the space that b cannot take
+        {
+            LayoutTestWidget a(QSize(20, 1)), b(QSize(1, 1));
+            b.setMaximumWidth(5);
+            QTuiBoxLayout layout(QTuiBoxLayout::LeftToRight);
+            layout.addWidget(&a, 1);
+            layout.addWidget(&b, 1);
+            layout.apply(QRect(0, 0, 30, 1));
+            QCOMPARE(a.geometry().width(), 25);
+            QCOMPARE(b.geometry().width(), 5);
+        }
+    }
+
+    void sizeLimitSetterAppliesTheParentLayoutAgain()
+    {
+        QTuiWidget parent;
+        auto *a = new LayoutTestWidget(QSize(2, 1), &parent);
+        auto *b = new LayoutTestWidget(QSize(2, 1), &parent);
+        auto *layout = new QTuiBoxLayout(QTuiBoxLayout::LeftToRight);
+        layout->addWidget(a, 1);
+        layout->addWidget(b, 1);
+        parent.setLayout(layout);
+        parent.setGeometry(QRect(0, 0, 40, 3));
+        QCoreApplication::processEvents();
+        QCOMPARE(a->geometry(), QRect(0, 0, 20, 3));
+
+        a->setMaximumWidth(8);
+        QCoreApplication::processEvents();
+        QCOMPARE(a->geometry(), QRect(0, 0, 8, 3));
+        QCOMPARE(b->geometry(), QRect(8, 0, 32, 3));
+
+        b->setMinimumWidth(36);
+        QCoreApplication::processEvents();
+        QCOMPARE(a->geometry(), QRect(0, 0, 4, 3));
+        QCOMPARE(b->geometry(), QRect(4, 0, 36, 3));
+    }
+
     void fixedSizeWidgetKeepsItsSize()
     {
         HintWidget fixed(QSize(2, 1), QSize(20, 3));
