@@ -40,6 +40,7 @@ set(QTTUI_SOURCES
     QTuiProgressBar.cpp
     QTuiProgressDialog.cpp
     QTuiTextEdit.cpp
+    QTuiSyntaxHighlighter.cpp
     QTuiDateTimeEdit.cpp
     QTuiLCDNumber.cpp
     QTuiScrollBar.cpp
@@ -144,6 +145,7 @@ set(QTTUI_HEADERS
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiProgressBar.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiProgressDialog.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiTextEdit.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiSyntaxHighlighter.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiDateTimeEdit.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiLCDNumber.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiScrollBar.h

@@ -122,6 +122,9 @@ qttui_add_test(test_text_wrap test_text_wrap.cpp)
 # QTuiTextEdit::find()
 qttui_add_test(test_text_find test_text_find.cpp)
 
+# QTuiSyntaxHighlighter on a text edit
+qttui_add_test(test_syntax_highlighter test_syntax_highlighter.cpp)
+
 # QTuiDateTimeEdit, QTuiDateEdit, QTuiTimeEdit, QTuiLCDNumber unit tests
 qttui_add_test(test_qtui_datetime_lcd test_qtui_datetime_lcd.cpp)
 

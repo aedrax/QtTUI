@@ -2,9 +2,11 @@
 #include <QtTUI/QtTuiUnicode.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
+#include <QtTUI/RenderUtils.h>
 #include <QtTUI/TuiEvents.h>
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiClipboard.h>
+#include <QtTUI/QTuiSyntaxHighlighter.h>
 #include <climits>
 
 namespace QtTUI {
@@ -114,6 +116,13 @@ void QTuiTextEdit::viewTop(int &line, int &sub) const
     sub = qBound(0, m_scrollSub, int(rowStarts(line).size()) - 1);
 }
 
+void QTuiTextEdit::setHighlighter(QTuiSyntaxHighlighter *highlighter)
+{
+    m_highlighter = highlighter;
+    m_statesValid = 0;
+    markDirty();
+}
+
 QTuiTextEdit::LineWrapMode QTuiTextEdit::lineWrapMode() const
 {
     return m_wrapMode;
@@ -151,6 +160,7 @@ void QTuiTextEdit::setPlainText(const QString &text)
     m_undoStack.clear();
     m_redoStack.clear();
     m_typingRow = m_typingCol = -1;
+    m_statesValid = 0;
     emit textChanged();
     markDirty();
 }
@@ -380,6 +390,10 @@ void QTuiTextEdit::appendLines(const QString &text, int maxLines)
         m_scrollRow = qMax(0, m_scrollRow - excess);
         clearSelection();
     }
+    // The block states of the highlighter stay for the lines before the new
+    // text. Lines removed from the top change the line numbers, so then all
+    // states are invalid.
+    m_statesValid = excess > 0 ? 0 : qMin(m_statesValid, int(before.size()) - 1);
 
     if (follow) {
         m_cursorRow = m_lines.size() - 1;
@@ -595,8 +609,13 @@ void QTuiTextEdit::keyPressEvent(TuiKeyEvent *event)
 
 void QTuiTextEdit::recordEdit(const QStringList &before, int row, int col, bool typing)
 {
-    if (before == m_lines)
+    // Find the first line that changed
+    int first = 0;
+    while (first < before.size() && first < m_lines.size() && before.at(first) == m_lines.at(first))
+        ++first;
+    if (first == before.size() && first == m_lines.size())
         return;
+    m_statesValid = qMin(m_statesValid, first); // for the highlighter
     // A typed character right after the previous one joins its step
     if (!(typing && row == m_typingRow && col == m_typingCol)) {
         m_undoStack.append({before, row, col});
@@ -614,6 +633,7 @@ void QTuiTextEdit::restoreState(const QStringList &lines, int row, int col)
     m_cursorRow = qBound(0, row, int(m_lines.size()) - 1);
     m_cursorCol = qBound(0, col, int(m_lines.at(m_cursorRow).length()));
     m_typingRow = m_typingCol = -1;
+    m_statesValid = 0;
     clearSelection();
     m_desiredCol = cursorRowColumn();
     scrollToVisible();
@@ -854,6 +874,22 @@ void QTuiTextEdit::paintEvent(ScreenBuffer &buffer)
         lineIdx = m_lines.size(); // the view is after the text
     QList<int> starts = lineIdx < m_lines.size() ? rowStarts(lineIdx) : QList<int>{0};
 
+    // The highlighter gives the formats of each line that shows. A line
+    // needs the block state of the line before it, so first calculate the
+    // states that are not known for the lines above the view.
+    QTuiSyntaxHighlighter *highlighter = m_highlighter;
+    QList<Cell> formats; // of line formatsLine; the paint does not keep them
+    int formatsLine = -1;
+    if (highlighter) {
+        m_blockStates.resize(m_lines.size());
+        m_statesValid = qMin(m_statesValid, int(m_lines.size()));
+        for (; m_statesValid < lineIdx; ++m_statesValid) {
+            m_blockStates[m_statesValid] = highlighter->highlightLine(
+                m_lines.at(m_statesValid),
+                m_statesValid > 0 ? m_blockStates.at(m_statesValid - 1) : -1, nullptr);
+        }
+    }
+
     for (int row = 0; row < geo.height(); ++row) {
         const int py = geo.y() + row;
         if (py >= buffer.height())
@@ -879,6 +915,15 @@ void QTuiTextEdit::paintEvent(ScreenBuffer &buffer)
         const int rowEnd = lastSub ? lineLen : starts.at(sub + 1);
         const int lineCols = QtTuiUnicode::stringWidth(line.mid(rowStart, rowEnd - rowStart));
         const bool focused = hasFocus();
+
+        // Ask the highlighter one time for each line, not for each row
+        if (highlighter && lineIdx < m_lines.size() && lineIdx != formatsLine) {
+            formats.fill(cellStyle(theme, theme.foreground, theme.background), lineLen);
+            m_blockStates[lineIdx] = highlighter->highlightLine(
+                line, lineIdx > 0 ? m_blockStates.at(lineIdx - 1) : -1, &formats);
+            m_statesValid = qMax(m_statesValid, lineIdx + 1);
+            formatsLine = lineIdx;
+        }
 
         // Style for the cell holding code-unit index `textIdx` of this line
         // (indices past lineLen address the virtual cells after the text,
@@ -911,6 +956,8 @@ void QTuiTextEdit::paintEvent(ScreenBuffer &buffer)
                 style.foreground = theme.focusBackground;
                 style.background = theme.focusForeground;
                 style.inverse = false;
+            } else if (lineIdx == formatsLine && textIdx >= 0 && textIdx < formats.size()) {
+                style = formats.at(textIdx); // from the highlighter
             } else {
                 style.foreground = theme.foreground;
                 style.background = theme.background;

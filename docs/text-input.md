@@ -2,7 +2,8 @@
 
 This page covers the widgets that show text or take text from the user: the
 label, the line edit, the text edits and the combo box. It also covers the
-validators and the completer for `QTuiLineEdit`.
+syntax highlighter for the text edits, and the validators and the completer
+for `QTuiLineEdit`.
 
 ## QTuiLabel
 
@@ -365,7 +366,8 @@ completer.
 clipboard and undo. It scrolls to keep the cursor visible. It can wrap long
 lines.
 
-QtTUI does not have rich text, a document or a text cursor class. The text
+QtTUI does not have rich text, a document or a text cursor class. A
+[QTuiSyntaxHighlighter](#qtuisyntaxhighlighter) can color the text. The text
 edit keeps the text as a list of lines. The cursor is a row and a column. The
 column counts UTF-16 code units. The constructor sets the focus policy to
 `Qt::StrongFocus`.
@@ -550,6 +552,98 @@ void example(QTuiWidget *parent)
 | `int maximumBlockCount() const` | Returns the maximum number of lines. Property `maximumBlockCount`. The default is 0 (no limit). |
 | `void setMaximumBlockCount(int count)` | Sets the maximum number of lines. If there are more lines, it removes lines from the top immediately. |
 | `int blockCount() const` | Returns the number of lines. |
+
+## QTuiSyntaxHighlighter
+
+`#include <QtTUI/QTuiSyntaxHighlighter.h>` · Inherits: QObject
+
+`QTuiSyntaxHighlighter` colors the text of a `QTuiTextEdit` or a
+`QTuiPlainTextEdit`, like `QSyntaxHighlighter` (which is in Qt GUI). It is an
+abstract class. Make a subclass and implement `highlightBlock()`. A block is
+one line of the text.
+
+The constructor attaches the highlighter to the text edit. The text edit is
+the parent, so it deletes the highlighter. A text edit uses one highlighter:
+the last one that you make for it. If you delete the highlighter, the text
+shows without colors again.
+
+The text edit calls `highlightBlock()` only for the lines that it paints, each
+time it paints them. It does not keep the formats. It keeps one number for
+each line, the block state, so that a line can continue the state of the line
+before it. If the view moves down, the lines above it give their block state
+one time. After an edit, the text edit calculates the block states from the
+first changed line on again when a paint needs them.
+
+A format changes the text color, bold, italic, underline and strikethrough.
+It does not change the background. The cursor and the selection show as they
+do without a highlighter. With word wrap, the text edit calls
+`highlightBlock()` one time for a line, not for each row.
+
+### Example
+
+This highlighter colors numbers, and C comments that can continue on the next
+lines:
+
+```cpp
+#include <QtTUI/QtTUI>
+
+using namespace QtTUI;
+
+class Highlighter : public QTuiSyntaxHighlighter {
+public:
+    using QTuiSyntaxHighlighter::QTuiSyntaxHighlighter;
+
+protected:
+    void highlightBlock(const QString &text) override
+    {
+        for (int i = 0; i < text.length(); ++i) {
+            if (text.at(i).isDigit())
+                setFormat(i, 1, Color(220, 160, 0));
+        }
+
+        // Block state 1: the line ends in a comment
+        bool inComment = previousBlockState() == 1;
+        int start = inComment ? 0 : text.indexOf(QLatin1String("/*"));
+        while (start >= 0) {
+            const int end = text.indexOf(QLatin1String("*/"), inComment ? start : start + 2);
+            if (end < 0) {
+                setFormat(start, text.length() - start, Color(0, 160, 0));
+                setCurrentBlockState(1);
+                return;
+            }
+            setFormat(start, end + 2 - start, Color(0, 160, 0));
+            inComment = false;
+            start = text.indexOf(QLatin1String("/*"), end + 2);
+        }
+        setCurrentBlockState(0);
+    }
+};
+
+void example(QTuiWidget *parent)
+{
+    auto *editor = new QTuiPlainTextEdit(parent);
+    new Highlighter(editor);
+}
+```
+
+### Functions
+
+| Function | Description |
+| --- | --- |
+| `explicit QTuiSyntaxHighlighter(QTuiTextEdit *parent)` | Makes a highlighter and attaches it to the text edit. |
+| `QTuiTextEdit *textEdit() const` | Returns the text edit. |
+| `void rehighlight()` | Slot. Makes the text edit calculate all block states again and repaint. Call it after a change of the rules. |
+
+### Protected functions
+
+| Function | Description |
+| --- | --- |
+| `virtual void highlightBlock(const QString &text) = 0` | Implement this function. `text` is one line. Call `setFormat()` for the parts that get a format. Do not keep data about the line, except with `setCurrentBlockState()`: the text edit can call this function for a line at any time and in any sequence. |
+| `void setFormat(int start, int count, const Color &color)` | Sets the text color of `count` UTF-16 code units from `start`. The function ignores the part of the range that is not in the line. |
+| `void setFormat(int start, int count, const Cell &format)` | Sets the `foreground`, `bold`, `italic`, `underline` and `strikethrough` of `format`. It does not use the other members. |
+| `int previousBlockState() const` | Returns the block state of the line before this line. Returns -1 for the first line, and if that line did not set a state. |
+| `int currentBlockState() const` | Returns the block state of this line. It is -1 until `setCurrentBlockState()` sets it. |
+| `void setCurrentBlockState(int newState)` | Sets the block state of this line. The next line gets it from `previousBlockState()`. |
 
 ## QTuiValidator
 

@@ -2,10 +2,13 @@
 #define QTTUI_QTUITEXTEDIT_H
 
 #include <QtTUI/QTuiWidget.h>
+#include <QPointer>
 #include <QString>
 #include <QStringList>
 
 namespace QtTUI {
+
+class QTuiSyntaxHighlighter;
 
 class QTuiTextEdit : public QTuiWidget {
     Q_OBJECT
@@ -77,6 +80,10 @@ protected:
     int lineCount() const;
 
 private:
+    friend class QTuiSyntaxHighlighter;
+    // Sets the highlighter and makes all block states invalid
+    void setHighlighter(QTuiSyntaxHighlighter *highlighter);
+
     void editKey(TuiKeyEvent *event);
     // Records an undo step if the text differs from before
     void recordEdit(const QStringList &before, int row, int col, bool typing);
@@ -106,6 +113,13 @@ private:
     int cursorRowColumn() const;
     // The first visual row of the view
     void viewTop(int &line, int &sub) const;
+
+    QPointer<QTuiSyntaxHighlighter> m_highlighter;
+    // The block state of the highlighter after each line. The states of
+    // the lines before m_statesValid are correct; the paint calculates
+    // the others when it needs them. The text edit keeps no formats.
+    QList<int> m_blockStates;
+    int m_statesValid = 0;
 
     QStringList m_lines;
     int m_cursorRow = 0;
