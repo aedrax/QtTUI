@@ -12,16 +12,12 @@ class QTuiAction;
 
 class QTuiToolBar : public QTuiWidget {
     Q_OBJECT
-    Q_PROPERTY(bool movable READ isMovable WRITE setMovable)
 public:
     explicit QTuiToolBar(const QString &title = QString(), QTuiWidget *parent = nullptr);
 
     void addAction(QTuiAction *action);
     void addSeparator();
     void addWidget(QTuiWidget *widget);
-
-    bool isMovable() const;
-    void setMovable(bool movable);
 
     QString title() const;
 
@@ -42,10 +38,12 @@ private:
         QTuiWidget *widget = nullptr;
         bool isSeparator = false;
     };
+    // The text of an action, with "[x] " or "[ ] " before it if the
+    // action is checkable
+    static QString actionLabel(const QTuiAction *action);
     QString m_title;
     QList<ToolBarItem> m_items;
     int m_focusedItem = 0;
-    bool m_movable = true;
 };
 
 } // namespace QtTUI

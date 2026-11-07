@@ -26,4 +26,10 @@ QEvent::Type TuiEventTypes::pasteEventType()
     return type;
 }
 
+QEvent::Type TuiEventTypes::closeEventType()
+{
+    static const QEvent::Type type = static_cast<QEvent::Type>(QEvent::registerEventType());
+    return type;
+}
+
 } // namespace QtTUI

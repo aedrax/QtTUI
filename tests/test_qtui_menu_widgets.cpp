@@ -304,6 +304,77 @@ private slots:
         QVERIFY(row2.contains(QStringLiteral("Open")));
     }
 
+    void action_checkable()
+    {
+        QTuiAction action(QStringLiteral("Wrap"));
+        QSignalSpy toggled(&action, &QTuiAction::toggled);
+        QSignalSpy triggered(&action, &QTuiAction::triggered);
+        QVERIFY(!action.isCheckable());
+
+        // Only a checkable action can be checked
+        action.setChecked(true);
+        QVERIFY(!action.isChecked());
+        QCOMPARE(toggled.count(), 0);
+        action.trigger();
+        QCOMPARE(triggered.at(0).at(0).toBool(), false);
+        action.setChecked(false);
+
+        action.setCheckable(true);
+        action.trigger();
+        QVERIFY(action.isChecked());
+        QCOMPARE(toggled.count(), 1);
+        QCOMPARE(toggled.at(0).at(0).toBool(), true);
+        QCOMPARE(triggered.count(), 2);
+        QCOMPARE(triggered.at(1).at(0).toBool(), true);
+
+        action.setChecked(true); // no change, no signal
+        QCOMPARE(toggled.count(), 1);
+        action.trigger();
+        QVERIFY(!action.isChecked());
+        QCOMPARE(toggled.count(), 2);
+
+        // A disabled action does not toggle
+        action.setEnabled(false);
+        action.trigger();
+        QVERIFY(!action.isChecked());
+        QCOMPARE(triggered.count(), 3);
+    }
+
+    void menu_showsTheCheckMark()
+    {
+        QTuiMenu menu(QStringLiteral("View"));
+        QTuiAction *wrap = menu.addAction(QStringLiteral("Wrap"));
+        menu.addAction(QStringLiteral("Zoom"));
+        const int plainWidth = menu.minimumSize().width();
+        wrap->setCheckable(true);
+        QCOMPARE(menu.minimumSize().width(), plainWidth + 4);
+        menu.popup(QPoint(0, 0));
+
+        auto row = [&](int y) {
+            ScreenBuffer buffer(20, 6);
+            menu.paintEvent(buffer);
+            QString text;
+            for (int col = 0; col < 20; ++col)
+                text += buffer.backCell(col, y).text();
+            return text;
+        };
+        QVERIFY(row(1).contains(QStringLiteral("[ ] Wrap")));
+        // The other items align with the checkable items
+        QVERIFY(row(2).contains(QStringLiteral("    Zoom")));
+
+        // Enter toggles the action and closes the menu
+        sendKey(menu, Qt::Key_Return);
+        QVERIFY(wrap->isChecked());
+        QVERIFY(!menu.isVisible());
+        menu.popup(QPoint(0, 0));
+        QVERIFY(row(1).contains(QStringLiteral("[x] Wrap")));
+
+        // A change of the state repaints the open menu
+        menu.clearDirtyRegions();
+        wrap->setChecked(false);
+        QVERIFY(menu.isDirty());
+    }
+
     void menu_highlightedItemRenderedDifferently()
     {
         QTuiMenu menu(QStringLiteral("File"));

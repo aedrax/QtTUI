@@ -69,7 +69,7 @@ QSize QTuiStackedLayout::minimumSize() const
     // is the maximum over all pages.
     QSize size(0, 0);
     for (QTuiWidget *widget : m_widgets)
-        size = size.expandedTo(widget->minimumSize());
+        size = size.expandedTo(widget->effectiveMinimumSize());
     return size + QSize(m_marginLeft + m_marginRight,
                         m_marginTop + m_marginBottom);
 }
@@ -128,7 +128,7 @@ void QTuiStackedLayout::apply(const QRect &availableArea)
 
     for (int i = 0; i < m_widgets.size(); ++i) {
         if (i == m_currentIndex) {
-            m_widgets.at(i)->setGeometry(rect);
+            m_widgets.at(i)->setGeometry(QRect(rect.topLeft(), rect.size().boundedTo(m_widgets.at(i)->maximumSize())));
             m_widgets.at(i)->setVisible(true);
         } else {
             m_widgets.at(i)->setVisible(false);

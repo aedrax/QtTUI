@@ -27,25 +27,27 @@ QSize QTuiWidgetItem::sizeHint() const
 {
     if (!m_widget)
         return QSize(0, 0);
-    return m_widget->sizeHint().expandedTo(m_widget->minimumSize());
+    return m_widget->effectiveSizeHint();
 }
 
 QSize QTuiWidgetItem::minimumSize() const
 {
     if (!m_widget)
         return QSize(0, 0);
-    return m_widget->minimumSize();
+    return m_widget->effectiveMinimumSize();
 }
 
 QSize QTuiWidgetItem::maximumSize() const
 {
-    return QSize(16777215, 16777215);
+    return m_widget ? m_widget->maximumSize() : QSize(16777215, 16777215);
 }
 
 void QTuiWidgetItem::setGeometry(const QRect &rect)
 {
+    // The widget stays at the top-left corner of rect if its maximum size
+    // is smaller
     if (m_widget)
-        m_widget->setGeometry(rect);
+        m_widget->setGeometry(QRect(rect.topLeft(), rect.size().boundedTo(m_widget->maximumSize())));
 }
 
 QRect QTuiWidgetItem::geometry() const

@@ -19,6 +19,9 @@ public:
 
     void addRow(const QString &labelText, QTuiWidget *field);
     void addRow(QTuiWidget *label, QTuiWidget *field);
+    // A row with a nested layout as the field. The form layout takes
+    // ownership of the layout.
+    void addRow(QTuiWidget *label, QTuiLayout *field);
     void removeRow(int row);
 
     int rowCount() const;
@@ -37,6 +40,7 @@ private:
         QTuiWidget *label;
         QTuiWidget *field;
         bool ownsLabel;
+        QTuiLayout *fieldLayout = nullptr;
     };
 
     void watchRowWidgets(const FormRow &row);

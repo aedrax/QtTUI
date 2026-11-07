@@ -312,6 +312,21 @@ private slots:
                 qDeleteAll(widgets);
             });
     }
+
+    // Size limits reach the grid through QTuiWidgetItem
+    void sizeLimitsOfACell()
+    {
+        QTuiWidget a, b;
+        a.setMinimumSize(6, 2);
+        b.setMaximumSize(4, 1);
+        QTuiGridLayout grid;
+        grid.addWidget(&a, 0, 0);
+        grid.addWidget(&b, 0, 1);
+        QCOMPARE(grid.minimumSize(), QSize(6, 2));
+        grid.apply(QRect(0, 0, 20, 4));
+        QVERIFY(a.geometry().width() >= 6);
+        QCOMPARE(b.geometry().size(), QSize(4, 1));
+    }
 };
 
 QTEST_MAIN(TestQTuiGridLayout)

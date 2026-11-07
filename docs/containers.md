@@ -199,7 +199,7 @@ void example(QTuiWidget *parent)
 
 `#include <QtTUI/QTuiTabWidget.h>` · Inherits: QTuiWidget
 
-QTuiTabWidget shows a row of tabs, a separator row and one page below them. The first row is a [QTuiTabBar](#qtuitabbar) and the pages start on row 3. The tab bar takes the keys and the mouse clicks.
+QTuiTabWidget shows a row of tabs, a separator row and one page. By default the first row is a [QTuiTabBar](#qtuitabbar) and the pages start on row 3. With `setTabPosition(QTuiTabBar::South)` the pages start on row 1, and the separator and the tab bar are the last 2 rows. The tab bar takes the keys and the mouse clicks.
 
 ### Example
 
@@ -235,7 +235,9 @@ void example(QTuiWidget *parent)
 | `void setCurrentIndex(int index)` | Shows the page at `index`. An index out of range does nothing. |
 | `QTuiWidget *currentWidget() const` | Returns the current page, or nullptr. |
 | `QTuiTabBar *tabBar() const` | Returns the tab bar. |
-| `QRect contentArea() const` | Returns the page area: the geometry without the first 2 rows. Returns an empty rect if the height is less than 3. |
+| `QTuiTabBar::TabPosition tabPosition() const` | Returns the tab position of the tab bar. The default is `QTuiTabBar::North`. |
+| `void setTabPosition(QTuiTabBar::TabPosition position)` | Puts the tab bar above the pages (`North`) or below them (`South`) and sets the geometry of the bar and the pages again. There is no `West` or `East`. |
+| `QRect contentArea() const` | Returns the page area: the geometry without the 2 rows of the tab bar and the separator. Returns an empty rect if the height is less than 3. |
 | `QSize minimumSize() const` | Returns the width of the tab bar or of the widest page, and 2 rows plus the height of the tallest page (at least 1). |
 | `void paintEvent(ScreenBuffer &buffer)` | Paints the tab bar, the separator and the current page. |
 | `void resizeEvent(TuiResizeEvent *event)` | Protected. Sets the geometry of the tab bar and the pages again. |
@@ -281,7 +283,7 @@ void example(QTuiWidget *parent)
 
 | Enum | Values |
 | --- | --- |
-| `TabPosition` | `North` (default), `South`. |
+| `TabPosition` | `North` (default): the tabs are above the pages. `South`: the tabs are below the pages. Unlike QTabWidget, there is no `West` or `East`. |
 
 ### Functions
 
@@ -296,7 +298,7 @@ void example(QTuiWidget *parent)
 | `int currentIndex() const` | Returns the current tab, or -1. Property: `currentIndex`. |
 | `void setCurrentIndex(int index)` | Sets the current tab. -1 is valid and means no tab. Emits `currentChanged()`. |
 | `TabPosition tabPosition() const` | Returns the tab position. |
-| `void setTabPosition(TabPosition position)` | Keeps the tab position. The tab bar does not use this value when it paints. |
+| `void setTabPosition(TabPosition position)` | Sets the tab position. The bar is always one row and paints the same for the two values. A [QTuiTabWidget](#qtuitabwidget) that owns the bar reads the value and puts the bar above or below its pages at the next paint. `QTuiTabWidget::setTabPosition()` does the same at once. |
 | `QSize minimumSize() const` | Returns the width of all labels and separators, and 1 row. |
 | `void paintEvent(ScreenBuffer &buffer)` | Paints the tab row. |
 | `void keyPressEvent(TuiKeyEvent *event)` | Protected. See "Keys". |
@@ -745,7 +747,8 @@ void example(QTuiMdiArea *mdi)
 | `bool isMaximized() const` | Returns true if the sub-window is maximized. |
 | `void showMaximized()` | Slot. Keeps the normal geometry and fills the parent area. Emits `windowStateChanged()`. |
 | `void showNormal()` | Slot. Sets the normal geometry again. Emits `windowStateChanged()`. |
-| `void close()` | Slot. Removes the sub-window from the MDI area, as `removeSubWindow()` does, and hides it. It does not delete the sub-window. |
+| `bool close()` | From QTuiWidget. Calls `closeEvent()` and hides the sub-window if the event stays accepted. It does not delete the sub-window. Before, QTuiMdiSubWindow had its own `void close()` slot. |
+| `void closeEvent(TuiCloseEvent *event)` | Protected. Removes the sub-window from the MDI area, as `removeSubWindow()` does. In an override, call `event->ignore()` to keep the sub-window open, else call this implementation. |
 | `QSize minimumSize() const` | Returns 3 rows, and the width of the title and buttons or of the content widget plus the frame. |
 | `void paintEvent(ScreenBuffer &buffer)` | Paints the frame and the content widget. A maximized sub-window shows `[▫]` in place of `[□]`. |
 | `void focusEntered(QTuiWidget *focus)` | Protected. Makes this sub-window the active window of its MDI area. |
@@ -812,10 +815,6 @@ void example(QTuiMainWindow *window)
 | `QTuiWidget *widget() const` | Returns the content widget, or nullptr. |
 | `QString windowTitle() const` | Returns the title. Property: `windowTitle`. |
 | `void setWindowTitle(const QString &title)` | Sets the title. |
-| `Qt::DockWidgetAreas allowedAreas() const` | Returns the allowed areas. The default is `Qt::AllDockWidgetAreas`. |
-| `void setAllowedAreas(Qt::DockWidgetAreas areas)` | Keeps the allowed areas. No other part of QtTUI reads this value. |
-| `bool isFloatable() const` | Returns the floatable flag. Property: `floatable`. The default is true. |
-| `void setFloatable(bool floatable)` | Keeps the floatable flag. A dock widget cannot float in QtTUI. |
 | `QRect contentArea() const` | Returns the area inside the frame. Returns an empty rect if the dock widget is smaller than 3 x 3 cells. |
 | `QSize minimumSize() const` | Returns 3 rows, and the width of the title and `[X]` or of the content widget plus the frame. |
 | `void paintEvent(ScreenBuffer &buffer)` | Paints the frame and the content widget. |
@@ -832,11 +831,11 @@ void example(QTuiMainWindow *window)
 
 | Key | Action |
 | --- | --- |
-| Escape, Q | Hides the dock widget and emits `visibilityChanged(false)`. |
+| Escape, Q | Closes the dock widget with `close()` and emits `visibilityChanged(false)`. If `closeEvent()` ignores the event, the dock widget stays open and emits nothing. |
 
 ### Mouse
 
-- A left click on `[X]` hides the dock widget and emits `visibilityChanged(false)`.
+- A left click on `[X]` closes the dock widget, as Escape does.
 
 ## QTuiSizeGrip
 

@@ -22,7 +22,16 @@ void QTuiToolBar::addAction(QTuiAction *action)
     ToolBarItem item;
     item.action = action;
     m_items.append(item);
+    // The checked state shows in the bar
+    connect(action, &QTuiAction::toggled, this, [this]() { markDirty(); });
     markDirty();
+}
+
+QString QTuiToolBar::actionLabel(const QTuiAction *action)
+{
+    if (!action->isCheckable())
+        return action->text();
+    return (action->isChecked() ? QStringLiteral("[x] ") : QStringLiteral("[ ] ")) + action->text();
 }
 
 void QTuiToolBar::addSeparator()
@@ -44,16 +53,6 @@ void QTuiToolBar::addWidget(QTuiWidget *widget)
     markDirty();
 }
 
-bool QTuiToolBar::isMovable() const
-{
-    return m_movable;
-}
-
-void QTuiToolBar::setMovable(bool movable)
-{
-    m_movable = movable;
-}
-
 QString QTuiToolBar::title() const
 {
     return m_title;
@@ -66,7 +65,7 @@ QSize QTuiToolBar::minimumSize() const
         if (item.isSeparator) {
             width += 3; // " | "
         } else if (item.action) {
-            width += QtTuiUnicode::stringWidth(item.action->text()) + 2; // padding
+            width += QtTuiUnicode::stringWidth(actionLabel(item.action)) + 2; // padding
         } else if (item.widget) {
             width += item.widget->minimumSize().width();
         }
@@ -106,7 +105,7 @@ void QTuiToolBar::paintEvent(ScreenBuffer &buffer)
             const Cell spaceStyle = isFocused ? cellStyle(bg, fg) : cellStyle(fg, bg);
             Cell textStyle = spaceStyle;
             textStyle.bold = isFocused;
-            const QString text = item.action->text();
+            const QString text = actionLabel(item.action);
             const int textWidth = QtTuiUnicode::stringWidth(text);
             fillRect(buffer, QRect(xPos, py, textWidth + 2, 1), spaceStyle);
             renderText(buffer, xPos + 1, py, text, textWidth, textStyle);
@@ -176,7 +175,7 @@ int QTuiToolBar::itemAt(int x, int *start, int *width, int *navigableIndex) cons
         if (item.isSeparator) {
             itemWidth = 3; // " | "
         } else if (item.action) {
-            itemWidth = QtTuiUnicode::stringWidth(item.action->text()) + 2; // padding
+            itemWidth = QtTuiUnicode::stringWidth(actionLabel(item.action)) + 2; // padding
         } else if (item.widget) {
             itemWidth = item.widget->minimumSize().width();
         }

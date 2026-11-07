@@ -456,6 +456,225 @@ private slots:
         QCOMPARE(b.geometry().width(), 3);
     }
 
+    void sizePolicyStretchUsedWhenAddWidgetStretchIsZero()
+    {
+        LayoutTestWidget a(QSize(1, 1)), b(QSize(1, 1)), c(QSize(1, 1));
+        QTuiSizePolicy policy;
+        policy.setHorizontalStretch(1);
+        a.setSizePolicy(policy);
+        policy.setHorizontalStretch(3);
+        b.setSizePolicy(policy);
+        // The stretch of addWidget() has priority over the policy
+        policy.setHorizontalStretch(200);
+        c.setSizePolicy(policy);
+
+        QTuiBoxLayout layout(QTuiBoxLayout::LeftToRight);
+        layout.addWidget(&a);
+        layout.addWidget(&b);
+        layout.addWidget(&c, 4);
+        layout.apply(QRect(0, 0, 80, 1));
+        QCOMPARE(a.geometry().width(), 10);
+        QCOMPARE(b.geometry().width(), 30);
+        QCOMPARE(c.geometry().width(), 40);
+
+        // The vertical stretch has no effect in a horizontal layout
+        LayoutTestWidget d(QSize(4, 1)), e(QSize(4, 1));
+        QTuiSizePolicy vertical;
+        vertical.setVerticalStretch(5);
+        d.setSizePolicy(vertical);
+        QTuiBoxLayout row(QTuiBoxLayout::LeftToRight);
+        row.addWidget(&d);
+        row.addWidget(&e, 1);
+        row.apply(QRect(0, 0, 40, 1));
+        QCOMPARE(d.geometry().width(), 4);
+        QCOMPARE(e.geometry().width(), 36);
+    }
+
+    void addLayoutNestsALayout()
+    {
+        LayoutTestWidget top(QSize(4, 2)), left(QSize(3, 1)), right(QSize(3, 1)), bottom(QSize(4, 1));
+        QTuiBoxLayout column(QTuiBoxLayout::TopToBottom);
+        auto *row = new QTuiBoxLayout(QTuiBoxLayout::LeftToRight);
+        row->addWidget(&left, 1);
+        row->addWidget(&right, 1);
+        column.addWidget(&top);
+        column.addLayout(row);
+        column.addWidget(&bottom, 1);
+        QCOMPARE(row->parent(), &column);
+        QCOMPARE(column.count(), 3);
+        // The nested layout counts in the minimum size on the two axes
+        QCOMPARE(column.minimumSize(), QSize(6, 4));
+
+        column.apply(QRect(0, 0, 20, 10));
+        QCOMPARE(top.geometry(), QRect(0, 0, 20, 2));
+        // Without a stretch the nested layout gets its minimum height
+        QCOMPARE(left.geometry(), QRect(0, 2, 10, 1));
+        QCOMPARE(right.geometry(), QRect(10, 2, 10, 1));
+        QCOMPARE(bottom.geometry(), QRect(0, 3, 20, 7));
+
+        // A destroyed nested layout leaves the layout
+        delete row;
+        QCOMPARE(column.count(), 2);
+        column.apply(QRect(0, 0, 20, 10));
+        QCOMPARE(bottom.geometry(), QRect(0, 2, 20, 8));
+    }
+
+    void addLayoutWithStretchSharesFreeSpace()
+    {
+        LayoutTestWidget a(QSize(2, 1)), b(QSize(2, 1));
+        QTuiBoxLayout row(QTuiBoxLayout::LeftToRight);
+        auto *nested = new QTuiBoxLayout(QTuiBoxLayout::TopToBottom);
+        nested->addWidget(&b);
+        row.addWidget(&a, 1);
+        row.addLayout(nested, 3);
+        row.apply(QRect(0, 0, 40, 5));
+        QCOMPARE(a.geometry(), QRect(0, 0, 10, 5));
+        QCOMPARE(b.geometry().x(), 10);
+        QCOMPARE(b.geometry().width(), 30);
+    }
+
+    void explicitMinimumWinsOverTheOverride()
+    {
+        // LayoutTestWidget overrides minimumSize()
+        LayoutTestWidget a(QSize(4, 1)), b(QSize(4, 1));
+        a.setMinimumWidth(12);
+        QCOMPARE(a.minimumSize(), QSize(4, 1)); // the override is not changed
+        QCOMPARE(a.effectiveMinimumSize(), QSize(12, 1));
+
+        QTuiBoxLayout layout(QTuiBoxLayout::LeftToRight);
+        layout.addWidget(&a);
+        layout.addWidget(&b, 1);
+        QCOMPARE(layout.minimumSize(), QSize(16, 1));
+        layout.apply(QRect(0, 0, 30, 1));
+        QCOMPARE(a.geometry(), QRect(0, 0, 12, 1));
+        QCOMPARE(b.geometry(), QRect(12, 0, 18, 1));
+
+        // 0 removes the explicit minimum
+        a.setMinimumWidth(0);
+        QCOMPARE(a.effectiveMinimumSize(), QSize(4, 1));
+
+        // A widget without an override reports the explicit minimum itself
+        QTuiWidget plain;
+        plain.setMinimumSize(7, 2);
+        QCOMPARE(plain.minimumSize(), QSize(7, 2));
+    }
+
+    void maximumSizeLimitsAStretchedWidget()
+    {
+        LayoutTestWidget a(QSize(2, 1)), b(QSize(2, 1)), c(QSize(2, 1));
+        a.setMaximumWidth(5);
+        QTuiBoxLayout layout(QTuiBoxLayout::LeftToRight);
+        layout.addWidget(&a, 1);
+        layout.addWidget(&b, 1);
+        layout.addWidget(&c, 1);
+        layout.apply(QRect(0, 0, 35, 4));
+        // The other widgets share the space that a cannot take
+        QCOMPARE(a.geometry(), QRect(0, 0, 5, 4));
+        QCOMPARE(b.geometry(), QRect(5, 0, 15, 4));
+        QCOMPARE(c.geometry(), QRect(20, 0, 15, 4));
+
+        // Across the direction
+        b.setMaximumHeight(2);
+        layout.apply(QRect(0, 0, 35, 4));
+        QCOMPARE(b.geometry(), QRect(5, 0, 15, 2));
+
+        // If each widget is at its maximum, the rest of the area stays empty
+        b.setMaximumWidth(6);
+        c.setMaximumWidth(7);
+        layout.apply(QRect(0, 0, 35, 4));
+        QCOMPARE(a.geometry().width(), 5);
+        QCOMPARE(b.geometry(), QRect(5, 0, 6, 2));
+        QCOMPARE(c.geometry(), QRect(11, 0, 7, 4));
+    }
+
+    void minimumAndMaximumLimitsDoNotDependOnTheOrder()
+    {
+        // The maximum of a must not take space that the minimum of b needs
+        {
+            LayoutTestWidget a(QSize(1, 1)), b(QSize(20, 1));
+            a.setMaximumWidth(12);
+            QTuiBoxLayout layout(QTuiBoxLayout::LeftToRight);
+            layout.addWidget(&a, 1);
+            layout.addWidget(&b, 1);
+            layout.apply(QRect(0, 0, 30, 1));
+            QCOMPARE(a.geometry().width(), 10);
+            QCOMPARE(b.geometry().width(), 20);
+        }
+        // a gets the space that b cannot take
+        {
+            LayoutTestWidget a(QSize(20, 1)), b(QSize(1, 1));
+            b.setMaximumWidth(5);
+            QTuiBoxLayout layout(QTuiBoxLayout::LeftToRight);
+            layout.addWidget(&a, 1);
+            layout.addWidget(&b, 1);
+            layout.apply(QRect(0, 0, 30, 1));
+            QCOMPARE(a.geometry().width(), 25);
+            QCOMPARE(b.geometry().width(), 5);
+        }
+    }
+
+    void sizeLimitSetterAppliesTheParentLayoutAgain()
+    {
+        QTuiWidget parent;
+        auto *a = new LayoutTestWidget(QSize(2, 1), &parent);
+        auto *b = new LayoutTestWidget(QSize(2, 1), &parent);
+        auto *layout = new QTuiBoxLayout(QTuiBoxLayout::LeftToRight);
+        layout->addWidget(a, 1);
+        layout->addWidget(b, 1);
+        parent.setLayout(layout);
+        parent.setGeometry(QRect(0, 0, 40, 3));
+        QCoreApplication::processEvents();
+        QCOMPARE(a->geometry(), QRect(0, 0, 20, 3));
+
+        a->setMaximumWidth(8);
+        QCoreApplication::processEvents();
+        QCOMPARE(a->geometry(), QRect(0, 0, 8, 3));
+        QCOMPARE(b->geometry(), QRect(8, 0, 32, 3));
+
+        b->setMinimumWidth(36);
+        QCoreApplication::processEvents();
+        QCOMPARE(a->geometry(), QRect(0, 0, 4, 3));
+        QCOMPARE(b->geometry(), QRect(4, 0, 36, 3));
+    }
+
+    void fixedSizeWidgetKeepsItsSize()
+    {
+        HintWidget fixed(QSize(2, 1), QSize(20, 3));
+        LayoutTestWidget rest(QSize(1, 1));
+        fixed.setFixedSize(8, 2);
+        QCOMPARE(fixed.maximumSize(), QSize(8, 2));
+        QCOMPARE(fixed.effectiveSizeHint(), QSize(8, 2));
+
+        QTuiBoxLayout layout(QTuiBoxLayout::TopToBottom);
+        layout.addWidget(&fixed);
+        layout.addWidget(&rest, 1);
+        layout.apply(QRect(0, 0, 30, 10));
+        QCOMPARE(fixed.geometry(), QRect(0, 0, 8, 2));
+        QCOMPARE(rest.geometry(), QRect(0, 2, 30, 8));
+    }
+
+    void sizeLimitSettersResizeTheWidget()
+    {
+        LayoutTestWidget w(QSize(1, 1));
+        w.setGeometry(QRect(3, 4, 10, 5));
+        w.clearDirtyRegions();
+        w.setMaximumSize(6, 2);
+        QCOMPARE(w.geometry(), QRect(3, 4, 6, 2));
+        // The old and the new area are dirty
+        QVERIFY(w.hasDirtyRegions());
+        QCOMPARE(w.dirtyOldRegion(), QRect(3, 4, 10, 5));
+        QCOMPARE(w.dirtyNewRegion(), QRect(3, 4, 6, 2));
+
+        w.setMaximumSize(100, 100);
+        w.setMinimumSize(8, 3);
+        QCOMPARE(w.geometry(), QRect(3, 4, 8, 3));
+
+        // The maximum wins over a larger minimum
+        w.setMaximumWidth(5);
+        QCOMPARE(w.effectiveMinimumSize(), QSize(5, 3));
+        QCOMPARE(w.geometry(), QRect(3, 4, 5, 3));
+    }
+
     void expandingTakesFreeSpaceAndFixedNeverGrows()
     {
         QTuiBoxLayout layout(QTuiBoxLayout::LeftToRight);

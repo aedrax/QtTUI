@@ -100,6 +100,18 @@ QTuiTabBar *QTuiTabWidget::tabBar() const
     return m_tabBar;
 }
 
+QTuiTabBar::TabPosition QTuiTabWidget::tabPosition() const
+{
+    return m_tabBar->tabPosition();
+}
+
+void QTuiTabWidget::setTabPosition(QTuiTabBar::TabPosition position)
+{
+    // The tab bar marks itself and this widget dirty
+    m_tabBar->setTabPosition(position);
+    updatePageGeometries();
+}
+
 void QTuiTabWidget::onTabChanged(int index)
 {
     if (index == m_currentIndex)
@@ -138,10 +150,12 @@ void QTuiTabWidget::updatePageGeometries()
     const int w = geo.width();
     const int h = geo.height();
 
-    // Tab bar occupies the first row (North position)
-    m_tabBar->setGeometry(QRect(x0, y0, w, 1));
+    // The tab bar is the first row (North) or the last row (South)
+    const bool south = m_tabBar->tabPosition() == QTuiTabBar::South;
+    m_tabBar->setGeometry(QRect(x0, south ? y0 + h - 1 : y0, w, 1));
 
-    // Content area is below the tab bar and separator line (2 rows of chrome)
+    // The content area is the geometry without the tab bar and the
+    // separator line (2 rows of chrome)
     const QRect content = contentArea();
 
     for (auto *page : m_pages) {
@@ -168,8 +182,10 @@ QRect QTuiTabWidget::contentArea() const
     const QRect geo = geometry();
     if (geo.isEmpty() || geo.height() < 3)
         return QRect();
-    // Chrome: 1 row for tab bar + 1 row for separator = 2 rows
-    return QRect(geo.x(), geo.y() + 2, geo.width(), qMax(0, geo.height() - 2));
+    // Chrome: 1 row for tab bar + 1 row for separator = 2 rows, above the
+    // pages (North) or below them (South)
+    const bool south = m_tabBar->tabPosition() == QTuiTabBar::South;
+    return QRect(geo.x(), south ? geo.y() : geo.y() + 2, geo.width(), geo.height() - 2);
 }
 
 void QTuiTabWidget::paintEvent(ScreenBuffer &buffer)
@@ -196,13 +212,14 @@ void QTuiTabWidget::paintEvent(ScreenBuffer &buffer)
     // Paint the tab bar
     m_tabBar->paintEvent(buffer);
 
-    // Clear the content area below the tab bar
-    fillRect(buffer, geo.adjusted(0, 1, 0, 0), cellStyle(fg, bg));
+    // Clear the separator row and the content area
+    const bool south = m_tabBar->tabPosition() == QTuiTabBar::South;
+    fillRect(buffer, south ? geo.adjusted(0, 0, 0, -1) : geo.adjusted(0, 1, 0, 0), cellStyle(fg, bg));
 
     // Draw a separator line between tab bar and content
     if (h > 1) {
-        int sepY = y0 + 1;
-        if (sepY < buffer.height()) {
+        int sepY = south ? y0 + h - 2 : y0 + 1;
+        if (sepY >= 0 && sepY < buffer.height()) {
             for (int col = 0; col < w; ++col) {
                 int px = x0 + col;
                 if (px < buffer.width()) {

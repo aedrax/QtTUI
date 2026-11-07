@@ -91,7 +91,13 @@ QTuiTabBar::TabPosition QTuiTabBar::tabPosition() const
 
 void QTuiTabBar::setTabPosition(TabPosition position)
 {
+    if (m_tabPosition == position)
+        return;
     m_tabPosition = position;
+    markDirty();
+    // A tab widget puts the bar above or below its pages
+    if (QTuiWidget *parent = parentWidget())
+        parent->markDirty();
 }
 
 QSize QTuiTabBar::minimumSize() const

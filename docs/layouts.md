@@ -127,10 +127,10 @@ void example(QTuiWidget *parent)
 | Function | Description |
 | --- | --- |
 | `QTuiWidgetItem(QTuiWidget *widget)` | Makes an item for `widget`. |
-| `QSize sizeHint() const` | Returns the size hint of the widget, at least its minimum size. |
-| `QSize minimumSize() const` | Returns the minimum size of the widget. |
-| `QSize maximumSize() const` | Returns 16777215 x 16777215. |
-| `void setGeometry(const QRect &rect)` | Sets the geometry of the widget. |
+| `QSize sizeHint() const` | Returns `effectiveSizeHint()` of the widget. |
+| `QSize minimumSize() const` | Returns `effectiveMinimumSize()` of the widget. |
+| `QSize maximumSize() const` | Returns `maximumSize()` of the widget. |
+| `void setGeometry(const QRect &rect)` | Sets the geometry of the widget. If the maximum size of the widget is smaller than `rect`, the widget gets its maximum size at the top-left corner of `rect`. |
 | `QRect geometry() const` | Returns the geometry of the widget. |
 | `bool isEmpty() const` | Returns true if the widget is destroyed or hidden. |
 | `QTuiWidget *widget() const` | Returns the widget, or nullptr if it is destroyed. |
@@ -172,7 +172,7 @@ QSize example()
 
 `#include <QtTUI/QTuiLayoutItem.h>` · Inherits: QTuiLayoutItem
 
-QTuiLayoutItemWrapper holds a nested layout as an item. `QTuiGridLayout::addLayout()` uses it. It keeps a guarded pointer to the layout.
+QTuiLayoutItemWrapper holds a nested layout as an item. `QTuiGridLayout::addLayout()` uses it. `QTuiBoxLayout::addLayout()` and `QTuiFormLayout::addRow()` keep the nested layout in their own entries. It keeps a guarded pointer to the layout.
 
 ### Example
 
@@ -251,13 +251,14 @@ int main(int argc, char *argv[])
 | `QTuiBoxLayout(Direction direction, QObject *parent = nullptr)` | Makes an empty box layout. |
 | `void addWidget(QTuiWidget *widget, int stretch = 0)` | Adds a widget with a stretch factor. A nullptr, a widget that is already in the layout, and a negative stretch give a warning. A negative stretch becomes 0. |
 | `void removeWidget(QTuiWidget *widget)` | Removes a widget from the layout. It does not delete or hide the widget. |
+| `void addLayout(QTuiLayout *layout, int stretch = 0)` | Adds a nested layout with a stretch factor. The box layout becomes the parent of the nested layout and deletes it, as in Qt. With stretch 0 the nested layout gets its minimum size along the direction. Across the direction it fills the area. If the nested layout is destroyed, the box layout removes its entry. |
 | `void addSpacing(int size)` | Adds empty space of `size` cells. |
 | `void addStretch(int stretch = 0)` | Adds empty space that takes free space by its stretch factor. A stretch of 0 becomes 1, so it takes free space, as in Qt. |
 | `int spacing() const` | Returns the cells between two items that follow each other. The default is 0. |
 | `void setSpacing(int spacing)` | Sets the spacing. A negative value becomes 0. |
 | `void apply(const QRect &availableArea)` | Sets the geometry of the widgets. See "How the space is divided". |
 | `Direction direction() const` | Returns the direction. |
-| `int count() const` | Returns the number of entries, with the spacings and stretches. |
+| `int count() const` | Returns the number of entries, with the spacings, stretches and nested layouts. |
 | `QSize minimumSize() const` | Returns the sum of the minimum sizes and spacings along the direction, the largest minimum size across it, and the margins. |
 | `const QList<Item> &items() const` | Returns the entries of the layout. Use this function, not `itemAt()`. |
 
@@ -265,9 +266,10 @@ The struct `QTuiBoxLayout::Item` has these fields:
 
 | Field | Description |
 | --- | --- |
-| `QTuiWidget *widget` | The widget, or nullptr for an entry from `addSpacing()` or `addStretch()`. |
+| `QTuiWidget *widget` | The widget, or nullptr for an entry from `addSpacing()`, `addStretch()` or `addLayout()`. |
 | `int stretch` | The stretch factor. |
 | `int spacerSize` | The cells of an entry from `addSpacing()`. 0 for the other entries. |
+| `QTuiLayout *layout` | The nested layout of an entry from `addLayout()`. nullptr for the other entries. |
 
 These free functions and aliases are in the same header:
 
@@ -280,15 +282,17 @@ These free functions and aliases are in the same header:
 ### How the space is divided
 
 1. The layout skips each widget that you hid. It keeps no space for it and does not show it again.
-2. An item gets stretch 0 if the size policy of its widget along the direction is `Fixed`. An `Expanding` or `MinimumExpanding` widget with stretch 0 gets stretch 1.
+2. An item gets stretch 0 if the size policy of its widget along the direction is `Fixed`. A widget that you add with stretch 0 uses the stretch of its size policy along the direction (`horizontalStretch()` or `verticalStretch()`), as in Qt. If that stretch is also 0, an `Expanding` or `MinimumExpanding` widget gets stretch 1.
 3. Each item with stretch 0 gets its size hint, if all of these size hints fit. Else it gets its minimum size.
-4. The free space goes to the items with a stretch, in proportion to the stretch. An item never gets less than its minimum size.
-5. Across the direction, a widget fills the area. A widget with the policy `Fixed` or `Maximum` across the direction gets its size hint (at least its minimum size).
+4. The free space goes to the items with a stretch, in proportion to the stretch. An item never gets less than its minimum size or more than the maximum size of its widget; the other items share the difference. If each item is at its maximum, the rest of the area stays empty.
+5. Across the direction, a widget fills the area, up to its maximum size. A widget with the policy `Fixed` or `Maximum` across the direction gets its size hint (at least its minimum size).
 6. If a widget does not fit, the layout hides it. The layout shows the widget again when there is space. If the widget had the focus, it gets the focus back.
+
+The minimum size is `QTuiWidget::effectiveMinimumSize()` and the size hint is `QTuiWidget::effectiveSizeHint()`, so the limits from `setMinimumSize()`, `setMaximumSize()` and `setFixedSize()` apply.
 
 If the layout direction is right-to-left, the layout mirrors the positions horizontally.
 
-`QTuiBoxLayout` does not override `itemAt()`, so `itemAt()` returns nullptr for each index. `apply()` does not use the items from the base `addItem()`.
+`QTuiBoxLayout` keeps its entries as `Item` structs, not as `QTuiLayoutItem` objects. It does not override `itemAt()`, so `itemAt()` returns nullptr for each index. Use `items()`. `apply()` does not use the items from the base `addItem()`.
 
 ## QTuiGridLayout
 
@@ -377,7 +381,8 @@ void example(QTuiWidget *parent)
 | `~QTuiFormLayout()` | Deletes the labels that the layout made. It does not delete the fields. |
 | `void addRow(const QString &labelText, QTuiWidget *field)` | Makes a `QTuiLabel` with `labelText` and adds a row. The label gets the same parent as the field. If the field has no parent yet, `apply()` sets the parent of the label later. |
 | `void addRow(QTuiWidget *label, QTuiWidget *field)` | Adds a row with your label widget. The layout does not own the label. |
-| `void removeRow(int row)` | Removes a row. It deletes the label if the layout made it. It does not delete the field. |
+| `void addRow(QTuiWidget *label, QTuiLayout *field)` | Adds a row with your label widget and a nested layout as the field. The form layout becomes the parent of the nested layout. A nullptr layout is ignored. If the nested layout is destroyed, the form layout removes its row. If you call `addRow(label, nullptr)`, cast the nullptr to `QTuiWidget *` or `QTuiLayout *`. |
+| `void removeRow(int row)` | Removes a row. It deletes the label if the layout made it, and the nested layout of the row. It does not delete the field or the widgets in the nested layout. |
 | `int rowCount() const` | Returns the number of rows. |
 | `int horizontalSpacing() const` | Returns the cells between the label column and the field column. The default is 0. |
 | `void setHorizontalSpacing(int spacing)` | Sets the horizontal spacing. A negative value becomes 0. |
@@ -385,7 +390,7 @@ void example(QTuiWidget *parent)
 | `QSize minimumSize() const` | Returns the widest label plus the spacing plus the widest field, the sum of the row heights, and the margins. |
 | `void apply(const QRect &availableArea)` | Sets the geometry of the labels and fields. The field column always keeps at least 1 cell. |
 
-If a field is destroyed, the layout removes its row. The form layout does not use the size policy of the widgets. `QTuiFormLayout` does not override `itemAt()`, so `itemAt()` returns nullptr for each index.
+If a field is destroyed, the layout removes its row. The form layout does not use the size policy of the widgets. It uses their size limits: a label or field never gets more than its maximum size. `QTuiFormLayout` does not override `itemAt()`, so `itemAt()` returns nullptr for each index.
 
 ## QTuiStackedLayout
 
@@ -491,4 +496,4 @@ void example(QTuiWidget *parent)
 | `int verticalStretch() const` | Returns the vertical stretch. |
 | `void setVerticalStretch(int stretch)` | Sets the vertical stretch, limited to 0 to 255. |
 
-No layout reads the stretch values of a size policy. Give the stretch to `QTuiBoxLayout::addWidget()` or `QTuiGridLayout::setRowStretch()` instead.
+`QTuiBoxLayout` uses the stretch of the size policy along its direction for a widget that you add with stretch 0. A stretch that you give to `addWidget()` has priority. `QTuiGridLayout` does not read these values: use `setRowStretch()` and `setColumnStretch()`.

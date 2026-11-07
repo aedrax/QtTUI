@@ -67,6 +67,7 @@ int main(int argc, char *argv[])
 | `QTuiStatusBar *statusBar() const` | Returns the status bar, or `nullptr`. |
 | `void addDockWidget(Qt::DockWidgetArea area, QTuiDockWidget *dockWidget)` | Adds a dock widget to an edge. If the dock is in a different area, it moves. See [containers](containers.md). |
 | `void removeDockWidget(QTuiDockWidget *dockWidget)` | Removes a dock widget. The dock gets no parent. |
+| `bool close()` | From QTuiWidget. If the window is the main window of the application (`QTuiApplication::setMainWindow()`), an accepted close calls `QCoreApplication::quit()`. Override `closeEvent()` and call `event->ignore()` to stop the quit, for example to ask about changes that are not saved. |
 | `void show()` | Shows the window. If the geometry is empty, the window takes the size of the terminal. Then it calls the layout. |
 | `void paintEvent(ScreenBuffer &buffer)` | Paints nothing. The children paint themselves. |
 | `void resizeEvent(TuiResizeEvent *event)` (protected) | Takes the new terminal size and does the layout again. |
@@ -346,7 +347,7 @@ void addViewMenu(QTuiMenuBar *bar)
 | --- | --- |
 | Up, k | Highlights the previous item. Separators are skipped. At the top, it goes to the bottom. |
 | Down, j | Highlights the next item. Separators are skipped. At the bottom, it goes to the top. |
-| Enter, Return | Triggers the highlighted action and closes the menu. On a submenu item, opens the submenu at the right of the menu. |
+| Enter, Return | Triggers the highlighted action (a checkable action changes its checked state) and closes the menu. On a submenu item, opens the submenu at the right of the menu. |
 | Right, l | Opens the submenu of the highlighted item. On an item without a submenu, the menu bar opens the next menu. |
 | Left, h | Closes a submenu. In a menu of the menu bar, the bar opens the previous menu. |
 | Escape | Closes the menu. |
@@ -367,7 +368,12 @@ menu stays open.
 A command that menus, tool bars, context menus and shortcuts use. Each live
 action is in a global list, and the main window uses that list to find
 shortcuts. The shortcut is a string that `QTuiKeySequence` parses. Unlike
-`QAction`, an action has no check state, icon or tooltip.
+`QAction`, an action has no icon or tooltip.
+
+A checkable action has an on/off state. A menu shows `[x] ` or `[ ] ` before
+the text of a checkable action, and gives the other items of that menu the
+same indent. A tool bar shows the same mark before the text. Each trigger
+(Enter, a click or the shortcut) inverts the state.
 
 ### Example
 
@@ -401,13 +407,18 @@ void addSaveAction(QTuiMainWindow *window, QTuiToolBar *toolBar)
 | `static QList<QTuiAction *> registeredActions()` | Returns all live actions, in the order that they were made. |
 | `bool isEnabled() const` | Returns `true` if the action is enabled. The default is `true`. |
 | `void setEnabled(bool enabled)` | Enables or disables the action. The property is `enabled`. |
-| `void trigger()` | Emits `triggered()` if the action is enabled. |
+| `bool isCheckable() const` | Returns `true` if the action has an on/off state. The default is `false`. The property is `checkable`. |
+| `void setCheckable(bool checkable)` | Makes the action checkable or not. If this changes `isChecked()`, the action emits `toggled()`. |
+| `bool isChecked() const` | Returns `true` if the action is checkable and checked. The property is `checked`. |
+| `void setChecked(bool checked)` | Sets the checked state and emits `toggled()` if a checkable action changes. As in `QAction`, an action that is not checkable keeps the value, but `isChecked()` stays `false` and no signal is emitted. |
+| `void trigger()` | Does nothing if the action is disabled. Else it inverts the checked state of a checkable action, then emits `triggered()`. |
 
 ### Signals
 
 | Signal | Description |
 | --- | --- |
-| `triggered()` | The action triggered. |
+| `triggered(bool checked = false)` | The action triggered. `checked` is the new state of a checkable action, else `false`. A slot without a parameter also connects. |
+| `toggled(bool checked)` | The checked state of a checkable action changed. |
 | `textChanged(const QString &text)` | The text changed. |
 | `enabledChanged(bool enabled)` | The action became enabled or disabled. |
 
@@ -567,7 +578,8 @@ void addSearchKey(QTuiWidget *page, QTuiLineEdit *search)
 
 A one-row bar of actions, separators and widgets. Give it to
 `QTuiMainWindow::addToolBar()`. Each action shows as its text with one space
-on each side. A separator shows as ` | `.
+on each side. A separator shows as ` | `. A checkable action shows `[x] ` or
+`[ ] ` before its text.
 
 ### Example
 
@@ -598,9 +610,7 @@ void addEditToolBar(QTuiMainWindow *window)
 | `void addAction(QTuiAction *action)` | Adds an action. The tool bar does not take ownership. |
 | `void addSeparator()` | Adds a separator. |
 | `void addWidget(QTuiWidget *widget)` | Adds a widget. The tool bar puts it at its place in the row, as wide as its `minimumSize().width()`. The tool bar becomes the parent of the widget. |
-| `bool isMovable() const` | Returns the `movable` property. |
-| `void setMovable(bool movable)` | Sets the `movable` property. The value has no effect: a tool bar cannot move. |
-| `QString title() const` | Returns the title. The tool bar does not show it. |
+| `QString title() const` | Returns the title. The tool bar does not show it. QToolBar also does not show it in the bar: Qt uses it in the context menu of the main window, and QtTUI has no such menu. Use the title to identify the tool bar in your code. |
 | `QSize minimumSize() const` | Returns the width of all items and a height of 1. |
 | `void paintEvent(ScreenBuffer &buffer)` | Paints the items. While the tool bar has focus, the current item has inverted colors and bold text. |
 | `QRect hoverRect() const` (protected) | Returns the item under the mouse, but not a separator. |
@@ -611,7 +621,7 @@ void addEditToolBar(QTuiMainWindow *window)
 | --- | --- |
 | Left, h | Makes the previous item current. At the start, it goes to the end. |
 | Right, l | Makes the next item current. At the end, it goes to the start. |
-| Enter, Return | Triggers the action of the current item. |
+| Enter, Return | Triggers the action of the current item. A checkable action changes its checked state. |
 
 Separators are not items for the keys. Widgets are items, but Enter does
 nothing on a widget.

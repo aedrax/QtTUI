@@ -161,6 +161,13 @@ void QTuiDialog::reject()
     done(Rejected);
 }
 
+void QTuiDialog::closeEvent(TuiCloseEvent *event)
+{
+    Q_UNUSED(event);
+    if (isVisible())
+        reject();
+}
+
 void QTuiDialog::done(int result)
 {
     m_result = result;

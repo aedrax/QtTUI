@@ -26,7 +26,6 @@ public:
 public slots:
     void showMaximized();
     void showNormal();
-    void close();
 
     void paintEvent(ScreenBuffer &buffer) override;
     QSize minimumSize() const override;
@@ -39,6 +38,9 @@ protected:
     // The focus in the window, or in a widget in it, makes it the active window
     void focusEntered(QTuiWidget *focus) override;
     void keyPressEvent(TuiKeyEvent *event) override;
+    // close() of QTuiWidget, Escape, Q and [X] come here. Removes the
+    // window from the list of the area, as in Qt.
+    void closeEvent(TuiCloseEvent *event) override;
     // Mouse: a press activates the window. On the title bar, [X] closes
     // it, [□] maximizes or restores it, and a drag moves it; a drag on
     // the bottom-right corner resizes it.

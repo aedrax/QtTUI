@@ -1,5 +1,6 @@
 #include <QtTest/QtTest>
 #include <QtTUI/QTuiFormLayout.h>
+#include <QtTUI/QTuiBoxLayout.h>
 #include <QtTUI/QTuiLabel.h>
 #include <QtTUI/QTuiWidget.h>
 #include <QtTUI/ScreenBuffer.h>
@@ -272,6 +273,41 @@ private slots:
         // Setting same text should not emit
         label.setText(QStringLiteral("Test"));
         QCOMPARE(spy.count(), 1);
+    }
+
+    void addRowWithNestedLayout()
+    {
+        FormTestWidget label(QSize(5, 1)), first(QSize(4, 1)), second(QSize(4, 1)), field(QSize(3, 1));
+        QTuiFormLayout form;
+        auto *row = new QTuiBoxLayout(QTuiBoxLayout::LeftToRight);
+        row->addWidget(&first, 1);
+        row->addWidget(&second, 1);
+        form.addRow(&label, row);
+        form.addRow(QStringLiteral("B"), &field);
+        QCOMPARE(row->parent(), &form);
+        QCOMPARE(form.minimumSize(), QSize(13, 2));
+
+        form.apply(QRect(0, 0, 25, 5));
+        QCOMPARE(label.geometry(), QRect(0, 0, 5, 1));
+        QCOMPARE(first.geometry(), QRect(5, 0, 10, 1));
+        QCOMPARE(second.geometry(), QRect(15, 0, 10, 1));
+        QCOMPARE(field.geometry(), QRect(5, 1, 20, 1));
+
+        // A destroyed nested layout removes its row
+        delete row;
+        QCOMPARE(form.rowCount(), 1);
+    }
+
+    void sizeLimitsOfTheField()
+    {
+        FormTestWidget label(QSize(5, 1)), field(QSize(3, 1));
+        field.setMinimumHeight(2);
+        field.setMaximumWidth(8);
+        QTuiFormLayout form;
+        form.addRow(&label, &field);
+        QCOMPARE(form.minimumSize(), QSize(8, 2));
+        form.apply(QRect(0, 0, 30, 5));
+        QCOMPARE(field.geometry(), QRect(5, 0, 8, 2));
     }
 
     void horizontalSpacingSeparatesColumns()

@@ -21,6 +21,7 @@ class TuiKeyEvent;
 class TuiMouseEvent;
 class TuiResizeEvent;
 class TuiPasteEvent;
+class TuiCloseEvent;
 
 class QTuiWidget : public QObject {
     Q_OBJECT
@@ -156,7 +157,7 @@ public:
     void raise();
 
     // The default minimum size is the layout's minimum size, or 0x0 if the
-    // widget has no layout.
+    // widget has no layout. A value from setMinimumSize() replaces it.
     virtual QSize minimumSize() const;
 
     // The size the widget prefers; a box layout gives it this size if
@@ -170,6 +171,40 @@ public:
     QTuiSizePolicy sizePolicy() const;
     void setSizePolicy(const QTuiSizePolicy &policy);
     void setSizePolicy(QTuiSizePolicy::Policy horizontal, QTuiSizePolicy::Policy vertical);
+
+    // Size limits, as in QWidget. A minimum that you set (a value above 0)
+    // replaces minimumSize() on that axis, also for a subclass that
+    // overrides minimumSize(). The layouts keep the widget inside the
+    // limits; they read effectiveMinimumSize() and effectiveSizeHint(). A
+    // setter also brings the current size inside the limits. The maximum
+    // wins if it is below the minimum.
+    void setMinimumSize(const QSize &size);
+    void setMinimumSize(int width, int height) { setMinimumSize(QSize(width, height)); }
+    void setMinimumWidth(int width);
+    void setMinimumHeight(int height);
+    QSize maximumSize() const;
+    void setMaximumSize(const QSize &size);
+    void setMaximumSize(int width, int height) { setMaximumSize(QSize(width, height)); }
+    void setMaximumWidth(int width);
+    void setMaximumHeight(int height);
+    void setFixedSize(const QSize &size);
+    void setFixedSize(int width, int height) { setFixedSize(QSize(width, height)); }
+    void setFixedWidth(int width);
+    void setFixedHeight(int height);
+    // The minimum that you set, else minimumSize(); at most maximumSize()
+    QSize effectiveMinimumSize() const;
+    // sizeHint(), from effectiveMinimumSize() to maximumSize()
+    QSize effectiveSizeHint() const;
+
+    // Closes the widget, as QWidget::close(): calls closeEvent(), and hides
+    // the widget if the event stays accepted. Returns false if the handler
+    // ignored the event. A close of the application's main window quits the
+    // application and does not hide the window.
+    bool close();
+protected:
+    // The default accepts the event. Call event->ignore() to stay open.
+    virtual void closeEvent(TuiCloseEvent *event);
+public:
 
     // The default paintEvent() clears the background, so a plain QTuiWidget
     // works as a container. The render pass paints the children.
@@ -251,6 +286,8 @@ private:
     QString m_accessibleName;
     QString m_accessibleDescription;
     QTuiSizePolicy m_sizePolicy;
+    QSize m_minimumSize = QSize(0, 0); // 0: not set
+    QSize m_maximumSize = QSize(16777215, 16777215);
     Qt::ContextMenuPolicy m_contextMenuPolicy = Qt::DefaultContextMenu;
     bool m_underMouse = false;
     QPoint m_hoverPos;

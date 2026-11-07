@@ -161,11 +161,13 @@ The keys and the mouse actions are the same as in [QTuiAbstractSpinBox](#qtuiabs
 
 `#include <QtTUI/QTuiDateTimeEdit.h>` · Inherits: QTuiWidget (QTuiDateEdit and QTuiTimeEdit inherit QTuiDateTimeEdit)
 
-An edit for a `QDateTime`, divided into sections (year, month, day, hour, minute, second). Left and Right select a section, and Up and Down step it. The text shows in a box with a border, centered in the middle row. When the widget has focus, the current section is bold and underlined.
+An edit for a `QDateTime`, divided into sections (year, month, day, hour, minute, second). Left and Right or a click select a section. Up and Down step it, and digits type a value into it. The text shows in a box with a border, centered in the middle row. When the widget has focus, the current section is bold and underlined.
 
 QTuiDateEdit shows only the year, month and day sections, with the format `yyyy-MM-dd`. QTuiTimeEdit shows only the hour, minute and second sections, with the format `HH:mm:ss`.
 
-The `calendarPopup` property is stored, but QtTUI has no calendar popup: the value has no effect. Unlike Qt, you cannot type digits into a section, and the widget does not take the mouse.
+If the `calendarPopup` property is true and the format has a date section, the edit shows a `▼` cell before the right border. F4, Alt+Down or a click on the cell opens a [QTuiCalendarWidget](#qtuicalendarwidget) below the edit, as a popup above the other widgets. The calendar keeps inside the main window and has the minimum and maximum date of the edit. A date that you choose in it (Enter or a click on a day) sets the date of the edit and closes the calendar. Escape or a click outside closes it without a change. A QTuiTimeEdit has no date section, so it shows no cell and opens no calendar.
+
+The edit takes digit keys as text (`acceptsTextInput()` returns true), so a shortcut that is only a digit does not trigger while the edit has the focus.
 
 ### Example
 
@@ -205,11 +207,13 @@ void example(QTuiWidget *parent)
 | `void setMaximumDateTime(const QDateTime &max)` | Sets the maximum. An invalid value removes the limit. If the value is later, it becomes `max`. |
 | `QDateTime minimumDateTime() const` | Returns the minimum. The default is an invalid `QDateTime` (no limit). |
 | `QDateTime maximumDateTime() const` | Returns the maximum. The default is an invalid `QDateTime` (no limit). |
-| `bool calendarPopup() const` | Returns the stored `calendarPopup` value. |
-| `void setCalendarPopup(bool enable)` | Stores the value. It has no effect, because no popup exists. |
+| `bool calendarPopup() const` | Returns the `calendarPopup` property. The default is false. |
+| `void setCalendarPopup(bool enable)` | Shows or hides the `▼` cell and enables the calendar popup. False also closes an open calendar. |
+| `bool acceptsTextInput() const override` | Returns true. |
 | `void paintEvent(ScreenBuffer &buffer) override` | Paints the border, the text and the current section. |
-| `QSize minimumSize() const override` | Returns the text width plus 4, and 3 rows. |
-| `void keyPressEvent(TuiKeyEvent *event) override` (protected) | Selects and steps the sections. |
+| `QSize minimumSize() const override` | Returns the text width plus 4, and 3 rows. With the `▼` cell the width is 2 more. |
+| `void keyPressEvent(TuiKeyEvent *event) override` (protected) | Selects, steps and types into the sections, and opens the calendar. |
+| `void mousePressEvent(TuiMouseEvent *event) override` (protected) | Selects the section under a click, and opens or closes the calendar. |
 | `virtual QList<Section> displaySections() const` (protected) | Returns the sections that the edit uses. QTuiDateTimeEdit returns all six sections. |
 
 The protected enum `Section` has the values `Year`, `Month`, `Day`, `Hour`, `Minute` and `Second`.
@@ -232,6 +236,17 @@ The edit knows the format tokens `yyyy`, `yy`, `MMMM`, `MMM`, `MM`, `M`, `dddd`,
 | Right | Selects the next section. |
 | Up | Adds 1 to the current section. |
 | Down | Subtracts 1 from the current section. |
+| 0 to 9 | Types a digit into the current section. |
+| F4, Alt+Down | Opens the calendar, if `calendarPopup` is true and the format has a date section. |
+
+In the open calendar, the keys of [QTuiCalendarWidget](#qtuicalendarwidget) apply: Enter chooses the date and closes the calendar, and Escape closes it.
+
+You can type digits into a section. In the day, month, hour, minute and second sections each digit shows at once: `2` then `5` in the day section gives day 2, then day 25. A value that is not valid yet, such as `0` for a day, waits for the next digit. If two digits give no valid value (`45` in the day section), the second digit starts again. The year changes only after 4 digits. After a full section (4 digits for the year, else 2) the next section becomes current. Left, Right, Up, Down, a click and a focus change discard the digits that wait.
+
+### Mouse
+
+- A left click on a section in the text makes it the current section.
+- A left click on `▼` opens the calendar, or closes it if it is open.
 
 A step on the year or the day changes the date with `QDate::addYears()` or `QDate::addDays()`. A step on the month goes to the next or previous year after December or January, and keeps the day in the month. A step on the hour, minute or second wraps in that section and does not change the other sections.
 
@@ -405,7 +420,7 @@ void example(QTuiWidget *parent)
 
 | Function | Description |
 | --- | --- |
-| `QTuiDial(QTuiWidget *parent = nullptr)` | Makes a dial. The orientation is horizontal and has no effect. |
+| `QTuiDial(QTuiWidget *parent = nullptr)` | Makes a dial. A dial is round: `orientation()` and `setOrientation()` of QTuiAbstractSlider have no effect on it. |
 | `bool wrapping() const` | Returns true if the value wraps at the ends of the range. The default is false. |
 | `void setWrapping(bool wrapping)` | If true, a step past the maximum goes to the minimum, and a step past the minimum goes to the maximum. |
 | `void paintEvent(ScreenBuffer &buffer) override` | Paints the dial, the value and the indicator. |

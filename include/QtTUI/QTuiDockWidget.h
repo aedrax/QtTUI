@@ -11,7 +11,6 @@ namespace QtTUI {
 class QTuiDockWidget : public QTuiWidget {
     Q_OBJECT
     Q_PROPERTY(QString windowTitle READ windowTitle WRITE setWindowTitle)
-    Q_PROPERTY(bool floatable READ isFloatable WRITE setFloatable)
 public:
     explicit QTuiDockWidget(const QString &title = QString(), QTuiWidget *parent = nullptr);
 
@@ -20,12 +19,6 @@ public:
 
     QString windowTitle() const;
     void setWindowTitle(const QString &title);
-
-    Qt::DockWidgetAreas allowedAreas() const;
-    void setAllowedAreas(Qt::DockWidgetAreas areas);
-
-    bool isFloatable() const;
-    void setFloatable(bool floatable);
 
     QRect contentArea() const;
 
@@ -36,15 +29,13 @@ signals:
     void visibilityChanged(bool visible);
 
 protected:
-    // A click on [X] closes the dock, as Escape does
+    // A click on [X] closes the dock with close(), as Escape does
     void mousePressEvent(TuiMouseEvent *event) override;
     void keyPressEvent(TuiKeyEvent *event) override;
 
 private:
     QTuiWidget *m_widget = nullptr;
     QString m_windowTitle;
-    Qt::DockWidgetAreas m_allowedAreas = Qt::AllDockWidgetAreas;
-    bool m_floatable = true;
 };
 
 } // namespace QtTUI

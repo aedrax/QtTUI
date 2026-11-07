@@ -61,7 +61,6 @@ private slots:
     {
         QTuiToolBar bar;
         QCOMPARE(bar.title(), QString());
-        QCOMPARE(bar.isMovable(), true);
     }
 
     void toolBar_addAction()
@@ -168,14 +167,36 @@ private slots:
         QCOMPARE(spy.count(), 1);
     }
 
-    void toolBar_movableProperty()
+    void toolBar_showsTheCheckedState()
     {
-        QTuiToolBar bar;
-        QCOMPARE(bar.isMovable(), true);
-        bar.setMovable(false);
-        QCOMPARE(bar.isMovable(), false);
-        bar.setMovable(true);
-        QCOMPARE(bar.isMovable(), true);
+        QTuiToolBar bar(QStringLiteral("Tools"));
+        QTuiAction bold(QStringLiteral("Bold"));
+        bold.setCheckable(true);
+        bar.addAction(&bold);
+        bar.setGeometry(QRect(0, 0, 30, 1));
+        QCOMPARE(bar.minimumSize().width(), 10); // " [ ] Bold "
+
+        auto row = [&]() {
+            ScreenBuffer buffer(30, 1);
+            bar.paintEvent(buffer);
+            QString text;
+            for (int col = 0; col < 30; ++col)
+                text += buffer.backCell(col, 0).text();
+            return text;
+        };
+        QVERIFY(row().startsWith(QStringLiteral(" [ ] Bold ")));
+
+        // Enter toggles the action, and the bar repaints
+        bar.clearDirtyRegions();
+        sendKey(bar, Qt::Key_Return);
+        QVERIFY(bold.isChecked());
+        QVERIFY(bar.isDirty());
+        QVERIFY(row().startsWith(QStringLiteral(" [x] Bold ")));
+
+        // A click on the mark toggles the action too
+        TuiMouseEvent click(TuiMouseEvent::Press, Qt::LeftButton, QPoint(2, 0));
+        QCoreApplication::sendEvent(&bar, &click);
+        QVERIFY(!bold.isChecked());
     }
 
     void toolBar_paintEventNoCrash()

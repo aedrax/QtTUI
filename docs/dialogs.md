@@ -77,7 +77,7 @@ bool askForName(QString *name)
 | Slot | Description |
 | --- | --- |
 | `accept()` | Closes the dialog with the result `Accepted`. |
-| `reject()` | Closes the dialog with the result `Rejected`. |
+| `reject()` | Closes the dialog with the result `Rejected`. It does not call `closeEvent()`. |
 | `done(int result)` | Hides the dialog, sets the result and emits `finished()`. Then it emits `accepted()` or `rejected()` if the result is `Accepted` or `Rejected`. |
 
 ### Signals
@@ -96,7 +96,7 @@ The main window handles these keys while the dialog is open.
 | --- | --- |
 | Tab | Moves focus to the next widget in the dialog. |
 | Shift+Tab | Moves focus to the previous widget in the dialog. |
-| Escape | Rejects the dialog. If a popup in the dialog is open, or an item view edits an item, Escape goes to that popup or editor first. |
+| Escape | Calls `close()`. The `closeEvent()` of QTuiDialog rejects the dialog. If a popup in the dialog is open, or an item view edits an item, Escape goes to that popup or editor first. |
 
 ## QTuiMessageBox
 

@@ -154,6 +154,20 @@ geometry.
 `minimumSize()`, `sizeHint()` and `sizePolicy()` tell a layout how to size
 the widget. For the rules, see [Layouts](layouts.md).
 
+`setMinimumSize()`, `setMaximumSize()` and `setFixedSize()` set size limits,
+as in QWidget. A minimum that you set replaces `minimumSize()` on that axis.
+This is also true for a widget class that overrides `minimumSize()`: the
+box, grid, form and stacked layouts read `effectiveMinimumSize()`, not
+`minimumSize()`. A layout gives a widget no more than its maximum size; the
+widget then stays at the start of its cell. A setter also changes the
+current size of the widget if it is outside the limits. `setGeometry()` does
+not check the limits.
+
+The containers that are not layouts (for example QTuiSplitter, QTuiTabWidget,
+QTuiDockWidget, QTuiToolBar and QTuiStatusBar) call `minimumSize()` of their
+children. They see a minimum that you set only on a widget class that does
+not override `minimumSize()`, and they do not read the maximum size.
+
 ### Visible and enabled
 
 `setVisible(false)` hides the widget and its children, and marks its area
@@ -332,6 +346,8 @@ marks the painting parent dirty instead. For the full render path, see
   also outside its geometry.
 - `pasteEvent(TuiPasteEvent *event)`: the text that the user pastes into
   the terminal, as one block.
+- `closeEvent(TuiCloseEvent *event)`: `close()` asks the widget to close.
+  Call `event->ignore()` to stay open.
 - `resizeEvent(TuiResizeEvent *event)`: the terminal size changed.
   `QTuiMainWindow` gets this event.
 
@@ -397,7 +413,16 @@ For the event classes, see [Events and rendering](events-and-rendering.md).
 | `QTuiWidget *parentWidget() const` | Returns the parent widget, or `nullptr`. |
 | `QList<QTuiWidget *> childWidgets() const` | Returns the child widgets in their order. |
 | `void raise()` | Moves the widget to the end of its siblings. It then paints last and gets the mouse first. |
-| `virtual QSize minimumSize() const` | Returns the minimum size. The default is the minimum size of the layout, or 0x0 with no layout. |
+| `virtual QSize minimumSize() const` | Returns the minimum size. The default is the value from `setMinimumSize()` on each axis where it is above 0, else the minimum size of the layout, or 0x0 with no layout. |
+| `void setMinimumSize(const QSize &size)`, `void setMinimumSize(int width, int height)` | Sets the minimum size. 0 on an axis removes the set value for that axis. Marks the layout of the parent for a new calculation. |
+| `void setMinimumWidth(int width)`, `void setMinimumHeight(int height)` | Sets the minimum on one axis. |
+| `QSize maximumSize() const` | Returns the maximum size. The default is 16777215 x 16777215 (no limit). |
+| `void setMaximumSize(const QSize &size)`, `void setMaximumSize(int width, int height)` | Sets the maximum size. Marks the layout of the parent for a new calculation. |
+| `void setMaximumWidth(int width)`, `void setMaximumHeight(int height)` | Sets the maximum on one axis. |
+| `void setFixedSize(const QSize &size)`, `void setFixedSize(int width, int height)` | Sets the minimum and the maximum to the same size. |
+| `void setFixedWidth(int width)`, `void setFixedHeight(int height)` | Sets the minimum and the maximum on one axis. |
+| `QSize effectiveMinimumSize() const` | Returns the minimum that the layouts use: the value from `setMinimumSize()` on each axis where it is above 0, else `minimumSize()`. The result is not larger than `maximumSize()`. |
+| `QSize effectiveSizeHint() const` | Returns the size hint that the layouts use: `sizeHint()`, not smaller than `effectiveMinimumSize()` and not larger than `maximumSize()`. |
 | `virtual QSize sizeHint() const` | Returns the preferred size. The default is `minimumSize()`. |
 | `QTuiSizePolicy sizePolicy() const` | Returns the size policy. The default is `Preferred` on the two axes. |
 | `void setSizePolicy(const QTuiSizePolicy &policy)` | Sets the size policy, and marks the layout of the parent for a new calculation. |
@@ -407,6 +432,7 @@ For the event classes, see [Events and rendering](events-and-rendering.md).
 | `virtual QTuiLayout *layout() const` | Returns the layout, or `nullptr`. |
 | `void clearBackground(ScreenBuffer &buffer, const QRect &clipRect)` | Fills the geometry, clipped to `clipRect`, with spaces in the theme colors. If the widget became smaller, it also clears the old area with the colors of the parent. |
 | `ThemeProperties themeProperties() const` | Returns the theme properties of the widget: a per-widget override, or the entry for its class name. See [Themes](themes.md). |
+| `bool close()` | Closes the widget, as `QWidget::close()`. It calls `closeEvent()`. If the event stays accepted, it hides the widget and returns `true`. Else it returns `false`. If the widget is the main window of the application, it calls `QCoreApplication::quit()` and does not hide the window. Dialogs, MDI sub-windows and dock widgets close through this function when the user closes them. `QTuiMenu` has its own `close()`, which does not call `closeEvent()`. |
 | `void markDirty()` | Marks the full geometry for a repaint. |
 | `void markDirty(const QRect &region)` | Marks an area in screen cells for a repaint. |
 | `bool hasDirtyRegions() const` | Returns `true` after a geometry change, until `clearDirtyRegions()`. |
@@ -425,6 +451,7 @@ For the event classes, see [Events and rendering](events-and-rendering.md).
 | `virtual void mousePressEvent(TuiMouseEvent *event)` | Gets all mouse events: press, release, move, wheel and double click. The default does nothing. |
 | `virtual void resizeEvent(TuiResizeEvent *event)` | Gets a terminal resize. The default does nothing. |
 | `virtual void pasteEvent(TuiPasteEvent *event)` | Gets pasted text for the focus widget. The default does nothing. |
+| `virtual void closeEvent(TuiCloseEvent *event)` | `close()` calls it. The default does nothing, so the event stays accepted. Call `event->ignore()` to keep the widget open. |
 | `virtual void focusEntered(QTuiWidget *focus)` | Called on the new focus widget and on each of its parents. The default does nothing. |
 | `virtual bool focusNextPrevChild(bool next)` | Finds the widget that gets the focus for Tab (`next` is `true`) or Shift+Tab. The default calls the parent; the main window moves the focus along the focus chain and returns `true`. A widget without a main window above it returns `false`. See [Tab order](#tab-order). |
 | `bool focusNextChild()` | Calls `focusNextPrevChild(true)`. |
