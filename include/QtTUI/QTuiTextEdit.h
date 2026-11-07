@@ -38,6 +38,16 @@ public:
     // Selects the whole text (Ctrl+A); the cursor goes to the end
     void selectAll();
 
+    // Options for find(), with the names of QTextDocument::FindFlag
+    enum FindFlag { FindBackward = 0x1, FindCaseSensitively = 0x2, FindWholeWords = 0x4 };
+    Q_DECLARE_FLAGS(FindFlags, FindFlag)
+    // Finds the next occurrence of exp, as QPlainTextEdit::find(). The
+    // search starts at the cursor (after the selection, or before it for
+    // FindBackward) and stops at the end of the text. If it finds exp, it
+    // selects the match, scrolls to it and returns true. A match is in one
+    // line. The text edit has no find bar; the application makes it.
+    bool find(const QString &exp, FindFlags options = {});
+
     // Undo history: Ctrl+Z undoes, Ctrl+Y and Ctrl+Shift+Z redo. Typed
     // characters in a row undo as one step. setPlainText() clears it.
     void undo();
@@ -123,6 +133,8 @@ private:
     int m_typingRow = -1;
     int m_typingCol = -1;
 };
+
+Q_DECLARE_OPERATORS_FOR_FLAGS(QTuiTextEdit::FindFlags)
 
 } // namespace QtTUI
 

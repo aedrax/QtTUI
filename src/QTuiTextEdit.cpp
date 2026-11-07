@@ -228,6 +228,59 @@ void QTuiTextEdit::selectAll()
     markDirty();
 }
 
+bool QTuiTextEdit::find(const QString &exp, FindFlags options)
+{
+    if (exp.isEmpty())
+        return false;
+    const bool backward = options & FindBackward;
+    const Qt::CaseSensitivity cs = (options & FindCaseSensitively) ? Qt::CaseSensitive
+                                                                   : Qt::CaseInsensitive;
+    const int len = exp.length();
+
+    // Start at the cursor. With a selection (for example the last match),
+    // start after it, or before it for a backward search.
+    int row = m_cursorRow;
+    int from = m_cursorCol;
+    if (hasSelection()) {
+        int sr, sc, er, ec;
+        normalizeSelection(sr, sc, er, ec);
+        row = backward ? sr : er;
+        from = backward ? sc : ec;
+    }
+
+    while (row >= 0 && row < m_lines.size()) {
+        const QString &line = m_lines.at(row);
+        // Forward: a match starts at `from` or later. Backward: it ends at
+        // `from` or earlier.
+        for (;;) {
+            const int at = !backward ? line.indexOf(exp, from, cs)
+                         : from >= len ? line.lastIndexOf(exp, from - len, cs) : -1;
+            if (at < 0)
+                break;
+            const bool word = !(at > 0 && line.at(at - 1).isLetterOrNumber())
+                && !(at + len < line.length() && line.at(at + len).isLetterOrNumber());
+            if (word || !(options & FindWholeWords)) {
+                // Select the match; the cursor goes to its end, as in Qt
+                m_selStartRow = row;
+                m_selStartCol = at;
+                m_cursorRow = row;
+                m_cursorCol = at + len;
+                m_selEndRow = m_cursorRow;
+                m_selEndCol = m_cursorCol;
+                m_selecting = true;
+                m_desiredCol = cursorRowColumn();
+                scrollToVisible();
+                markDirty();
+                return true;
+            }
+            from = backward ? at + len - 1 : at + 1;
+        }
+        row += backward ? -1 : 1;
+        from = (backward && row >= 0) ? int(m_lines.at(row).length()) : 0;
+    }
+    return false;
+}
+
 void QTuiTextEdit::startOrExtendSelection()
 {
     if (!m_selecting) {

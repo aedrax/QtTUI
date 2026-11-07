@@ -257,6 +257,7 @@ void example(QTuiWidget *parent)
 | Enum | Values |
 | --- | --- |
 | `LineWrapMode` | `NoWrap` scrolls a long line horizontally. `WidgetWidth` shows a long line on more than one row. |
+| `FindFlag` | `FindBackward` searches to the start of the text. `FindCaseSensitively` makes the search case sensitive. `FindWholeWords` finds complete words only. `FindFlags` is a combination of these values. |
 
 ### Functions
 
@@ -274,6 +275,7 @@ void example(QTuiWidget *parent)
 | `bool hasSelection() const` | Returns true if text is selected. |
 | `QString selectedText() const` | Returns the selected text, with `\n` between the lines. |
 | `void selectAll()` | Selects all text. The cursor goes to the end. |
+| `bool find(const QString &exp, FindFlags options = {})` | Finds the next occurrence of `exp`. Returns true if it finds one. See [Find](#find). |
 | `void undo()` | Undoes the last edit. Emits `textChanged()`. |
 | `void redo()` | Does the last undone edit again. Emits `textChanged()`. |
 | `bool isUndoAvailable() const` | Returns true if there is an edit to undo. |
@@ -287,6 +289,34 @@ The undo history works as in `QTuiLineEdit`: typed characters in a row make
 one step, and the history keeps 100 steps.
 
 A paste keeps line breaks and tabs, and removes other control characters.
+
+### Find
+
+`find()` works as `QPlainTextEdit::find()`. The flags have the names of
+`QTextDocument::FindFlag`, which is in Qt GUI.
+
+- The search starts at the cursor. With a selection, it starts after the
+  selection, or before the selection for `FindBackward`. Thus a second call
+  finds the next match.
+- The search stops at the end (or the start) of the text. It does not continue
+  from the other end.
+- If `find()` finds the text, it selects the match, puts the cursor at the end
+  of the match and scrolls to it. If not, it changes nothing and returns false.
+- Without flags, the search is not case sensitive.
+- With `FindWholeWords`, a match must not have a letter or a digit directly
+  before or after it.
+- A match is in one line. `exp` with a line break finds nothing.
+- `find()` works also if the text edit is read-only.
+
+The text edit has no find bar and no key for find. The application makes them,
+for example with a `QTuiLineEdit` and an action for Ctrl+F:
+
+```cpp
+QObject::connect(findEdit, &QTuiLineEdit::returnPressed, [findEdit, notes]() {
+    if (!notes->find(findEdit->text()))
+        qDebug() << "No more matches";
+});
+```
 
 ### Word wrap
 
