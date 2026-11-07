@@ -227,7 +227,7 @@ completer.
 `#include <QtTUI/QTuiTextEdit.h>` · Inherits: [QTuiWidget](widget.md)
 
 `QTuiTextEdit` is a multi-line plain text editor. It has a selection, the
-clipboard and undo. It scrolls to keep the cursor visible. It does not wrap
+clipboard and undo. It scrolls to keep the cursor visible. It can wrap long
 lines.
 
 QtTUI does not have rich text, a document or a text cursor class. The text
@@ -252,6 +252,12 @@ void example(QTuiWidget *parent)
 }
 ```
 
+### Enums
+
+| Enum | Values |
+| --- | --- |
+| `LineWrapMode` | `NoWrap` scrolls a long line horizontally. `WidgetWidth` shows a long line on more than one row. |
+
 ### Functions
 
 | Function | Description |
@@ -261,7 +267,9 @@ void example(QTuiWidget *parent)
 | `void setPlainText(const QString &text)` | Sets the text and puts the cursor at the start. It clears the selection and the undo history. Emits `textChanged()`. |
 | `bool isReadOnly() const` | Returns true if the user cannot change the text. Property `readOnly`. The default is false. |
 | `void setReadOnly(bool readOnly)` | Sets read-only. A read-only text edit moves the cursor, selects and copies. |
-| `int cursorRow() const` | Returns the line of the cursor, from 0. |
+| `LineWrapMode lineWrapMode() const` | Returns the line wrap mode. Property `lineWrapMode`. The default is `NoWrap`. |
+| `void setLineWrapMode(LineWrapMode mode)` | Sets the line wrap mode. See [Word wrap](#word-wrap). |
+| `int cursorRow() const` | Returns the line of the cursor, from 0. A wrapped line is one line. |
 | `int cursorColumn() const` | Returns the cursor position in the line, in UTF-16 code units. |
 | `bool hasSelection() const` | Returns true if text is selected. |
 | `QString selectedText() const` | Returns the selected text, with `\n` between the lines. |
@@ -279,6 +287,23 @@ The undo history works as in `QTuiLineEdit`: typed characters in a row make
 one step, and the history keeps 100 steps.
 
 A paste keeps line breaks and tabs, and removes other control characters.
+
+### Word wrap
+
+With `setLineWrapMode(QTuiTextEdit::WidgetWidth)`, a line that is wider than
+the widget continues on the next row. The text does not change: `toPlainText()`,
+`cursorRow()` and `cursorColumn()` use the lines, not the rows.
+
+- A row breaks after the last space that fits. A word that is wider than the
+  widget breaks at the edge.
+- Spaces at the end of a row can go past the edge. The cursor on such a space
+  shows in the last column.
+- Up, Down, PageUp, PageDown, Home, End and the mouse use the rows.
+- The view scrolls by rows. It does not scroll horizontally.
+
+The default is `NoWrap`, where Qt has `WidgetWidth`. The text edit calculates
+the rows from the width of the widget each time it needs them. It does not
+keep them.
 
 ### Signals
 
@@ -301,8 +326,8 @@ A paste keeps line breaks and tabs, and removes other control characters.
 | Key | Action |
 | --- | --- |
 | Left, Right | Moves the cursor one character. At the start or the end of a line, goes to the previous or the next line. |
-| Up, Down | Moves the cursor one line. The cursor tries to stay in the same column. |
-| Home, End | Moves the cursor to the start or the end of the line. |
+| Up, Down | Moves the cursor one line. The cursor tries to stay in the same column. With word wrap, moves one row. |
+| Home, End | Moves the cursor to the start or the end of the line. With word wrap, to the start or the end of the row. |
 | PageUp, PageDown | Moves the cursor one page (the height of the widget). |
 | Shift + a movement key | Selects. |
 | Backspace | Removes the selection, or the character before the cursor. At the start of a line, joins the line to the previous line. |

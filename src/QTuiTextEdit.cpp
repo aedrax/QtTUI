@@ -5,6 +5,7 @@
 #include <QtTUI/TuiEvents.h>
 #include <QtTUI/QTuiApplication.h>
 #include <QtTUI/QTuiClipboard.h>
+#include <climits>
 
 namespace QtTUI {
 
@@ -22,6 +23,114 @@ QTuiTextEdit::QTuiTextEdit(QTuiWidget *parent)
     m_lines.append(QString());
 }
 
+// Returns the index where each visual row of line starts, for rows of width
+// columns. A row breaks after the last space that fits. A word that is wider
+// than the row breaks at the edge. Spaces at the end of a row can go past
+// the edge.
+static QList<int> wrapStarts(const QString &line, int width)
+{
+    QList<int> starts{0};
+    if (width <= 0)
+        return starts;
+    int col = 0;
+    int i = 0;
+    int breakAt = 0; // index after the last space
+    QtTuiUnicode::Cluster c;
+    while (QtTuiUnicode::nextCluster(line, i, c)) {
+        const bool space = c.base == U' ' || c.base == U'\t';
+        while (!space && col > 0 && col + c.width > width) {
+            const int start = breakAt > starts.last() ? breakAt : c.index;
+            starts.append(start);
+            col = QtTuiUnicode::stringWidth(line.mid(start, c.index - start));
+        }
+        col += c.width;
+        if (space)
+            breakAt = i;
+    }
+    return starts;
+}
+
+// The visual row that holds index col
+static int subOf(const QList<int> &starts, int col)
+{
+    int sub = starts.size() - 1;
+    while (sub > 0 && starts.at(sub) > col)
+        --sub;
+    return sub;
+}
+
+QList<int> QTuiTextEdit::rowStarts(int line) const
+{
+    return wrapStarts(m_lines.at(line), m_wrapMode == WidgetWidth ? geometry().width() : 0);
+}
+
+bool QTuiTextEdit::stepRow(int &line, int &sub, int delta) const
+{
+    if (delta > 0) {
+        if (sub + 1 < rowStarts(line).size()) {
+            ++sub;
+        } else if (line + 1 < m_lines.size()) {
+            ++line;
+            sub = 0;
+        } else {
+            return false;
+        }
+    } else if (sub > 0) {
+        --sub;
+    } else if (line > 0) {
+        --line;
+        sub = rowStarts(line).size() - 1;
+    } else {
+        return false;
+    }
+    return true;
+}
+
+int QTuiTextEdit::indexAtColumn(int line, int sub, int column) const
+{
+    const QString &text = m_lines.at(line);
+    const QList<int> starts = rowStarts(line);
+    const int start = starts.at(sub);
+    if (column <= 0)
+        return start;
+    // The index after a row that continues is the start of the next row,
+    // so the last position in such a row is its last character
+    const int end = sub + 1 < starts.size()
+        ? QtTuiUnicode::prevClusterIndex(text, starts.at(sub + 1)) : int(text.length());
+    return qMin(end, start + QtTuiUnicode::indexOfColumn(text.mid(start), column));
+}
+
+int QTuiTextEdit::cursorRowColumn() const
+{
+    const QString &text = m_lines.at(m_cursorRow);
+    const QList<int> starts = rowStarts(m_cursorRow);
+    return QtTuiUnicode::columnOfIndex(text, m_cursorCol)
+        - QtTuiUnicode::columnOfIndex(text, starts.at(subOf(starts, m_cursorCol)));
+}
+
+void QTuiTextEdit::viewTop(int &line, int &sub) const
+{
+    line = qBound(0, m_scrollRow, int(m_lines.size()) - 1);
+    sub = qBound(0, m_scrollSub, int(rowStarts(line).size()) - 1);
+}
+
+QTuiTextEdit::LineWrapMode QTuiTextEdit::lineWrapMode() const
+{
+    return m_wrapMode;
+}
+
+void QTuiTextEdit::setLineWrapMode(LineWrapMode mode)
+{
+    if (m_wrapMode == mode)
+        return;
+    m_wrapMode = mode;
+    m_scrollCol = 0;
+    m_scrollSub = 0;
+    m_desiredCol = cursorRowColumn();
+    scrollToVisible();
+    markDirty();
+}
+
 QString QTuiTextEdit::toPlainText() const
 {
     return m_lines.join(QLatin1Char('\n'));
@@ -35,6 +144,7 @@ void QTuiTextEdit::setPlainText(const QString &text)
     m_cursorRow = 0;
     m_cursorCol = 0;
     m_scrollRow = 0;
+    m_scrollSub = 0;
     m_scrollCol = 0;
     m_desiredCol = 0;
     clearSelection();
@@ -113,7 +223,7 @@ void QTuiTextEdit::selectAll()
     m_selEndRow = m_cursorRow;
     m_selEndCol = m_cursorCol;
     m_selecting = true;
-    m_desiredCol = QtTuiUnicode::columnOfIndex(m_lines.at(m_cursorRow), m_cursorCol);
+    m_desiredCol = cursorRowColumn();
     scrollToVisible();
     markDirty();
 }
@@ -188,7 +298,7 @@ void QTuiTextEdit::insertPastedText(const QString &pasted)
             insertNewLine();
         insertText(lines.at(i));
     }
-    m_desiredCol = QtTuiUnicode::columnOfIndex(m_lines.at(m_cursorRow), m_cursorCol);
+    m_desiredCol = cursorRowColumn();
     scrollToVisible();
     markDirty();
 }
@@ -316,13 +426,17 @@ void QTuiTextEdit::deleteSelection()
 
 void QTuiTextEdit::moveCursor(int dRow, int dCol)
 {
-    int newRow = qBound(0, m_cursorRow + dRow, m_lines.size() - 1);
+    int newRow = m_cursorRow;
     int newCol = m_cursorCol;
 
     if (dRow != 0) {
-        // Vertical movement targets the desired ("sticky") display column so
-        // that passing over a short line does not lose the position.
-        newCol = QtTuiUnicode::indexOfColumn(m_lines.at(newRow), m_desiredCol);
+        // Vertical movement goes by visual row. It targets the desired
+        // ("sticky") display column so that passing over a short line does
+        // not lose the position.
+        int sub = subOf(rowStarts(newRow), m_cursorCol);
+        for (int n = qAbs(dRow); n > 0 && stepRow(newRow, sub, dRow); --n) {
+        }
+        newCol = indexAtColumn(newRow, sub, m_desiredCol);
     } else if (dCol < 0) {
         // Step left by one whole cluster, wrapping to the previous line end
         if (m_cursorCol > 0) {
@@ -353,10 +467,26 @@ void QTuiTextEdit::scrollToVisible()
 {
     int visibleRows = geometry().height();
     if (visibleRows > 0) {
-        if (m_cursorRow < m_scrollRow)
-            m_scrollRow = m_cursorRow;
-        else if (m_cursorRow >= m_scrollRow + visibleRows)
-            m_scrollRow = m_cursorRow - visibleRows + 1;
+        int line = m_cursorRow;
+        int sub = subOf(rowStarts(line), m_cursorCol);
+        if (line < m_scrollRow || (line == m_scrollRow && sub < m_scrollSub)) {
+            m_scrollRow = line;
+            m_scrollSub = sub;
+        } else {
+            // Find the lowest first row that keeps the cursor row in the view
+            for (int n = visibleRows - 1; n > 0 && stepRow(line, sub, -1); --n) {
+            }
+            if (line > m_scrollRow || (line == m_scrollRow && sub > m_scrollSub)) {
+                m_scrollRow = line;
+                m_scrollSub = sub;
+            }
+        }
+    }
+
+    // Wrapped text does not scroll horizontally
+    if (m_wrapMode == WidgetWidth) {
+        m_scrollCol = 0;
+        return;
     }
 
     int visibleCols = geometry().width();
@@ -432,7 +562,7 @@ void QTuiTextEdit::restoreState(const QStringList &lines, int row, int col)
     m_cursorCol = qBound(0, col, int(m_lines.at(m_cursorRow).length()));
     m_typingRow = m_typingCol = -1;
     clearSelection();
-    m_desiredCol = QtTuiUnicode::columnOfIndex(m_lines.at(m_cursorRow), m_cursorCol);
+    m_desiredCol = cursorRowColumn();
     scrollToVisible();
     emit textChanged();
     markDirty();
@@ -518,13 +648,13 @@ void QTuiTextEdit::editKey(TuiKeyEvent *event)
     case Qt::Key_Home:
         if (shift) startOrExtendSelection();
         else clearSelection();
-        m_cursorCol = 0;
+        m_cursorCol = indexAtColumn(m_cursorRow, subOf(rowStarts(m_cursorRow), m_cursorCol), 0);
         if (shift) { m_selEndRow = m_cursorRow; m_selEndCol = m_cursorCol; }
         break;
     case Qt::Key_End:
         if (shift) startOrExtendSelection();
         else clearSelection();
-        m_cursorCol = m_lines.at(m_cursorRow).length();
+        m_cursorCol = indexAtColumn(m_cursorRow, subOf(rowStarts(m_cursorRow), m_cursorCol), INT_MAX);
         if (shift) { m_selEndRow = m_cursorRow; m_selEndCol = m_cursorCol; }
         break;
     case Qt::Key_PageUp: {
@@ -583,7 +713,7 @@ void QTuiTextEdit::editKey(TuiKeyEvent *event)
     const bool verticalMove = key == Qt::Key_Up || key == Qt::Key_Down
         || key == Qt::Key_PageUp || key == Qt::Key_PageDown;
     if (!verticalMove)
-        m_desiredCol = QtTuiUnicode::columnOfIndex(m_lines.at(m_cursorRow), m_cursorCol);
+        m_desiredCol = cursorRowColumn();
 
     scrollToVisible();
     markDirty();
@@ -598,18 +728,20 @@ void QTuiTextEdit::mousePressEvent(TuiMouseEvent *event)
         return;
 
     const QRect geo = geometry();
-    // Absolute screen coordinates -> widget-relative -> document position
-    int row = event->y() - geo.y() + m_scrollRow;
-    row = qBound(0, row, m_lines.size() - 1);
-    const QString &line = m_lines.at(row);
+    // Absolute screen coordinates -> widget-relative -> visual row -> document position
+    int row, sub;
+    viewTop(row, sub);
+    const int dy = event->y() - geo.y();
+    for (int n = qAbs(dy); n > 0 && stepRow(row, sub, dy); --n) {
+    }
     const int clickCol = event->x() - geo.x() + m_scrollCol; // display column
-    const int col = (clickCol <= 0) ? 0 : QtTuiUnicode::indexOfColumn(line, clickCol);
+    const int col = indexAtColumn(row, sub, clickCol);
 
     if (drag)
         startOrExtendSelection(); // the anchor is the cursor before the move
     m_cursorRow = row;
     m_cursorCol = col;
-    m_desiredCol = QtTuiUnicode::columnOfIndex(line, col);
+    m_desiredCol = cursorRowColumn();
     if (drag) {
         m_selEndRow = m_cursorRow;
         m_selEndCol = m_cursorCol;
@@ -631,10 +763,20 @@ QPoint QTuiTextEdit::terminalCursorPos() const
     if (geo.width() <= 0 || geo.height() <= 0)
         return QPoint(-1, -1);
 
-    const int row = m_cursorRow - m_scrollRow;
-    const int col = QtTuiUnicode::columnOfIndex(m_lines.at(m_cursorRow), m_cursorCol)
-        - m_scrollCol;
-    if (row < 0 || row >= geo.height() || col < 0 || col >= geo.width())
+    // Count the visual rows from the top of the view to the cursor
+    int line, sub;
+    viewTop(line, sub);
+    const int cursorSub = subOf(rowStarts(m_cursorRow), m_cursorCol);
+    if (m_cursorRow < line || (m_cursorRow == line && cursorSub < sub))
+        return QPoint(-1, -1);
+    int row = 0;
+    while (row < geo.height() && !(line == m_cursorRow && sub == cursorSub) && stepRow(line, sub, 1))
+        ++row;
+    int col = cursorRowColumn() - m_scrollCol;
+    // In wrapped text, a cursor past the edge shows in the last column
+    if (m_wrapMode == WidgetWidth)
+        col = qMin(col, geo.width() - 1);
+    if (row >= geo.height() || col < 0 || col >= geo.width())
         return QPoint(-1, -1);
     return QPoint(geo.x() + col, geo.y() + row);
 }
@@ -652,16 +794,37 @@ void QTuiTextEdit::paintEvent(ScreenBuffer &buffer)
     if (hasSel)
         normalizeSelection(selSR, selSC, selER, selEC);
 
+    // The visual row to paint: a line and the number of the row in the line
+    int lineIdx, sub;
+    viewTop(lineIdx, sub);
+    if (m_scrollRow >= m_lines.size())
+        lineIdx = m_lines.size(); // the view is after the text
+    QList<int> starts = lineIdx < m_lines.size() ? rowStarts(lineIdx) : QList<int>{0};
+
     for (int row = 0; row < geo.height(); ++row) {
-        const int lineIdx = m_scrollRow + row;
         const int py = geo.y() + row;
         if (py >= buffer.height())
             break;
+        if (row > 0 && lineIdx < m_lines.size()) {
+            // Go to the next visual row
+            if (sub + 1 < starts.size()) {
+                ++sub;
+            } else {
+                ++lineIdx;
+                sub = 0;
+                if (lineIdx < m_lines.size())
+                    starts = rowStarts(lineIdx);
+            }
+        }
 
         const QString line = (lineIdx < m_lines.size()) ? m_lines.at(lineIdx)
                                                         : QString();
         const int lineLen = line.length();
-        const int lineCols = QtTuiUnicode::stringWidth(line);
+        // The part of the line in this visual row; lastSub: the line ends here
+        const bool lastSub = lineIdx >= m_lines.size() || sub + 1 == starts.size();
+        const int rowStart = lineIdx < m_lines.size() ? starts.at(sub) : 0;
+        const int rowEnd = lastSub ? lineLen : starts.at(sub + 1);
+        const int lineCols = QtTuiUnicode::stringWidth(line.mid(rowStart, rowEnd - rowStart));
         const bool focused = hasFocus();
 
         // Style for the cell holding code-unit index `textIdx` of this line
@@ -712,15 +875,16 @@ void QTuiTextEdit::paintEvent(ScreenBuffer &buffer)
             if (px >= buffer.width())
                 break;
             const int displayCol = m_scrollCol + col;
-            const int textIdx = lineLen + (displayCol - lineCols);
+            // The cells after a row that continues belong to no index
+            const int textIdx = lastSub ? lineLen + (displayCol - lineCols) : -1;
             buffer.backCell(px, py) = styleFor(textIdx);
         }
 
         // Draw the visible clusters at their display columns
         int col = -m_scrollCol;
-        int i = 0;
+        int i = rowStart;
         QtTuiUnicode::Cluster c;
-        while (col < geo.width() && QtTuiUnicode::nextCluster(line, i, c)) {
+        while (col < geo.width() && i < rowEnd && QtTuiUnicode::nextCluster(line, i, c)) {
             const int nextCol = col + c.width;
             if (nextCol <= 0) {
                 col = nextCol;
@@ -738,6 +902,20 @@ void QTuiTextEdit::paintEvent(ScreenBuffer &buffer)
                 }
             }
             col = nextCol;
+        }
+
+        // In wrapped text, a cursor past the edge (on a space at the end of
+        // a row, or after a line that fills the row) shows in the last column
+        const int lastX = geo.x() + geo.width() - 1;
+        if (m_wrapMode == WidgetWidth && focused && lineIdx == m_cursorRow
+            && m_cursorCol >= rowStart && (lastSub || m_cursorCol < rowEnd)
+            && lastX < buffer.width()
+            && QtTuiUnicode::stringWidth(line.mid(rowStart, m_cursorCol - rowStart)) >= geo.width()) {
+            const Cell style = styleFor(m_cursorCol);
+            Cell &cell = buffer.backCell(lastX, py);
+            cell.foreground = style.foreground;
+            cell.background = style.background;
+            cell.inverse = style.inverse;
         }
     }
 }
