@@ -241,7 +241,7 @@ The edit knows the format tokens `yyyy`, `yy`, `MMMM`, `MMM`, `MM`, `M`, `dddd`,
 
 In the open calendar, the keys of [QTuiCalendarWidget](#qtuicalendarwidget) apply: Enter chooses the date and closes the calendar, and Escape closes it.
 
-Typed digits work as in Qt. In the day, month, hour, minute and second sections each digit shows at once: `2` then `5` in the day section gives day 2, then day 25. A value that is not valid yet, such as `0` for a day, waits for the next digit. If two digits give no valid value (`45` in the day section), the second digit starts again. The year changes only after 4 digits. After a full section (4 digits for the year, else 2) the next section becomes current. Left, Right, Up, Down and a click discard the digits that wait.
+You can type digits into a section. In the day, month, hour, minute and second sections each digit shows at once: `2` then `5` in the day section gives day 2, then day 25. A value that is not valid yet, such as `0` for a day, waits for the next digit. If two digits give no valid value (`45` in the day section), the second digit starts again. The year changes only after 4 digits. After a full section (4 digits for the year, else 2) the next section becomes current. Left, Right, Up, Down, a click and a focus change discard the digits that wait.
 
 ### Mouse
 

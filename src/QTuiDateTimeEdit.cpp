@@ -38,6 +38,8 @@ QTuiDateTimeEdit::QTuiDateTimeEdit(QTuiWidget *parent)
     , m_dateTime(QDateTime::currentDateTime())
 {
     setFocusPolicy(Qt::StrongFocus);
+    // Digits typed before the focus left do not join later digits
+    connect(this, &QTuiWidget::focusLost, this, [this]() { m_typed.clear(); });
 }
 
 QTuiDateTimeEdit::QTuiDateTimeEdit(const QDateTime &dateTime, QTuiWidget *parent)
@@ -45,6 +47,8 @@ QTuiDateTimeEdit::QTuiDateTimeEdit(const QDateTime &dateTime, QTuiWidget *parent
     , m_dateTime(dateTime.isValid() ? dateTime : QDateTime::currentDateTime())
 {
     setFocusPolicy(Qt::StrongFocus);
+    // Digits typed before the focus left do not join later digits
+    connect(this, &QTuiWidget::focusLost, this, [this]() { m_typed.clear(); });
 }
 
 QDateTime QTuiDateTimeEdit::dateTime() const

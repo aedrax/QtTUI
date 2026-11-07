@@ -411,6 +411,17 @@ private slots:
         typeDigits(edit, QStringLiteral("7"));
         QCOMPARE(edit.date(), QDate(2026, 10, 7));
 
+        // The focus change discards the digit that waits
+        QTuiDateEdit other;
+        edit.setFocus();
+        typeDigits(edit, QStringLiteral("1"));
+        other.setFocus();
+        edit.setFocus();
+        typeDigits(edit, QStringLiteral("2"));
+        QCOMPARE(edit.date(), QDate(2026, 10, 2));
+        typeDigits(edit, QStringLiteral("07"));
+        QCOMPARE(edit.date(), QDate(2026, 10, 7));
+
         // A year needs 4 digits; then the month is the current section
         sendKey(edit, Qt::Key_Left);
         sendKey(edit, Qt::Key_Left);

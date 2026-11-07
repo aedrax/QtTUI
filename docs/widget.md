@@ -308,6 +308,8 @@ marks the painting parent dirty instead. For the full render path, see
   also outside its geometry.
 - `pasteEvent(TuiPasteEvent *event)`: the text that the user pastes into
   the terminal, as one block.
+- `closeEvent(TuiCloseEvent *event)`: `close()` asks the widget to close.
+  Call `event->ignore()` to stay open.
 - `resizeEvent(TuiResizeEvent *event)`: the terminal size changed.
   `QTuiMainWindow` gets this event.
 

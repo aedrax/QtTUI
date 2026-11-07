@@ -12,7 +12,7 @@ Input path:
 2. `InputParser::processInput()` converts the bytes into `TuiKeyEvent`, `TuiMouseEvent` and `TuiPasteEvent` objects. It posts them to the application with `QCoreApplication::postEvent()`.
 3. `QTuiApplication::event()` sends each of these events to the main window.
 4. The main window checks the shortcuts and sends a key event or a paste event to the focus widget. It hit-tests a mouse event against the widget geometry. During a drag, the motion and the release go to the widget that got the left press.
-5. `QTuiWidget::event()` calls `keyPressEvent()`, `mousePressEvent()`, `resizeEvent()` or `pasteEvent()`. A disabled widget consumes key, mouse and paste events without a call to the handler.
+5. `QTuiWidget::event()` calls `keyPressEvent()`, `mousePressEvent()`, `resizeEvent()` or `pasteEvent()`. A disabled widget consumes key, mouse and paste events without a call to the handler. `QTuiWidget::close()` gives a `TuiCloseEvent` to `event()` directly, which calls `closeEvent()`; an event filter does not see it.
 
 A terminal resize does not go through the parser queue. The application resizes the `ScreenBuffer`, sends a `TuiResizeEvent` synchronously, and then does a full repaint.
 
