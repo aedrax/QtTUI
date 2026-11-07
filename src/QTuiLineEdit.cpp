@@ -26,6 +26,163 @@ QTuiLineEdit::QTuiLineEdit(QTuiWidget *parent)
         if (m_completer)
             m_completer->hidePopup();
     });
+    // With a mask, the cursor starts at the first position for a character
+    connect(this, &QTuiWidget::focusGained, this, [this]() {
+        if (m_mask.isEmpty())
+            return;
+        m_cursorPos = 0;
+        while (m_cursorPos < m_mask.size() && m_mask.at(m_cursorPos).separator)
+            ++m_cursorPos;
+        m_selAnchor = -1;
+        adjustScrollToCursor();
+        markDirty();
+    });
+}
+
+QString QTuiLineEdit::inputMask() const
+{
+    return m_inputMask;
+}
+
+void QTuiLineEdit::setInputMask(const QString &inputMask)
+{
+    if (m_inputMask == inputMask)
+        return;
+    const QString oldText = text();
+    m_inputMask = inputMask;
+
+    // Read the mask into one cell per position
+    m_mask.clear();
+    m_blank = QLatin1Char(' ');
+    quint8 caseMode = 0;
+    for (int i = 0; i < inputMask.length(); ++i) {
+        const QChar c = inputMask.at(i);
+        if (c == QLatin1Char(';')) {
+            if (i + 1 < inputMask.length())
+                m_blank = inputMask.at(i + 1);
+            break;
+        }
+        if (c == QLatin1Char('\\')) {
+            if (++i < inputMask.length())
+                m_mask.append({inputMask.at(i), true, caseMode});
+        } else if (c == QLatin1Char('>')) {
+            caseMode = 1;
+        } else if (c == QLatin1Char('<')) {
+            caseMode = 2;
+        } else if (c == QLatin1Char('!')) {
+            caseMode = 0;
+        } else if (!QStringLiteral("[]{}").contains(c)) { // reserved, as in Qt
+            m_mask.append({c, !QStringLiteral("AaNnXx90Dd#HhBb").contains(c), caseMode});
+        }
+    }
+    // As in Qt, the mask sets the maximum length
+    m_maxLength = m_mask.isEmpty() ? 32767 : int(m_mask.size());
+
+    // Keep the old text, as far as the new mask takes it
+    m_text.clear();
+    m_undoStack.clear();
+    m_redoStack.clear();
+    m_typingEnd = -1;
+    setText(oldText);
+    m_cursorPos = 0;
+    while (m_cursorPos < m_mask.size() && m_mask.at(m_cursorPos).separator)
+        ++m_cursorPos;
+    if (m_mask.isEmpty())
+        m_cursorPos = m_text.length();
+    m_selAnchor = -1;
+    m_scrollOffset = 0;
+    adjustScrollToCursor();
+    markDirty();
+}
+
+bool QTuiLineEdit::maskAccepts(QChar type, QChar ch) const
+{
+    // A position that can stay empty also takes the blank
+    const bool optional = type.isLower() || type == QLatin1Char('0') || type == QLatin1Char('#');
+    if (optional && ch == m_blank)
+        return true;
+    switch (type.toLower().unicode()) {
+    case 'a': return ch.isLetter();
+    case 'n': return ch.isLetterOrNumber();
+    case 'x': return ch.isPrint() && ch != m_blank;
+    case '9':
+    case '0': return ch.isNumber();
+    case 'd': return ch.isNumber() && ch.digitValue() > 0;
+    case '#': return ch.isNumber() || ch == QLatin1Char('+') || ch == QLatin1Char('-');
+    case 'h': return ch.isDigit() || (ch.toLower() >= QLatin1Char('a') && ch.toLower() <= QLatin1Char('f'));
+    case 'b': return ch == QLatin1Char('0') || ch == QLatin1Char('1');
+    }
+    return false;
+}
+
+// This follows QLineEdit: a character goes into the position at the cursor
+// if the mask takes it there. If not, a character that is a later separator
+// moves the cursor after that separator, and any other character goes into
+// the next position that takes it.
+int QTuiLineEdit::maskInsert(QString &buffer, int pos, const QString &text) const
+{
+    const int size = m_mask.size();
+    auto put = [&](int i, QChar ch) {
+        const MaskCell &cell = m_mask.at(i);
+        buffer[i] = cell.caseMode == 1 ? ch.toUpper() : cell.caseMode == 2 ? ch.toLower() : ch;
+    };
+    auto findFrom = [&](int from, bool separator, QChar ch) {
+        for (int i = from; i < size; ++i) {
+            const MaskCell &cell = m_mask.at(i);
+            if (cell.separator == separator && (separator ? cell.ch == ch : maskAccepts(cell.ch, ch)))
+                return i;
+        }
+        return -1;
+    };
+
+    int i = pos;
+    int t = 0;
+    bool changed = false;
+    while (i < size && t < text.length()) {
+        const QChar ch = text.at(t);
+        const MaskCell &cell = m_mask.at(i);
+        if (cell.separator) {
+            // Go over the separator; it also takes the same typed character
+            if (ch == cell.ch) {
+                ++t;
+                changed = true;
+            }
+            ++i;
+            continue;
+        }
+        if (maskAccepts(cell.ch, ch)) {
+            put(i++, ch);
+            changed = true;
+        } else if (int n = findFrom(i, true, ch); n >= 0) {
+            // One typed separator directly after the same separator does
+            // nothing: the cursor went over it already
+            if (text.length() != 1 || i == 0 || !m_mask.at(i - 1).separator || m_mask.at(i - 1).ch != ch) {
+                i = n + 1;
+                changed = true;
+            }
+        } else if (n = findFrom(i, false, ch); n >= 0) {
+            put(n, ch);
+            i = n + 1;
+            changed = true;
+        }
+        ++t;
+    }
+    if (!changed)
+        return -1;
+    // The cursor waits at the next position for a character
+    while (i < size && m_mask.at(i).separator)
+        ++i;
+    return i;
+}
+
+QString QTuiLineEdit::stripMask(const QString &buffer) const
+{
+    QString text;
+    for (int i = 0; i < buffer.length() && i < m_mask.size(); ++i) {
+        if (m_mask.at(i).separator || buffer.at(i) != m_blank)
+            text += buffer.at(i);
+    }
+    return text;
 }
 
 QTuiCompleter *QTuiLineEdit::completer() const
@@ -137,6 +294,8 @@ int QTuiLineEdit::maxLength() const
 
 void QTuiLineEdit::setMaxLength(int length)
 {
+    if (!m_mask.isEmpty())
+        return; // the mask sets the length
     m_maxLength = qMax(0, length);
     if (m_text.length() > m_maxLength)
         setText(m_text.left(m_maxLength));
@@ -154,10 +313,16 @@ void QTuiLineEdit::setValidator(const QTuiValidator *validator)
 
 bool QTuiLineEdit::hasAcceptableInput() const
 {
+    // Each mask position must hold a character that it takes; only a
+    // position that can stay empty takes the blank
+    for (int i = 0; i < m_mask.size(); ++i) {
+        if (!m_mask.at(i).separator && !maskAccepts(m_mask.at(i).ch, m_text.at(i)))
+            return false;
+    }
     if (!m_validator)
         return true;
-    QString text = m_text;
-    int pos = m_cursorPos;
+    QString text = this->text();
+    int pos = qMin(m_cursorPos, int(text.length()));
     return m_validator->validate(text, pos) == QTuiValidator::Acceptable;
 }
 
@@ -237,7 +402,7 @@ void QTuiLineEdit::undo()
     m_cursorPos = state.cursor;
     m_selAnchor = -1;
     m_typingEnd = -1;
-    emit textChanged(m_text);
+    emit textChanged(text());
     adjustScrollToCursor();
     markDirty();
 }
@@ -252,7 +417,7 @@ void QTuiLineEdit::redo()
     m_cursorPos = state.cursor;
     m_selAnchor = -1;
     m_typingEnd = -1;
-    emit textChanged(m_text);
+    emit textChanged(text());
     adjustScrollToCursor();
     markDirty();
 }
@@ -279,27 +444,51 @@ bool QTuiLineEdit::replaceRange(int start, int end, const QString &text)
     if (m_readOnly)
         return false;
 
-    // Cut the inserted text to the length limit, at a cluster boundary
     QString inserted = text;
-    const int room = m_maxLength - (m_text.length() - (end - start));
-    if (inserted.length() > room) {
-        int cut = 0;
-        while (cut < inserted.length()) {
-            const int next = QtTuiUnicode::nextClusterIndex(inserted, cut);
-            if (next > room)
-                break;
-            cut = next;
-        }
-        inserted.truncate(qMax(0, cut));
-    }
-    if (start == end && inserted.isEmpty())
-        return false;
-
     QString candidate = m_text;
-    candidate.replace(start, end - start, inserted);
-    int pos = start + inserted.length();
-    if (m_validator && m_validator->validate(candidate, pos) == QTuiValidator::Invalid)
-        return false;
+    int pos = start;
+    if (!m_mask.isEmpty()) {
+        // With a mask the text keeps its length: a removed character
+        // becomes a blank, and a new character goes into a mask position
+        for (int i = start; i < end; ++i) {
+            if (!m_mask.at(i).separator)
+                candidate[i] = m_blank;
+        }
+        if (!inserted.isEmpty())
+            pos = maskInsert(candidate, start, inserted);
+        if (pos < 0)
+            return false;
+        QString plain = stripMask(candidate);
+        int plainPos = plain.length();
+        if (m_validator && m_validator->validate(plain, plainPos) == QTuiValidator::Invalid)
+            return false;
+        if (candidate == m_text) {
+            // Only the cursor moves (over a separator or a blank)
+            m_cursorPos = pos;
+            m_selAnchor = -1;
+            return true;
+        }
+    } else {
+        // Cut the inserted text to the length limit, at a cluster boundary
+        const int room = m_maxLength - (m_text.length() - (end - start));
+        if (inserted.length() > room) {
+            int cut = 0;
+            while (cut < inserted.length()) {
+                const int next = QtTuiUnicode::nextClusterIndex(inserted, cut);
+                if (next > room)
+                    break;
+                cut = next;
+            }
+            inserted.truncate(qMax(0, cut));
+        }
+        if (start == end && inserted.isEmpty())
+            return false;
+
+        candidate.replace(start, end - start, inserted);
+        pos = start + inserted.length();
+        if (m_validator && m_validator->validate(candidate, pos) == QTuiValidator::Invalid)
+            return false;
+    }
 
     // One undo step per edit, except that one character typed right after
     // the previous one joins its step
@@ -316,7 +505,7 @@ bool QTuiLineEdit::replaceRange(int start, int end, const QString &text)
     m_cursorPos = qBound(0, pos, int(m_text.length()));
     m_selAnchor = -1;
     m_typingEnd = typing ? m_cursorPos : -1;
-    emit textChanged(m_text);
+    emit textChanged(this->text());
     return true;
 }
 
@@ -327,7 +516,7 @@ QSize QTuiLineEdit::minimumSize() const
 
 QString QTuiLineEdit::text() const
 {
-    return m_text;
+    return m_mask.isEmpty() ? m_text : stripMask(m_text);
 }
 
 // Keeps the cursor's display column inside the visible column window,
@@ -357,7 +546,14 @@ void QTuiLineEdit::adjustScrollToCursor()
 
 void QTuiLineEdit::setText(const QString &newText)
 {
-    const QString text = newText.left(m_maxLength);
+    QString text = newText.left(m_maxLength);
+    if (!m_mask.isEmpty()) {
+        // Start from the empty template and put in what the mask takes
+        text.clear();
+        for (const MaskCell &cell : m_mask)
+            text += cell.separator ? cell.ch : m_blank;
+        maskInsert(text, 0, newText);
+    }
     if (m_text == text)
         return;
     m_text = text;
@@ -367,7 +563,7 @@ void QTuiLineEdit::setText(const QString &newText)
     m_redoStack.clear();
     m_typingEnd = -1;
     adjustScrollToCursor();
-    emit textChanged(m_text);
+    emit textChanged(this->text());
     markDirty();
 }
 
@@ -401,7 +597,7 @@ void QTuiLineEdit::keyPressEvent(TuiKeyEvent *event)
     // An open completion popup takes Up, Down, Enter and Escape
     if (m_completer && m_completer->handleKey(key))
         return;
-    const QString oldText = m_text;
+    const QString oldText = text();
 
     // Clipboard and select all
     if (event->modifiers() == Qt::ControlModifier) {
@@ -427,8 +623,8 @@ void QTuiLineEdit::keyPressEvent(TuiKeyEvent *event)
             replaceRange(start, m_cursorPos, QString());
             adjustScrollToCursor();
             markDirty();
-            if (m_completer && m_text != oldText)
-                m_completer->updateForText(this, m_text);
+            if (m_completer && this->text() != oldText)
+                m_completer->updateForText(this, this->text());
             return;
         }
         default: break;
@@ -480,8 +676,13 @@ void QTuiLineEdit::keyPressEvent(TuiKeyEvent *event)
         // (surrogate pair + marks)
         if (hasSelectedText())
             replaceSelection(QString());
-        else if (m_cursorPos > 0)
-            replaceRange(QtTuiUnicode::prevClusterIndex(m_text, m_cursorPos), m_cursorPos, QString());
+        else if (m_cursorPos > 0) {
+            int from = QtTuiUnicode::prevClusterIndex(m_text, m_cursorPos);
+            // With a mask, go over the separators to the character before them
+            while (!m_mask.isEmpty() && from > 0 && m_mask.at(from).separator)
+                --from;
+            replaceRange(from, m_cursorPos, QString());
+        }
         break;
     case Qt::Key_Delete:
         if (hasSelectedText())
@@ -492,13 +693,13 @@ void QTuiLineEdit::keyPressEvent(TuiKeyEvent *event)
     case Qt::Key_Return:
     case Qt::Key_Enter:
         // As in QLineEdit: only acceptable input (after fixup) is returned
-        if (m_validator && !hasAcceptableInput()) {
+        if (m_validator && m_mask.isEmpty() && !hasAcceptableInput()) {
             QString fixed = m_text;
             m_validator->fixup(fixed);
             if (fixed != m_text) {
                 m_text = fixed;
                 m_cursorPos = qMin(m_cursorPos, int(m_text.length()));
-                emit textChanged(m_text);
+                emit textChanged(text());
             }
         }
         if (hasAcceptableInput())
@@ -520,8 +721,8 @@ void QTuiLineEdit::keyPressEvent(TuiKeyEvent *event)
     markDirty();
 
     // Typing updates the completions; cursor movement does not
-    if (m_completer && m_text != oldText)
-        m_completer->updateForText(this, m_text);
+    if (m_completer && text() != oldText)
+        m_completer->updateForText(this, text());
 }
 
 void QTuiLineEdit::pasteEvent(TuiPasteEvent *event)
@@ -545,7 +746,7 @@ void QTuiLineEdit::insertPastedText(const QString &pasted)
     adjustScrollToCursor();
     markDirty();
     if (m_completer)
-        m_completer->updateForText(this, m_text);
+        m_completer->updateForText(this, this->text());
 }
 
 void QTuiLineEdit::mousePressEvent(TuiMouseEvent *event)

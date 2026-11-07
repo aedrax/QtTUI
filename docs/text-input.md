@@ -84,7 +84,8 @@ void example(QTuiWidget *parent)
 `#include <QtTUI/QTuiLineEdit.h>` · Inherits: [QTuiWidget](widget.md)
 
 `QTuiLineEdit` is a one-line text editor. It has echo modes, a placeholder, a
-maximum length, a validator, a completer, a selection, the clipboard and undo.
+maximum length, an input mask, a validator, a completer, a selection, the
+clipboard and undo.
 The line edit scrolls the text to keep the cursor visible.
 
 The cursor position and the maximum length count UTF-16 code units, as in Qt.
@@ -124,20 +125,22 @@ void example(QTuiWidget *parent)
 | Function | Description |
 | --- | --- |
 | `explicit QTuiLineEdit(QTuiWidget *parent = nullptr)` | Makes an empty line edit. |
-| `QString text() const` | Returns the text. Property `text`. |
+| `QString text() const` | Returns the text. Property `text`. With an input mask, returns the text without the blank characters. |
 | `void setText(const QString &text)` | Sets the text and puts the cursor at the end. It cuts the text to `maxLength()`. It does not use the validator. It clears the selection and the undo history. Emits `textChanged()` if the text changes. |
 | `EchoMode echoMode() const` | Returns the echo mode. Property `echoMode`. The default is `Normal`. |
 | `void setEchoMode(EchoMode mode)` | Sets the echo mode. |
-| `QString displayText() const` | Returns the text as it shows: the text, "•" characters, or an empty string. |
+| `QString displayText() const` | Returns the text as it shows: the text, "•" characters, or an empty string. With an input mask, the text has the blank characters. |
 | `QString placeholderText() const` | Returns the placeholder. Property `placeholderText`. |
 | `void setPlaceholderText(const QString &text)` | Sets the hint text that shows while the line edit is empty. It shows in the muted color, or in italics while the line edit has focus. |
 | `bool isReadOnly() const` | Returns true if the user cannot change the text. Property `readOnly`. The default is false. |
 | `void setReadOnly(bool readOnly)` | Sets read-only. A read-only line edit moves the cursor, selects, copies and emits `returnPressed()`. `setText()` still works. |
 | `int maxLength() const` | Returns the maximum length. Property `maxLength`. The default is 32767. |
-| `void setMaxLength(int length)` | Sets the maximum length. It cuts the current text if it is longer. The line edit also cuts typed and pasted text. |
+| `void setMaxLength(int length)` | Sets the maximum length. It cuts the current text if it is longer. The line edit also cuts typed and pasted text. It does nothing while there is an input mask. |
+| `QString inputMask() const` | Returns the input mask. Property `inputMask`. The default is an empty string (no mask). |
+| `void setInputMask(const QString &inputMask)` | Sets the input mask. An empty string removes the mask. See [Input mask](#input-mask). |
 | `const QTuiValidator *validator() const` | Returns the validator, or `nullptr`. |
 | `void setValidator(const QTuiValidator *validator)` | Sets the validator. The line edit rejects each user edit that makes the text `Invalid`. It does not take ownership of the validator. |
-| `bool hasAcceptableInput() const` | Returns true if there is no validator, or if the validator returns `Acceptable`. |
+| `bool hasAcceptableInput() const` | Returns true if the text fills each necessary position of the input mask, and there is no validator or the validator returns `Acceptable`. |
 | `bool hasSelectedText() const` | Returns true if text is selected. |
 | `QString selectedText() const` | Returns the selected text. |
 | `int selectionStart() const` | Returns the start of the selection, or -1 if no text is selected. |
@@ -173,6 +176,82 @@ Each user edit goes to the validator first. If the validator returns
 calls `fixup()` if the text is not `Acceptable`. Then it emits
 `returnPressed()` only if the text is `Acceptable`.
 
+### Input mask
+
+`setInputMask()` sets a template for the text, as in `QLineEdit`. The template
+has one position for each character. A mask character says which characters a
+position takes:
+
+| Mask character | The position takes |
+| --- | --- |
+| `A` | A letter. Necessary. |
+| `a` | A letter. Can stay empty. |
+| `N` | A letter or a digit. Necessary. |
+| `n` | A letter or a digit. Can stay empty. |
+| `X` | A character that is not the blank character. Necessary. |
+| `x` | A character that is not the blank character. Can stay empty. |
+| `9` | A digit. Necessary. |
+| `0` | A digit. Can stay empty. |
+| `D` | A digit from 1 to 9. Necessary. |
+| `d` | A digit from 1 to 9. Can stay empty. |
+| `#` | A digit, or a plus or minus sign. Can stay empty. |
+| `H` | A hexadecimal digit (0-9, A-F, a-f). Necessary. |
+| `h` | A hexadecimal digit. Can stay empty. |
+| `B` | 0 or 1. Necessary. |
+| `b` | 0 or 1. Can stay empty. |
+
+| Other character | Function |
+| --- | --- |
+| `>` | Makes all subsequent letters uppercase. |
+| `<` | Makes all subsequent letters lowercase. |
+| `!` | Stops the case conversion. |
+| `;c` | Ends the mask and sets the blank character to `c`. The default blank character is a space. |
+| `\` | Makes the next character a separator. Use it for a separator that is a mask character. |
+| `[ ] { }` | Reserved. The line edit ignores them. |
+
+All other characters are separators. The user cannot change a separator.
+
+Examples from the Qt documentation:
+
+| Mask | Use |
+| --- | --- |
+| `000.000.000.000;_` | An IP address. The blank character is `_`. |
+| `HH:HH:HH:HH:HH:HH;_` | A MAC address. |
+| `0000-00-00` | An ISO date. The blank character is a space. |
+| `>AAAAA-AAAAA-AAAAA-AAAAA-AAAAA;#` | A license number. The blank character is `#`, and letters become uppercase. |
+
+With a mask:
+
+- `displayText()` is the full template, for example `192.168.1__.1__`.
+  `text()` is the same without the blank characters: `192.168.1.1`. The
+  separators stay in `text()`.
+- `textChanged()` gives `text()`.
+- The length of the text does not change. `maxLength()` is the number of
+  positions. Backspace and Delete change a character to the blank character.
+  The characters after it do not move.
+- A typed character goes into the position at the cursor if the position takes
+  it. Then the cursor goes over the separators that follow. If the position
+  does not take the character, a typed separator moves the cursor after the
+  next such separator. A different character goes into the next position that
+  takes it. If there is none, the line edit ignores the character.
+- When the line edit gets the focus, the cursor goes to the first position.
+- `setText()` puts the characters into the template with the same rules.
+  `setInputMask()` keeps the characters of the old text that the new mask
+  takes, and clears the undo history.
+- `hasAcceptableInput()` returns false, and Enter does not emit
+  `returnPressed()`, while a necessary position is empty.
+- The validator gets `text()`. On Enter, the line edit does not call
+  `fixup()`.
+
+A mask does not control a range, for example 0 to 255 in an IP address. Use a
+validator together with the mask for this.
+
+```cpp
+auto *address = new QTuiLineEdit(parent);
+address->setInputMask(QStringLiteral("000.000.000.000;_"));
+address->setText(QStringLiteral("192.168.1.1"));
+```
+
 ### Paste
 
 A paste from the terminal or from `paste()` changes each line break and each
@@ -183,7 +262,7 @@ tab to a space. It removes all other control characters. A paste never emits
 
 | Signal | Description |
 | --- | --- |
-| `void textChanged(const QString &text)` | The text changed, from the user or from a function. |
+| `void textChanged(const QString &text)` | The text changed, from the user or from a function. `text` is `text()`. |
 | `void returnPressed()` | The user pushed Enter, and the text is acceptable. |
 
 ### Protected functions
@@ -201,7 +280,7 @@ tab to a space. It removes all other control characters. A paste never emits
 | Left, Right | Moves the cursor one character. With a selection, goes to the start or the end of the selection. |
 | Home, End | Moves the cursor to the start or the end of the text. |
 | Shift+Left, Shift+Right, Shift+Home, Shift+End | Selects. |
-| Backspace | Removes the selection, or the character before the cursor. |
+| Backspace | Removes the selection, or the character before the cursor. With an input mask, goes over separators. |
 | Delete | Removes the selection, or the character after the cursor. |
 | Enter, Return | Calls `fixup()` if necessary, then emits `returnPressed()` if the text is acceptable. |
 | Ctrl+A | Selects all text. |

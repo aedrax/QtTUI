@@ -62,6 +62,9 @@ qttui_add_test(test_qtui_mainwindow test_qtui_mainwindow.cpp)
 # QTuiLineEdit property tests (Properties 26-30)
 qttui_add_test(test_qtui_lineedit test_qtui_lineedit.cpp)
 
+# QTuiLineEdit input mask
+qttui_add_test(test_lineedit_inputmask test_lineedit_inputmask.cpp)
+
 # QTuiCompleter matching and line edit popup flow
 qttui_add_test(test_qtui_completer test_qtui_completer.cpp)
 

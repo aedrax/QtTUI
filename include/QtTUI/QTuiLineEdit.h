@@ -17,6 +17,7 @@ class QTuiLineEdit : public QTuiWidget {
     Q_PROPERTY(QString placeholderText READ placeholderText WRITE setPlaceholderText)
     Q_PROPERTY(bool readOnly READ isReadOnly WRITE setReadOnly)
     Q_PROPERTY(int maxLength READ maxLength WRITE setMaxLength)
+    Q_PROPERTY(QString inputMask READ inputMask WRITE setInputMask)
 public:
     // How the text shows, as in QLineEdit. Password shows one "•" per
     // character; NoEcho shows nothing and keeps the cursor at the start.
@@ -44,11 +45,24 @@ public:
     int maxLength() const;
     void setMaxLength(int length);
 
+    // Input mask, as in QLineEdit: a template with one position for each
+    // character. The mask characters are A a N n X x 9 0 D d # H h B b; an
+    // uppercase one (and 9) needs a character, a lowercase one (and 0 and
+    // #) can stay blank. > and < change the case of the letters that
+    // follow, ! stops that, \ makes the next character a separator, and
+    // ";c" at the end sets the blank character to c (default: a space).
+    // All other characters are separators. With a mask, displayText() is
+    // the full template and text() is the same without the blanks. An
+    // empty mask (the default) removes the mask.
+    QString inputMask() const;
+    void setInputMask(const QString &inputMask);
+
     // Rejects edits that make the text Invalid. The line edit does not take
     // ownership of the validator.
     const QTuiValidator *validator() const;
     void setValidator(const QTuiValidator *validator);
-    // True if there is no validator or it says Acceptable
+    // True if each position of the mask that needs a character has one,
+    // and there is no validator or it says Acceptable
     bool hasAcceptableInput() const;
 
     // Selection, as in QLineEdit. Keys: Shift+Left/Right/Home/End select,
@@ -111,7 +125,22 @@ private:
     // Replaces the selection (or inserts at the cursor) with text
     bool replaceSelection(const QString &text);
 
-    QString m_text;
+    // One position of the input mask
+    struct MaskCell {
+        QChar ch;       // the mask character, or the separator itself
+        bool separator;
+        quint8 caseMode; // 0: as typed, 1: uppercase, 2: lowercase
+    };
+    // True if the mask position of this type takes ch
+    bool maskAccepts(QChar type, QChar ch) const;
+    // Puts the characters of text into buffer from position pos on, each in
+    // the next position that takes it. Returns the position after the last
+    // one, or -1 if the mask takes nothing of text.
+    int maskInsert(QString &buffer, int pos, const QString &text) const;
+    // The buffer without the blanks
+    QString stripMask(const QString &buffer) const;
+
+    QString m_text;          // with a mask: one character per mask position
     int m_cursorPos = 0;     // code-unit index into m_text (cluster boundary)
     int m_scrollOffset = 0;  // display columns scrolled off the left edge
     EchoMode m_echoMode = Normal;
@@ -119,6 +148,9 @@ private:
     bool m_readOnly = false;
     int m_maxLength = 32767;
     int m_selAnchor = -1; // the fixed end of the selection; -1 for none
+    QString m_inputMask;
+    QList<MaskCell> m_mask; // empty: no mask
+    QChar m_blank = QLatin1Char(' ');
 
     struct UndoState {
         QString text;
