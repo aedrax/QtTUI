@@ -10,10 +10,11 @@ validators and the completer for `QTuiLineEdit`.
 
 `QTuiLabel` shows text. Each `\n` starts a new line. With word wrap, the label
 breaks lines at spaces. The label can read a small subset of Markdown or HTML
-for bold, italic, underline, strikethrough and code.
+for bold, italic, underline, strikethrough, code and links.
 
 With the `Box` frame shape, the label paints a border and shows the text
-inside it. The label does not take keys or the mouse.
+inside it. The label takes keys and the mouse only if the text has links. See
+[Links](#links).
 
 ### Text formats
 
@@ -26,13 +27,41 @@ inside it. The label does not take keys or the mouse.
   `~~strikethrough~~` and `` `code` ``. A marker counts only if the same marker
   closes it later on the same line. Otherwise the label shows the marker. A
   backslash shows the next character as it is. Markup in code shows as text.
-  The label does not read headings, lists or links.
+  `[text](url)` is a link. The label does not read headings or lists.
 - `Qt::RichText`: the tags `<b>`, `<strong>`, `<i>`, `<em>`, `<u>`, `<s>`,
-  `<del>` and `<code>`. `<br>` and `</p>` start a new line. The label removes
+  `<del>` and `<code>`. `<a href="url">` is a link. `<br>` and `</p>` start a
+  new line. The label removes
   all other tags, and line breaks at the end of the text. It reads the entities
   `&lt;`, `&gt;`, `&amp;`, `&quot;`, `&#39;` and `&nbsp;`.
 
 Code shows in inverted colors.
+
+### Links
+
+A link shows underlined in the accent color (the focus background color of the
+theme). In Markdown, a link is `[text](url)` on one line. The text can have
+other markup, but no brackets. The url cannot have a space. In rich text, a
+link is `<a href="url">text</a>`. The quotation marks can be `"` or `'`.
+
+A label with links sets its focus policy to `Qt::StrongFocus`, so the user can
+reach the links with the keyboard. A label without links has `Qt::NoFocus`.
+While the label has focus, the current link shows in the focus colors. The
+other text keeps its colors.
+
+The label does not open a link. It emits `linkActivated()` with the url, and
+the application decides what to do. There is no `setOpenExternalLinks()`,
+because `QDesktopServices` is in Qt GUI.
+
+```cpp
+auto *about = new QTuiLabel(QString(), parent);
+about->setTextFormat(Qt::MarkdownText);
+about->setText(QStringLiteral("Read the [manual](help:manual) or the [license](help:license)."));
+QObject::connect(about, &QTuiLabel::linkActivated, [](const QString &link) {
+    qDebug() << "Open" << link;
+});
+```
+
+A label can have 255 links.
 
 ### Example
 
@@ -60,7 +89,7 @@ void example(QTuiWidget *parent)
 | --- | --- |
 | `explicit QTuiLabel(const QString &text = QString(), QTuiWidget *parent = nullptr)` | Makes a label with the text. |
 | `QString text() const` | Returns the text, with the markup. Property `text`. |
-| `void setText(const QString &text)` | Sets the text. Emits `textChanged()` if the text changes. |
+| `void setText(const QString &text)` | Sets the text. Emits `textChanged()` if the text changes. The first link becomes the current link. |
 | `Qt::Alignment alignment() const` | Returns the alignment. Property `alignment`. The default is `Qt::AlignLeft \| Qt::AlignVCenter`. |
 | `void setAlignment(Qt::Alignment alignment)` | Sets the alignment. The label reads `AlignLeft`, `AlignHCenter`, `AlignRight`, `AlignTop`, `AlignVCenter` and `AlignBottom`. |
 | `bool wordWrap() const` | Returns true if the label breaks long lines at spaces. Property `wordWrap`. The default is false. |
@@ -71,13 +100,40 @@ void example(QTuiWidget *parent)
 | `QTuiWidget *buddy() const` | Returns the buddy widget, or `nullptr`. |
 | `void setBuddy(QTuiWidget *buddy)` | Keeps a pointer to the buddy widget. QtTUI does not use the buddy, so this function has no effect on focus. |
 | `QSize minimumSize() const override` | Returns the width of the widest line and the number of lines, plus the frame. With word wrap, the width is the width of the longest word. |
-| `void paintEvent(ScreenBuffer &buffer) override` | Paints the text with the styles of the markup. |
+| `void paintEvent(ScreenBuffer &buffer) override` | Paints the text with the styles of the markup. A space in markup has the style of the markup. |
 
 ### Signals
 
 | Signal | Description |
 | --- | --- |
 | `void textChanged(const QString &text)` | The text changed. |
+| `void linkActivated(const QString &link)` | The user activated a link with Enter or with a left click. `link` is the url of the link. |
+
+### Protected functions
+
+| Function | Description |
+| --- | --- |
+| `void keyPressEvent(TuiKeyEvent *event) override` | Moves between the links and activates a link. See the keys below. |
+| `void mousePressEvent(TuiMouseEvent *event) override` | Activates the link under the mouse. |
+
+### Keys
+
+The label takes keys only while it has links and focus.
+
+| Key | Action |
+| --- | --- |
+| Right, Down | Goes to the next link. |
+| Left, Up | Goes to the previous link. |
+| Enter, Return | Emits `linkActivated()` for the current link. |
+
+Tab and Shift+Tab also go to the next and the previous link if the label gets
+them. In a `QTuiMainWindow`, the window uses Tab to go to the next widget, so
+use the arrow keys there.
+
+### Mouse
+
+- A left press on a link makes it the current link and emits
+  `linkActivated()`.
 
 ## QTuiLineEdit
 
