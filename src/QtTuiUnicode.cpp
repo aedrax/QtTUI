@@ -322,6 +322,36 @@ int prevClusterIndex(const QString &text, int index)
     return prev;
 }
 
+namespace {
+
+bool bidiDefault()
+{
+    bool ok = false;
+    const int value = qEnvironmentVariableIntValue("QTTUI_BIDI", &ok);
+    if (ok)
+        return value != 0;
+    // Konsole reorders the text itself and has no explicit bidi mode
+    // (CSI 8 l), so a reorder here shows the text reversed two times.
+    // ponytail: only Konsole is known here. For another terminal that
+    // reorders without an explicit mode, the user sets QTTUI_BIDI=0. Add a
+    // check for it here if there is a sure sign of that terminal.
+    return !qEnvironmentVariableIsSet("KONSOLE_VERSION");
+}
+
+bool s_bidiEnabled = bidiDefault();
+
+} // namespace
+
+bool bidiEnabled()
+{
+    return s_bidiEnabled;
+}
+
+void setBidiEnabled(bool enabled)
+{
+    s_bidiEnabled = enabled;
+}
+
 bool hasRightToLeft(const QString &text)
 {
     for (const QChar ch : text) {

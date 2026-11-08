@@ -2,6 +2,7 @@
 #define QTTUI_TERMINALBACKEND_H
 
 #include <QtTUI/QtTUIGlobal.h>
+#include <QtTUI/QtTuiUnicode.h>
 #include <QByteArray>
 #include <QObject>
 #include <QSize>
@@ -57,6 +58,18 @@ inline QByteArray mouseEnableSequence()
     if (level == "drag")
         return QByteArrayLiteral("\x1b[?1002h\x1b[?1006h");
     return QByteArrayLiteral("\x1b[?1003h\x1b[?1006h");
+}
+
+// The escape sequence that sets the explicit bidi mode of the terminal
+// (BDSM reset, CSI 8 l) if QtTUI reorders right-to-left text. The mode tells
+// a terminal with bidi support (VTE) that the application did the reorder,
+// so the terminal does not reorder the cells again. A terminal without the
+// mode ignores the sequence. The result is empty if the reorder is off.
+// The backends always set the implicit mode (CSI 8 h), which is the default
+// of a terminal, when they give the terminal back.
+inline QByteArray bidiModeSequence()
+{
+    return QtTuiUnicode::bidiEnabled() ? QByteArrayLiteral("\x1b[8l") : QByteArray();
 }
 
 // Factory: creates the platform-appropriate backend at compile time

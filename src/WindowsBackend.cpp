@@ -52,7 +52,7 @@ bool WindowsBackend::enterRawMode()
 
     // The same terminal modes as the POSIX backend: SGR mouse reporting at
     // the QTTUI_MOUSE level, bracketed paste, kitty keyboard level 1
-    write(mouseEnableSequence() + QByteArrayLiteral("\x1b[?2004h\x1b[>1u"));
+    write(mouseEnableSequence() + bidiModeSequence() + QByteArrayLiteral("\x1b[?2004h\x1b[>1u"));
 
     m_rawMode = true;
     return true;
@@ -63,7 +63,7 @@ bool WindowsBackend::exitRawMode()
     if (!m_rawMode)
         return true;
 
-    write(QByteArrayLiteral("\x1b[<u\x1b[?2004l\x1b[?1006l\x1b[?1003l\x1b[?1002l\x1b[?1000l\x1b[?25h"));
+    write(QByteArrayLiteral("\x1b[<u\x1b[8h\x1b[?2004l\x1b[?1006l\x1b[?1003l\x1b[?1002l\x1b[?1000l\x1b[?25h"));
 
     bool ok = true;
     if (!SetConsoleMode(m_hStdin, m_originalInMode)) {

@@ -491,7 +491,7 @@ void QTuiLabel::layoutText(const std::function<void(int x, int y, const QtTuiUni
         // the clusters go to the cells after the loop. The paint and the
         // mouse both use this function, so a click finds the link that
         // shows in the cell.
-        const bool reorder = QtTuiUnicode::hasRightToLeft(line);
+        const bool reorder = QtTuiUnicode::bidiEnabled() && QtTuiUnicode::hasRightToLeft(line);
         QVarLengthArray<quint16, 256> lineBits(reorder ? line.size() : 0);
         int kept = 0; // the logical end of the clusters that fit
         while (QtTuiUnicode::nextCluster(line, i, c)) {

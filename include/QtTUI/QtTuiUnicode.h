@@ -110,6 +110,25 @@ int nextClusterIndex(const QString &text, int index);
 int prevClusterIndex(const QString &text, int index);
 
 /**
+ * The switch for the reorder of right-to-left text in text paint
+ * (renderText(), renderTextTruncated(), QTuiLabel). It has no effect on
+ * visualOrder() itself.
+ *
+ * Turn the reorder off for a terminal that reorders the text itself and
+ * has no explicit bidi mode. If not, the text shows reversed two times.
+ * The start value comes from the environment variable QTTUI_BIDI (0 is
+ * off, another number is on). Without the variable the reorder is on, but
+ * it is off in Konsole (the variable KONSOLE_VERSION is set): Konsole
+ * reorders the text itself and has no explicit mode.
+ *
+ * Set the switch before you make the QTuiApplication. The terminal backend
+ * sends the bidi mode of the terminal (see bidiModeSequence()) only when
+ * it starts, and a change does not repaint the widgets.
+ */
+bool bidiEnabled();
+void setBidiEnabled(bool enabled);
+
+/**
  * True if the text has a character that visualOrder() moves: a
  * right-to-left letter (Hebrew, Arabic and others) or an Arabic number.
  * This is one scan of the code units with no allocation. Text paint uses it

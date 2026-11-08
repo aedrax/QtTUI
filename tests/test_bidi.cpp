@@ -9,6 +9,7 @@
 #include <QtTUI/QtTuiUnicode.h>
 #include <QtTUI/RenderUtils.h>
 #include <QtTUI/ScreenBuffer.h>
+#include <QtTUI/TerminalBackend.h>
 #include <QtTUI/TuiEvents.h>
 
 #include <QSignalSpy>
@@ -32,6 +33,43 @@ static const char32_t ZWJ = 0x200D;
 class TestBidi : public QObject {
     Q_OBJECT
 private slots:
+    // The start value of the switch comes from the environment (QTTUI_BIDI,
+    // KONSOLE_VERSION), so the paint tests set it
+    void init() { QtTuiUnicode::setBidiEnabled(true); }
+
+    void switchTurnsThePaintReorderOff()
+    {
+        const QString text = s({ALEF, BET, GIMEL, DALET, HE});
+        QtTuiUnicode::setBidiEnabled(false);
+        QVERIFY(!QtTuiUnicode::bidiEnabled());
+
+        ScreenBuffer buffer(6, 1);
+        renderText(buffer, 0, 0, text, 3, Cell());
+        QCOMPARE(row(buffer), s({ALEF, BET, GIMEL, ' ', ' ', ' '}));
+
+        buffer = ScreenBuffer(6, 1);
+        renderTextTruncated(buffer, 0, 0, text, 4, Cell());
+        QCOMPARE(row(buffer), s({ALEF, BET, GIMEL, 0x2026, ' ', ' '}));
+
+        QTuiLabel label(text);
+        label.setAlignment(Qt::AlignLeft | Qt::AlignTop);
+        label.setGeometry(QRect(0, 0, 6, 1));
+        buffer = ScreenBuffer(6, 1);
+        label.paintEvent(buffer);
+        QCOMPARE(row(buffer), s({ALEF, BET, GIMEL, DALET, HE, ' '}));
+
+        // visualOrder() itself does not use the switch
+        QCOMPARE(QtTuiUnicode::visualOrder(s({ALEF, BET})), s({BET, ALEF}));
+    }
+
+    // The explicit bidi mode goes to the terminal only if QtTUI reorders
+    void terminalModeSequence()
+    {
+        QCOMPARE(bidiModeSequence(), QByteArray("\x1b[8l"));
+        QtTuiUnicode::setBidiEnabled(false);
+        QVERIFY(bidiModeSequence().isEmpty());
+    }
+
     void visualOrder_data()
     {
         QTest::addColumn<QString>("logical");

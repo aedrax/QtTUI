@@ -89,7 +89,7 @@ int renderText(ScreenBuffer &buffer, int x, int y, const QString &text,
         return 0;
     maxWidth = qMin(maxWidth, buffer.width() - x);
     int col = 0;
-    if (QtTuiUnicode::hasRightToLeft(text)) {
+    if (QtTuiUnicode::bidiEnabled() && QtTuiUnicode::hasRightToLeft(text)) {
         // Cut the logical end of the text, then put the rest in display order
         const QString kept = text.left(QtTuiUnicode::indexOfColumn(text, maxWidth));
         for (const QtTuiUnicode::Cluster &c : QtTuiUnicode::visualClusters(kept)) {
@@ -148,7 +148,7 @@ void renderTextTruncated(ScreenBuffer &buffer,
     // columns, then the ellipsis. A wide character that would straddle the
     // truncation boundary is replaced by a space.
     const int textCols = maxWidth - 1;
-    if (QtTuiUnicode::hasRightToLeft(text)) {
+    if (QtTuiUnicode::bidiEnabled() && QtTuiUnicode::hasRightToLeft(text)) {
         // The ellipsis is the logical end of the text that stays, so the
         // reorder puts it at the left end of right-to-left text
         QString kept = text.left(QtTuiUnicode::indexOfColumn(text, textCols));
