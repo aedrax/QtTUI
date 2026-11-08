@@ -3,10 +3,15 @@
 //
 // Qt Core has no bidi reference. The expected values here are derived by
 // hand from the rules of UAX #9, not from the implementation.
+#include <QtTUI/QTuiLabel.h>
+#include <QtTUI/QTuiLineEdit.h>
+#include <QtTUI/QTuiTextEdit.h>
 #include <QtTUI/QtTuiUnicode.h>
 #include <QtTUI/RenderUtils.h>
 #include <QtTUI/ScreenBuffer.h>
+#include <QtTUI/TuiEvents.h>
 
+#include <QSignalSpy>
 #include <QtTest/QtTest>
 
 using namespace QtTUI;
@@ -228,6 +233,73 @@ private slots:
         buffer = ScreenBuffer(6, 1);
         renderTextTruncated(buffer, 0, 0, s({ALEF, BET}), 4, Cell());
         QCOMPARE(row(buffer), s({BET, ALEF, ' ', ' ', ' ', ' '}));
+    }
+
+    // QTuiLabel paints its own cells, with the style of each character
+    void labelReordersAndKeepsTheStyles()
+    {
+        // Markdown: alef and bet are bold. Display order: dalet, gimel,
+        // space, bet, alef.
+        QTuiLabel label(QStringLiteral("**") + s({ALEF, BET}) + QStringLiteral("** ") + s({GIMEL, DALET}));
+        label.setTextFormat(Qt::MarkdownText);
+        label.setAlignment(Qt::AlignLeft | Qt::AlignTop);
+        label.setGeometry(QRect(0, 0, 8, 1));
+
+        ScreenBuffer buffer(8, 1);
+        label.paintEvent(buffer);
+        QCOMPARE(row(buffer), s({DALET, GIMEL, ' ', BET, ALEF, ' ', ' ', ' '}));
+        QVERIFY(!buffer.backCell(0, 0).bold);
+        QVERIFY(!buffer.backCell(1, 0).bold);
+        QVERIFY(buffer.backCell(3, 0).bold);
+        QVERIFY(buffer.backCell(4, 0).bold);
+    }
+
+    // A click finds the link in the cell where the link shows. The text is
+    // "alef bet" (a link), a space and "cd". Display order: "cd", space,
+    // bet, alef. So the link is in columns 3 and 4.
+    void labelLinkClickUsesTheDisplayOrder()
+    {
+        QTuiLabel label(QStringLiteral("[") + s({ALEF, BET}) + QStringLiteral("](u) cd"));
+        label.setTextFormat(Qt::MarkdownText);
+        label.setAlignment(Qt::AlignLeft | Qt::AlignTop);
+        label.setGeometry(QRect(0, 0, 8, 1));
+
+        ScreenBuffer buffer(8, 1);
+        label.paintEvent(buffer);
+        QCOMPARE(row(buffer), s({'c', 'd', ' ', BET, ALEF, ' ', ' ', ' '}));
+
+        QSignalSpy spy(&label, &QTuiLabel::linkActivated);
+        TuiMouseEvent onLatin(TuiMouseEvent::Press, Qt::LeftButton, QPoint(0, 0));
+        QCoreApplication::sendEvent(&label, &onLatin);
+        QCOMPARE(spy.count(), 0);
+        TuiMouseEvent onLink(TuiMouseEvent::Press, Qt::LeftButton, QPoint(4, 0));
+        QCoreApplication::sendEvent(&label, &onLink);
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(spy.last().at(0).toString(), QStringLiteral("u"));
+    }
+
+    // The editors are not visual-order editors: the cell of a character
+    // must agree with the cursor column, so the text stays in logical order
+    void lineEditKeepsLogicalOrder()
+    {
+        QTuiLineEdit edit;
+        edit.setGeometry(QRect(0, 0, 8, 1));
+        edit.setText(s({ALEF, BET, GIMEL}));
+        ScreenBuffer buffer(8, 1);
+        edit.paintEvent(buffer);
+        QCOMPARE(row(buffer).left(3), s({ALEF, BET, GIMEL}));
+        // The cursor is after gimel, at column 3
+        QCOMPARE(edit.terminalCursorPos(), QPoint(3, 0));
+    }
+
+    void textEditKeepsLogicalOrder()
+    {
+        QTuiTextEdit edit;
+        edit.setGeometry(QRect(0, 0, 8, 2));
+        edit.setPlainText(s({ALEF, BET, ' ', 'a', 'b'}));
+        ScreenBuffer buffer(8, 2);
+        edit.paintEvent(buffer);
+        QCOMPARE(row(buffer).left(5), s({ALEF, BET, ' ', 'a', 'b'}));
     }
 
 private:
