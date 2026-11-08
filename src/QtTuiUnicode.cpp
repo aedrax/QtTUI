@@ -1,6 +1,7 @@
 #include <QtTUI/QtTuiUnicode.h>
 
 #include <QChar>
+#include <QVarLengthArray>
 #include <algorithm>
 #include <iterator>
 
@@ -319,6 +320,287 @@ int prevClusterIndex(const QString &text, int index)
         prev = c.index;
     }
     return prev;
+}
+
+bool hasRightToLeft(const QString &text)
+{
+    for (const QChar ch : text) {
+        const char16_t u = ch.unicode();
+        if (u < 0x0590)
+            continue; // Latin, Greek, Cyrillic: the usual text stops here
+        if (ch.isHighSurrogate()) {
+            // U+10800 to U+10FFF and U+1E800 to U+1EFFF are right-to-left
+            if ((u & 0xFFFE) == 0xD802 || (u & 0xFFFE) == 0xD83A)
+                return true;
+            continue;
+        }
+        switch (ch.direction()) {
+        case QChar::DirR:
+        case QChar::DirAL:
+        case QChar::DirAN: // two Arabic numbers with a space between them change places
+            return true;
+        default:
+            break;
+        }
+    }
+    return false;
+}
+
+namespace {
+
+// One character of the bidi algorithm: the base of a cluster, or a strong
+// character (LRM, RLM, ALM) in the joined code points of a cluster
+struct BidiItem {
+    QChar::Direction type;
+    int cluster; // index in the cluster list, or -1 for a joined code point
+    int level = 0;
+};
+
+bool isStrong(QChar::Direction t)
+{
+    return t == QChar::DirL || t == QChar::DirR || t == QChar::DirAL;
+}
+
+bool isNeutral(QChar::Direction t)
+{
+    return t == QChar::DirB || t == QChar::DirS || t == QChar::DirWS || t == QChar::DirON;
+}
+
+// The direction of a type for the rules N0 to N2: a number is R. Call it
+// only after the W rules, when a type that is not neutral is L, R, EN or AN.
+QChar::Direction strongSide(QChar::Direction t)
+{
+    return t == QChar::DirL ? QChar::DirL : QChar::DirR;
+}
+
+} // namespace
+
+QList<Cluster> visualClusters(const QString &line, Qt::LayoutDirection base)
+{
+    using Dir = QChar::Direction;
+
+    QList<Cluster> clusters;
+    QVarLengthArray<BidiItem, 128> items;
+    {
+        int i = 0;
+        Cluster c;
+        while (nextCluster(line, i, c)) {
+            Dir type = QChar::direction(c.base);
+            switch (type) {
+            case QChar::DirL: case QChar::DirR: case QChar::DirAL:
+            case QChar::DirEN: case QChar::DirES: case QChar::DirET:
+            case QChar::DirAN: case QChar::DirCS: case QChar::DirNSM:
+            case QChar::DirB: case QChar::DirS: case QChar::DirWS:
+                break;
+            default:
+                // ponytail: no explicit levels (X1 to X8). An embedding,
+                // override or isolate control is a neutral here, or it is in
+                // the joined code points of a cluster and has no effect.
+                // Add the X rules if text with these controls must show
+                // right.
+                type = QChar::DirON;
+            }
+            items.append({ type, int(clusters.size()) });
+            // The joined code points have no type of their own (W1), but a
+            // strong one (LRM, RLM, ALM) has an effect on the text near it
+            for (int k = 0, len = 0; k < c.combining.size(); k += len) {
+                const Dir joined = QChar::direction(codePointAt(c.combining, k, len));
+                if (isStrong(joined))
+                    items.append({ joined, -1 });
+            }
+            clusters.append(c);
+        }
+    }
+    const int n = int(items.size());
+
+    // P2, P3: the paragraph level is the direction of the first strong character
+    int paragraphLevel = base == Qt::RightToLeft ? 1 : 0;
+    if (base == Qt::LayoutDirectionAuto) {
+        for (const BidiItem &item : items) {
+            if (isStrong(item.type)) {
+                paragraphLevel = item.type == QChar::DirL ? 0 : 1;
+                break;
+            }
+        }
+    }
+    // The embedding direction. Without explicit levels the line is one run,
+    // and this is also the type of the start and of the end of the run.
+    const Dir e = paragraphLevel ? QChar::DirR : QChar::DirL;
+
+    // W1: a nonspacing mark gets the type of the character before it
+    // W2: a European number after an Arabic letter is an Arabic number
+    // W3: an Arabic letter is R
+    Dir previous = e;
+    Dir strong = e;
+    for (BidiItem &item : items) {
+        if (item.type == QChar::DirNSM)
+            item.type = previous;
+        previous = item.type;
+        if (item.type == QChar::DirEN && strong == QChar::DirAL) {
+            item.type = QChar::DirAN;
+        } else if (isStrong(item.type)) {
+            strong = item.type;
+            if (item.type == QChar::DirAL)
+                item.type = QChar::DirR;
+        }
+    }
+    // W4: one separator between two numbers of the same type is a number
+    for (int i = 1; i + 1 < n; ++i) {
+        const Dir before = items[i - 1].type;
+        if (before != items[i + 1].type)
+            continue;
+        if ((items[i].type == QChar::DirES && before == QChar::DirEN)
+            || (items[i].type == QChar::DirCS && (before == QChar::DirEN || before == QChar::DirAN)))
+            items[i].type = before;
+    }
+    // W5: number terminators next to a European number are a European number
+    for (int i = 1; i < n; ++i) {
+        if (items[i].type == QChar::DirET && items[i - 1].type == QChar::DirEN)
+            items[i].type = QChar::DirEN;
+    }
+    for (int i = n - 2; i >= 0; --i) {
+        if (items[i].type == QChar::DirET && items[i + 1].type == QChar::DirEN)
+            items[i].type = QChar::DirEN;
+    }
+    // W6: the other separators and terminators are neutral
+    // W7: a European number after L is L
+    strong = e;
+    for (BidiItem &item : items) {
+        if (item.type == QChar::DirES || item.type == QChar::DirET || item.type == QChar::DirCS)
+            item.type = QChar::DirON;
+        else if (item.type == QChar::DirL || item.type == QChar::DirR)
+            strong = item.type;
+        else if (item.type == QChar::DirEN && strong == QChar::DirL)
+            item.type = QChar::DirL;
+    }
+
+    // N0: the two brackets of a pair get the same direction
+    {
+        // ponytail: a bracket is a Ps or Pe character with a mirror
+        // character, not the exact Bidi_Paired_Bracket property, and
+        // U+2329/U+232A do not match U+3008/U+3009. Use BidiBrackets.txt if
+        // this matters.
+        struct Pair { int open; int close; };
+        QVarLengthArray<Pair, 16> pairs;
+        QVarLengthArray<int, 63> stack; // positions of the open brackets
+        for (int i = 0; i < n; ++i) {
+            if (items[i].cluster < 0 || items[i].type != QChar::DirON)
+                continue;
+            const char32_t ch = clusters.at(items[i].cluster).base;
+            const QChar::Category category = QChar::category(ch);
+            if (category == QChar::Punctuation_Open && QChar::mirroredChar(ch) != ch) {
+                if (stack.size() == 63)
+                    break; // BD16: stop at the stack limit
+                stack.append(i);
+            } else if (category == QChar::Punctuation_Close) {
+                for (int k = int(stack.size()) - 1; k >= 0; --k) {
+                    if (clusters.at(items[stack[k]].cluster).base == QChar::mirroredChar(ch)) {
+                        pairs.append({ stack[k], i });
+                        stack.resize(k);
+                        break;
+                    }
+                }
+            }
+        }
+        std::sort(pairs.begin(), pairs.end(),
+                  [](const Pair &a, const Pair &b) { return a.open < b.open; });
+        for (const Pair &pair : pairs) {
+            bool found = false;
+            Dir inside = e;
+            for (int i = pair.open + 1; i < pair.close; ++i) {
+                if (isNeutral(items[i].type))
+                    continue;
+                found = true;
+                inside = strongSide(items[i].type);
+                if (inside == e)
+                    break;
+            }
+            if (!found)
+                continue; // only neutrals in the pair: N1 and N2 resolve it
+            if (inside != e) {
+                // Only the opposite direction is in the pair. The pair gets
+                // it if the text before the pair also has it.
+                Dir context = e;
+                for (int i = pair.open - 1; i >= 0; --i) {
+                    if (!isNeutral(items[i].type)) {
+                        context = strongSide(items[i].type);
+                        break;
+                    }
+                }
+                if (context != inside)
+                    inside = e;
+            }
+            items[pair.open].type = items[pair.close].type = inside;
+        }
+    }
+
+    // N1: neutrals between two characters of the same direction get that
+    // direction. N2: the other neutrals get the embedding direction.
+    for (int i = 0; i < n;) {
+        if (!isNeutral(items[i].type)) {
+            ++i;
+            continue;
+        }
+        int end = i;
+        while (end < n && isNeutral(items[end].type))
+            ++end;
+        const Dir before = i > 0 ? strongSide(items[i - 1].type) : e;
+        const Dir after = end < n ? strongSide(items[end].type) : e;
+        for (; i < end; ++i)
+            items[i].type = before == after ? before : e;
+    }
+
+    // I1, I2: the level of each character. The types are now L, R, EN and AN.
+    int highest = paragraphLevel;
+    for (BidiItem &item : items) {
+        if (paragraphLevel == 0)
+            item.level = item.type == QChar::DirL ? 0 : item.type == QChar::DirR ? 1 : 2;
+        else
+            item.level = item.type == QChar::DirR ? 1 : 2;
+        highest = qMax(highest, item.level);
+    }
+
+    // L2: from the highest level down to level 1, reverse each run of
+    // characters at that level or higher
+    for (int level = highest; level >= 1; --level) {
+        for (int i = 0; i < n;) {
+            if (items[i].level < level) {
+                ++i;
+                continue;
+            }
+            int end = i;
+            while (end < n && items[end].level >= level)
+                ++end;
+            std::reverse(items.begin() + i, items.begin() + end);
+            i = end;
+        }
+    }
+
+    // L4: a mirrored character at an odd level shows as its mirror character
+    QList<Cluster> visual;
+    visual.reserve(clusters.size());
+    for (const BidiItem &item : items) {
+        if (item.cluster < 0)
+            continue;
+        Cluster c = clusters.at(item.cluster);
+        if (item.level & 1)
+            c.base = QChar::mirroredChar(c.base);
+        visual.append(c);
+    }
+    return visual;
+}
+
+QString visualOrder(const QString &line, Qt::LayoutDirection base)
+{
+    if (base != Qt::RightToLeft && !hasRightToLeft(line))
+        return line;
+    QString out;
+    out.reserve(line.size());
+    for (const Cluster &c : visualClusters(line, base)) {
+        out.append(QChar::fromUcs4(c.base));
+        out.append(c.combining);
+    }
+    return out;
 }
 
 } // namespace QtTuiUnicode

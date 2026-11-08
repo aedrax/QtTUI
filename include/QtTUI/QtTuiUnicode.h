@@ -2,6 +2,7 @@
 #define QTTUI_QTTUIUNICODE_H
 
 #include <QtTUI/QtTUIGlobal.h>
+#include <QList>
 #include <QString>
 
 namespace QtTUI {
@@ -28,7 +29,8 @@ namespace QtTUI {
  *   Extended_Pictographic property.
  * - UAX #11 "Ambiguous" width characters are treated as narrow (width 1),
  *   matching wcwidth and most terminal emulators.
- * - Text is not reordered for right-to-left scripts (no bidi).
+ * - visualOrder() does not do the explicit levels of UAX #9 and does not
+ *   shape Arabic letters (see visualOrder).
  */
 namespace QtTuiUnicode {
 
@@ -106,6 +108,47 @@ int nextClusterIndex(const QString &text, int index);
 
 /** Cluster boundary before `index` (clamped to 0). */
 int prevClusterIndex(const QString &text, int index);
+
+/**
+ * True if the text has a character that visualOrder() moves: a
+ * right-to-left letter (Hebrew, Arabic and others) or an Arabic number.
+ * This is one scan of the code units with no allocation. Text paint uses it
+ * to skip the reorder for left-to-right text.
+ */
+bool hasRightToLeft(const QString &text);
+
+/**
+ * The line in display order: the Unicode Bidirectional Algorithm (UAX #9)
+ * for one line. Right-to-left runs are reversed, and a mirrored character
+ * (a bracket) in such a run changes to its mirror character. A cluster
+ * stays together, with the base before its marks.
+ *
+ * base is the paragraph direction. Qt::LayoutDirectionAuto uses the first
+ * strong character (rules P2 and P3), and left-to-right if there is none.
+ * A line with no right-to-left character and a base that is not
+ * Qt::RightToLeft returns unchanged, with no allocation.
+ *
+ * The rules: P2, P3, W1 to W7, N0 to N2, I1, I2, L2 and L4.
+ *
+ * Known limitations (documented, deliberate):
+ * - No explicit levels (rules X1 to X8). The function ignores the
+ *   embedding, override and isolate control characters (U+202A to U+202E,
+ *   U+2066 to U+2069). The marks LRM, RLM and ALM work.
+ * - A bracket pair (rule N0) is a character of the category Ps and a
+ *   character of the category Pe that are mirror characters of each other.
+ *   This is not the exact Bidi_Paired_Bracket property.
+ * - No rule L1 for a tab or a paragraph separator in the line.
+ * - No Arabic shaping (joined letter forms). A terminal that shapes text
+ *   does this itself.
+ */
+QString visualOrder(const QString &line, Qt::LayoutDirection base = Qt::LayoutDirectionAuto);
+
+/**
+ * The clusters of the line in display order (see visualOrder). The index
+ * of each cluster is its position in line, so a caller can find the source
+ * of each cell. The base of a mirrored cluster is the mirror character.
+ */
+QList<Cluster> visualClusters(const QString &line, Qt::LayoutDirection base = Qt::LayoutDirectionAuto);
 
 } // namespace QtTuiUnicode
 
