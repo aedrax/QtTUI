@@ -1,6 +1,8 @@
 #include <QtTUI/QTuiLabel.h>
 #include <QtTUI/RenderUtils.h>
+#include <QtTUI/TuiEvents.h>
 #include <QHash>
+#include <QRegularExpression>
 #include <QtTUI/QtTuiUnicode.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
@@ -22,6 +24,7 @@ void QTuiLabel::setText(const QString &text)
 {
     if (m_text != text) {
         m_text = text;
+        updateLinks();
         emit textChanged(m_text);
         markDirty();
     }
@@ -124,6 +127,7 @@ void QTuiLabel::setTextFormat(Qt::TextFormat format)
     if (m_textFormat == format)
         return;
     m_textFormat = format;
+    updateLinks();
     markDirty();
 }
 
@@ -134,14 +138,18 @@ QString QTuiLabel::displayText() const
     return shown;
 }
 
-// Reads Markdown (a small subset) into text and style bits
-static void parseMarkdown(const QString &in, QString *out, QVector<quint8> *styles)
+// Reads Markdown (a small subset) into text, styles and link targets
+static void parseMarkdown(const QString &in, QString *out, QVector<quint16> *styles,
+                          QStringList *links)
 {
     quint8 current = 0;
+    int linkCount = 0;
+    int link = 0;     // number of the open link (from 1), or 0
+    int linkEnd = -1; // index of the "]" that closes its text
     auto put = [&](QChar ch) {
         out->append(ch);
         if (styles)
-            styles->append(current);
+            styles->append(quint16(current | (link << 8)));
     };
     // A marker counts only if the same marker closes it later in the paragraph
     auto closes = [&](int from, const QString &marker) {
@@ -151,6 +159,14 @@ static void parseMarkdown(const QString &in, QString *out, QVector<quint8> *styl
     };
     for (int i = 0; i < in.length(); ++i) {
         const QChar ch = in.at(i);
+        if (i == linkEnd) {
+            // The end of the link text: go over "](url)". The url is not
+            // text, so its * and _ are not markup.
+            i = in.indexOf(QLatin1Char(')'), i);
+            link = 0;
+            linkEnd = -1;
+            continue;
+        }
         if (current & 16) { // inside `code`: no other markup
             if (ch == QLatin1Char('`'))
                 current &= ~16;
@@ -161,6 +177,26 @@ static void parseMarkdown(const QString &in, QString *out, QVector<quint8> *styl
         if (ch == QLatin1Char('\\') && i + 1 < in.length()) {
             put(in.at(++i));
             continue;
+        }
+        if (ch == QLatin1Char('[') && link == 0) {
+            // [text](url) on one line: the text is not empty and has no
+            // brackets, and the url has no space
+            const int eol = in.indexOf(QLatin1Char('\n'), i);
+            const int close = in.indexOf(QLatin1Char(']'), i + 1);
+            const bool text = close >= i + 2 && in.mid(close, 2) == QLatin1String("](")
+                && !in.mid(i + 1, close - i - 1).contains(QLatin1Char('['));
+            const int paren = text ? in.indexOf(QLatin1Char(')'), close + 2) : -1;
+            const QString url = in.mid(close + 2, paren - close - 2);
+            if (paren >= 0 && (eol < 0 || paren < eol) && !url.contains(QLatin1Char(' '))) {
+                if (links)
+                    links->append(url);
+                // ponytail: the style has one byte for the link number, so
+                // links after number 255 act as link 255. Use a wider style
+                // if a label needs more.
+                link = qMin(++linkCount, 255);
+                linkEnd = close;
+                continue;
+            }
         }
         const QString two = in.mid(i, 2);
         if (two == QLatin1String("**") || two == QLatin1String("__")) {
@@ -190,10 +226,13 @@ static void parseMarkdown(const QString &in, QString *out, QVector<quint8> *styl
     }
 }
 
-// Reads a small HTML subset into text and style bits
-static void parseHtml(const QString &in, QString *out, QVector<quint8> *styles)
+// Reads a small HTML subset into text, styles and link targets
+static void parseHtml(const QString &in, QString *out, QVector<quint16> *styles,
+                      QStringList *links)
 {
     int count[5] = {0, 0, 0, 0, 0}; // open tags per style bit
+    int linkCount = 0;
+    int link = 0; // number of the open link (from 1), or 0
     auto bits = [&]() {
         quint8 b = 0;
         for (int k = 0; k < 5; ++k)
@@ -204,7 +243,7 @@ static void parseHtml(const QString &in, QString *out, QVector<quint8> *styles)
     auto put = [&](QChar ch) {
         out->append(ch);
         if (styles)
-            styles->append(bits());
+            styles->append(quint16(bits() | (link << 8)));
     };
     static const QHash<QString, int> tagBit = {
         {QStringLiteral("b"), 0}, {QStringLiteral("strong"), 0}, {QStringLiteral("i"), 1},
@@ -222,7 +261,9 @@ static void parseHtml(const QString &in, QString *out, QVector<quint8> *styles)
                 put(ch);
                 continue;
             }
-            QString tag = in.mid(i + 1, end - i - 1).trimmed().toLower();
+            // The tag in its original case: a link target keeps its case
+            const QString raw = in.mid(i + 1, end - i - 1);
+            QString tag = raw.trimmed().toLower();
             i = end;
             const bool closing = tag.startsWith(QLatin1Char('/'));
             if (closing)
@@ -230,6 +271,18 @@ static void parseHtml(const QString &in, QString *out, QVector<quint8> *styles)
             tag = tag.section(QLatin1Char(' '), 0, 0).remove(QLatin1Char('/'));
             if (tag == QLatin1String("br") || (closing && tag == QLatin1String("p"))) {
                 put(QLatin1Char('\n'));
+            } else if (tag == QLatin1String("a")) {
+                // <a href="url">: a link. An <a> without href is not a link.
+                static const QRegularExpression href(
+                    QStringLiteral("\\bhref\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)')"),
+                    QRegularExpression::CaseInsensitiveOption);
+                const QRegularExpressionMatch m = closing ? QRegularExpressionMatch() : href.match(raw);
+                link = 0;
+                if (m.hasMatch()) {
+                    if (links)
+                        links->append(m.captured(1) + m.captured(2));
+                    link = qMin(++linkCount, 255);
+                }
             } else if (tagBit.contains(tag)) {
                 int &n = count[tagBit.value(tag)];
                 n = qMax(0, n + (closing ? -1 : 1));
@@ -254,17 +307,17 @@ static void parseHtml(const QString &in, QString *out, QVector<quint8> *styles)
     }
 }
 
-QChar QTuiLabel::parse(QString *shown, QVector<quint8> *styles) const
+QChar QTuiLabel::parse(QString *shown, QVector<quint16> *styles, QStringList *links) const
 {
     shown->clear();
     if (styles)
         styles->clear();
     switch (m_textFormat) {
     case Qt::MarkdownText:
-        parseMarkdown(m_text, shown, styles);
+        parseMarkdown(m_text, shown, styles, links);
         break;
     case Qt::RichText:
-        parseHtml(m_text, shown, styles);
+        parseHtml(m_text, shown, styles, links);
         break;
     default:
         *shown = m_text;
@@ -317,28 +370,77 @@ QSize QTuiLabel::minimumSize() const
     return QSize(width + frame, int(textLines.size()) + frame);
 }
 
-void QTuiLabel::paintEvent(ScreenBuffer &buffer)
+void QTuiLabel::updateLinks()
 {
-    const QRect geo = geometry();
-    if (!isVisible() || geo.isEmpty())
+    const bool hadLinks = !m_links.isEmpty();
+    QString shown;
+    m_links.clear();
+    parse(&shown, nullptr, &m_links);
+    m_currentLink = 0;
+    // A label with links takes the focus, so that the keys reach the links
+    if (hadLinks != !m_links.isEmpty())
+        setFocusPolicy(m_links.isEmpty() ? Qt::NoFocus : Qt::StrongFocus);
+}
+
+void QTuiLabel::keyPressEvent(TuiKeyEvent *event)
+{
+    if (m_links.isEmpty())
         return;
+    int link = m_currentLink;
+    switch (event->key()) {
+    case Qt::Key_Right:
+    case Qt::Key_Down:
+    case Qt::Key_Tab:
+        link += (event->modifiers() & Qt::ShiftModifier) ? -1 : 1;
+        break;
+    case Qt::Key_Left:
+    case Qt::Key_Up:
+    case Qt::Key_Backtab:
+        --link;
+        break;
+    case Qt::Key_Return:
+    case Qt::Key_Enter:
+        emit linkActivated(m_links.at(m_currentLink));
+        return;
+    default:
+        return;
+    }
+    link = qBound(0, link, int(m_links.size()) - 1);
+    if (link == m_currentLink)
+        return;
+    m_currentLink = link;
+    markDirty();
+}
 
-    const auto theme = themeProperties();
-    // Determine colors based on focus state
-    const Color fg = hasFocus() ? theme.focusForeground : theme.foreground;
-    const Color bg = hasFocus() ? theme.focusBackground : theme.background;
+void QTuiLabel::mousePressEvent(TuiMouseEvent *event)
+{
+    if (event->mouseType() != TuiMouseEvent::Press || event->button() != Qt::LeftButton)
+        return;
+    // Find the link in the cell under the mouse
+    int link = 0;
+    layoutText([&](int x, int y, const QtTuiUnicode::Cluster &c, quint16 style) {
+        if (y == event->y() && event->x() >= x && event->x() < x + c.width)
+            link = style >> 8;
+    });
+    if (link == 0)
+        return;
+    if (m_currentLink != link - 1) {
+        m_currentLink = link - 1;
+        markDirty();
+    }
+    emit linkActivated(m_links.at(m_currentLink));
+}
 
-    // Clear the label area with background
-    fillRect(buffer, geo, cellStyle(theme, fg, bg));
-    if (frameShape() == Box)
-        drawBorder(buffer, geo, theme.borderStyle, cellStyle(theme, fg, bg));
+void QTuiLabel::layoutText(const std::function<void(int x, int y, const QtTuiUnicode::Cluster &c,
+                                                    quint16 style)> &visit) const
+{
     const QRect area = contentsRect();
     if (area.isEmpty())
         return;
 
     // Get wrapped lines
     QString shown;
-    QVector<quint8> styles;
+    QVector<quint16> styles;
     parse(&shown, &styles);
     QStringList lines = wrapText(shown, area.width());
     // Position in `shown` of the next character to match with the lines;
@@ -358,7 +460,6 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
     // AlignTop: startRow stays 0
     startRow = qMax(0, startRow);
 
-    // Render each line
     for (int lineIdx = 0; lineIdx < lines.size(); ++lineIdx) {
         int row = startRow + lineIdx;
         if (row >= area.height())
@@ -377,18 +478,6 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
         // AlignLeft: startCol stays 0
         startCol = qMax(0, startCol);
 
-        // Write clusters until the widget (or buffer) edge; a wide character
-        // straddling the right edge is left as the background space.
-        Cell style;
-        style.foreground = fg;
-        style.background = bg;
-        style.bold = theme.bold;
-        style.italic = theme.italic;
-        style.underline = theme.underline;
-
-        const int py = area.y() + row;
-        if (py >= buffer.height())
-            continue;
         int col = startCol;
         int i = 0;
         QtTuiUnicode::Cluster c;
@@ -398,28 +487,70 @@ void QTuiLabel::paintEvent(ScreenBuffer &buffer)
         bool full = false; // a cluster did not fit: the rest of the line is cut
         while (QtTuiUnicode::nextCluster(line, i, c)) {
             // Match the cluster with its source character for the style
-            quint8 bits = 0;
+            quint16 bits = 0;
             if (c.base == U' ') {
+                // A space has the style of the first source space
+                if (src < shown.length() && shown.at(src) == QLatin1Char(' '))
+                    bits = styles.value(src);
                 while (src < shown.length() && shown.at(src) == QLatin1Char(' '))
                     ++src;
             } else if (src < shown.length()) {
                 bits = styles.value(src);
                 src += i - c.index;
             }
-            if (full || col + c.width > area.width() || area.x() + col + c.width > buffer.width()) {
+            // A wide character that goes past the right edge does not show
+            if (full || col + c.width > area.width()) {
                 full = true; // keep matching, so the next line starts right
                 continue;
             }
-            Cell styled = style;
-            styled.bold = style.bold || (bits & Bold);
-            styled.italic = style.italic || (bits & Italic);
-            styled.underline = style.underline || (bits & Underline);
-            styled.strikethrough = bits & Strike;
-            styled.inverse = bits & Code;
-            buffer.putChar(area.x() + col, py, c.base, c.combining, styled);
+            visit(area.x() + col, area.y() + row, c, bits);
             col += c.width;
         }
     }
+}
+
+void QTuiLabel::paintEvent(ScreenBuffer &buffer)
+{
+    const QRect geo = geometry();
+    if (!isVisible() || geo.isEmpty())
+        return;
+
+    const auto theme = themeProperties();
+    // Determine colors based on focus state. A label with links keeps its
+    // colors; only the current link shows the focus.
+    const bool focusColors = hasFocus() && m_links.isEmpty();
+    const Color fg = focusColors ? theme.focusForeground : theme.foreground;
+    const Color bg = focusColors ? theme.focusBackground : theme.background;
+
+    // Clear the label area with background
+    fillRect(buffer, geo, cellStyle(theme, fg, bg));
+    if (frameShape() == Box)
+        drawBorder(buffer, geo, theme.borderStyle, cellStyle(theme, fg, bg));
+
+    const Cell style = cellStyle(theme, fg, bg);
+    const bool focused = hasFocus();
+    layoutText([&](int x, int y, const QtTuiUnicode::Cluster &c, quint16 bits) {
+        // A character past the buffer edge does not show
+        if (y >= buffer.height() || x + c.width > buffer.width())
+            return;
+        Cell styled = style;
+        styled.bold = style.bold || (bits & Bold);
+        styled.italic = style.italic || (bits & Italic);
+        styled.underline = style.underline || (bits & Underline);
+        styled.strikethrough = bits & Strike;
+        styled.inverse = bits & Code;
+        if (const int link = bits >> 8) {
+            // A link: underlined in the accent color. The current link of
+            // a label with focus shows in the focus colors.
+            styled.underline = true;
+            styled.foreground = theme.focusBackground;
+            if (focused && link - 1 == m_currentLink) {
+                styled.foreground = theme.focusForeground;
+                styled.background = theme.focusBackground;
+            }
+        }
+        buffer.putChar(x, y, c.base, c.combining, styled);
+    });
 }
 
 } // namespace QtTUI

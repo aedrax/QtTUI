@@ -80,6 +80,9 @@ qttui_add_test(test_qtui_mainwindow test_qtui_mainwindow.cpp)
 # QTuiLineEdit property tests (Properties 26-30)
 qttui_add_test(test_qtui_lineedit test_qtui_lineedit.cpp)
 
+# QTuiLineEdit input mask
+qttui_add_test(test_lineedit_inputmask test_lineedit_inputmask.cpp)
+
 # QTuiCompleter matching and line edit popup flow
 qttui_add_test(test_qtui_completer test_qtui_completer.cpp)
 
@@ -116,6 +119,9 @@ qttui_add_test(test_ui_loader test_ui_loader.cpp)
 # QTuiLabel unit tests
 qttui_add_test(test_qtui_label test_qtui_label.cpp)
 
+# QTuiLabel links
+qttui_add_test(test_label_links test_label_links.cpp)
+
 # Button and toggle widget tests
 qttui_add_test(test_qtui_button_widgets test_qtui_button_widgets.cpp)
 
@@ -127,6 +133,15 @@ qttui_add_test(test_qtui_combobox_progressbar test_qtui_combobox_progressbar.cpp
 
 # QTuiTextEdit unit tests
 qttui_add_test(test_qtui_textedit test_qtui_textedit.cpp)
+
+# Word wrap of the text edits (visual rows)
+qttui_add_test(test_text_wrap test_text_wrap.cpp)
+
+# QTuiTextEdit::find()
+qttui_add_test(test_text_find test_text_find.cpp)
+
+# QTuiSyntaxHighlighter on a text edit
+qttui_add_test(test_syntax_highlighter test_syntax_highlighter.cpp)
 
 # QTuiDateTimeEdit, QTuiDateEdit, QTuiTimeEdit, QTuiLCDNumber unit tests
 qttui_add_test(test_qtui_datetime_lcd test_qtui_datetime_lcd.cpp)

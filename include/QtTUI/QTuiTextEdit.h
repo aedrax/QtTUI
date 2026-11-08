@@ -2,15 +2,25 @@
 #define QTTUI_QTUITEXTEDIT_H
 
 #include <QtTUI/QTuiWidget.h>
+#include <QPointer>
 #include <QString>
 #include <QStringList>
 
 namespace QtTUI {
 
+class QTuiSyntaxHighlighter;
+
 class QTuiTextEdit : public QTuiWidget {
     Q_OBJECT
     Q_PROPERTY(bool readOnly READ isReadOnly WRITE setReadOnly)
+    Q_PROPERTY(LineWrapMode lineWrapMode READ lineWrapMode WRITE setLineWrapMode)
 public:
+    // How a line that is wider than the widget shows, as in QPlainTextEdit.
+    // NoWrap (the default) scrolls the text horizontally. WidgetWidth
+    // continues the line on the next row; it breaks after a space if it can.
+    enum LineWrapMode { NoWrap, WidgetWidth };
+    Q_ENUM(LineWrapMode)
+
     explicit QTuiTextEdit(QTuiWidget *parent = nullptr);
 
     QString toPlainText() const;
@@ -18,6 +28,9 @@ public:
 
     bool isReadOnly() const;
     void setReadOnly(bool readOnly);
+
+    LineWrapMode lineWrapMode() const;
+    void setLineWrapMode(LineWrapMode mode);
 
     int cursorRow() const;
     int cursorColumn() const;
@@ -27,6 +40,16 @@ public:
     QString selectedText() const;
     // Selects the whole text (Ctrl+A); the cursor goes to the end
     void selectAll();
+
+    // Options for find(), with the names of QTextDocument::FindFlag
+    enum FindFlag { FindBackward = 0x1, FindCaseSensitively = 0x2, FindWholeWords = 0x4 };
+    Q_DECLARE_FLAGS(FindFlags, FindFlag)
+    // Finds the next occurrence of exp, as QPlainTextEdit::find(). The
+    // search starts at the cursor (after the selection, or before it for
+    // FindBackward) and stops at the end of the text. If it finds exp, it
+    // selects the match, scrolls to it and returns true. A match is in one
+    // line. The text edit has no find bar; the application makes it.
+    bool find(const QString &exp, FindFlags options = {});
 
     // Undo history: Ctrl+Z undoes, Ctrl+Y and Ctrl+Shift+Z redo. Typed
     // characters in a row undo as one step. setPlainText() clears it.
@@ -57,6 +80,10 @@ protected:
     int lineCount() const;
 
 private:
+    friend class QTuiSyntaxHighlighter;
+    // Sets the highlighter and makes all block states invalid
+    void setHighlighter(QTuiSyntaxHighlighter *highlighter);
+
     void editKey(TuiKeyEvent *event);
     // Records an undo step if the text differs from before
     void recordEdit(const QStringList &before, int row, int col, bool typing);
@@ -74,13 +101,35 @@ private:
     void startOrExtendSelection();
     void normalizeSelection(int &startRow, int &startCol, int &endRow, int &endCol) const;
 
+    // A line shows as one visual row, or as more with WidgetWidth. A visual
+    // row is a line and the number of the row in that line (sub).
+    // rowStarts() returns the index in the line where each visual row starts.
+    QList<int> rowStarts(int line) const;
+    // Moves one visual row up (delta < 0) or down; false at the end of the text
+    bool stepRow(int &line, int &sub, int delta) const;
+    // The index in the line for a display column of a visual row
+    int indexAtColumn(int line, int sub, int column) const;
+    // The display column of the cursor in its visual row
+    int cursorRowColumn() const;
+    // The first visual row of the view
+    void viewTop(int &line, int &sub) const;
+
+    QPointer<QTuiSyntaxHighlighter> m_highlighter;
+    // The block state of the highlighter after each line. The states of
+    // the lines before m_statesValid are correct; the paint calculates
+    // the others when it needs them. The text edit keeps no formats.
+    QList<int> m_blockStates;
+    int m_statesValid = 0;
+
     QStringList m_lines;
     int m_cursorRow = 0;
     int m_cursorCol = 0;  // code-unit index into the line (cluster boundary)
-    int m_scrollRow = 0;
+    int m_scrollRow = 0;  // line of the first visual row of the view
+    int m_scrollSub = 0;  // number of that visual row in the line
     int m_scrollCol = 0;  // display columns scrolled off the left edge
-    int m_desiredCol = 0; // sticky DISPLAY column for vertical cursor movement
+    int m_desiredCol = 0; // sticky DISPLAY column (in the visual row) for vertical cursor movement
     bool m_readOnly = false;
+    LineWrapMode m_wrapMode = NoWrap;
 
     // Selection state
     int m_selStartRow = -1, m_selStartCol = -1;
@@ -98,6 +147,8 @@ private:
     int m_typingRow = -1;
     int m_typingCol = -1;
 };
+
+Q_DECLARE_OPERATORS_FOR_FLAGS(QTuiTextEdit::FindFlags)
 
 } // namespace QtTUI
 

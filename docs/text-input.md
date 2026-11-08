@@ -2,19 +2,20 @@
 
 This page covers the widgets that show text or take text from the user: the
 label, the line edit, the key sequence edit, the text edits and the combo
-box. It also covers the
+box. It also covers the syntax highlighter for the text edits, and the
 validators and the completer for `QTuiLineEdit`.
-
 ## QTuiLabel
+
 
 `#include <QtTUI/QTuiLabel.h>` · Inherits: [QTuiFrame](widget.md)
 
 `QTuiLabel` shows text. Each `\n` starts a new line. With word wrap, the label
 breaks lines at spaces. The label can read a small subset of Markdown or HTML
-for bold, italic, underline, strikethrough and code.
+for bold, italic, underline, strikethrough, code and links.
 
 With the `Box` frame shape, the label paints a border and shows the text
-inside it. The label does not take keys or the mouse.
+inside it. The label takes keys and the mouse only if the text has links. See
+[Links](#links).
 
 ### Text formats
 
@@ -27,9 +28,10 @@ inside it. The label does not take keys or the mouse.
   `~~strikethrough~~` and `` `code` ``. A marker counts only if the same marker
   closes it later on the same line. Otherwise the label shows the marker. A
   backslash shows the next character as it is. Markup in code shows as text.
-  The label does not read headings, lists or links.
+  `[text](url)` is a link. The label does not read headings or lists.
 - `Qt::RichText`: the tags `<b>`, `<strong>`, `<i>`, `<em>`, `<u>`, `<s>`,
-  `<del>` and `<code>`. `<br>` and `</p>` start a new line. The label removes
+  `<del>` and `<code>`. `<a href="url">` is a link. `<br>` and `</p>` start a
+  new line. The label removes
   all other tags, and line breaks at the end of the text. It reads the entities
   `&lt;`, `&gt;`, `&amp;`, `&quot;`, `&#39;` and `&nbsp;`.
 
@@ -54,6 +56,33 @@ auto *nameLabel = new QTuiLabel(QStringLiteral("&Name:"), parent);
 auto *name = new QTuiLineEdit(parent);
 nameLabel->setBuddy(name); // shows "Name:" with N underlined; Alt+N goes to name
 ```
+
+### Links
+
+A link shows underlined in the accent color (the focus background color of the
+theme). In Markdown, a link is `[text](url)` on one line. The text can have
+other markup, but no brackets. The url cannot have a space. In rich text, a
+link is `<a href="url">text</a>`. The quotation marks can be `"` or `'`.
+
+A label with links sets its focus policy to `Qt::StrongFocus`, so the user can
+reach the links with the keyboard. A label without links has `Qt::NoFocus`.
+While the label has focus, the current link shows in the focus colors. The
+other text keeps its colors.
+
+The label does not open a link. It emits `linkActivated()` with the url, and
+the application decides what to do. There is no `setOpenExternalLinks()`,
+because `QDesktopServices` is in Qt GUI.
+
+```cpp
+auto *about = new QTuiLabel(QString(), parent);
+about->setTextFormat(Qt::MarkdownText);
+about->setText(QStringLiteral("Read the [manual](help:manual) or the [license](help:license)."));
+QObject::connect(about, &QTuiLabel::linkActivated, [](const QString &link) {
+    qDebug() << "Open" << link;
+});
+```
+
+A label can have 255 links.
 
 ### Example
 
@@ -81,7 +110,7 @@ void example(QTuiWidget *parent)
 | --- | --- |
 | `explicit QTuiLabel(const QString &text = QString(), QTuiWidget *parent = nullptr)` | Makes a label with the text. |
 | `QString text() const` | Returns the text, with the markup. Property `text`. |
-| `void setText(const QString &text)` | Sets the text. Emits `textChanged()` if the text changes. |
+| `void setText(const QString &text)` | Sets the text. Emits `textChanged()` if the text changes. The first link becomes the current link. |
 | `Qt::Alignment alignment() const` | Returns the alignment. Property `alignment`. The default is `Qt::AlignLeft \| Qt::AlignVCenter`. |
 | `void setAlignment(Qt::Alignment alignment)` | Sets the alignment. The label reads `AlignLeft`, `AlignHCenter`, `AlignRight`, `AlignTop`, `AlignVCenter` and `AlignBottom`. |
 | `bool wordWrap() const` | Returns true if the label breaks long lines at spaces. Property `wordWrap`. The default is false. |
@@ -93,20 +122,48 @@ void example(QTuiWidget *parent)
 | `void setBuddy(QTuiWidget *buddy)` | Sets the buddy widget, or removes it with `nullptr`. Marks the label dirty. The label does not take ownership. If the buddy is deleted, the label has no buddy. See "Buddy and mnemonic". |
 | `QChar mnemonic() const` | Returns the mnemonic character, or a null `QChar` if there is none. |
 | `QSize minimumSize() const override` | Returns the width of the widest line and the number of lines, plus the frame. With word wrap, the width is the width of the longest word. |
-| `void paintEvent(ScreenBuffer &buffer) override` | Paints the text with the styles of the markup. |
+| `void paintEvent(ScreenBuffer &buffer) override` | Paints the text with the styles of the markup. A space in markup has the style of the markup. |
 
 ### Signals
 
 | Signal | Description |
 | --- | --- |
 | `void textChanged(const QString &text)` | The text changed. |
+| `void linkActivated(const QString &link)` | The user activated a link with Enter or with a left click. `link` is the url of the link. |
+
+### Protected functions
+
+| Function | Description |
+| --- | --- |
+| `void keyPressEvent(TuiKeyEvent *event) override` | Moves between the links and activates a link. See the keys below. |
+| `void mousePressEvent(TuiMouseEvent *event) override` | Activates the link under the mouse. |
+
+### Keys
+
+The label takes keys only while it has links and focus.
+
+| Key | Action |
+| --- | --- |
+| Right, Down | Goes to the next link. |
+| Left, Up | Goes to the previous link. |
+| Enter, Return | Emits `linkActivated()` for the current link. |
+
+Tab and Shift+Tab also go to the next and the previous link if the label gets
+them. In a `QTuiMainWindow`, the window uses Tab to go to the next widget, so
+use the arrow keys there.
+
+### Mouse
+
+- A left press on a link makes it the current link and emits
+  `linkActivated()`.
 
 ## QTuiLineEdit
 
 `#include <QtTUI/QTuiLineEdit.h>` · Inherits: [QTuiWidget](widget.md)
 
 `QTuiLineEdit` is a one-line text editor. It has echo modes, a placeholder, a
-maximum length, a validator, a completer, a selection, the clipboard and undo.
+maximum length, an input mask, a validator, a completer, a selection, the
+clipboard and undo.
 The line edit scrolls the text to keep the cursor visible.
 
 The cursor position and the maximum length count UTF-16 code units, as in Qt.
@@ -146,20 +203,22 @@ void example(QTuiWidget *parent)
 | Function | Description |
 | --- | --- |
 | `explicit QTuiLineEdit(QTuiWidget *parent = nullptr)` | Makes an empty line edit. |
-| `QString text() const` | Returns the text. Property `text`. |
+| `QString text() const` | Returns the text. Property `text`. With an input mask, returns the text without the blank characters. |
 | `void setText(const QString &text)` | Sets the text and puts the cursor at the end. It cuts the text to `maxLength()`. It does not use the validator. It clears the selection and the undo history. Emits `textChanged()` if the text changes. |
 | `EchoMode echoMode() const` | Returns the echo mode. Property `echoMode`. The default is `Normal`. |
 | `void setEchoMode(EchoMode mode)` | Sets the echo mode. |
-| `QString displayText() const` | Returns the text as it shows: the text, "•" characters, or an empty string. |
+| `QString displayText() const` | Returns the text as it shows: the text, "•" characters, or an empty string. With an input mask, the text has the blank characters. |
 | `QString placeholderText() const` | Returns the placeholder. Property `placeholderText`. |
 | `void setPlaceholderText(const QString &text)` | Sets the hint text that shows while the line edit is empty. It shows in the muted color, or in italics while the line edit has focus. |
 | `bool isReadOnly() const` | Returns true if the user cannot change the text. Property `readOnly`. The default is false. |
 | `void setReadOnly(bool readOnly)` | Sets read-only. A read-only line edit moves the cursor, selects, copies and emits `returnPressed()`. `setText()` still works. |
 | `int maxLength() const` | Returns the maximum length. Property `maxLength`. The default is 32767. |
-| `void setMaxLength(int length)` | Sets the maximum length. It cuts the current text if it is longer. The line edit also cuts typed and pasted text. |
+| `void setMaxLength(int length)` | Sets the maximum length. It cuts the current text if it is longer. The line edit also cuts typed and pasted text. It does nothing while there is an input mask. |
+| `QString inputMask() const` | Returns the input mask. Property `inputMask`. The default is an empty string (no mask). |
+| `void setInputMask(const QString &inputMask)` | Sets the input mask. An empty string removes the mask. See [Input mask](#input-mask). |
 | `const QTuiValidator *validator() const` | Returns the validator, or `nullptr`. |
 | `void setValidator(const QTuiValidator *validator)` | Sets the validator. The line edit rejects each user edit that makes the text `Invalid`. It does not take ownership of the validator. |
-| `bool hasAcceptableInput() const` | Returns true if there is no validator, or if the validator returns `Acceptable`. |
+| `bool hasAcceptableInput() const` | Returns true if the text fills each necessary position of the input mask, and there is no validator or the validator returns `Acceptable`. |
 | `bool hasSelectedText() const` | Returns true if text is selected. |
 | `QString selectedText() const` | Returns the selected text. |
 | `int selectionStart() const` | Returns the start of the selection, or -1 if no text is selected. |
@@ -195,6 +254,82 @@ Each user edit goes to the validator first. If the validator returns
 calls `fixup()` if the text is not `Acceptable`. Then it emits
 `returnPressed()` only if the text is `Acceptable`.
 
+### Input mask
+
+`setInputMask()` sets a template for the text, as in `QLineEdit`. The template
+has one position for each character. A mask character says which characters a
+position takes:
+
+| Mask character | The position takes |
+| --- | --- |
+| `A` | A letter. Necessary. |
+| `a` | A letter. Can stay empty. |
+| `N` | A letter or a digit. Necessary. |
+| `n` | A letter or a digit. Can stay empty. |
+| `X` | A character that is not the blank character. Necessary. |
+| `x` | A character that is not the blank character. Can stay empty. |
+| `9` | A digit. Necessary. |
+| `0` | A digit. Can stay empty. |
+| `D` | A digit from 1 to 9. Necessary. |
+| `d` | A digit from 1 to 9. Can stay empty. |
+| `#` | A digit, or a plus or minus sign. Can stay empty. |
+| `H` | A hexadecimal digit (0-9, A-F, a-f). Necessary. |
+| `h` | A hexadecimal digit. Can stay empty. |
+| `B` | 0 or 1. Necessary. |
+| `b` | 0 or 1. Can stay empty. |
+
+| Other character | Function |
+| --- | --- |
+| `>` | Makes all subsequent letters uppercase. |
+| `<` | Makes all subsequent letters lowercase. |
+| `!` | Stops the case conversion. |
+| `;c` | Ends the mask and sets the blank character to `c`. The default blank character is a space. |
+| `\` | Makes the next character a separator. Use it for a separator that is a mask character. |
+| `[ ] { }` | Reserved. The line edit ignores them. |
+
+All other characters are separators. The user cannot change a separator.
+
+Examples from the Qt documentation:
+
+| Mask | Use |
+| --- | --- |
+| `000.000.000.000;_` | An IP address. The blank character is `_`. |
+| `HH:HH:HH:HH:HH:HH;_` | A MAC address. |
+| `0000-00-00` | An ISO date. The blank character is a space. |
+| `>AAAAA-AAAAA-AAAAA-AAAAA-AAAAA;#` | A license number. The blank character is `#`, and letters become uppercase. |
+
+With a mask:
+
+- `displayText()` is the full template, for example `192.168.1__.1__`.
+  `text()` is the same without the blank characters: `192.168.1.1`. The
+  separators stay in `text()`.
+- `textChanged()` gives `text()`.
+- The length of the text does not change. `maxLength()` is the number of
+  positions. Backspace and Delete change a character to the blank character.
+  The characters after it do not move.
+- A typed character goes into the position at the cursor if the position takes
+  it. Then the cursor goes over the separators that follow. If the position
+  does not take the character, a typed separator moves the cursor after the
+  next such separator. A different character goes into the next position that
+  takes it. If there is none, the line edit ignores the character.
+- When the line edit gets the focus, the cursor goes to the first position.
+- `setText()` puts the characters into the template with the same rules.
+  `setInputMask()` keeps the characters of the old text that the new mask
+  takes, and clears the undo history.
+- `hasAcceptableInput()` returns false, and Enter does not emit
+  `returnPressed()`, while a necessary position is empty.
+- The validator gets `text()`. On Enter, the line edit does not call
+  `fixup()`.
+
+A mask does not control a range, for example 0 to 255 in an IP address. Use a
+validator together with the mask for this.
+
+```cpp
+auto *address = new QTuiLineEdit(parent);
+address->setInputMask(QStringLiteral("000.000.000.000;_"));
+address->setText(QStringLiteral("192.168.1.1"));
+```
+
 ### Paste
 
 A paste from the terminal or from `paste()` changes each line break and each
@@ -205,7 +340,7 @@ tab to a space. It removes all other control characters. A paste never emits
 
 | Signal | Description |
 | --- | --- |
-| `void textChanged(const QString &text)` | The text changed, from the user or from a function. |
+| `void textChanged(const QString &text)` | The text changed, from the user or from a function. `text` is `text()`. |
 | `void returnPressed()` | The user pushed Enter, and the text is acceptable. |
 
 ### Protected functions
@@ -223,7 +358,7 @@ tab to a space. It removes all other control characters. A paste never emits
 | Left, Right | Moves the cursor one character. With a selection, goes to the start or the end of the selection. |
 | Home, End | Moves the cursor to the start or the end of the text. |
 | Shift+Left, Shift+Right, Shift+Home, Shift+End | Selects. |
-| Backspace | Removes the selection, or the character before the cursor. |
+| Backspace | Removes the selection, or the character before the cursor. With an input mask, goes over separators. |
 | Delete | Removes the selection, or the character after the cursor. |
 | Enter, Return | Calls `fixup()` if necessary, then emits `returnPressed()` if the text is acceptable. |
 | Ctrl+A | Selects all text. |
@@ -331,10 +466,11 @@ void example(QTuiWidget *parent, QTuiAction *saveAction)
 `#include <QtTUI/QTuiTextEdit.h>` · Inherits: [QTuiWidget](widget.md)
 
 `QTuiTextEdit` is a multi-line plain text editor. It has a selection, the
-clipboard and undo. It scrolls to keep the cursor visible. It does not wrap
+clipboard and undo. It scrolls to keep the cursor visible. It can wrap long
 lines.
 
-QtTUI does not have rich text, a document or a text cursor class. The text
+QtTUI does not have rich text, a document or a text cursor class. A
+[QTuiSyntaxHighlighter](#qtuisyntaxhighlighter) can color the text. The text
 edit keeps the text as a list of lines. The cursor is a row and a column. The
 column counts UTF-16 code units. The constructor sets the focus policy to
 `Qt::StrongFocus`.
@@ -356,6 +492,13 @@ void example(QTuiWidget *parent)
 }
 ```
 
+### Enums
+
+| Enum | Values |
+| --- | --- |
+| `LineWrapMode` | `NoWrap` scrolls a long line horizontally. `WidgetWidth` shows a long line on more than one row. |
+| `FindFlag` | `FindBackward` searches to the start of the text. `FindCaseSensitively` makes the search case sensitive. `FindWholeWords` finds complete words only. `FindFlags` is a combination of these values. |
+
 ### Functions
 
 | Function | Description |
@@ -365,11 +508,14 @@ void example(QTuiWidget *parent)
 | `void setPlainText(const QString &text)` | Sets the text and puts the cursor at the start. It clears the selection and the undo history. Emits `textChanged()`. |
 | `bool isReadOnly() const` | Returns true if the user cannot change the text. Property `readOnly`. The default is false. |
 | `void setReadOnly(bool readOnly)` | Sets read-only. A read-only text edit moves the cursor, selects and copies. |
-| `int cursorRow() const` | Returns the line of the cursor, from 0. |
+| `LineWrapMode lineWrapMode() const` | Returns the line wrap mode. Property `lineWrapMode`. The default is `NoWrap`. |
+| `void setLineWrapMode(LineWrapMode mode)` | Sets the line wrap mode. See [Word wrap](#word-wrap). |
+| `int cursorRow() const` | Returns the line of the cursor, from 0. A wrapped line is one line. |
 | `int cursorColumn() const` | Returns the cursor position in the line, in UTF-16 code units. |
 | `bool hasSelection() const` | Returns true if text is selected. |
 | `QString selectedText() const` | Returns the selected text, with `\n` between the lines. |
 | `void selectAll()` | Selects all text. The cursor goes to the end. |
+| `bool find(const QString &exp, FindFlags options = {})` | Finds the next occurrence of `exp`. Returns true if it finds one. See [Find](#find). |
 | `void undo()` | Undoes the last edit. Emits `textChanged()`. |
 | `void redo()` | Does the last undone edit again. Emits `textChanged()`. |
 | `bool isUndoAvailable() const` | Returns true if there is an edit to undo. |
@@ -383,6 +529,51 @@ The undo history works as in `QTuiLineEdit`: typed characters in a row make
 one step, and the history keeps 100 steps.
 
 A paste keeps line breaks and tabs, and removes other control characters.
+
+### Find
+
+`find()` works as `QPlainTextEdit::find()`. The flags have the names of
+`QTextDocument::FindFlag`, which is in Qt GUI.
+
+- The search starts at the cursor. With a selection, it starts after the
+  selection, or before the selection for `FindBackward`. Thus a second call
+  finds the next match.
+- The search stops at the end (or the start) of the text. It does not continue
+  from the other end.
+- If `find()` finds the text, it selects the match, puts the cursor at the end
+  of the match and scrolls to it. If not, it changes nothing and returns false.
+- Without flags, the search is not case sensitive.
+- With `FindWholeWords`, a match must not have a letter or a digit directly
+  before or after it.
+- A match is in one line. `exp` with a line break finds nothing.
+- `find()` works also if the text edit is read-only.
+
+The text edit has no find bar and no key for find. The application makes them,
+for example with a `QTuiLineEdit` and an action for Ctrl+F:
+
+```cpp
+QObject::connect(findEdit, &QTuiLineEdit::returnPressed, [findEdit, notes]() {
+    if (!notes->find(findEdit->text()))
+        qDebug() << "No more matches";
+});
+```
+
+### Word wrap
+
+With `setLineWrapMode(QTuiTextEdit::WidgetWidth)`, a line that is wider than
+the widget continues on the next row. The text does not change: `toPlainText()`,
+`cursorRow()` and `cursorColumn()` use the lines, not the rows.
+
+- A row breaks after the last space that fits. A word that is wider than the
+  widget breaks at the edge.
+- Spaces at the end of a row can go past the edge. The cursor on such a space
+  shows in the last column.
+- Up, Down, PageUp, PageDown, Home, End and the mouse use the rows.
+- The view scrolls by rows. It does not scroll horizontally.
+
+The default is `NoWrap`, where Qt has `WidgetWidth`. The text edit calculates
+the rows from the width of the widget each time it needs them. It does not
+keep them.
 
 ### Signals
 
@@ -405,8 +596,8 @@ A paste keeps line breaks and tabs, and removes other control characters.
 | Key | Action |
 | --- | --- |
 | Left, Right | Moves the cursor one character. At the start or the end of a line, goes to the previous or the next line. |
-| Up, Down | Moves the cursor one line. The cursor tries to stay in the same column. |
-| Home, End | Moves the cursor to the start or the end of the line. |
+| Up, Down | Moves the cursor one line. The cursor tries to stay in the same column. With word wrap, moves one row. |
+| Home, End | Moves the cursor to the start or the end of the line. With word wrap, to the start or the end of the row. |
 | PageUp, PageDown | Moves the cursor one page (the height of the widget). |
 | Shift + a movement key | Selects. |
 | Backspace | Removes the selection, or the character before the cursor. At the start of a line, joins the line to the previous line. |
@@ -464,6 +655,98 @@ void example(QTuiWidget *parent)
 | `int maximumBlockCount() const` | Returns the maximum number of lines. Property `maximumBlockCount`. The default is 0 (no limit). |
 | `void setMaximumBlockCount(int count)` | Sets the maximum number of lines. If there are more lines, it removes lines from the top immediately. |
 | `int blockCount() const` | Returns the number of lines. |
+
+## QTuiSyntaxHighlighter
+
+`#include <QtTUI/QTuiSyntaxHighlighter.h>` · Inherits: QObject
+
+`QTuiSyntaxHighlighter` colors the text of a `QTuiTextEdit` or a
+`QTuiPlainTextEdit`, like `QSyntaxHighlighter` (which is in Qt GUI). It is an
+abstract class. Make a subclass and implement `highlightBlock()`. A block is
+one line of the text.
+
+The constructor attaches the highlighter to the text edit. The text edit is
+the parent, so it deletes the highlighter. A text edit uses one highlighter:
+the last one that you make for it. If you delete the highlighter, the text
+shows without colors again.
+
+The text edit calls `highlightBlock()` only for the lines that it paints, each
+time it paints them. It does not keep the formats. It keeps one number for
+each line, the block state, so that a line can continue the state of the line
+before it. If the view moves down, the lines above it give their block state
+one time. After an edit, the text edit calculates the block states from the
+first changed line on again when a paint needs them.
+
+A format changes the text color, bold, italic, underline and strikethrough.
+It does not change the background. The cursor and the selection show as they
+do without a highlighter. With word wrap, the text edit calls
+`highlightBlock()` one time for a line, not for each row.
+
+### Example
+
+This highlighter colors numbers, and C comments that can continue on the next
+lines:
+
+```cpp
+#include <QtTUI/QtTUI>
+
+using namespace QtTUI;
+
+class Highlighter : public QTuiSyntaxHighlighter {
+public:
+    using QTuiSyntaxHighlighter::QTuiSyntaxHighlighter;
+
+protected:
+    void highlightBlock(const QString &text) override
+    {
+        for (int i = 0; i < text.length(); ++i) {
+            if (text.at(i).isDigit())
+                setFormat(i, 1, Color(220, 160, 0));
+        }
+
+        // Block state 1: the line ends in a comment
+        bool inComment = previousBlockState() == 1;
+        int start = inComment ? 0 : text.indexOf(QLatin1String("/*"));
+        while (start >= 0) {
+            const int end = text.indexOf(QLatin1String("*/"), inComment ? start : start + 2);
+            if (end < 0) {
+                setFormat(start, text.length() - start, Color(0, 160, 0));
+                setCurrentBlockState(1);
+                return;
+            }
+            setFormat(start, end + 2 - start, Color(0, 160, 0));
+            inComment = false;
+            start = text.indexOf(QLatin1String("/*"), end + 2);
+        }
+        setCurrentBlockState(0);
+    }
+};
+
+void example(QTuiWidget *parent)
+{
+    auto *editor = new QTuiPlainTextEdit(parent);
+    new Highlighter(editor);
+}
+```
+
+### Functions
+
+| Function | Description |
+| --- | --- |
+| `explicit QTuiSyntaxHighlighter(QTuiTextEdit *parent)` | Makes a highlighter and attaches it to the text edit. |
+| `QTuiTextEdit *textEdit() const` | Returns the text edit. |
+| `void rehighlight()` | Slot. Makes the text edit calculate all block states again and repaint. Call it after a change of the rules. |
+
+### Protected functions
+
+| Function | Description |
+| --- | --- |
+| `virtual void highlightBlock(const QString &text) = 0` | Implement this function. `text` is one line. Call `setFormat()` for the parts that get a format. Do not keep data about the line, except with `setCurrentBlockState()`: the text edit can call this function for a line at any time and in any sequence. |
+| `void setFormat(int start, int count, const Color &color)` | Sets the text color of `count` UTF-16 code units from `start`. The function ignores the part of the range that is not in the line. |
+| `void setFormat(int start, int count, const Cell &format)` | Sets the `foreground`, `bold`, `italic`, `underline` and `strikethrough` of `format`. It does not use the other members. |
+| `int previousBlockState() const` | Returns the block state of the line before this line. Returns -1 for the first line, and if that line did not set a state. |
+| `int currentBlockState() const` | Returns the block state of this line. It is -1 until `setCurrentBlockState()` sets it. |
+| `void setCurrentBlockState(int newState)` | Sets the block state of this line. The next line gets it from `previousBlockState()`. |
 
 ## QTuiValidator
 
