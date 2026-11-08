@@ -3,6 +3,7 @@
 #include <QtTUI/TuiEvents.h>
 #include <QHash>
 #include <QRegularExpression>
+#include <QVarLengthArray>
 #include <QtTUI/QtTuiUnicode.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/ScreenBuffer.h>
@@ -485,6 +486,14 @@ void QTuiLabel::layoutText(const std::function<void(int x, int y, const QtTuiUni
         while (src < shown.length() && (shown.at(src) == QLatin1Char(' ') || shown.at(src) == QLatin1Char('\n')))
             ++src;
         bool full = false; // a cluster did not fit: the rest of the line is cut
+        // A line with a right-to-left character shows in display order.
+        // The loop then only keeps the style of each cluster that fits, and
+        // the clusters go to the cells after the loop. The paint and the
+        // mouse both use this function, so a click finds the link that
+        // shows in the cell.
+        const bool reorder = QtTuiUnicode::bidiEnabled() && QtTuiUnicode::hasRightToLeft(line);
+        QVarLengthArray<quint16, 256> lineBits(reorder ? line.size() : 0);
+        int kept = 0; // the logical end of the clusters that fit
         while (QtTuiUnicode::nextCluster(line, i, c)) {
             // Match the cluster with its source character for the style
             quint16 bits = 0;
@@ -503,8 +512,21 @@ void QTuiLabel::layoutText(const std::function<void(int x, int y, const QtTuiUni
                 full = true; // keep matching, so the next line starts right
                 continue;
             }
-            visit(area.x() + col, area.y() + row, c, bits);
+            if (reorder) {
+                lineBits[c.index] = bits;
+                kept = i;
+            } else {
+                visit(area.x() + col, area.y() + row, c, bits);
+            }
             col += c.width;
+        }
+        if (reorder) {
+            col = startCol;
+            const auto visual = QtTuiUnicode::visualClusters(line.left(kept));
+            for (const QtTuiUnicode::Cluster &cluster : visual) {
+                visit(area.x() + col, area.y() + row, cluster, lineBits[cluster.index]);
+                col += cluster.width;
+            }
         }
     }
 }

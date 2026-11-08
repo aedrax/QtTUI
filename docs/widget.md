@@ -313,8 +313,14 @@ For Shift+F10, `pos` is the cell below the top-left corner of the widget.
 `layoutDirection()` returns the direction of the widget. A widget without
 its own direction uses the direction of its parent. A widget without a
 parent uses `QTuiApplication::layoutDirection()`. In a right-to-left
-widget, the box, grid and form layouts mirror horizontally. QtTUI does not
-reorder bidirectional text: the text in a cell shows in its stored order.
+widget, the box, grid and form layouts mirror horizontally.
+
+The layout direction does not set the order of the characters in a text.
+The text paint puts each line with Hebrew or Arabic text in display order,
+with the direction of its first strong character. The reorder does not
+change the alignment of the text. The editors show right-to-left text in
+logical order. See
+[Bidirectional text](events-and-rendering.md#bidirectional-text).
 
 ### Dirty tracking
 

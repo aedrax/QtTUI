@@ -166,6 +166,10 @@ maximum length, an input mask, a validator, a completer, a selection, the
 clipboard and undo.
 The line edit scrolls the text to keep the cursor visible.
 
+The line edit shows right-to-left text (Hebrew, Arabic) in logical order: it
+is not a visual-order editor. Only the placeholder shows in display order.
+See [Bidirectional text](events-and-rendering.md#bidirectional-text).
+
 The cursor position and the maximum length count UTF-16 code units, as in Qt.
 The cursor always stays at the start of a character, also for emoji and
 combining marks. The constructor sets the focus policy to `Qt::StrongFocus`.
@@ -467,7 +471,8 @@ void example(QTuiWidget *parent, QTuiAction *saveAction)
 
 `QTuiTextEdit` is a multi-line plain text editor. It has a selection, the
 clipboard and undo. It scrolls to keep the cursor visible. It can wrap long
-lines.
+lines. It shows right-to-left text in logical order (see
+[Bidirectional text](events-and-rendering.md#bidirectional-text)).
 
 QtTUI does not have rich text, a document or a text cursor class. A
 [QTuiSyntaxHighlighter](#qtuisyntaxhighlighter) can color the text. The text
