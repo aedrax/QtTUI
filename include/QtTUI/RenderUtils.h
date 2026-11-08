@@ -45,6 +45,11 @@ void drawWindowFrame(ScreenBuffer &buffer, const QRect &rect, const ThemePropert
  * maxWidth and at the right edge of the buffer, without an ellipsis. A
  * wide character that does not fit is not written. Each character gets the
  * attributes of style.
+ *
+ * Text with a right-to-left character shows in display order (see
+ * QtTuiUnicode::visualOrder). The function cuts the logical end of the
+ * text at maxWidth first, then it reorders the text that stays. The text
+ * starts at x for each direction: the caller sets the alignment.
  */
 int renderText(ScreenBuffer &buffer, int x, int y, const QString &text,
                int maxWidth, const Cell &style);
@@ -74,6 +79,10 @@ int renderText(ScreenBuffer &buffer, int x, int y, const QString &text,
  * - When maxWidth == 1: writes only U+2026.
  * - When maxWidth <= 0: writes nothing.
  * - When width(text) <= maxWidth: writes the full string without truncation.
+ *
+ * Right-to-left text: the function cuts the logical end of the text, adds
+ * the ellipsis after it, and then reorders the result (see renderText). So
+ * the ellipsis of a right-to-left line is at the left end.
  *
  * Each character is written using the provided style Cell's attributes
  * (foreground, background, bold, italic, etc.) with the appropriate character.

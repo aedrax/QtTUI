@@ -4,6 +4,8 @@
 // Qt Core has no bidi reference. The expected values here are derived by
 // hand from the rules of UAX #9, not from the implementation.
 #include <QtTUI/QtTuiUnicode.h>
+#include <QtTUI/RenderUtils.h>
+#include <QtTUI/ScreenBuffer.h>
 
 #include <QtTest/QtTest>
 
@@ -162,6 +164,80 @@ private slots:
         QCOMPARE(clusters.at(2).base, ALEF);
         QCOMPARE(clusters.at(2).index, 1);
         QCOMPARE(clusters.at(2).length, 2);
+    }
+
+    // renderText() cuts the logical end, then reorders what stays
+    void renderTextReorders()
+    {
+        ScreenBuffer buffer(8, 1);
+        const QString text = s({ALEF, BET, GIMEL, DALET, HE});
+        QCOMPARE(renderText(buffer, 1, 0, text, 5, Cell()), 5);
+        QCOMPARE(row(buffer), s({' ', HE, DALET, GIMEL, BET, ALEF, ' ', ' '}));
+
+        // 3 columns: dalet and he are cut, alef to gimel show reversed
+        buffer = ScreenBuffer(8, 1);
+        QCOMPARE(renderText(buffer, 1, 0, text, 3, Cell()), 3);
+        QCOMPARE(row(buffer), s({' ', GIMEL, BET, ALEF, ' ', ' ', ' ', ' '}));
+    }
+
+    void renderTextKeepsLeftToRightText()
+    {
+        ScreenBuffer buffer(8, 1);
+        QCOMPARE(renderText(buffer, 0, 0, QStringLiteral("abc (d)"), 8, Cell()), 7);
+        QCOMPARE(row(buffer), QStringLiteral("abc (d) "));
+    }
+
+    void renderTextKeepsMarksAndWideClusters()
+    {
+        // alef with qamats, a wide emoji, bet: the emoji is a neutral
+        // between R and R. Display order: bet, emoji, alef with its mark.
+        ScreenBuffer buffer(6, 1);
+        QCOMPARE(renderText(buffer, 0, 0, s({ALEF, 0x05B8, 0x1F600, BET}), 6, Cell()), 4);
+        QCOMPARE(buffer.backCell(0, 0).ch, BET);
+        QCOMPARE(buffer.backCell(1, 0).ch, char32_t(0x1F600));
+        QCOMPARE(buffer.backCell(1, 0).width, quint8(2));
+        QCOMPARE(buffer.backCell(3, 0).ch, ALEF);
+        QCOMPARE(buffer.backCell(3, 0).combining, s({0x05B8}));
+    }
+
+    void renderTextWithUrlReorders()
+    {
+        ScreenBuffer buffer(4, 1);
+        renderText(buffer, 0, 0, s({ALEF, BET}), 4, Cell(), QStringLiteral("https://example.org"));
+        QCOMPARE(row(buffer), s({BET, ALEF, ' ', ' '}));
+        QVERIFY(buffer.backCell(0, 0).link != 0);
+        QCOMPARE(buffer.backCell(1, 0).link, buffer.backCell(0, 0).link);
+    }
+
+    // The ellipsis is the logical end of the text that stays: the left
+    // end of a right-to-left line, the right end of a left-to-right line
+    void renderTextTruncatedReorders()
+    {
+        ScreenBuffer buffer(6, 1);
+        renderTextTruncated(buffer, 0, 0, s({ALEF, BET, GIMEL, DALET, HE}), 4, Cell());
+        QCOMPARE(row(buffer), s({0x2026, GIMEL, BET, ALEF, ' ', ' '}));
+
+        // Paragraph level 0. "ab alef bet gimel dalet" in 6 columns keeps
+        // "ab alef bet" and the ellipsis. The ellipsis is between R and
+        // the end of an L paragraph, so it is L (N2) and stays at the end.
+        buffer = ScreenBuffer(6, 1);
+        renderTextTruncated(buffer, 0, 0, s({'a', 'b', ' ', ALEF, BET, GIMEL, DALET}), 6, Cell());
+        QCOMPARE(row(buffer), s({'a', 'b', ' ', BET, ALEF, 0x2026}));
+
+        // Text that fits has no ellipsis
+        buffer = ScreenBuffer(6, 1);
+        renderTextTruncated(buffer, 0, 0, s({ALEF, BET}), 4, Cell());
+        QCOMPARE(row(buffer), s({BET, ALEF, ' ', ' ', ' ', ' '}));
+    }
+
+private:
+    // The characters of row 0, one for each cell
+    static QString row(const ScreenBuffer &buffer)
+    {
+        QString out;
+        for (int x = 0; x < buffer.width(); ++x)
+            out.append(QChar::fromUcs4(buffer.backCell(x, 0).ch));
+        return out;
     }
 };
 
