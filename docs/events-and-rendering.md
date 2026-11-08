@@ -419,7 +419,7 @@ The `QTuiApplication` constructor calls `setColorMode(detectColorMode())`. Call 
 
 The abstract interface to the terminal. `createTerminalBackend()` returns a `PosixBackend` or a `WindowsBackend`; the build selects one. Tests use `MockTerminalBackend`, which saves the output.
 
-The POSIX backend turns on mouse reporting (see `mouseEnableSequence()`), bracketed paste (`?2004h`) and level 1 of the kitty keyboard protocol (`>1u`). When it gives the terminal back, it turns all of these off.
+The POSIX backend turns on mouse reporting (see `mouseEnableSequence()`), bracketed paste (`?2004h`) and level 1 of the kitty keyboard protocol (`>1u`). When it gives the terminal back, it turns all of these off. If QtTUI reorders right-to-left text, the backend also sets the explicit bidi mode (see `bidiModeSequence()`), and it sets the implicit mode again when it gives the terminal back.
 
 `QTuiApplication` writes the window title sequences through `write()`: it saves the title of the shell on start (`CSI 22;0t`), sets the title for `setWindowTitle()` (`OSC 2`), and restores the saved title on exit and during a suspend (`CSI 23;0t`). A terminal without a title stack ignores the save and restore sequences.
 
@@ -437,6 +437,7 @@ The POSIX backend turns on mouse reporting (see `mouseEnableSequence()`), bracke
 | `virtual qint64 write(const QByteArray &data) = 0` | Writes the bytes to the terminal. |
 | `virtual QByteArray read() = 0` | Reads the available input bytes. |
 | `QByteArray mouseEnableSequence()` | A free function. Returns the sequence that turns on mouse reporting at the `QTTUI_MOUSE` level. |
+| `QByteArray bidiModeSequence()` | A free function. Returns the sequence that sets the explicit bidi mode of the terminal (`CSI 8 l`) if `QtTuiUnicode::bidiEnabled()` is true. If not, it returns an empty array. See [Bidirectional text](#bidirectional-text). |
 | `std::unique_ptr<TerminalBackend> createTerminalBackend(QObject *parent = nullptr)` | A free function. Makes the backend for the platform. |
 
 ### Signals
@@ -464,6 +465,8 @@ Free functions that draw into a `ScreenBuffer`. All widgets use them. Each funct
 | `int renderText(ScreenBuffer &buffer, int x, int y, const QString &text, int maxWidth, const Cell &style, const QString &url)` | Writes `text` as a hyperlink to `url`, in other respects as the function above. An empty `url` gives text without a link. For other drawing functions, set the link in the style: `style.link = buffer.linkId(url)`. The link has no style of its own: set `underline` or a color in `style` to show it. |
 | `void renderTextTruncated(ScreenBuffer &buffer, int x, int y, const QString &text, int maxWidth, const Cell &style)` | Writes `text` at (x, y). If the text is wider than `maxWidth`, it writes `maxWidth - 1` columns of text and then `…` (U+2026). With `maxWidth == 1`, it writes only `…`. With `maxWidth <= 0`, it writes nothing. A wide character at the cut becomes a space. |
 
+The three text functions show right-to-left text in display order. They cut the logical end of the text first, and then they reorder the text that stays. See [Bidirectional text](#bidirectional-text).
+
 ## QtTuiUnicode
 
 `#include <QtTUI/QtTuiUnicode.h>`
@@ -486,7 +489,36 @@ Known limits:
 - One regional indicator without a partner is narrow (1 column).
 - The test for an emoji base uses Unicode blocks, not the exact `Extended_Pictographic` property.
 - Characters with the "Ambiguous" East Asian width are narrow (1 column).
-- QtTUI does not reorder text for right-to-left scripts (no bidi).
+- The reorder of right-to-left text has no explicit levels and no Arabic shaping. See [Bidirectional text](#bidirectional-text).
+
+### Bidirectional text
+
+A string holds text in logical order: the order in which a person reads it. A terminal shows the cells from left to right, so Hebrew and Arabic text must go to the cells in display order. `visualOrder()` does this for one line with the Unicode Bidirectional Algorithm (UAX #9). It reverses the right-to-left runs, keeps the numbers and the Latin words in them left-to-right, and changes a bracket in a right-to-left run to its mirror character. A cluster stays together, with the base before its marks.
+
+`renderText()`, `renderTextTruncated()` and `QTuiLabel` use the reorder, so the labels, buttons, menus, headers and item views show right-to-left text in the correct order. Left-to-right text does not go through the reorder: one scan of the string (`hasRightToLeft()`) finds that it is not necessary.
+
+The rules of the text paint:
+
+- The paragraph direction of each line comes from its first strong character. A line that starts with a Hebrew letter is a right-to-left line.
+- The text starts at the same cell for each direction. The reorder does not change the alignment.
+- A text that is too wide loses its logical end. Then the text that stays goes in display order. The ellipsis of `renderTextTruncated()` is the logical end, so it is at the left end of a right-to-left line.
+- Each line of a wrapped `QTuiLabel` gets its own paragraph direction. A click on a link of a label finds the link in the cell where it shows.
+- The editors (`QTuiLineEdit`, `QTuiTextEdit`) show right-to-left text in logical order, not in display order. The cell of a character must agree with the cursor column and with a mouse click. The placeholder of a line edit shows in display order.
+
+Some terminals reorder right-to-left text themselves. If QtTUI and the terminal both reorder, the text shows reversed two times, which is wrong. QtTUI handles this in two ways:
+
+- When the reorder is on, the terminal backend sends the explicit bidi mode (`CSI 8 l`) at the start and the implicit mode (`CSI 8 h`, the default of a terminal) at the end. The explicit mode tells the terminal that the application did the reorder. GNOME Terminal and the other VTE terminals know this mode. A terminal that does not know the mode ignores it.
+- Konsole reorders the text itself and has no explicit mode. So the reorder is off by default in Konsole (QtTUI finds Konsole from the variable `KONSOLE_VERSION`), and Konsole puts each screen row in display order.
+
+Set `QTTUI_BIDI=0` or call `QtTuiUnicode::setBidiEnabled(false)` for another terminal that reorders the text and does not know the explicit mode, or for a VTE terminal in tmux, because tmux does not send the mode to the terminal. Set `QTTUI_BIDI=1` in Konsole if "Bi-Directional text rendering" is off in the Konsole profile. Call `setBidiEnabled()` before you make the `QTuiApplication`: the backend sends the mode only when it starts.
+
+Known limits of `visualOrder()`:
+
+- No explicit levels (the rules X1 to X8). The function ignores the embedding, override and isolate control characters (U+202A to U+202E, U+2066 to U+2069). The marks LRM (U+200E), RLM (U+200F) and ALM (U+061C) work.
+- A bracket pair (rule N0) is an open and a close punctuation character that are mirror characters of each other. This is not the exact `Bidi_Paired_Bracket` property: U+2329 and U+3009 are not a pair.
+- No rule L1 for a tab or a paragraph separator in the line.
+- No Arabic shaping (the joined letter forms). A terminal that shapes text does this itself.
+- A widget that puts a mark on a part of its text by character position (the active section of `QTuiDateTimeEdit`) puts it at the logical position.
 
 ### Example
 
@@ -523,6 +555,11 @@ void example()
 | `int indexOfColumn(const QString &text, int column)` | Returns the code unit index of the cluster at `column`. A column in a wide character gives the start of that character. A column after the end gives `text.size()`. |
 | `int nextClusterIndex(const QString &text, int index)` | Returns the start of the next cluster. An emoji sequence is one step. |
 | `int prevClusterIndex(const QString &text, int index)` | Returns the start of the previous cluster. An emoji sequence is one step. |
+| `bool hasRightToLeft(const QString &text)` | Returns true if the text has a right-to-left letter or an Arabic number, thus if `visualOrder()` can change it. This is one scan with no allocation. |
+| `QString visualOrder(const QString &line, Qt::LayoutDirection base = Qt::LayoutDirectionAuto)` | Returns the line in display order (see [Bidirectional text](#bidirectional-text)). `base` is the paragraph direction; `Qt::LayoutDirectionAuto` uses the first strong character. A line with no right-to-left character returns unchanged, with no allocation, if `base` is not `Qt::RightToLeft`. |
+| `QList<Cluster> visualClusters(const QString &line, Qt::LayoutDirection base = Qt::LayoutDirectionAuto)` | Returns the clusters of the line in display order. The `index` of each cluster is its position in `line`. The `base` of a mirrored cluster is the mirror character. |
+| `bool bidiEnabled()` | Returns true if the text paint reorders right-to-left text. The start value comes from `QTTUI_BIDI` and `KONSOLE_VERSION`. |
+| `void setBidiEnabled(bool enabled)` | Turns the reorder in the text paint on or off. It has no effect on `visualOrder()`. Call it before you make the `QTuiApplication`. |
 
 ### Cluster
 
@@ -547,8 +584,10 @@ A base code point and the code points that join it: the zero-width code points a
 | `QTTUI_MOUSE` | `off` (or `none`, `0`), `click`, `drag`, `all` | `off`: no mouse reports, and the terminal keeps its own text selection. `click`: presses, releases and the wheel. `drag`: also motion with a button down. `all` (the default): also motion without a button, for the hover highlight. |
 | `QTTUI_REDUCE_MOTION` | `1` | No moving busy bar in `QTuiProgressBar` and no pressed-button flash. `QTuiApplication::setReducedMotion()` changes the value at runtime. |
 | `QTTUI_FOCUS_CURSOR` | `1` | The terminal cursor stays on the focus widget, also if the widget is not editable. Screen readers and magnifiers that follow the cursor then follow the focus. `QTuiApplication::setFocusCursor()` changes the value at runtime. |
+| `QTTUI_BIDI` | `0`, `1` | `0`: QtTUI does not reorder right-to-left text. `1`: QtTUI reorders it. Without the variable the reorder is on, but off in Konsole. `QtTuiUnicode::setBidiEnabled()` changes the value in code. See [Bidirectional text](#bidirectional-text). |
+| `KONSOLE_VERSION` | any value | Konsole sets this variable. If `QTTUI_BIDI` is not set, it turns the reorder of right-to-left text off. |
 
-`detectColorMode()` reads the color variables in the order of the table: `QTTUI_COLOR`, `NO_COLOR`, `COLORTERM`, `TERM`. QtTUI reads `QTTUI_REDUCE_MOTION` and `QTTUI_FOCUS_CURSOR` as integers, so `true` has no effect; use `1`.
+`detectColorMode()` reads the color variables in the order of the table: `QTTUI_COLOR`, `NO_COLOR`, `COLORTERM`, `TERM`. QtTUI reads `QTTUI_REDUCE_MOTION`, `QTTUI_FOCUS_CURSOR` and `QTTUI_BIDI` as integers, so `true` has no effect; use `1`.
 
 ```bash
 QTTUI_COLOR=256 QTTUI_MOUSE=click ./build/demos/demo_gallery

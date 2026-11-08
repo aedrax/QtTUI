@@ -124,13 +124,16 @@ scrolls a view by 3 rows and does not move the current item.
 | `QTTUI_MOUSE` | `off`, `click`, `drag`, `all` (default) | Sets the mouse events that QtTUI gets. A drag needs `drag` or `all`. The hover needs `all`. Use `off` to keep the text selection of the terminal. |
 | `QTTUI_REDUCE_MOTION` | `1` | Stops the busy bar animation and the button flash. |
 | `QTTUI_FOCUS_CURSOR` | `1` | Keeps the terminal cursor on the focus widget, for screen magnifiers. |
+| `QTTUI_BIDI` | `0`, `1` | Turns the reorder of right-to-left text off or on. The default is on, but off in Konsole, which reorders the text itself. |
 
 An application can set the same options in code, for example with
-`AnsiRenderer::setColorMode()`, `QTuiApplication::setReducedMotion()` and
-`QTuiApplication::setFocusCursor()`.
+`AnsiRenderer::setColorMode()`, `QTuiApplication::setReducedMotion()`,
+`QTuiApplication::setFocusCursor()` and `QtTuiUnicode::setBidiEnabled()`.
 
-QtTUI does not reorder bidirectional text and has no screen reader
-interface.
+QtTUI shows Hebrew and Arabic text in display order, but it does not shape
+Arabic letters, and the editors show right-to-left text in logical order.
+See [Bidirectional text](docs/events-and-rendering.md#bidirectional-text).
+QtTUI has no screen reader interface.
 
 ## License
 

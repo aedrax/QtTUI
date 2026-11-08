@@ -186,6 +186,11 @@ The constructor does these steps:
   constructor to change it.
 - It enters the alternate screen and raw mode. If both start, it also
   saves the terminal window title on the title stack of the terminal.
+  If QtTUI reorders right-to-left text, raw mode also sets the explicit
+  bidi mode of the terminal. Set `QTTUI_BIDI=0` or call
+  `QtTuiUnicode::setBidiEnabled(false)` before the constructor for a
+  terminal that reorders the text itself (see
+  [Bidirectional text](events-and-rendering.md#bidirectional-text)).
 - If the terminal starts correctly, it sends all Qt messages (`qDebug()`,
   `qWarning()` and the other functions) to a log file. Text on stderr
   would break the screen. The file is
