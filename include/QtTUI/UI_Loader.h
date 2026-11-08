@@ -11,6 +11,7 @@
 namespace QtTUI {
 
 class QTuiWidget;
+class QTuiLayout;
 
 class UI_Loader : public QObject {
     Q_OBJECT
@@ -33,8 +34,13 @@ public:
     QStringList availableWidgets() const;
 
 private:
-    QTuiWidget *createWidget(const QJsonObject &obj, QTuiWidget *parent);
-    void applyProperties(QTuiWidget *widget, const QJsonObject &obj);
+    // itemKeys: the keys that the layout of the widget reads, for example
+    // "stretch". They are not properties.
+    QTuiWidget *createWidget(const QJsonObject &obj, QTuiWidget *parent, int depth,
+                             const QStringList &itemKeys = {});
+    // owner becomes the parent of each widget in the layout
+    QTuiLayout *createLayout(const QJsonObject &obj, QTuiWidget *owner, int depth);
+    void applyProperties(QTuiWidget *widget, const QJsonObject &obj, const QStringList &itemKeys);
     QJsonObject serializeWidget(const QTuiWidget *widget) const;
 
     QHash<QString, WidgetFactory> m_factories;

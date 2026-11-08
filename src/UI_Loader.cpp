@@ -47,7 +47,12 @@
 #include <QtTUI/QTuiMdiSubWindow.h>
 #include <QtTUI/QTuiFrame.h>
 #include <QtTUI/QTuiPlainTextEdit.h>
+#include <QtTUI/QTuiBoxLayout.h>
+#include <QtTUI/QTuiGridLayout.h>
+#include <QtTUI/QTuiFormLayout.h>
+#include <QtTUI/QTuiStackedLayout.h>
 #include <QMetaProperty>
+#include <cmath>
 #include <memory>
 #include <QFile>
 #include <QJsonDocument>
@@ -55,6 +60,34 @@
 #include <QDebug>
 
 namespace QtTUI {
+
+// The JSON is application input. These limits keep a wrong document from
+// a stack overflow or a very large allocation.
+static const int kMaxDepth = 64;   // widgets and layouts, counted together
+static const int kMaxCells = 1000; // grid positions, spacings, margins, stretch
+
+// Returns the integer in v. A missing value gives def. A value that is not
+// an integer in [min, max] gives a warning and def, and sets *ok to false.
+static int intValue(const QJsonValue &v, const char *name, int def, int min, int max, bool *ok = nullptr)
+{
+    if (v.isUndefined())
+        return def;
+    const double d = v.toDouble();
+    if (v.isDouble() && d == std::floor(d) && d >= min && d <= max)
+        return int(d);
+    qWarning() << "UI_Loader: The value of" << name << "is not an integer from" << min << "to" << max;
+    if (ok)
+        *ok = false;
+    return def;
+}
+
+static void warnUnknownKeys(const QJsonObject &obj, const QStringList &known, const char *what)
+{
+    for (auto it = obj.constBegin(); it != obj.constEnd(); ++it) {
+        if (!known.contains(it.key()))
+            qWarning() << "UI_Loader: Unknown key" << it.key() << "in" << what;
+    }
+}
 
 UI_Loader::UI_Loader(QObject *parent)
     : QObject(parent)
@@ -301,11 +334,17 @@ QTuiWidget *UI_Loader::loadFromData(const QByteArray &data, QTuiWidget *parent)
         return nullptr;
     }
 
-    return createWidget(doc.object(), parent);
+    return createWidget(doc.object(), parent, 0);
 }
 
-QTuiWidget *UI_Loader::createWidget(const QJsonObject &obj, QTuiWidget *parent)
+QTuiWidget *UI_Loader::createWidget(const QJsonObject &obj, QTuiWidget *parent, int depth,
+                                    const QStringList &itemKeys)
 {
+    if (depth > kMaxDepth) {
+        qWarning() << "UI_Loader: The document is deeper than" << kMaxDepth << "levels, skipping";
+        return nullptr;
+    }
+
     const QString typeName = obj.value(QStringLiteral("type")).toString();
 
     if (typeName.isEmpty()) {
@@ -325,17 +364,158 @@ QTuiWidget *UI_Loader::createWidget(const QJsonObject &obj, QTuiWidget *parent)
         return nullptr;
     }
 
-    applyProperties(widget, obj);
+    applyProperties(widget, obj, itemKeys);
 
     // Recursively process children
     const QJsonArray children = obj.value(QStringLiteral("children")).toArray();
     for (const QJsonValue &childVal : children) {
         if (childVal.isObject()) {
-            createWidget(childVal.toObject(), widget);
+            createWidget(childVal.toObject(), widget, depth + 1);
         }
     }
 
+    // Set the full layout last: setLayout() applies it one time, and the
+    // geometry of the widget is already known
+    if (obj.contains(QStringLiteral("layout"))) {
+        if (QTuiLayout *layout = createLayout(obj.value(QStringLiteral("layout")).toObject(), widget, depth + 1))
+            widget->setLayout(layout);
+    }
+
     return widget;
+}
+
+QTuiLayout *UI_Loader::createLayout(const QJsonObject &obj, QTuiWidget *owner, int depth)
+{
+    if (depth > kMaxDepth) {
+        qWarning() << "UI_Loader: The document is deeper than" << kMaxDepth << "levels, skipping";
+        return nullptr;
+    }
+
+    // The two box names are one class. Each layout type has its own keys.
+    const QString typeName = obj.value(QStringLiteral("type")).toString();
+    QTuiBoxLayout *box = nullptr;
+    QTuiGridLayout *grid = nullptr;
+    QTuiFormLayout *form = nullptr;
+    QTuiStackedLayout *stack = nullptr;
+    QTuiLayout *layout = nullptr;
+    QStringList layoutKeys = {QStringLiteral("type"), QStringLiteral("items"), QStringLiteral("contentsMargins")};
+    QStringList itemKeys;
+    if (typeName == QLatin1String("QTuiVBoxLayout") || typeName == QLatin1String("QTuiHBoxLayout")) {
+        layout = box = new QTuiBoxLayout(typeName == QLatin1String("QTuiVBoxLayout") ? QTuiBoxLayout::TopToBottom
+                                                                                     : QTuiBoxLayout::LeftToRight);
+        layoutKeys << QStringLiteral("spacing");
+        itemKeys << QStringLiteral("stretch");
+    } else if (typeName == QLatin1String("QTuiGridLayout")) {
+        layout = grid = new QTuiGridLayout;
+        itemKeys << QStringLiteral("row") << QStringLiteral("column") << QStringLiteral("rowSpan")
+                 << QStringLiteral("columnSpan");
+    } else if (typeName == QLatin1String("QTuiFormLayout")) {
+        layout = form = new QTuiFormLayout;
+        layoutKeys << QStringLiteral("horizontalSpacing");
+        itemKeys << QStringLiteral("label");
+    } else if (typeName == QLatin1String("QTuiStackedLayout")) {
+        layout = stack = new QTuiStackedLayout;
+        layoutKeys << QStringLiteral("currentIndex");
+    } else {
+        qWarning() << "UI_Loader: Unknown layout type:" << typeName << ", skipping";
+        return nullptr;
+    }
+    warnUnknownKeys(obj, layoutKeys, "a layout");
+
+    const QJsonValue itemsValue = obj.value(QStringLiteral("items"));
+    if (!itemsValue.isUndefined() && !itemsValue.isArray())
+        qWarning() << "UI_Loader: The \"items\" of a layout is not an array";
+    const QJsonArray items = itemsValue.toArray();
+    for (const QJsonValue &itemValue : items) {
+        const QJsonObject item = itemValue.toObject();
+
+        // Read the grid position first: a wrong position skips the item
+        // before the loader makes its widget
+        bool ok = true;
+        const int row = grid ? intValue(item.value(QStringLiteral("row")), "row", 0, 0, kMaxCells, &ok) : 0;
+        const int column = grid ? intValue(item.value(QStringLiteral("column")), "column", 0, 0, kMaxCells, &ok) : 0;
+        const int rowSpan = grid ? intValue(item.value(QStringLiteral("rowSpan")), "rowSpan", 1, 1, kMaxCells, &ok) : 1;
+        const int columnSpan =
+            grid ? intValue(item.value(QStringLiteral("columnSpan")), "columnSpan", 1, 1, kMaxCells, &ok) : 1;
+        if (!ok)
+            continue;
+
+        // An item is a widget (it has a "type"), a nested layout, or empty
+        // space in a box layout
+        QTuiWidget *widget = nullptr;
+        QTuiLayout *nested = nullptr;
+        if (item.contains(QStringLiteral("type"))) {
+            widget = createWidget(item, owner, depth + 1, itemKeys);
+        } else if (item.contains(QStringLiteral("layout"))) {
+            warnUnknownKeys(item, QStringList(itemKeys) << QStringLiteral("layout"), "a layout item");
+            if (stack)
+                qWarning() << "UI_Loader: A QTuiStackedLayout cannot hold a layout, skipping";
+            else
+                nested = createLayout(item.value(QStringLiteral("layout")).toObject(), owner, depth + 1);
+        } else if (box && item.contains(QStringLiteral("spacer"))) {
+            warnUnknownKeys(item, {QStringLiteral("spacer")}, "a spacer item");
+            box->addSpacing(intValue(item.value(QStringLiteral("spacer")), "spacer", 0, 0, kMaxCells));
+        } else if (box && item.contains(QStringLiteral("stretch"))) {
+            warnUnknownKeys(item, {QStringLiteral("stretch")}, "a stretch item");
+            box->addStretch(intValue(item.value(QStringLiteral("stretch")), "stretch", 0, 0, kMaxCells));
+        } else {
+            qWarning() << "UI_Loader: A layout item is not a widget or a layout, skipping";
+        }
+        if (!widget && !nested)
+            continue;
+
+        if (box) {
+            const int stretch = intValue(item.value(QStringLiteral("stretch")), "stretch", 0, 0, kMaxCells);
+            if (widget)
+                box->addWidget(widget, stretch);
+            else
+                box->addLayout(nested, stretch);
+        } else if (grid) {
+            if (widget)
+                grid->addWidget(widget, row, column, rowSpan, columnSpan);
+            else
+                grid->addLayout(nested, row, column, rowSpan, columnSpan);
+        } else if (form) {
+            // The label is a text or a widget object. A row can have no label.
+            const QJsonValue label = item.value(QStringLiteral("label"));
+            QTuiWidget *labelWidget = nullptr;
+            if (label.isObject())
+                labelWidget = createWidget(label.toObject(), owner, depth + 1);
+            else if (label.isString() && nested)
+                labelWidget = new QTuiLabel(label.toString(), owner);
+            else if (!label.isString() && !label.isUndefined())
+                qWarning() << "UI_Loader: The \"label\" of a form row is not a string or an object";
+            if (nested)
+                form->addRow(labelWidget, nested);
+            else if (label.isString())
+                form->addRow(label.toString(), widget);
+            else
+                form->addRow(labelWidget, widget);
+        } else {
+            stack->addWidget(widget);
+        }
+    }
+
+    if (box)
+        box->setSpacing(intValue(obj.value(QStringLiteral("spacing")), "spacing", 0, 0, kMaxCells));
+    if (form)
+        form->setHorizontalSpacing(
+            intValue(obj.value(QStringLiteral("horizontalSpacing")), "horizontalSpacing", 0, 0, kMaxCells));
+    if (stack && obj.contains(QStringLiteral("currentIndex")))
+        stack->setCurrentIndex(intValue(obj.value(QStringLiteral("currentIndex")), "currentIndex", 0, 0, kMaxCells));
+    if (obj.contains(QStringLiteral("contentsMargins"))) {
+        // [left, top, right, bottom]
+        const QJsonArray m = obj.value(QStringLiteral("contentsMargins")).toArray();
+        bool ok = m.size() == 4;
+        int v[4] = {0, 0, 0, 0};
+        for (int i = 0; ok && i < 4; ++i)
+            v[i] = intValue(m.at(i), "contentsMargins", 0, 0, kMaxCells, &ok);
+        if (ok)
+            layout->setContentsMargins(v[0], v[1], v[2], v[3]);
+        else
+            qWarning() << "UI_Loader: \"contentsMargins\" is not an array of 4 integers";
+    }
+    return layout;
 }
 
 // Keys with their own handling; every other key is a Q_PROPERTY name
@@ -343,11 +523,11 @@ static bool isReservedKey(const QString &key)
 {
     static const QStringList reserved = {QStringLiteral("type"), QStringLiteral("children"),
                                          QStringLiteral("objectName"), QStringLiteral("geometry"),
-                                         QStringLiteral("visible")};
+                                         QStringLiteral("visible"), QStringLiteral("layout")};
     return reserved.contains(key);
 }
 
-void UI_Loader::applyProperties(QTuiWidget *widget, const QJsonObject &obj)
+void UI_Loader::applyProperties(QTuiWidget *widget, const QJsonObject &obj, const QStringList &itemKeys)
 {
     // objectName
     if (obj.contains(QStringLiteral("objectName"))) {
@@ -373,7 +553,7 @@ void UI_Loader::applyProperties(QTuiWidget *widget, const QJsonObject &obj)
     // "text", "checked", "readOnly", "echoMode": "Password"
     const QMetaObject *meta = widget->metaObject();
     for (auto it = obj.constBegin(); it != obj.constEnd(); ++it) {
-        if (isReservedKey(it.key()))
+        if (isReservedKey(it.key()) || itemKeys.contains(it.key()))
             continue;
         const int index = meta->indexOfProperty(it.key().toLatin1().constData());
         if (index < 0 || !meta->property(index).isWritable()) {
