@@ -264,6 +264,9 @@ void QTuiScrollArea::paintEvent(ScreenBuffer &buffer)
                     const Cell &src = childBuffer.backCell(left + childCol, top + childRow);
                     Cell &dst = buffer.backCell(px, py);
                     dst = src;
+                    // A link id is valid only in the buffer that gave it
+                    if (src.link)
+                        dst.link = buffer.linkId(childBuffer.linkUrl(src.link));
                 }
             }
         }

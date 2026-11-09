@@ -146,6 +146,25 @@ QString QTuiLabel::displayText() const
     return parsedText().shown;
 }
 
+bool QTuiLabel::terminalHyperlinks() const
+{
+    return m_terminalHyperlinks;
+}
+
+void QTuiLabel::setTerminalHyperlinks(bool on)
+{
+    if (m_terminalHyperlinks == on)
+        return;
+    m_terminalHyperlinks = on;
+    markDirty();
+}
+
+QString QTuiLabel::linkScheme(const QString &link)
+{
+    static const QRegularExpression scheme(QStringLiteral("^([A-Za-z][A-Za-z0-9+.-]+):"));
+    return scheme.match(link).captured(1).toLower();
+}
+
 int QTuiLabel::currentLink() const
 {
     return m_links.isEmpty() ? -1 : m_currentLink;
@@ -631,6 +650,9 @@ void QTuiLabel::render(ScreenBuffer &buffer, const QPoint &offset, const QRect &
     if (frameShape() == Box && area == geo)
         drawBorder(buffer, geo, theme.borderStyle, style);
 
+    // The cells of a link are together, so one lookup per link is enough
+    int idLink = 0;
+    quint16 id = 0;
     const int lastY = qMin(area.bottom(), buffer.height() - 1) - offset.y();
     layoutText([&](int x, int y, const QtTuiUnicode::Cluster &c, quint32 bits) {
         x += offset.x();
@@ -653,6 +675,13 @@ void QTuiLabel::render(ScreenBuffer &buffer, const QPoint &offset, const QRect &
                 styled.foreground = theme.focusForeground;
                 styled.background = theme.focusBackground;
             }
+            // A target with a scheme is also a hyperlink of the terminal
+            if (link != idLink) {
+                idLink = link;
+                const QString url = m_links.value(link - 1);
+                id = m_terminalHyperlinks && !linkScheme(url).isEmpty() ? buffer.linkId(url) : 0;
+            }
+            styled.link = id;
         }
         buffer.putChar(x, y, c.base, c.combining, styled);
     }, area.top() - offset.y(), lastY);

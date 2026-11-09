@@ -7,6 +7,7 @@
 #include <QtTUI/QTuiLabel.h>
 #include <QtTUI/QTuiMainWindow.h>
 #include <QtTUI/QTuiPushButton.h>
+#include <QtTUI/QTuiScrollArea.h>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/Theme_Engine.h>
 #include <QtTUI/TuiEvents.h>
@@ -300,6 +301,65 @@ private slots:
         QVERIFY(label->hasFocus());
         QCOMPARE(spy.count(), 2);
         QCOMPARE(spy.last().at(0).toString(), QStringLiteral("2"));
+    }
+
+    void linkWithASchemeIsATerminalHyperlink()
+    {
+        QCOMPARE(QTuiLabel::linkScheme(QStringLiteral("HTTPS://x.example")), QStringLiteral("https"));
+        QCOMPARE(QTuiLabel::linkScheme(QStringLiteral("mailto:a@x.example")), QStringLiteral("mailto"));
+        QCOMPARE(QTuiLabel::linkScheme(QStringLiteral("file:///tmp/a.md")), QStringLiteral("file"));
+        for (const char *internal : {"#section", "settings", "dir/page.md", "/abs/page.md",
+                                     "C:\\dir\\page.md", "a b:c", ":x", "1x:y", ""})
+            QVERIFY2(QTuiLabel::linkScheme(QString::fromLatin1(internal)).isEmpty(), internal);
+
+        QTuiLabel label;
+        QVERIFY(label.terminalHyperlinks());
+        label.setTextFormat(Qt::MarkdownText);
+        // "web mail top"
+        label.setText(QStringLiteral("[web](https://x.example/a) [mail](mailto:a@x.example) [top](#top)"));
+        label.setGeometry(QRect(0, 0, 20, 1));
+        ScreenBuffer buffer(20, 1);
+        label.paintEvent(buffer);
+        auto url = [&](int x) { return buffer.linkUrl(buffer.backCell(x, 0).link); };
+        for (int x : {0, 1, 2})
+            QCOMPARE(url(x), QStringLiteral("https://x.example/a"));
+        for (int x : {4, 7})
+            QCOMPARE(url(x), QStringLiteral("mailto:a@x.example"));
+        // The spaces between the links and the internal link have no id
+        for (int x : {3, 8, 9, 10, 11, 12})
+            QCOMPARE(buffer.backCell(x, 0).link, quint16(0));
+        QVERIFY(buffer.backCell(9, 0).underline); // "#top" is still a link of the label
+
+        // The property turns the terminal hyperlinks off
+        label.clearDirtyRegions();
+        label.setTerminalHyperlinks(false);
+        QVERIFY(label.isDirty());
+        label.paintEvent(buffer);
+        for (int x = 0; x < 20; ++x)
+            QCOMPARE(buffer.backCell(x, 0).link, quint16(0));
+        QVERIFY(buffer.backCell(0, 0).underline);
+    }
+
+    void hyperlinkStaysCorrectInAScrollArea()
+    {
+        // The scroll area paints its content into a different buffer, and
+        // a link id is valid only in the buffer that gave it
+        QTuiScrollArea area;
+        area.setGeometry(QRect(0, 0, 20, 2));
+        auto *label = new QTuiLabel;
+        label->setTextFormat(Qt::MarkdownText);
+        label->setText(QStringLiteral("[web](https://x.example/a)"));
+        label->setGeometry(QRect(0, 0, 20, 1));
+        area.setWidget(label);
+
+        ScreenBuffer buffer(20, 2);
+        // The screen buffer has other links already, so the ids differ
+        buffer.linkId(QStringLiteral("https://other.example/1"));
+        buffer.linkId(QStringLiteral("https://other.example/2"));
+        area.paintEvent(buffer);
+        QCOMPARE(buffer.backCell(0, 0).ch, U'w');
+        QCOMPARE(buffer.linkUrl(buffer.backCell(0, 0).link), QStringLiteral("https://x.example/a"));
+        QCOMPARE(buffer.backCell(5, 0).link, quint16(0));
     }
 
     void aLabelCanHaveManyLinks()

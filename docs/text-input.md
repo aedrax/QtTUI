@@ -82,6 +82,15 @@ QObject::connect(about, &QTuiLabel::linkActivated, [](const QString &link) {
 });
 ```
 
+A link whose target has a URL scheme (`https:`, `file:`, `mailto:`, ...) is
+also a hyperlink of the terminal (OSC 8). A terminal that knows OSC 8 can then
+open the link, for example with Ctrl and a click. A target without a scheme
+(`#section`, `settings`, `page.md`) is never a terminal hyperlink. A scheme has
+two or more characters, so the drive in `C:\dir` is not a scheme. The label
+cannot know if a scheme is for the application only (`help:manual`), and it
+cannot know if the text is safe. Thus `setTerminalHyperlinks(false)` turns the
+terminal hyperlinks off. `linkActivated()` does not change.
+
 The label keeps the parsed text and its lines until the text, the format, the
 buddy or the width changes. Thus a paint of a long text is fast. `render()`
 paints a part of a label that is larger than the screen; `QTuiTextBrowser`
@@ -121,6 +130,9 @@ void example(QTuiWidget *parent)
 | `Qt::TextFormat textFormat() const` | Returns the text format. Property `textFormat`. |
 | `void setTextFormat(Qt::TextFormat format)` | Sets the text format. See [Text formats](#text-formats). |
 | `QString displayText() const` | Returns the text as it shows, without the markup. |
+| `bool terminalHyperlinks() const` | Returns true if a link with a URL scheme is also a hyperlink of the terminal. Property `terminalHyperlinks`. The default is true. |
+| `void setTerminalHyperlinks(bool on)` | Turns the terminal hyperlinks on or off. See [Links](#links). |
+| `static QString linkScheme(const QString &link)` | Returns the scheme of a link target in lower case, for example `https`. Returns an empty string if the target has no scheme. |
 | `int currentLink() const` | Returns the index of the current link (from 0), or -1 if the text has no links. |
 | `QRect linkRect(int index) const` | Returns the cells of a link, in the coordinates of `geometry()`. Returns an empty rectangle if the link does not show. |
 | `int heightForWidth(int width) const` | Returns the height that shows all the text in a label of this width. With word wrap, it counts the wrapped lines. |
