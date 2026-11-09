@@ -8,6 +8,18 @@
 #include <QtTUI/QTuiGridLayout.h>
 #include <QtTUI/QTuiFormLayout.h>
 #include <QtTUI/QTuiStackedLayout.h>
+#include <QtTUI/QTuiTabWidget.h>
+#include <QtTUI/QTuiTabBar.h>
+#include <QtTUI/QTuiToolBox.h>
+#include <QtTUI/QTuiStackedWidget.h>
+#include <QtTUI/QTuiSplitter.h>
+#include <QtTUI/QTuiScrollArea.h>
+#include <QtTUI/QTuiDockWidget.h>
+#include <QtTUI/QTuiGroupBox.h>
+#include <QtTUI/QTuiMainWindow.h>
+#include <QtTUI/QTuiMenuBar.h>
+#include <QtTUI/QTuiToolBar.h>
+#include <QtTUI/QTuiStatusBar.h>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -27,6 +39,20 @@ private slots:
     void testLayoutAndChildren();
     void testWrongLayoutInput();
     void testDepthLimit();
+    void testTabPages();
+    void testContainerPages();
+    void testMainWindowPages();
+    void testCustomAdopter();
+    void testWrongPagesInput();
+};
+
+// An application container: it keeps its pages in a list
+class TestDeck : public QTuiWidget {
+    Q_OBJECT
+public:
+    using QTuiWidget::QTuiWidget;
+    QList<QTuiWidget *> cards;
+    QStringList suits;
 };
 
 void TestUILoaderLayouts::testBoxLayout()
@@ -365,6 +391,212 @@ void TestUILoaderLayouts::testDepthLimit()
     root.reset(loader.loadFromData(json));
     QVERIFY(root);
     QCOMPARE(depthOf(root.get()), 32);
+}
+
+// A form in a tab page; a group box as a page keeps its own title
+void TestUILoaderLayouts::testTabPages()
+{
+    UI_Loader loader;
+    const QByteArray json = R"({
+        "type": "QTuiTabWidget", "currentIndex": 1,
+        "geometry": { "x": 0, "y": 0, "width": 40, "height": 10 },
+        "pages": [
+            { "title": "General", "widget": { "type": "QTuiWidget", "objectName": "general",
+                "layout": { "type": "QTuiFormLayout", "items": [
+                    { "type": "QTuiLineEdit", "objectName": "name", "label": "Name:" } ] } } },
+            { "title": "Box", "widget": { "type": "QTuiGroupBox", "objectName": "box", "title": "Options" } }
+        ]
+    })";
+    std::unique_ptr<QTuiWidget> root(loader.loadFromData(json));
+    auto *tabs = qobject_cast<QTuiTabWidget *>(root.get());
+    QVERIFY(tabs);
+    QCOMPARE(tabs->count(), 2);
+    QCOMPARE(tabs->tabBar()->tabText(0), QStringLiteral("General"));
+    QCOMPARE(tabs->tabBar()->tabText(1), QStringLiteral("Box"));
+    QCOMPARE(tabs->widget(0)->objectName(), QStringLiteral("general"));
+    QCOMPARE(qobject_cast<QTuiGroupBox *>(tabs->widget(1))->title(), QStringLiteral("Options"));
+    QCOMPARE(tabs->currentIndex(), 1);
+    QVERIFY(tabs->widget(1)->isVisible());
+    QVERIFY(!tabs->widget(0)->isVisible());
+
+    // The page has the content area, and its form layout has the field
+    tabs->setCurrentIndex(0);
+    QCOMPARE(tabs->widget(0)->geometry(), tabs->contentArea());
+    auto *name = root->findChild<QTuiLineEdit *>(QStringLiteral("name"));
+    QVERIFY(name);
+    QCOMPARE(name->geometry().top(), tabs->contentArea().top());
+    QVERIFY(name->geometry().width() > 0);
+}
+
+void TestUILoaderLayouts::testContainerPages()
+{
+    UI_Loader loader;
+    const QByteArray json = R"({
+        "type": "QTuiWidget",
+        "children": [
+            { "type": "QTuiToolBox", "objectName": "toolBox", "currentIndex": 1, "pages": [
+                { "title": "First", "widget": { "type": "QTuiLabel", "text": "1" } },
+                { "title": "Second", "widget": { "type": "QTuiLabel", "text": "2" } } ] },
+            { "type": "QTuiStackedWidget", "objectName": "stack", "currentIndex": 1, "pages": [
+                { "widget": { "type": "QTuiLabel", "text": "1" } },
+                { "widget": { "type": "QTuiLabel", "objectName": "second", "text": "2" } } ] },
+            { "type": "QTuiSplitter", "objectName": "splitter", "orientation": "Vertical", "pages": [
+                { "widget": { "type": "QTuiLabel", "text": "1" } },
+                { "widget": { "type": "QTuiLabel", "text": "2" } },
+                { "widget": { "type": "QTuiLabel", "text": "3" } } ] },
+            { "type": "QTuiScrollArea", "objectName": "area", "pages": [
+                { "widget": { "type": "QTuiLabel", "objectName": "content", "text": "Content" } } ] },
+            { "type": "QTuiDockWidget", "objectName": "dock", "windowTitle": "Dock", "pages": [
+                { "widget": { "type": "QTuiLabel", "objectName": "docked", "text": "Docked" } } ] }
+        ]
+    })";
+    std::unique_ptr<QTuiWidget> root(loader.loadFromData(json));
+    QVERIFY(root);
+
+    auto *toolBox = root->findChild<QTuiToolBox *>(QStringLiteral("toolBox"));
+    QVERIFY(toolBox);
+    QCOMPARE(toolBox->count(), 2);
+    QCOMPARE(toolBox->itemText(0), QStringLiteral("First"));
+    QCOMPARE(toolBox->itemText(1), QStringLiteral("Second"));
+    QCOMPARE(toolBox->currentIndex(), 1);
+
+    auto *stack = root->findChild<QTuiStackedWidget *>(QStringLiteral("stack"));
+    QVERIFY(stack);
+    QCOMPARE(stack->count(), 2);
+    QCOMPARE(stack->currentWidget()->objectName(), QStringLiteral("second"));
+
+    auto *splitter = root->findChild<QTuiSplitter *>(QStringLiteral("splitter"));
+    QVERIFY(splitter);
+    QCOMPARE(splitter->count(), 3);
+    QCOMPARE(splitter->orientation(), Qt::Vertical);
+    QVERIFY(splitter->handle(1));
+
+    auto *area = root->findChild<QTuiScrollArea *>(QStringLiteral("area"));
+    QVERIFY(area && area->widget());
+    QCOMPARE(area->widget()->objectName(), QStringLiteral("content"));
+
+    auto *dock = root->findChild<QTuiDockWidget *>(QStringLiteral("dock"));
+    QVERIFY(dock && dock->widget());
+    QCOMPARE(dock->widget()->objectName(), QStringLiteral("docked"));
+}
+
+void TestUILoaderLayouts::testMainWindowPages()
+{
+    UI_Loader loader;
+    const QByteArray json = R"({
+        "type": "QTuiMainWindow",
+        "geometry": { "x": 0, "y": 0, "width": 80, "height": 24 },
+        "pages": [
+            { "widget": { "type": "QTuiMenuBar", "objectName": "menu" } },
+            { "widget": { "type": "QTuiToolBar", "objectName": "tools" } },
+            { "widget": { "type": "QTuiWidget", "objectName": "central" } },
+            { "area": "BottomDockWidgetArea", "widget": { "type": "QTuiDockWidget", "objectName": "log" } },
+            { "widget": { "type": "QTuiStatusBar", "objectName": "status" } }
+        ],
+        "children": [
+            { "type": "QTuiLabel", "objectName": "plain", "text": "Plain" }
+        ]
+    })";
+    std::unique_ptr<QTuiWidget> root(loader.loadFromData(json));
+    auto *window = qobject_cast<QTuiMainWindow *>(root.get());
+    QVERIFY(window);
+    QVERIFY(window->menuBar());
+    QCOMPARE(window->menuBar()->objectName(), QStringLiteral("menu"));
+    QCOMPARE(window->toolBars().size(), 1);
+    QVERIFY(window->centralWidget());
+    QCOMPARE(window->centralWidget()->objectName(), QStringLiteral("central"));
+    QVERIFY(window->statusBar());
+    auto *dock = window->findChild<QTuiDockWidget *>(QStringLiteral("log"));
+    QVERIFY(dock);
+    QCOMPARE(dock->parentWidget(), window);
+
+    // The window places the pages; the bottom dock is below the central widget
+    window->show();
+    QVERIFY(!window->centralWidget()->geometry().isEmpty());
+    QVERIFY(dock->geometry().top() > window->centralWidget()->geometry().top());
+    QCOMPARE(window->menuBar()->geometry().top(), 0);
+
+    // A second central widget and a wrong area give warnings
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("already has a page"));
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Unknown dock \"area\""));
+    root.reset(loader.loadFromData(R"({
+        "type": "QTuiMainWindow",
+        "pages": [
+            { "widget": { "type": "QTuiWidget", "objectName": "first" } },
+            { "widget": { "type": "QTuiWidget", "objectName": "second" } },
+            { "area": "Middle", "widget": { "type": "QTuiDockWidget" } }
+        ]
+    })"));
+    window = qobject_cast<QTuiMainWindow *>(root.get());
+    QVERIFY(window);
+    QCOMPARE(window->centralWidget()->objectName(), QStringLiteral("first"));
+    QCOMPARE(window->childWidgets().size(), 2);
+}
+
+// An application type takes its pages with the adopter of registerWidget()
+void TestUILoaderLayouts::testCustomAdopter()
+{
+    UI_Loader loader;
+    loader.registerWidget(QStringLiteral("TestDeck"),
+        [](QTuiWidget *parent) -> QTuiWidget * { return new TestDeck(parent); },
+        [](QTuiWidget *container, QTuiWidget *page, const QJsonObject &entry) {
+            auto *deck = static_cast<TestDeck *>(container);
+            deck->cards.append(page);
+            deck->suits.append(entry.value(QStringLiteral("suit")).toString());
+        });
+    std::unique_ptr<QTuiWidget> root(loader.loadFromData(R"({
+        "type": "TestDeck",
+        "pages": [
+            { "suit": "hearts", "widget": { "type": "QTuiLabel", "text": "Ace" } },
+            { "suit": "spades", "widget": { "type": "QTuiLabel", "text": "King" } }
+        ]
+    })"));
+    auto *deck = qobject_cast<TestDeck *>(root.get());
+    QVERIFY(deck);
+    QCOMPARE(deck->cards.size(), 2);
+    QCOMPARE(deck->suits, QStringList({QStringLiteral("hearts"), QStringLiteral("spades")}));
+    QCOMPARE(deck->cards.at(0)->parentWidget(), deck);
+}
+
+void TestUILoaderLayouts::testWrongPagesInput()
+{
+    UI_Loader loader;
+
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("cannot have \"pages\""));
+    std::unique_ptr<QTuiWidget> root(loader.loadFromData(R"({
+        "type": "QTuiLabel", "pages": [ { "widget": { "type": "QTuiLabel" } } ] })"));
+    QVERIFY(root);
+    QVERIFY(root->childWidgets().isEmpty());
+
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("\"pages\" of \"QTuiTabWidget\" is not an array"));
+    root.reset(loader.loadFromData(R"({ "type": "QTuiTabWidget", "pages": "many" })"));
+    QVERIFY(root);
+
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("no \"widget\" object"));
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("no \"widget\" object"));
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Unknown widget type"));
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("\"title\" of a page is not a string"));
+    root.reset(loader.loadFromData(R"({
+        "type": "QTuiTabWidget", "currentIndex": 9,
+        "pages": [ 4, { "title": "No widget" }, { "widget": { "type": "Nothing" } },
+                   { "title": 12, "widget": { "type": "QTuiLabel" } } ]
+    })"));
+    auto *tabs = qobject_cast<QTuiTabWidget *>(root.get());
+    QVERIFY(tabs);
+    QCOMPARE(tabs->count(), 1);
+    QCOMPARE(tabs->currentIndex(), 0);
+
+    // A scroll area holds one widget: the loader deletes the second one
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("QTuiScrollArea already has a page"));
+    root.reset(loader.loadFromData(R"({
+        "type": "QTuiScrollArea",
+        "pages": [ { "widget": { "type": "QTuiLabel", "objectName": "kept" } },
+                   { "widget": { "type": "QTuiLabel", "objectName": "dropped" } } ]
+    })"));
+    auto *area = qobject_cast<QTuiScrollArea *>(root.get());
+    QVERIFY(area);
+    QCOMPARE(area->widget()->objectName(), QStringLiteral("kept"));
+    QVERIFY(!area->findChild<QTuiWidget *>(QStringLiteral("dropped")));
 }
 
 QTEST_MAIN(TestUILoaderLayouts)

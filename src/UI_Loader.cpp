@@ -89,6 +89,33 @@ static void warnUnknownKeys(const QJsonObject &obj, const QStringList &known, co
     }
 }
 
+// Makes an adopter for the container class T. A factory of the application
+// can replace the type, so the adopter checks the class.
+template <typename T, typename F>
+static UI_Loader::ChildAdopter adopter(F adopt)
+{
+    return [adopt](QTuiWidget *container, QTuiWidget *page, const QJsonObject &entry) {
+        if (auto *typed = qobject_cast<T *>(container))
+            adopt(typed, page, entry);
+    };
+}
+
+static QString pageTitle(const QJsonObject &entry)
+{
+    const QJsonValue title = entry.value(QStringLiteral("title"));
+    if (!title.isString() && !title.isUndefined())
+        qWarning() << "UI_Loader: The \"title\" of a page is not a string";
+    return title.toString();
+}
+
+// For a container that holds only one page of this kind
+static void dropPage(QTuiWidget *page, const char *container)
+{
+    qWarning() << "UI_Loader:" << container << "already has a page of the type" << page->metaObject()->className()
+               << ", skipping";
+    delete page;
+}
+
 UI_Loader::UI_Loader(QObject *parent)
     : QObject(parent)
 {
@@ -295,11 +322,76 @@ UI_Loader::UI_Loader(QObject *parent)
     registerWidget(QStringLiteral("QTuiMdiSubWindow"), [](QTuiWidget *parent) -> QTuiWidget * {
         return new QTuiMdiSubWindow(parent);
     });
+
+    // How the built-in containers take a page from "pages"
+    m_adopters.insert(QStringLiteral("QTuiTabWidget"), adopter<QTuiTabWidget>(
+        [](QTuiTabWidget *tabs, QTuiWidget *page, const QJsonObject &entry) {
+            tabs->addTab(page, pageTitle(entry));
+        }));
+    m_adopters.insert(QStringLiteral("QTuiToolBox"), adopter<QTuiToolBox>(
+        [](QTuiToolBox *box, QTuiWidget *page, const QJsonObject &entry) {
+            box->addItem(page, pageTitle(entry));
+        }));
+    m_adopters.insert(QStringLiteral("QTuiStackedWidget"), adopter<QTuiStackedWidget>(
+        [](QTuiStackedWidget *stack, QTuiWidget *page, const QJsonObject &) { stack->addWidget(page); }));
+    m_adopters.insert(QStringLiteral("QTuiSplitter"), adopter<QTuiSplitter>(
+        [](QTuiSplitter *splitter, QTuiWidget *page, const QJsonObject &) { splitter->addWidget(page); }));
+    m_adopters.insert(QStringLiteral("QTuiScrollArea"), adopter<QTuiScrollArea>(
+        [](QTuiScrollArea *area, QTuiWidget *page, const QJsonObject &) {
+            if (area->widget())
+                dropPage(page, "QTuiScrollArea");
+            else
+                area->setWidget(page);
+        }));
+    m_adopters.insert(QStringLiteral("QTuiDockWidget"), adopter<QTuiDockWidget>(
+        [](QTuiDockWidget *dock, QTuiWidget *page, const QJsonObject &) {
+            if (dock->widget())
+                dropPage(page, "QTuiDockWidget");
+            else
+                dock->setWidget(page);
+        }));
+    // The main window finds the role of a page from its type. A page that
+    // is not a bar or a dock is the central widget.
+    m_adopters.insert(QStringLiteral("QTuiMainWindow"), adopter<QTuiMainWindow>(
+        [](QTuiMainWindow *window, QTuiWidget *page, const QJsonObject &entry) {
+            if (auto *toolBar = qobject_cast<QTuiToolBar *>(page)) {
+                window->addToolBar(toolBar);
+            } else if (auto *dock = qobject_cast<QTuiDockWidget *>(page)) {
+                // "area" is a name from Qt::DockWidgetArea
+                static const QHash<QString, Qt::DockWidgetArea> areas = {
+                    {QStringLiteral("LeftDockWidgetArea"), Qt::LeftDockWidgetArea},
+                    {QStringLiteral("RightDockWidgetArea"), Qt::RightDockWidgetArea},
+                    {QStringLiteral("TopDockWidgetArea"), Qt::TopDockWidgetArea},
+                    {QStringLiteral("BottomDockWidgetArea"), Qt::BottomDockWidgetArea}};
+                const QJsonValue area = entry.value(QStringLiteral("area"));
+                if (!area.isUndefined() && !areas.contains(area.toString()))
+                    qWarning() << "UI_Loader: Unknown dock \"area\", using LeftDockWidgetArea";
+                window->addDockWidget(areas.value(area.toString(), Qt::LeftDockWidgetArea), dock);
+            } else if (auto *menuBar = qobject_cast<QTuiMenuBar *>(page)) {
+                if (window->menuBar())
+                    dropPage(page, "QTuiMainWindow");
+                else
+                    window->setMenuBar(menuBar);
+            } else if (auto *statusBar = qobject_cast<QTuiStatusBar *>(page)) {
+                if (window->statusBar())
+                    dropPage(page, "QTuiMainWindow");
+                else
+                    window->setStatusBar(statusBar);
+            } else if (window->centralWidget()) {
+                dropPage(page, "QTuiMainWindow");
+            } else {
+                window->setCentralWidget(page);
+            }
+        }));
 }
 
-void UI_Loader::registerWidget(const QString &typeName, WidgetFactory factory)
+void UI_Loader::registerWidget(const QString &typeName, WidgetFactory factory, ChildAdopter adopter)
 {
     m_factories.insert(typeName, std::move(factory));
+    if (adopter)
+        m_adopters.insert(typeName, std::move(adopter));
+    else
+        m_adopters.remove(typeName);
 }
 
 QStringList UI_Loader::availableWidgets() const
@@ -372,6 +464,30 @@ QTuiWidget *UI_Loader::createWidget(const QJsonObject &obj, QTuiWidget *parent, 
         if (childVal.isObject()) {
             createWidget(childVal.toObject(), widget, depth + 1);
         }
+    }
+
+    // The pages go where the container holds them, for example into a tab.
+    // An entry is { "widget": { ... } } with the keys of the container.
+    if (obj.contains(QStringLiteral("pages"))) {
+        const ChildAdopter adopt = m_adopters.value(typeName);
+        const QJsonValue pages = obj.value(QStringLiteral("pages"));
+        if (!adopt)
+            qWarning() << "UI_Loader: The type" << typeName << "cannot have \"pages\", skipping them";
+        else if (!pages.isArray())
+            qWarning() << "UI_Loader: The \"pages\" of" << typeName << "is not an array";
+        const QJsonArray entries = adopt ? pages.toArray() : QJsonArray();
+        for (const QJsonValue &entryValue : entries) {
+            const QJsonObject entry = entryValue.toObject();
+            if (!entry.value(QStringLiteral("widget")).isObject()) {
+                qWarning() << "UI_Loader: A page has no \"widget\" object, skipping";
+                continue;
+            }
+            if (QTuiWidget *page = createWidget(entry.value(QStringLiteral("widget")).toObject(), widget, depth + 1))
+                adopt(widget, page, entry);
+        }
+        // The first pass has no pages, so the container ignores the index
+        if (obj.contains(QStringLiteral("currentIndex")))
+            widget->setProperty("currentIndex", obj.value(QStringLiteral("currentIndex")).toVariant());
     }
 
     // Set the full layout last: setLayout() applies it one time, and the
@@ -523,7 +639,8 @@ static bool isReservedKey(const QString &key)
 {
     static const QStringList reserved = {QStringLiteral("type"), QStringLiteral("children"),
                                          QStringLiteral("objectName"), QStringLiteral("geometry"),
-                                         QStringLiteral("visible"), QStringLiteral("layout")};
+                                         QStringLiteral("visible"), QStringLiteral("layout"),
+                                         QStringLiteral("pages")};
     return reserved.contains(key);
 }
 

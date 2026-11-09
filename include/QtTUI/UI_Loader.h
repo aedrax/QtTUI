@@ -18,6 +18,11 @@ class UI_Loader : public QObject {
 public:
     using WidgetFactory = std::function<QTuiWidget *(QTuiWidget *parent)>;
 
+    // Gives a page to its container, for example with addTab(). page is
+    // already a child of container. entry is the object in "pages": it has
+    // the "widget" key and the keys of the container, for example "title".
+    using ChildAdopter = std::function<void(QTuiWidget *container, QTuiWidget *page, const QJsonObject &entry)>;
+
     explicit UI_Loader(QObject *parent = nullptr);
 
     // Load from file or data
@@ -27,8 +32,8 @@ public:
     // Serialization (for round-trip)
     QByteArray serialize(const QTuiWidget *root) const;
 
-    // Custom widget registration
-    void registerWidget(const QString &typeName, WidgetFactory factory);
+    // Custom widget registration. A type with an adopter can have "pages".
+    void registerWidget(const QString &typeName, WidgetFactory factory, ChildAdopter adopter = nullptr);
 
     // Available widget types
     QStringList availableWidgets() const;
@@ -44,6 +49,7 @@ private:
     QJsonObject serializeWidget(const QTuiWidget *widget) const;
 
     QHash<QString, WidgetFactory> m_factories;
+    QHash<QString, ChildAdopter> m_adopters;
 };
 
 } // namespace QtTUI
