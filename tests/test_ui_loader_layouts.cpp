@@ -332,6 +332,26 @@ void TestUILoaderLayouts::testWrongLayoutInput()
     QCOMPARE(qobject_cast<QTuiFormLayout *>(root->layout())->rowCount(), 1);
     QCOMPARE(root->childWidgets().size(), 1);
 
+    // A very large geometry does not make the layouts slow or allocate
+    QElapsedTimer timer;
+    timer.start();
+    root.reset(loader.loadFromData(R"({
+        "type": "QTuiWidget",
+        "geometry": { "x": 0, "y": 0, "width": 2000000000, "height": 2000000000 },
+        "layout": { "type": "QTuiVBoxLayout", "items": [
+            { "type": "QTuiLabel", "text": "A", "stretch": 1 },
+            { "stretch": 2 },
+            { "layout": { "type": "QTuiGridLayout", "items": [
+                { "type": "QTuiLabel", "text": "B", "row": 0, "column": 0 },
+                { "type": "QTuiLineEdit", "row": 1, "column": 1 } ] }, "stretch": 1 },
+            { "layout": { "type": "QTuiFormLayout", "items": [
+                { "type": "QTuiLineEdit", "label": "C" } ] }, "stretch": 1 }
+        ] }
+    })"));
+    QVERIFY(root);
+    QCOMPARE(root->childWidgets().size(), 5);
+    QVERIFY(timer.elapsed() < 2000);
+
     QTest::ignoreMessage(QtWarningMsg, QRegularExpression("cannot hold a layout"));
     QTest::ignoreMessage(QtWarningMsg, QRegularExpression("value of currentIndex is not an integer"));
     root.reset(loader.loadFromData(R"({
@@ -559,6 +579,13 @@ void TestUILoaderLayouts::testCustomAdopter()
     QCOMPARE(deck->cards.size(), 2);
     QCOMPARE(deck->suits, QStringList({QStringLiteral("hearts"), QStringLiteral("spades")}));
     QCOMPARE(deck->cards.at(0)->parentWidget(), deck);
+
+    // A new factory for a built-in container keeps the adopter of the type
+    loader.registerWidget(QStringLiteral("QTuiTabWidget"),
+        [](QTuiWidget *parent) -> QTuiWidget * { return new QTuiTabWidget(parent); });
+    root.reset(loader.loadFromData(R"({
+        "type": "QTuiTabWidget", "pages": [ { "title": "One", "widget": { "type": "QTuiLabel" } } ] })"));
+    QCOMPARE(qobject_cast<QTuiTabWidget *>(root.get())->count(), 1);
 }
 
 void TestUILoaderLayouts::testWrongPagesInput()

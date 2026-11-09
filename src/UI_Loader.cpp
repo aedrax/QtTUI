@@ -393,10 +393,10 @@ UI_Loader::UI_Loader(QObject *parent)
 void UI_Loader::registerWidget(const QString &typeName, WidgetFactory factory, ChildAdopter adopter)
 {
     m_factories.insert(typeName, std::move(factory));
+    // Without an adopter, a type keeps the adopter that it has: a new
+    // factory for "QTuiTabWidget" still gets its tabs
     if (adopter)
         m_adopters.insert(typeName, std::move(adopter));
-    else
-        m_adopters.remove(typeName);
 }
 
 QStringList UI_Loader::availableWidgets() const
@@ -594,8 +594,12 @@ QTuiLayout *UI_Loader::createLayout(const QJsonObject &obj, QTuiWidget *owner, i
         } else if (grid) {
             if (widget)
                 grid->addWidget(widget, row, column, rowSpan, columnSpan);
-            else
+            else {
+                // Unlike the box and form layouts, the grid does not take
+                // the ownership of a nested layout
                 grid->addLayout(nested, row, column, rowSpan, columnSpan);
+                nested->setParent(grid);
+            }
         } else if (form) {
             // The label is a text or a widget object. A row can have no label.
             const QJsonValue label = item.value(QStringLiteral("label"));

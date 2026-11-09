@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
 | `QTuiWidget *load(const QString &filePath, QTuiWidget *parent = nullptr)` | Reads the file and calls `loadFromData()`. If the file cannot be opened, it shows a warning and returns `nullptr`. |
 | `QTuiWidget *loadFromData(const QByteArray &data, QTuiWidget *parent = nullptr)` | Makes the widget tree and returns the root widget, with `parent` as its parent. If `parent` is null, the caller owns the root. It returns `nullptr` if the JSON is not valid, if the root is not an object, or if the root type is missing or unknown. |
 | `QByteArray serialize(const QTuiWidget *root) const` | Returns the widget tree as indented JSON. A null root gives an empty array. See [Serialization](#serialization). |
-| `void registerWidget(const QString &typeName, WidgetFactory factory, ChildAdopter adopter = nullptr)` | Adds a type for the `"type"` key, or replaces the factory and the adopter of a type. A type with an adopter can have `"pages"`. |
+| `void registerWidget(const QString &typeName, WidgetFactory factory, ChildAdopter adopter = nullptr)` | Adds a type for the `"type"` key, or replaces the factory of a type. A type with an adopter can have `"pages"`. Without `adopter`, a type keeps the adopter that it has, so a new factory for `"QTuiTabWidget"` still gets its tabs. |
 | `QStringList availableWidgets() const` | Returns the registered type names, in no specified order. |
 
 `WidgetFactory` is `std::function<QTuiWidget *(QTuiWidget *parent)>`. The factory makes a widget with the given parent. If the factory returns `nullptr`, the loader shows a warning and skips the object and its children.
@@ -320,7 +320,7 @@ The adopter works in one direction. `serialize()` writes the pages of your type 
 - The writable properties that are different from a new widget of the same type. The loader makes the new widget with the factory of the type. For an unregistered type, it writes all writable properties.
 - Enum and flag properties as names. The loader does not write values that JSON cannot hold directly, for example `QRect`.
 - `visible`: only if it is false. A page of a `QTuiTabWidget`, a `QTuiToolBox` or a `QTuiStackedWidget` and a widget in a `QTuiStackedLayout` do not get it, because the container shows and hides them.
-- `layout`: the layout of the widget with its items, if the widget has one of the four built-in layout classes. A form label from a text is a text. A different label is a widget object.
+- `layout`: the layout of the widget with its items, if the widget has one of the four built-in layout classes. A form label from a text is a text, if the field is a widget. Each other label is a widget object.
 - `pages`: the pages of the built-in containers in [Pages](#pages), in the order of the container, with `title` and `area`.
 - `children`: the other child widgets, if there are any. The widgets in the layout, the pages, the widgets that a widget makes itself, the handles of a `QTuiSplitter` and popups are not included.
 
