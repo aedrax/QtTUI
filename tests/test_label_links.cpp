@@ -301,6 +301,147 @@ private slots:
         QCOMPARE(spy.count(), 2);
         QCOMPARE(spy.last().at(0).toString(), QStringLiteral("2"));
     }
+
+    void aLabelCanHaveManyLinks()
+    {
+        // 300 links, one on each line: "L0" to "L299"
+        QString text;
+        for (int i = 0; i < 300; ++i)
+            text += QStringLiteral("[L%1](t%1)\n").arg(i);
+        QTuiLabel label;
+        label.setTextFormat(Qt::MarkdownText);
+        label.setAlignment(Qt::AlignLeft | Qt::AlignTop);
+        label.setText(text);
+        label.setGeometry(QRect(0, 0, 10, 300));
+
+        QSignalSpy spy(&label, &QTuiLabel::linkActivated);
+        click(label, 0, 280);
+        QCOMPARE(spy.last().at(0).toString(), QStringLiteral("t280"));
+        QCOMPARE(label.currentLink(), 280);
+        QCOMPARE(label.linkRect(299), QRect(0, 299, 4, 1));
+    }
+
+    void currentLinkAndLinkRect()
+    {
+        QTuiLabel label;
+        QCOMPARE(label.currentLink(), -1);
+        label.setTextFormat(Qt::RichText);
+        label.setText(kHtml); // "Go here or there"
+        label.setWordWrap(true);
+        label.setAlignment(Qt::AlignLeft | Qt::AlignTop);
+        // Rows: "Go here" and "or there"
+        label.setGeometry(QRect(2, 1, 8, 2));
+        QCOMPARE(label.currentLink(), 0);
+        QCOMPARE(label.linkRect(0), QRect(2 + 3, 1, 4, 1));
+        QCOMPARE(label.linkRect(1), QRect(2 + 3, 2, 5, 1));
+        QVERIFY(label.linkRect(2).isEmpty());
+        sendKey(label, Qt::Key_Right);
+        QCOMPARE(label.currentLink(), 1);
+    }
+
+    void heightForWidthCountsTheWrappedLines()
+    {
+        QTuiLabel label(QStringLiteral("one two three\nfour"));
+        QCOMPARE(label.heightForWidth(20), 2);
+        label.setWordWrap(true);
+        QCOMPARE(label.heightForWidth(20), 2);
+        QCOMPARE(label.heightForWidth(7), 3); // "one two", "three", "four"
+        QCOMPARE(label.heightForWidth(5), 4);
+        label.setFrameShape(QTuiFrame::Box);
+        QCOMPARE(label.heightForWidth(7 + 2), 3 + 2);
+        QCOMPARE(QTuiLabel().heightForWidth(10), 1);
+    }
+
+    // The label keeps the parsed text and the lines. Each change that
+    // changes them must show in the next paint.
+    void paintFollowsEachChange()
+    {
+        QTuiLabel label(QStringLiteral("one two"));
+        label.setAlignment(Qt::AlignLeft | Qt::AlignTop);
+        label.setGeometry(QRect(0, 0, 8, 2));
+        ScreenBuffer buffer(8, 2);
+        auto row = [&](int y) {
+            label.paintEvent(buffer);
+            QString s;
+            for (int x = 0; x < buffer.width(); ++x)
+                s += buffer.backCell(x, y).text();
+            return s.trimmed();
+        };
+        QCOMPARE(row(0), QStringLiteral("one two"));
+
+        label.setText(QStringLiteral("a *b* three"));
+        QCOMPARE(row(0), QStringLiteral("a *b* th"));
+        label.setTextFormat(Qt::MarkdownText);
+        QCOMPARE(row(0), QStringLiteral("a b thre"));
+        QVERIFY(buffer.backCell(2, 0).italic);
+        label.setWordWrap(true);
+        QCOMPARE(row(0), QStringLiteral("a b"));
+        QCOMPARE(row(1), QStringLiteral("three"));
+        // A new width wraps again
+        label.setGeometry(QRect(0, 0, 3, 2));
+        QCOMPARE(row(0), QStringLiteral("a b"));
+        label.setGeometry(QRect(0, 0, 1, 2));
+        label.paintEvent(buffer);
+        QCOMPARE(buffer.backCell(0, 0).ch, U'a');
+        QCOMPARE(buffer.backCell(0, 1).ch, U'b');
+        QVERIFY(buffer.backCell(0, 1).italic);
+
+        // The buddy changes how the label reads &
+        label.setGeometry(QRect(0, 0, 8, 2));
+        label.setTextFormat(Qt::PlainText);
+        label.setText(QStringLiteral("&Name"));
+        QCOMPARE(row(0), QStringLiteral("&Name"));
+        auto *buddy = new QTuiPushButton(QStringLiteral("x"));
+        label.setBuddy(buddy);
+        QCOMPARE(row(0), QStringLiteral("Name"));
+        QCOMPARE(label.mnemonic(), QChar(QLatin1Char('N')));
+        delete buddy;
+        QCOMPARE(row(0), QStringLiteral("&Name"));
+        QCOMPARE(label.displayText(), QStringLiteral("&Name"));
+    }
+
+    void renderPaintsAPartOfTheLabel()
+    {
+        // 100 lines: "row 0" to "row 99"
+        QString text;
+        for (int i = 0; i < 100; ++i)
+            text += QStringLiteral("row [%1](t%1)\n").arg(i);
+        QTuiLabel label;
+        label.setTextFormat(Qt::MarkdownText);
+        label.setAlignment(Qt::AlignLeft | Qt::AlignTop);
+        label.setText(text);
+        label.setGeometry(QRect(0, 0, 10, 100));
+        const ThemeProperties theme = label.themeProperties();
+
+        // Rows 40 to 42 of the label show in the rows 1 to 3 at column 2
+        ScreenBuffer buffer(14, 5);
+        const Cell before = buffer.backCell(0, 0);
+        label.render(buffer, QPoint(2, 1 - 40), QRect(2, 1, 10, 3), true);
+        auto text3 = [&](int y) {
+            QString s;
+            for (int x = 6; x < 9; ++x)
+                s += buffer.backCell(x, y).text();
+            return s.trimmed();
+        };
+        QCOMPARE(text3(1), QStringLiteral("40"));
+        QCOMPARE(text3(3), QStringLiteral("42"));
+        QVERIFY(buffer.backCell(6, 1).underline);
+        // No cell outside the clip changes
+        for (int x = 0; x < 14; ++x) {
+            QCOMPARE(buffer.backCell(x, 0), before);
+            QCOMPARE(buffer.backCell(x, 4), before);
+        }
+        QCOMPARE(buffer.backCell(1, 2), before);
+        QCOMPARE(buffer.backCell(12, 2), before);
+
+        // showLinkFocus shows the current link in the focus colors
+        click(label, 4, 41);
+        label.render(buffer, QPoint(2, 1 - 40), QRect(2, 1, 10, 3), true);
+        QCOMPARE(buffer.backCell(6, 2).background, theme.focusBackground);
+        QCOMPARE(buffer.backCell(6, 1).background, theme.background);
+        label.render(buffer, QPoint(2, 1 - 40), QRect(2, 1, 10, 3), false);
+        QCOMPARE(buffer.backCell(6, 2).background, theme.background);
+    }
 };
 
 QTEST_APPLESS_MAIN(TestLabelLinks)

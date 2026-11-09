@@ -82,7 +82,10 @@ QObject::connect(about, &QTuiLabel::linkActivated, [](const QString &link) {
 });
 ```
 
-A label can have 255 links.
+The label keeps the parsed text and its lines until the text, the format, the
+buddy or the width changes. Thus a paint of a long text is fast. `render()`
+paints a part of a label that is larger than the screen; `QTuiTextBrowser`
+uses it.
 
 ### Example
 
@@ -118,6 +121,10 @@ void example(QTuiWidget *parent)
 | `Qt::TextFormat textFormat() const` | Returns the text format. Property `textFormat`. |
 | `void setTextFormat(Qt::TextFormat format)` | Sets the text format. See [Text formats](#text-formats). |
 | `QString displayText() const` | Returns the text as it shows, without the markup. |
+| `int currentLink() const` | Returns the index of the current link (from 0), or -1 if the text has no links. |
+| `QRect linkRect(int index) const` | Returns the cells of a link, in the coordinates of `geometry()`. Returns an empty rectangle if the link does not show. |
+| `int heightForWidth(int width) const` | Returns the height that shows all the text in a label of this width. With word wrap, it counts the wrapped lines. |
+| `void render(ScreenBuffer &buffer, const QPoint &offset, const QRect &clip, bool showLinkFocus)` | Paints the label moved by `offset`, and only inside `clip` (in buffer coordinates). The paint time depends on the clip, not on the length of the text. `showLinkFocus` shows the current link in the focus colors. A clipped label shows no frame. |
 | `QTuiWidget *buddy() const` | Returns the buddy widget, or `nullptr`. |
 | `void setBuddy(QTuiWidget *buddy)` | Sets the buddy widget, or removes it with `nullptr`. Marks the label dirty. The label does not take ownership. If the buddy is deleted, the label has no buddy. See "Buddy and mnemonic". |
 | `QChar mnemonic() const` | Returns the mnemonic character, or a null `QChar` if there is none. |
