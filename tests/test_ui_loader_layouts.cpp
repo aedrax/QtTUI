@@ -46,6 +46,7 @@ private slots:
     void testWrongPagesInput();
     void testSerializeLayoutsAndPages();
     void testRoundTrip();
+    void testDocExamples();
 };
 
 // An application container: it keeps its pages in a list
@@ -817,6 +818,75 @@ void TestUILoaderLayouts::testRoundTrip()
         QVERIFY2(!a->geometry().isEmpty(), qPrintable(name));
         QCOMPARE(b->geometry(), a->geometry());
     }
+}
+
+// The examples of docs/ui-loader.md load without a warning
+void TestUILoaderLayouts::testDocExamples()
+{
+    QTest::failOnWarning(QRegularExpression(QStringLiteral(".*")));
+    UI_Loader loader;
+    std::unique_ptr<QTuiWidget> root(loader.loadFromData(R"({
+        "type": "QTuiWidget",
+        "geometry": { "x": 0, "y": 0, "width": 40, "height": 10 },
+        "layout": {
+            "type": "QTuiVBoxLayout", "spacing": 1, "contentsMargins": [1, 0, 1, 0],
+            "items": [
+                { "type": "QTuiLabel", "text": "Notes" },
+                { "type": "QTuiPlainTextEdit", "objectName": "notes", "stretch": 1 },
+                { "layout": { "type": "QTuiHBoxLayout", "spacing": 1, "items": [
+                    { "stretch": 1 },
+                    { "type": "QTuiPushButton", "objectName": "ok", "text": "OK" },
+                    { "type": "QTuiPushButton", "objectName": "cancel", "text": "Cancel" }
+                ] } }
+            ]
+        }
+    })"));
+    QVERIFY(root);
+    auto *ok = root->findChild<QTuiPushButton *>(QStringLiteral("ok"));
+    auto *cancel = root->findChild<QTuiPushButton *>(QStringLiteral("cancel"));
+    QVERIFY(ok && cancel);
+    QCOMPARE(ok->geometry().bottom(), 9);
+    QCOMPARE(cancel->geometry().right(), 38);
+    QVERIFY(root->findChild<QTuiWidget *>(QStringLiteral("notes"))->geometry().height() > 3);
+
+    root.reset(loader.loadFromData(R"({
+        "type": "QTuiMainWindow",
+        "geometry": { "x": 0, "y": 0, "width": 80, "height": 24 },
+        "pages": [
+            { "widget": {
+                "type": "QTuiTabWidget", "objectName": "tabs",
+                "pages": [
+                    { "title": "Account", "widget": {
+                        "type": "QTuiWidget",
+                        "layout": {
+                            "type": "QTuiFormLayout", "horizontalSpacing": 1, "contentsMargins": [1, 1, 1, 1],
+                            "items": [
+                                { "type": "QTuiLineEdit", "objectName": "name", "label": "Name:" },
+                                { "type": "QTuiLineEdit", "objectName": "password", "label": "Password:",
+                                  "echoMode": "Password" },
+                                { "type": "QTuiCheckBox", "objectName": "remember", "text": "Remember me" },
+                                { "layout": { "type": "QTuiHBoxLayout", "items": [
+                                    { "stretch": 1 },
+                                    { "type": "QTuiPushButton", "objectName": "ok", "text": "OK" }
+                                ] } }
+                            ]
+                        }
+                    } },
+                    { "title": "Log", "widget": { "type": "QTuiPlainTextEdit", "objectName": "log",
+                                                  "readOnly": true } }
+                ]
+            } },
+            { "widget": { "type": "QTuiStatusBar", "objectName": "status" } }
+        ]
+    })"));
+    auto *window = qobject_cast<QTuiMainWindow *>(root.get());
+    QVERIFY(window);
+    auto *tabs = qobject_cast<QTuiTabWidget *>(window->centralWidget());
+    QVERIFY(tabs && window->statusBar());
+    QCOMPARE(tabs->count(), 2);
+    QCOMPARE(qobject_cast<QTuiFormLayout *>(tabs->widget(0)->layout())->rowCount(), 4);
+    window->show();
+    QVERIFY(!tabs->geometry().isEmpty());
 }
 
 QTEST_MAIN(TestUILoaderLayouts)

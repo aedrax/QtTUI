@@ -67,6 +67,7 @@ int main(int argc, char *argv[])
 | `QTuiStatusBar *statusBar() const` | Returns the status bar, or `nullptr`. |
 | `void addDockWidget(Qt::DockWidgetArea area, QTuiDockWidget *dockWidget)` | Adds a dock widget to an edge. If the dock is in a different area, it moves. See [containers](containers.md). |
 | `void removeDockWidget(QTuiDockWidget *dockWidget)` | Removes a dock widget. The dock gets no parent. |
+| `Qt::DockWidgetArea dockWidgetArea(QTuiDockWidget *dockWidget) const` | Returns the area of a dock, or `Qt::NoDockWidgetArea` if the dock is not in this window. |
 | `bool close()` | From QTuiWidget. If the window is the main window of the application (`QTuiApplication::setMainWindow()`), an accepted close calls `QCoreApplication::quit()`. Override `closeEvent()` and call `event->ignore()` to stop the quit, for example to ask about changes that are not saved. |
 | `void show()` | Shows the window. If the geometry is empty, the window takes the size of the terminal. Then it calls the layout. |
 | `void paintEvent(ScreenBuffer &buffer)` | Paints nothing. The children paint themselves. |

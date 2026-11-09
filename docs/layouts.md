@@ -344,6 +344,7 @@ void example(QTuiWidget *parent)
 | `int columnCount() const` | Returns the number of columns, including the columns with only a stretch or a minimum width. |
 | `int count() const` | Returns the number of items. |
 | `QTuiLayoutItem *itemAt(int index) const` | Returns the item at `index`, or nullptr. |
+| `void getItemPosition(int index, int *row, int *column, int *rowSpan, int *columnSpan) const` | Gives the cell and the spans of the item at `index`, as in `QGridLayout`. A pointer can be nullptr. A wrong index changes nothing. |
 | `QSize minimumSize() const` | Returns the sum of the row and column minimum sizes plus the margins. |
 | `void apply(const QRect &availableArea)` | Sets the geometry of the items. See below. |
 
@@ -384,13 +385,14 @@ void example(QTuiWidget *parent)
 | `void addRow(QTuiWidget *label, QTuiLayout *field)` | Adds a row with your label widget and a nested layout as the field. The form layout becomes the parent of the nested layout. A nullptr layout is ignored. If the nested layout is destroyed, the form layout removes its row. If you call `addRow(label, nullptr)`, cast the nullptr to `QTuiWidget *` or `QTuiLayout *`. |
 | `void removeRow(int row)` | Removes a row. It deletes the label if the layout made it, and the nested layout of the row. It does not delete the field or the widgets in the nested layout. |
 | `int rowCount() const` | Returns the number of rows. |
+| `const QList<FormRow> &rows() const` | Returns the rows. A `FormRow` has `label` (nullptr for a row without a label), `field` or `fieldLayout`, and `ownsLabel`, which is true for a label from a text. |
 | `int horizontalSpacing() const` | Returns the cells between the label column and the field column. The default is 0. |
 | `void setHorizontalSpacing(int spacing)` | Sets the horizontal spacing. A negative value becomes 0. |
 | `int count() const` | Returns the number of rows. |
 | `QSize minimumSize() const` | Returns the widest label plus the spacing plus the widest field, the sum of the row heights, and the margins. |
 | `void apply(const QRect &availableArea)` | Sets the geometry of the labels and fields. The field column always keeps at least 1 cell. |
 
-If a field is destroyed, the layout removes its row. The form layout does not use the size policy of the widgets. It uses their size limits: a label or field never gets more than its maximum size. `QTuiFormLayout` does not override `itemAt()`, so `itemAt()` returns nullptr for each index.
+If a field is destroyed, the layout removes its row. The form layout does not use the size policy of the widgets. It uses their size limits: a label or field never gets more than its maximum size. `QTuiFormLayout` does not override `itemAt()`, so `itemAt()` returns nullptr for each index. Use `rows()`.
 
 ## QTuiStackedLayout
 
