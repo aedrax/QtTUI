@@ -37,9 +37,23 @@ protected:
     void resizeEvent(TuiResizeEvent *event) override;
     // Tab to a widget in the content scrolls to it
     void focusEntered(QTuiWidget *focus) override;
+    // Paints the visible part of the content into viewport (in buffer
+    // coordinates). paintEvent() calls it if there is a visible content
+    // widget. The default paints all the content into a second buffer and
+    // copies the visible part. A subclass with large content paints only
+    // the visible part; scrollOffset() and m_scrollX give the first row
+    // and the first column that show.
+    virtual void paintContent(ScreenBuffer &buffer, const QRect &viewport);
+
+    // Shows or hides the scroll bars and sets their ranges for the size
+    // of the content. paintEvent() calls it; call it after a change of
+    // the content size if the scroll position must be correct before the
+    // next paint.
+    void updateScrollBars();
+
+    int m_scrollX = 0;
 
 private:
-    void updateScrollBars();
     // A screen position in content coordinates
     QPoint contentPos(const QPoint &pos) const;
     // The deepest visible content widget at a content position, or null
@@ -48,7 +62,6 @@ private:
     QTuiWidget *m_widget = nullptr;
     QTuiScrollBar *m_verticalScrollBar;
     QTuiScrollBar *m_horizontalScrollBar;
-    int m_scrollX = 0;
 };
 
 } // namespace QtTUI

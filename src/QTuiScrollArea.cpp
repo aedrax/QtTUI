@@ -225,52 +225,8 @@ void QTuiScrollArea::paintEvent(ScreenBuffer &buffer)
     // Clear the viewport area with background
     fillRect(buffer, QRect(geo.x(), geo.y(), viewportW, viewportH), cellStyle(fg, bg));
 
-    // Render the clipped portion of the child widget into a temporary buffer,
-    // then copy the visible region into the main buffer
-    if (m_widget && m_widget->isVisible()) {
-        const QRect childGeo = m_widget->geometry();
-        if (childGeo.width() > 0 && childGeo.height() > 0) {
-            // Paint the content and all widgets in it into a temporary buffer
-            // at their own (content) coordinates. Geometry does not change
-            // during the paint, so no repaint is scheduled from here.
-            const int left = qMax(0, childGeo.x());
-            const int top = qMax(0, childGeo.y());
-            ScreenBuffer childBuffer(left + childGeo.width(), top + childGeo.height());
-            std::function<void(QTuiWidget *)> paintSubtree = [&](QTuiWidget *w) {
-                w->paintEvent(childBuffer);
-                for (QTuiWidget *child : w->childWidgets()) {
-                    if (child->isVisible() && !child->isPopup())
-                        paintSubtree(child);
-                }
-            };
-            paintSubtree(m_widget);
-
-            // Copy the visible portion (clipped by viewport) from child buffer
-            for (int row = 0; row < viewportH; ++row) {
-                int childRow = row + m_scrollOffset;
-                if (childRow < 0 || childRow >= childGeo.height())
-                    continue;
-
-                for (int col = 0; col < viewportW; ++col) {
-                    int childCol = col + m_scrollX;
-                    if (childCol < 0 || childCol >= childGeo.width())
-                        continue;
-
-                    int px = geo.x() + col;
-                    int py = geo.y() + row;
-                    if (px >= buffer.width() || py >= buffer.height())
-                        continue;
-
-                    const Cell &src = childBuffer.backCell(left + childCol, top + childRow);
-                    Cell &dst = buffer.backCell(px, py);
-                    dst = src;
-                    // A link id is valid only in the buffer that gave it
-                    if (src.link)
-                        dst.link = buffer.linkId(childBuffer.linkUrl(src.link));
-                }
-            }
-        }
-    }
+    if (m_widget && m_widget->isVisible())
+        paintContent(buffer, QRect(geo.x(), geo.y(), viewportW, viewportH));
 
     // Paint scroll bars (they paint themselves into the main buffer)
     if (needsVScroll)
@@ -325,6 +281,54 @@ void QTuiScrollArea::paintEvent(ScreenBuffer &buffer)
     // Fill corner cell if both scroll bars are visible
     if (needsVScroll && needsHScroll)
         fillRect(buffer, QRect(geo.right(), geo.bottom(), 1, 1), cellStyle(fg, bg));
+}
+
+void QTuiScrollArea::paintContent(ScreenBuffer &buffer, const QRect &viewport)
+{
+    // Render the content into a temporary buffer, then copy the visible
+    // region into the main buffer
+    const QRect childGeo = m_widget->geometry();
+    if (childGeo.width() <= 0 || childGeo.height() <= 0)
+        return;
+    // Paint the content and all widgets in it into a temporary buffer
+    // at their own (content) coordinates. Geometry does not change
+    // during the paint, so no repaint is scheduled from here.
+    const int left = qMax(0, childGeo.x());
+    const int top = qMax(0, childGeo.y());
+    ScreenBuffer childBuffer(left + childGeo.width(), top + childGeo.height());
+    std::function<void(QTuiWidget *)> paintSubtree = [&](QTuiWidget *w) {
+        w->paintEvent(childBuffer);
+        for (QTuiWidget *child : w->childWidgets()) {
+            if (child->isVisible() && !child->isPopup())
+                paintSubtree(child);
+        }
+    };
+    paintSubtree(m_widget);
+
+    // Copy the visible portion (clipped by viewport) from child buffer
+    for (int row = 0; row < viewport.height(); ++row) {
+        int childRow = row + m_scrollOffset;
+        if (childRow < 0 || childRow >= childGeo.height())
+            continue;
+
+        for (int col = 0; col < viewport.width(); ++col) {
+            int childCol = col + m_scrollX;
+            if (childCol < 0 || childCol >= childGeo.width())
+                continue;
+
+            int px = viewport.x() + col;
+            int py = viewport.y() + row;
+            if (px >= buffer.width() || py >= buffer.height())
+                continue;
+
+            const Cell &src = childBuffer.backCell(left + childCol, top + childRow);
+            Cell &dst = buffer.backCell(px, py);
+            dst = src;
+            // A link id is valid only in the buffer that gave it
+            if (src.link)
+                dst.link = buffer.linkId(childBuffer.linkUrl(src.link));
+        }
+    }
 }
 
 void QTuiScrollArea::keyPressEvent(TuiKeyEvent *event)

@@ -618,6 +618,8 @@ void example(QTuiWidget *parent)
 | `void mousePressEvent(TuiMouseEvent *event)` | Protected. See "Mouse". |
 | `void resizeEvent(TuiResizeEvent *event)` | Protected. Updates the scroll bars. |
 | `void focusEntered(QTuiWidget *focus)` | Protected. Calls `ensureWidgetVisible(focus)` when a widget in the content gets the focus. |
+| `virtual void paintContent(ScreenBuffer &buffer, const QRect &viewport)` | Protected. Paints the visible part of the content into `viewport` (in buffer coordinates). `paintEvent()` calls it if there is a visible content widget. The default paints all the content into a second buffer and copies the visible part, so the paint time grows with the content size. A subclass with large content paints only the visible part, as `QTuiTextBrowser` does. `scrollOffset()` and `m_scrollX` give the first row and the first column that show. |
+| `void updateScrollBars()` | Protected. Shows or hides the scroll bars and sets their ranges for the size of the content. `paintEvent()` calls it. Call it after a change of the content size if the scroll position must be correct before the next paint. |
 
 ### Keys
 
