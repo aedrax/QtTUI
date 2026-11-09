@@ -150,6 +150,17 @@ QTuiLayoutItem *QTuiGridLayout::itemAt(int index) const
     return m_gridItems.at(index).item;
 }
 
+void QTuiGridLayout::getItemPosition(int index, int *row, int *column, int *rowSpan, int *columnSpan) const
+{
+    if (index < 0 || index >= m_gridItems.size())
+        return;
+    const GridItem &gi = m_gridItems.at(index);
+    if (row) *row = gi.row;
+    if (column) *column = gi.column;
+    if (rowSpan) *rowSpan = gi.rowSpan;
+    if (columnSpan) *columnSpan = gi.columnSpan;
+}
+
 // Compute per-row/per-column minimum sizes from single-span items plus the
 // configured row/column minimums. The vectors must be pre-sized to
 // rowCount()/columnCount() and zero-initialized.

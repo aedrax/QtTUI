@@ -44,6 +44,8 @@ private slots:
     void testMainWindowPages();
     void testCustomAdopter();
     void testWrongPagesInput();
+    void testSerializeLayoutsAndPages();
+    void testRoundTrip();
 };
 
 // An application container: it keeps its pages in a list
@@ -597,6 +599,224 @@ void TestUILoaderLayouts::testWrongPagesInput()
     QVERIFY(area);
     QCOMPARE(area->widget()->objectName(), QStringLiteral("kept"));
     QVERIFY(!area->findChild<QTuiWidget *>(QStringLiteral("dropped")));
+}
+
+// serialize() of a tree from C++ code: each widget is in the output one time
+void TestUILoaderLayouts::testSerializeLayoutsAndPages()
+{
+    UI_Loader loader;
+    QTuiWidget root;
+    root.setGeometry(QRect(0, 0, 40, 12));
+    auto *form = new QTuiFormLayout;
+    form->addRow(QStringLiteral("Name:"), new QTuiLineEdit(&root));
+    auto *buttons = createHBoxLayout();
+    buttons->addStretch(1);
+    buttons->addWidget(new QTuiPushButton(QStringLiteral("OK"), &root), 2);
+    buttons->addSpacing(3);
+    form->addRow(new QTuiLabel(QStringLiteral("Do:"), &root), buttons);
+    form->setContentsMargins(1, 0, 1, 0);
+    root.setLayout(form);
+    auto *splitter = new QTuiSplitter(Qt::Horizontal, &root);
+    splitter->addWidget(new QTuiLabel(QStringLiteral("L")));
+    splitter->addWidget(new QTuiLabel(QStringLiteral("R")));
+
+    const QJsonObject obj = QJsonDocument::fromJson(loader.serialize(&root)).object();
+    const QJsonObject layout = obj[QStringLiteral("layout")].toObject();
+    QCOMPARE(layout[QStringLiteral("type")].toString(), QStringLiteral("QTuiFormLayout"));
+    QCOMPARE(layout[QStringLiteral("contentsMargins")].toArray(), QJsonArray({1, 0, 1, 0}));
+    const QJsonArray rows = layout[QStringLiteral("items")].toArray();
+    QCOMPARE(rows.size(), 2);
+
+    // A label from a text is a text, and a widget in a layout has no geometry
+    const QJsonObject first = rows[0].toObject();
+    QCOMPARE(first[QStringLiteral("type")].toString(), QStringLiteral("QTuiLineEdit"));
+    QCOMPARE(first[QStringLiteral("label")].toString(), QStringLiteral("Name:"));
+    QVERIFY(!first.contains(QStringLiteral("geometry")));
+
+    const QJsonObject second = rows[1].toObject();
+    QCOMPARE(second[QStringLiteral("label")].toObject()[QStringLiteral("text")].toString(), QStringLiteral("Do:"));
+    const QJsonObject row = second[QStringLiteral("layout")].toObject();
+    QCOMPARE(row[QStringLiteral("type")].toString(), QStringLiteral("QTuiHBoxLayout"));
+    const QJsonArray rowItems = row[QStringLiteral("items")].toArray();
+    QCOMPARE(rowItems.size(), 3);
+    QCOMPARE(rowItems[0].toObject(), QJsonObject({{QStringLiteral("stretch"), 1}}));
+    QCOMPARE(rowItems[1].toObject()[QStringLiteral("stretch")].toInt(), 2);
+    QCOMPARE(rowItems[1].toObject()[QStringLiteral("text")].toString(), QStringLiteral("OK"));
+    QCOMPARE(rowItems[2].toObject(), QJsonObject({{QStringLiteral("spacer"), 3}}));
+
+    // Only the splitter is in "children". Its handle is not a page.
+    const QJsonArray children = obj[QStringLiteral("children")].toArray();
+    QCOMPARE(children.size(), 1);
+    const QJsonObject splitterObj = children[0].toObject();
+    QCOMPARE(splitterObj[QStringLiteral("type")].toString(), QStringLiteral("QTuiSplitter"));
+    QCOMPARE(splitterObj[QStringLiteral("pages")].toArray().size(), 2);
+    QVERIFY(!splitterObj.contains(QStringLiteral("children")));
+}
+
+// load(serialize(tree)) gives an equal tree
+void TestUILoaderLayouts::testRoundTrip()
+{
+    UI_Loader loader;
+    const QByteArray json = R"({
+        "type": "QTuiMainWindow",
+        "geometry": { "x": 0, "y": 0, "width": 80, "height": 24 },
+        "pages": [
+            { "widget": { "type": "QTuiMenuBar" } },
+            { "widget": { "type": "QTuiTabWidget", "objectName": "tabs", "currentIndex": 1, "pages": [
+                { "title": "Form", "widget": { "type": "QTuiWidget", "objectName": "formPage",
+                    "layout": { "type": "QTuiFormLayout", "horizontalSpacing": 1,
+                                "contentsMargins": [1, 1, 1, 1], "items": [
+                        { "type": "QTuiLineEdit", "objectName": "name", "label": "Name:" },
+                        { "type": "QTuiLineEdit", "objectName": "mail",
+                          "label": { "type": "QTuiLabel", "objectName": "mailLabel", "text": "Mail:" } },
+                        { "label": "Size:", "layout": { "type": "QTuiHBoxLayout", "spacing": 1, "items": [
+                            { "type": "QTuiLineEdit", "objectName": "width", "stretch": 2 },
+                            { "spacer": 2 },
+                            { "type": "QTuiLineEdit", "objectName": "height", "stretch": 1 },
+                            { "stretch": 1 } ] } } ] } } },
+                { "title": "Grid", "widget": { "type": "QTuiGroupBox", "objectName": "gridPage",
+                    "title": "Options",
+                    "layout": { "type": "QTuiGridLayout", "items": [
+                        { "type": "QTuiLabel", "objectName": "g00", "text": "A", "row": 0, "column": 0 },
+                        { "type": "QTuiLabel", "objectName": "g11", "text": "B", "row": 1, "column": 1,
+                          "rowSpan": 2, "columnSpan": 3 } ] } } },
+                { "title": "Stack", "widget": { "type": "QTuiWidget", "objectName": "stackPage",
+                    "layout": { "type": "QTuiStackedLayout", "currentIndex": 1, "items": [
+                        { "type": "QTuiLabel", "text": "One" },
+                        { "type": "QTuiLabel", "objectName": "shown", "text": "Two" } ] } } } ] } },
+            { "area": "RightDockWidgetArea", "widget": { "type": "QTuiDockWidget", "objectName": "dock",
+                "windowTitle": "Tools", "pages": [
+                    { "widget": { "type": "QTuiToolBox", "objectName": "toolBox", "currentIndex": 1, "pages": [
+                        { "title": "One", "widget": { "type": "QTuiLabel", "text": "1" } },
+                        { "title": "Two", "widget": { "type": "QTuiSplitter", "objectName": "splitter", "pages": [
+                            { "widget": { "type": "QTuiLabel", "text": "L" } },
+                            { "widget": { "type": "QTuiScrollArea", "objectName": "area", "pages": [
+                                { "widget": { "type": "QTuiLabel", "objectName": "content", "text": "C",
+                                    "geometry": { "x": 0, "y": 0, "width": 30, "height": 30 } } } ] } } ] } } ] } }
+                ] } },
+            { "widget": { "type": "QTuiStatusBar" } }
+        ],
+        "children": [
+            { "type": "QTuiStackedWidget", "objectName": "stack", "currentIndex": 1,
+              "geometry": { "x": 1, "y": 1, "width": 5, "height": 2 }, "pages": [
+                { "widget": { "type": "QTuiLabel", "text": "1" } },
+                { "widget": { "type": "QTuiLabel", "text": "2" } } ] }
+        ]
+    })";
+    std::unique_ptr<QTuiWidget> first(loader.loadFromData(json));
+    QVERIFY(first);
+    qobject_cast<QTuiMainWindow *>(first.get())->show(); // the window places its pages
+
+    const QByteArray data = loader.serialize(first.get());
+    std::unique_ptr<QTuiWidget> second(loader.loadFromData(data));
+    QVERIFY(second);
+    qobject_cast<QTuiMainWindow *>(second.get())->show();
+    // Compare line by line: a failure then shows the first different line
+    const QList<QByteArray> expected = data.split('\n');
+    const QList<QByteArray> actual = loader.serialize(second.get()).split('\n');
+    for (int i = 0; i < qMin(expected.size(), actual.size()); ++i)
+        QVERIFY2(actual.at(i) == expected.at(i),
+                 (QByteArray::number(i) + ": " + actual.at(i) + " != " + expected.at(i) + " after "
+                  + expected.mid(qMax(0, i - 12), qMin(i, 12)).join(' ').simplified()).constData());
+    QCOMPARE(actual.size(), expected.size());
+
+    // The same output is not sufficient: examine the second tree
+    auto *window = qobject_cast<QTuiMainWindow *>(second.get());
+    QVERIFY(window->menuBar() && window->statusBar());
+    auto *tabs = qobject_cast<QTuiTabWidget *>(window->centralWidget());
+    QVERIFY(tabs);
+    QCOMPARE(tabs->count(), 3);
+    QCOMPARE(tabs->tabBar()->tabText(0), QStringLiteral("Form"));
+    QCOMPARE(tabs->tabBar()->tabText(2), QStringLiteral("Stack"));
+    QCOMPARE(tabs->currentIndex(), 1);
+    QCOMPARE(tabs->childWidgets().size(), 4); // the tab bar and 3 pages
+
+    // The form: 3 rows, 2 labels from a text, 1 label widget, no more labels
+    QTuiWidget *formPage = tabs->widget(0);
+    auto *form = qobject_cast<QTuiFormLayout *>(formPage->layout());
+    QVERIFY(form);
+    QCOMPARE(form->horizontalSpacing(), 1);
+    int left, top, right, bottom;
+    form->contentsMargins(&left, &top, &right, &bottom);
+    QCOMPARE(QList<int>({left, top, right, bottom}), QList<int>({1, 1, 1, 1}));
+    const auto &rows = form->rows();
+    QCOMPARE(rows.size(), 3);
+    QCOMPARE(rows.at(0).field->objectName(), QStringLiteral("name"));
+    QVERIFY(rows.at(0).ownsLabel);
+    QCOMPARE(qobject_cast<QTuiLabel *>(rows.at(0).label)->text(), QStringLiteral("Name:"));
+    QCOMPARE(rows.at(1).label->objectName(), QStringLiteral("mailLabel"));
+    QVERIFY(!rows.at(1).ownsLabel);
+    QCOMPARE(qobject_cast<QTuiLabel *>(rows.at(2).label)->text(), QStringLiteral("Size:"));
+    QCOMPARE(formPage->childWidgets().size(), 7); // 4 line edits and 3 labels
+    auto *sizeRow = qobject_cast<QTuiBoxLayout *>(rows.at(2).fieldLayout);
+    QVERIFY(sizeRow);
+    QCOMPARE(sizeRow->direction(), QTuiBoxLayout::LeftToRight);
+    QCOMPARE(sizeRow->spacing(), 1);
+    const auto &sizeItems = sizeRow->items();
+    QCOMPARE(sizeItems.size(), 4);
+    QCOMPARE(sizeItems.at(0).widget->objectName(), QStringLiteral("width"));
+    QCOMPARE(sizeItems.at(0).stretch, 2);
+    QCOMPARE(sizeItems.at(1).spacerSize, 2);
+    QCOMPARE(sizeItems.at(2).widget->objectName(), QStringLiteral("height"));
+    QCOMPARE(sizeItems.at(2).stretch, 1);
+    QVERIFY(!sizeItems.at(3).widget);
+    QCOMPARE(sizeItems.at(3).stretch, 1);
+
+    // The grid positions, and the title of the group box
+    auto *gridPage = qobject_cast<QTuiGroupBox *>(tabs->widget(1));
+    QVERIFY(gridPage);
+    QCOMPARE(gridPage->title(), QStringLiteral("Options"));
+    auto *grid = qobject_cast<QTuiGridLayout *>(gridPage->layout());
+    QVERIFY(grid);
+    QCOMPARE(grid->count(), 2);
+    int row = -1, column = -1, rowSpan = -1, columnSpan = -1;
+    grid->getItemPosition(1, &row, &column, &rowSpan, &columnSpan);
+    QCOMPARE(QList<int>({row, column, rowSpan, columnSpan}), QList<int>({1, 1, 2, 3}));
+    QCOMPARE(dynamic_cast<QTuiWidgetItem *>(grid->itemAt(1))->widget()->objectName(), QStringLiteral("g11"));
+    QCOMPARE(gridPage->childWidgets().size(), 2);
+
+    auto *stackLayout = qobject_cast<QTuiStackedLayout *>(tabs->widget(2)->layout());
+    QVERIFY(stackLayout);
+    QCOMPARE(stackLayout->count(), 2);
+    QCOMPARE(stackLayout->currentWidget()->objectName(), QStringLiteral("shown"));
+
+    // The dock and the containers in it
+    auto *dock = window->findChild<QTuiDockWidget *>(QStringLiteral("dock"));
+    QVERIFY(dock);
+    QCOMPARE(window->dockWidgetArea(dock), Qt::RightDockWidgetArea);
+    auto *toolBox = qobject_cast<QTuiToolBox *>(dock->widget());
+    QVERIFY(toolBox);
+    QCOMPARE(toolBox->count(), 2);
+    QCOMPARE(toolBox->itemText(1), QStringLiteral("Two"));
+    QCOMPARE(toolBox->currentIndex(), 1);
+    auto *splitter = qobject_cast<QTuiSplitter *>(toolBox->widget(1));
+    QVERIFY(splitter);
+    QCOMPARE(splitter->count(), 2);
+    QCOMPARE(splitter->childWidgets().size(), 3); // 2 pages and 1 handle
+    auto *area = qobject_cast<QTuiScrollArea *>(splitter->widget(1));
+    QVERIFY(area && area->widget());
+    QCOMPARE(area->widget()->objectName(), QStringLiteral("content"));
+    QCOMPARE(area->widget()->geometry().size(), QSize(30, 30));
+
+    auto *stack = window->findChild<QTuiStackedWidget *>(QStringLiteral("stack"));
+    QVERIFY(stack);
+    QCOMPARE(stack->count(), 2);
+    QCOMPARE(stack->currentIndex(), 1);
+    QCOMPARE(stack->geometry(), QRect(1, 1, 5, 2));
+
+    // The geometry that the layouts give is the same in the two trees. A
+    // tab widget gives the geometry to its pages when it paints, so give
+    // it to the form page here.
+    first->findChild<QTuiWidget *>(QStringLiteral("formPage"))->setGeometry(QRect(0, 3, 60, 10));
+    formPage->setGeometry(QRect(0, 3, 60, 10));
+    for (const QString &name : {QStringLiteral("tabs"), QStringLiteral("name"), QStringLiteral("mailLabel"),
+                                QStringLiteral("width"), QStringLiteral("height"), QStringLiteral("dock")}) {
+        auto *a = first->findChild<QTuiWidget *>(name);
+        auto *b = second->findChild<QTuiWidget *>(name);
+        QVERIFY2(a && b, qPrintable(name));
+        QVERIFY2(!a->geometry().isEmpty(), qPrintable(name));
+        QCOMPARE(b->geometry(), a->geometry());
+    }
 }
 
 QTEST_MAIN(TestUILoaderLayouts)

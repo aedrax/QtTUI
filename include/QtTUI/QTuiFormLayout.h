@@ -26,6 +26,16 @@ public:
 
     int rowCount() const;
 
+    // A row has a field or a fieldLayout. label is nullptr for a row
+    // without a label. ownsLabel is true for a label from a text.
+    struct FormRow {
+        QTuiWidget *label;
+        QTuiWidget *field;
+        bool ownsLabel;
+        QTuiLayout *fieldLayout = nullptr;
+    };
+    const QList<FormRow> &rows() const;
+
     // Cells between the label column and the field column (default 0)
     int horizontalSpacing() const;
     void setHorizontalSpacing(int spacing);
@@ -36,13 +46,6 @@ public:
     void apply(const QRect &availableArea) override;
 
 private:
-    struct FormRow {
-        QTuiWidget *label;
-        QTuiWidget *field;
-        bool ownsLabel;
-        QTuiLayout *fieldLayout = nullptr;
-    };
-
     void watchRowWidgets(const FormRow &row);
 
     QList<FormRow> m_rows;

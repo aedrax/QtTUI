@@ -4,6 +4,7 @@
 #include <QtTUI/QtTUIGlobal.h>
 #include <QObject>
 #include <QHash>
+#include <QSet>
 #include <QStringList>
 #include <QJsonObject>
 #include <functional>
@@ -47,6 +48,8 @@ private:
     QTuiLayout *createLayout(const QJsonObject &obj, QTuiWidget *owner, int depth);
     void applyProperties(QTuiWidget *widget, const QJsonObject &obj, const QStringList &itemKeys);
     QJsonObject serializeWidget(const QTuiWidget *widget) const;
+    // claimed gets the widgets of the layout: they are not in "children"
+    QJsonObject serializeLayout(const QTuiLayout *layout, QSet<const QTuiWidget *> &claimed) const;
 
     QHash<QString, WidgetFactory> m_factories;
     QHash<QString, ChildAdopter> m_adopters;

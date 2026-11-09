@@ -427,8 +427,10 @@ void TestUILoader::testSerializeSkipsOwnChildren()
     auto *content = new QTuiLabel(QStringLiteral("Content"));
     area.setWidget(content);
     obj = QJsonDocument::fromJson(loader.serialize(&area)).object();
-    QCOMPARE(obj[QStringLiteral("children")].toArray().size(), 1);
-    QCOMPARE(obj[QStringLiteral("children")].toArray()[0].toObject()[QStringLiteral("type")].toString(),
+    QVERIFY(!obj.contains(QStringLiteral("children")));
+    QCOMPARE(obj[QStringLiteral("pages")].toArray().size(), 1);
+    QCOMPARE(obj[QStringLiteral("pages")].toArray()[0].toObject()[QStringLiteral("widget")]
+                 .toObject()[QStringLiteral("type")].toString(),
              QStringLiteral("QTuiLabel"));
 }
 

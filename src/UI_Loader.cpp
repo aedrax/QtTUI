@@ -108,6 +108,17 @@ static QString pageTitle(const QJsonObject &entry)
     return title.toString();
 }
 
+// The values of "area" for a dock in a main window
+static const QHash<QString, Qt::DockWidgetArea> &dockAreas()
+{
+    static const QHash<QString, Qt::DockWidgetArea> areas = {
+        {QStringLiteral("LeftDockWidgetArea"), Qt::LeftDockWidgetArea},
+        {QStringLiteral("RightDockWidgetArea"), Qt::RightDockWidgetArea},
+        {QStringLiteral("TopDockWidgetArea"), Qt::TopDockWidgetArea},
+        {QStringLiteral("BottomDockWidgetArea"), Qt::BottomDockWidgetArea}};
+    return areas;
+}
+
 // For a container that holds only one page of this kind
 static void dropPage(QTuiWidget *page, const char *container)
 {
@@ -357,16 +368,10 @@ UI_Loader::UI_Loader(QObject *parent)
             if (auto *toolBar = qobject_cast<QTuiToolBar *>(page)) {
                 window->addToolBar(toolBar);
             } else if (auto *dock = qobject_cast<QTuiDockWidget *>(page)) {
-                // "area" is a name from Qt::DockWidgetArea
-                static const QHash<QString, Qt::DockWidgetArea> areas = {
-                    {QStringLiteral("LeftDockWidgetArea"), Qt::LeftDockWidgetArea},
-                    {QStringLiteral("RightDockWidgetArea"), Qt::RightDockWidgetArea},
-                    {QStringLiteral("TopDockWidgetArea"), Qt::TopDockWidgetArea},
-                    {QStringLiteral("BottomDockWidgetArea"), Qt::BottomDockWidgetArea}};
                 const QJsonValue area = entry.value(QStringLiteral("area"));
-                if (!area.isUndefined() && !areas.contains(area.toString()))
+                if (!area.isUndefined() && !dockAreas().contains(area.toString()))
                     qWarning() << "UI_Loader: Unknown dock \"area\", using LeftDockWidgetArea";
-                window->addDockWidget(areas.value(area.toString(), Qt::LeftDockWidgetArea), dock);
+                window->addDockWidget(dockAreas().value(area.toString(), Qt::LeftDockWidgetArea), dock);
             } else if (auto *menuBar = qobject_cast<QTuiMenuBar *>(page)) {
                 if (window->menuBar())
                     dropPage(page, "QTuiMainWindow");
@@ -763,19 +768,187 @@ QJsonObject UI_Loader::serializeWidget(const QTuiWidget *widget) const
     if (!widget->isVisible())
         obj.insert(QStringLiteral("visible"), false);
 
-    // Recursively serialize children. The children that the widget makes
-    // itself (a tab bar, scroll bars) come first, and a new widget of the
-    // same type has them too: skip them. Skip popups also.
+    // The widgets of the layout and the pages are children too. They go
+    // under "layout" and "pages", and not under "children".
+    QSet<const QTuiWidget *> claimed;
+    if (const QTuiLayout *layout = widget->layout()) {
+        const QJsonObject layoutObj = serializeLayout(layout, claimed);
+        if (!layoutObj.isEmpty())
+            obj.insert(QStringLiteral("layout"), layoutObj);
+    }
+
+    // The pages, in the order of the container. managed: the container
+    // shows and hides the page, so "visible" is not a setting of the page.
+    QJsonArray pages;
+    auto addPage = [&](const QTuiWidget *page, QJsonObject entry = QJsonObject(), bool managed = false) {
+        if (!page)
+            return;
+        claimed.insert(page);
+        QJsonObject pageObj = serializeWidget(page);
+        if (managed)
+            pageObj.remove(QStringLiteral("visible"));
+        // A container sets the geometry of its pages. Only the content of
+        // a scroll area has its own size.
+        if (!qobject_cast<const QTuiScrollArea *>(widget))
+            pageObj.remove(QStringLiteral("geometry"));
+        entry.insert(QStringLiteral("widget"), pageObj);
+        pages.append(entry);
+    };
+    const QString title = QStringLiteral("title");
+    // ponytail: only the built-in adopters have a way back to JSON. The
+    // pages of an application type go to "children". Add a second hook to
+    // registerWidget() if an application needs its pages in the output.
+    if (!m_adopters.contains(typeName)) {
+        // No pages
+    } else if (auto *tabs = qobject_cast<const QTuiTabWidget *>(widget)) {
+        for (int i = 0; i < tabs->count(); ++i)
+            addPage(tabs->widget(i), {{title, tabs->tabBar()->tabText(i)}}, true);
+    } else if (auto *toolBox = qobject_cast<const QTuiToolBox *>(widget)) {
+        for (int i = 0; i < toolBox->count(); ++i)
+            addPage(toolBox->widget(i), {{title, toolBox->itemText(i)}}, true);
+    } else if (auto *stack = qobject_cast<const QTuiStackedWidget *>(widget)) {
+        for (int i = 0; i < stack->count(); ++i)
+            addPage(stack->widget(i), QJsonObject(), true);
+    } else if (auto *splitter = qobject_cast<const QTuiSplitter *>(widget)) {
+        for (int i = 0; i < splitter->count(); ++i)
+            addPage(splitter->widget(i));
+    } else if (auto *area = qobject_cast<const QTuiScrollArea *>(widget)) {
+        addPage(area->widget());
+    } else if (auto *dock = qobject_cast<const QTuiDockWidget *>(widget)) {
+        addPage(dock->widget());
+    } else if (auto *window = qobject_cast<const QTuiMainWindow *>(widget)) {
+        addPage(window->menuBar());
+        for (const QTuiToolBar *toolBar : window->toolBars())
+            addPage(toolBar);
+        addPage(window->centralWidget());
+        for (QTuiWidget *child : widget->childWidgets()) {
+            auto *childDock = qobject_cast<QTuiDockWidget *>(child);
+            const QString areaName = dockAreas().key(window->dockWidgetArea(childDock));
+            if (childDock && !areaName.isEmpty())
+                addPage(childDock, {{QStringLiteral("area"), areaName}});
+        }
+        addPage(window->statusBar());
+    }
+    if (!pages.isEmpty())
+        obj.insert(QStringLiteral("pages"), pages);
+
+    // Recursively serialize the other children. The children that the
+    // widget makes itself (a tab bar, scroll bars) come first, and a new
+    // widget of the same type has them too: skip them. Skip popups and
+    // the handles of a splitter also.
     const QList<QTuiWidget *> children = widget->childWidgets();
     const int ownChildren = defaults ? int(defaults->childWidgets().size()) : 0;
     QJsonArray childArray;
     for (int i = ownChildren; i < children.size(); ++i) {
-        if (!children.at(i)->isPopup())
-            childArray.append(serializeWidget(children.at(i)));
+        const QTuiWidget *child = children.at(i);
+        if (!child->isPopup() && !claimed.contains(child) && !qobject_cast<const QTuiSplitterHandle *>(child))
+            childArray.append(serializeWidget(child));
     }
     if (!childArray.isEmpty())
         obj.insert(QStringLiteral("children"), childArray);
 
+    return obj;
+}
+
+QJsonObject UI_Loader::serializeLayout(const QTuiLayout *layout, QSet<const QTuiWidget *> &claimed) const
+{
+    // An item for a widget or for a nested layout. The layout sets the
+    // geometry of its widgets, so the output has no "geometry" for them.
+    auto itemObject = [&](const QTuiWidget *widget, const QTuiLayout *nested) {
+        QJsonObject item;
+        if (widget) {
+            claimed.insert(widget);
+            item = serializeWidget(widget);
+            item.remove(QStringLiteral("geometry"));
+        } else if (nested) {
+            const QJsonObject nestedObj = serializeLayout(nested, claimed);
+            if (!nestedObj.isEmpty())
+                item.insert(QStringLiteral("layout"), nestedObj);
+        }
+        return item;
+    };
+
+    QJsonObject obj;
+    QJsonArray items;
+    if (auto *box = qobject_cast<const QTuiBoxLayout *>(layout)) {
+        obj.insert(QStringLiteral("type"), box->direction() == QTuiBoxLayout::TopToBottom
+                                               ? QStringLiteral("QTuiVBoxLayout") : QStringLiteral("QTuiHBoxLayout"));
+        if (box->spacing() != 0)
+            obj.insert(QStringLiteral("spacing"), box->spacing());
+        for (const QTuiBoxLayout::Item &boxItem : box->items()) {
+            QJsonObject item = itemObject(boxItem.widget, boxItem.layout);
+            if (!boxItem.widget && !boxItem.layout)
+                item.insert(boxItem.stretch == 0 ? QStringLiteral("spacer") : QStringLiteral("stretch"),
+                            boxItem.stretch == 0 ? boxItem.spacerSize : boxItem.stretch);
+            else if (item.isEmpty())
+                continue;
+            else if (boxItem.stretch != 0)
+                item.insert(QStringLiteral("stretch"), boxItem.stretch);
+            items.append(item);
+        }
+    } else if (auto *grid = qobject_cast<const QTuiGridLayout *>(layout)) {
+        // ponytail: the row and column stretch factors and minimum sizes of
+        // a grid are not in the format. Add getters to QTuiGridLayout and
+        // two keys here if a JSON form needs them.
+        obj.insert(QStringLiteral("type"), QStringLiteral("QTuiGridLayout"));
+        for (int i = 0; i < grid->count(); ++i) {
+            const QTuiLayoutItem *gridItem = grid->itemAt(i);
+            auto *widgetItem = dynamic_cast<const QTuiWidgetItem *>(gridItem);
+            auto *layoutItem = dynamic_cast<const QTuiLayoutItemWrapper *>(gridItem);
+            QJsonObject item = itemObject(widgetItem ? widgetItem->widget() : nullptr,
+                                          layoutItem ? layoutItem->layout() : nullptr);
+            if (item.isEmpty())
+                continue;
+            int row = 0, column = 0, rowSpan = 1, columnSpan = 1;
+            grid->getItemPosition(i, &row, &column, &rowSpan, &columnSpan);
+            item.insert(QStringLiteral("row"), row);
+            item.insert(QStringLiteral("column"), column);
+            if (rowSpan != 1)
+                item.insert(QStringLiteral("rowSpan"), rowSpan);
+            if (columnSpan != 1)
+                item.insert(QStringLiteral("columnSpan"), columnSpan);
+            items.append(item);
+        }
+    } else if (auto *form = qobject_cast<const QTuiFormLayout *>(layout)) {
+        obj.insert(QStringLiteral("type"), QStringLiteral("QTuiFormLayout"));
+        if (form->horizontalSpacing() != 0)
+            obj.insert(QStringLiteral("horizontalSpacing"), form->horizontalSpacing());
+        for (const QTuiFormLayout::FormRow &row : form->rows()) {
+            QJsonObject item = itemObject(row.field, row.fieldLayout);
+            if (item.isEmpty())
+                continue;
+            // A label that the layout made from a text goes back as a text
+            auto *textLabel = row.ownsLabel ? qobject_cast<const QTuiLabel *>(row.label) : nullptr;
+            if (textLabel) {
+                claimed.insert(textLabel);
+                item.insert(QStringLiteral("label"), textLabel->text());
+            } else if (row.label) {
+                item.insert(QStringLiteral("label"), itemObject(row.label, nullptr));
+            }
+            items.append(item);
+        }
+    } else if (auto *stack = qobject_cast<const QTuiStackedLayout *>(layout)) {
+        obj.insert(QStringLiteral("type"), QStringLiteral("QTuiStackedLayout"));
+        if (stack->currentIndex() > 0)
+            obj.insert(QStringLiteral("currentIndex"), stack->currentIndex());
+        for (int i = 0; i < stack->count(); ++i) {
+            // The layout shows and hides its widgets
+            QJsonObject item = itemObject(stack->widget(i), nullptr);
+            item.remove(QStringLiteral("visible"));
+            items.append(item);
+        }
+    } else {
+        // ponytail: a layout class of the application has no name in the
+        // format. Its widgets go to "children" with their geometry.
+        return obj;
+    }
+    if (!items.isEmpty())
+        obj.insert(QStringLiteral("items"), items);
+
+    int left = 0, top = 0, right = 0, bottom = 0;
+    layout->contentsMargins(&left, &top, &right, &bottom);
+    if (left != 0 || top != 0 || right != 0 || bottom != 0)
+        obj.insert(QStringLiteral("contentsMargins"), QJsonArray({left, top, right, bottom}));
     return obj;
 }
 
