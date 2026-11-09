@@ -46,6 +46,9 @@ public:
     // Dock widgets
     void addDockWidget(Qt::DockWidgetArea area, QTuiDockWidget *dockWidget);
     void removeDockWidget(QTuiDockWidget *dockWidget);
+    // The area of a dock, or Qt::NoDockWidgetArea if the dock is not in
+    // this window
+    Qt::DockWidgetArea dockWidgetArea(QTuiDockWidget *dockWidget) const;
 
     void show();
 

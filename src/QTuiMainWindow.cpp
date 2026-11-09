@@ -241,6 +241,15 @@ void QTuiMainWindow::removeDockWidget(QTuiDockWidget *dockWidget)
         relayout();
 }
 
+Qt::DockWidgetArea QTuiMainWindow::dockWidgetArea(QTuiDockWidget *dockWidget) const
+{
+    for (auto it = m_dockWidgets.cbegin(); it != m_dockWidgets.cend(); ++it) {
+        if (it.value().contains(dockWidget))
+            return it.key();
+    }
+    return Qt::NoDockWidgetArea;
+}
+
 // --- Show ---
 
 void QTuiMainWindow::show()

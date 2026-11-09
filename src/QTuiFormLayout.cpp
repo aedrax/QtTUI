@@ -86,6 +86,11 @@ int QTuiFormLayout::rowCount() const
     return m_rows.size();
 }
 
+const QList<QTuiFormLayout::FormRow> &QTuiFormLayout::rows() const
+{
+    return m_rows;
+}
+
 int QTuiFormLayout::count() const
 {
     return m_rows.size();

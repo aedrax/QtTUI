@@ -34,6 +34,9 @@ public:
 
     int count() const override;
     QTuiLayoutItem *itemAt(int index) const override;
+    // The cell and the spans of the item at index, as in QGridLayout. A
+    // wrong index changes nothing.
+    void getItemPosition(int index, int *row, int *column, int *rowSpan, int *columnSpan) const;
     QSize minimumSize() const override;
 
     void apply(const QRect &availableArea) override;
