@@ -1,6 +1,7 @@
 #include <QtTUI/QTuiItemDelegate.h>
 #include <QtTUI/QTuiWidget.h>
 #include <QtTUI/ScreenBuffer.h>
+#include <QtTUI/RenderUtils.h>
 
 namespace QtTUI {
 
@@ -9,24 +10,14 @@ QTuiItemDelegate::QTuiItemDelegate(QObject *parent)
 {
 }
 
-void QTuiItemDelegate::paint(ScreenBuffer &buffer, const QRect &rect,
+void QTuiItemDelegate::paint(ScreenBuffer &buffer, const QTuiStyleOptionViewItem &option,
                              const QModelIndex &index) const
 {
-    if (!index.isValid() || rect.isEmpty())
+    if (!index.isValid() || option.rect.isEmpty())
         return;
-
-    QString text = index.data(Qt::DisplayRole).toString();
-
-    int y = rect.y();
-    int x = rect.x();
-    int maxWidth = rect.width();
-
-    for (int i = 0; i < text.length() && i < maxWidth; ++i) {
-        if (x + i >= 0 && x + i < buffer.width() && y >= 0 && y < buffer.height()) {
-            Cell &cell = buffer.backCell(x + i, y);
-            cell.setChar(text.at(i).unicode());
-        }
-    }
+    renderTextTruncated(buffer, option.rect.x(), option.rect.y(),
+                        index.data(Qt::DisplayRole).toString(), option.rect.width(),
+                        option.style, option.textElideMode);
 }
 
 QTuiWidget *QTuiItemDelegate::createEditor(QTuiWidget * /*parent*/,

@@ -7,6 +7,7 @@
 #include <QItemSelectionModel>
 #include <QPersistentModelIndex>
 #include <QPointer>
+#include <QHash>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/Theme_Engine.h>
 
@@ -120,10 +121,22 @@ public:
     // The default is DoubleClicked | EditKeyPressed, as in Qt
     EditTriggers editTriggers() const;
     void setEditTriggers(EditTriggers triggers);
-    // The delegate that makes the editors. The view does not take
-    // ownership. Without a delegate, the view uses a QTuiStyledItemDelegate.
+    // The delegate that paints the items and makes the editors. The view
+    // does not take ownership. Without a delegate, the view uses a
+    // QTuiStyledItemDelegate. itemDelegate() returns the delegate that
+    // setItemDelegate() set, or nullptr.
     void setItemDelegate(QTuiItemDelegate *delegate);
     QTuiItemDelegate *itemDelegate() const;
+    // A delegate for the items of one row or one column, as in Qt. nullptr
+    // removes it. The row and the column are numbers of the model.
+    void setItemDelegateForRow(int row, QTuiItemDelegate *delegate);
+    QTuiItemDelegate *itemDelegateForRow(int row) const;
+    void setItemDelegateForColumn(int column, QTuiItemDelegate *delegate);
+    QTuiItemDelegate *itemDelegateForColumn(int column) const;
+    // The delegate that the view uses for the item: the delegate of its
+    // row, then of its column, then itemDelegate(), then the default
+    // QTuiStyledItemDelegate. It never returns nullptr.
+    virtual QTuiItemDelegate *itemDelegateForIndex(const QModelIndex &index) const;
 
     // Opens an editor on the item. Returns false if the item is not
     // editable or the delegate makes no editor.
@@ -265,6 +278,10 @@ protected:
     // The background of the alternate rows: the theme background with a
     // part of the theme foreground
     static Color alternateBackground(const ThemeProperties &theme);
+    // Calls paint() of the delegate of the item for `rect`, with `style`
+    // and the elide mode of the view. The view fills the rectangle first.
+    void paintItem(ScreenBuffer &buffer, const QRect &rect, const QModelIndex &index,
+                   const Cell &style) const;
     // The items from `from` to `to` in the order of the view. The default
     // is the rectangle between the two indexes if they have the same parent.
     virtual QItemSelection selectionRange(const QModelIndex &from, const QModelIndex &to) const;
@@ -273,7 +290,6 @@ protected:
     QPointer<QTuiItemDelegate> m_delegate;
 
 private:
-    QTuiItemDelegate *editingDelegate();
     void watchEditorFocus(QTuiWidget *widget);
     QItemSelectionModel::SelectionFlags behaviorFlags() const;
     void onSelectionCurrentChanged(const QModelIndex &current);
@@ -303,6 +319,8 @@ private:
     bool m_alternatingRowColors = false;
     Qt::TextElideMode m_textElideMode = Qt::ElideRight;
     QTuiItemDelegate *m_defaultDelegate = nullptr;
+    QHash<int, QPointer<QTuiItemDelegate>> m_rowDelegates;
+    QHash<int, QPointer<QTuiItemDelegate>> m_columnDelegates;
     // True while the view follows a current index set on the selection
     // model, so that selectCurrent() does not change the selection
     bool m_followingSelectionModel = false;

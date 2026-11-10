@@ -11,6 +11,7 @@ namespace QtTUI {
 
 QTuiAbstractItemView::QTuiAbstractItemView(QTuiWidget *parent)
     : QTuiAbstractScrollArea(parent)
+    , m_defaultDelegate(new QTuiStyledItemDelegate(this))
 {
     connect(this, &QTuiWidget::geometryChanged, this, [this]() { updateEditorGeometry(); });
 }
@@ -467,13 +468,60 @@ QTuiItemDelegate *QTuiAbstractItemView::itemDelegate() const
     return m_delegate;
 }
 
-QTuiItemDelegate *QTuiAbstractItemView::editingDelegate()
+void QTuiAbstractItemView::setItemDelegateForRow(int row, QTuiItemDelegate *delegate)
 {
-    if (m_delegate)
-        return m_delegate;
-    if (!m_defaultDelegate)
-        m_defaultDelegate = new QTuiStyledItemDelegate(this);
-    return m_defaultDelegate;
+    closeEditor(false);
+    if (delegate)
+        m_rowDelegates.insert(row, delegate);
+    else
+        m_rowDelegates.remove(row);
+    markDirty();
+}
+
+QTuiItemDelegate *QTuiAbstractItemView::itemDelegateForRow(int row) const
+{
+    return m_rowDelegates.value(row);
+}
+
+void QTuiAbstractItemView::setItemDelegateForColumn(int column, QTuiItemDelegate *delegate)
+{
+    closeEditor(false);
+    if (delegate)
+        m_columnDelegates.insert(column, delegate);
+    else
+        m_columnDelegates.remove(column);
+    markDirty();
+}
+
+QTuiItemDelegate *QTuiAbstractItemView::itemDelegateForColumn(int column) const
+{
+    return m_columnDelegates.value(column);
+}
+
+QTuiItemDelegate *QTuiAbstractItemView::itemDelegateForIndex(const QModelIndex &index) const
+{
+    // A deleted delegate leaves a null pointer: use the next one
+    if (!m_rowDelegates.isEmpty()) {
+        if (QTuiItemDelegate *delegate = m_rowDelegates.value(index.row()))
+            return delegate;
+    }
+    if (!m_columnDelegates.isEmpty()) {
+        if (QTuiItemDelegate *delegate = m_columnDelegates.value(index.column()))
+            return delegate;
+    }
+    return m_delegate ? m_delegate.data() : m_defaultDelegate;
+}
+
+void QTuiAbstractItemView::paintItem(ScreenBuffer &buffer, const QRect &rect,
+                                     const QModelIndex &index, const Cell &style) const
+{
+    if (!index.isValid() || rect.isEmpty())
+        return;
+    QTuiStyleOptionViewItem option;
+    option.rect = rect;
+    option.style = style;
+    option.textElideMode = m_textElideMode;
+    itemDelegateForIndex(index)->paint(buffer, option, index);
 }
 
 bool QTuiAbstractItemView::edit(const QModelIndex &index)
@@ -487,7 +535,7 @@ bool QTuiAbstractItemView::edit(const QModelIndex &index)
     const QRect rect = visualRect(index);
     if (rect.isEmpty())
         return false;
-    QTuiItemDelegate *delegate = editingDelegate();
+    QTuiItemDelegate *delegate = itemDelegateForIndex(index);
     QTuiWidget *editor = delegate->createEditor(this, index);
     if (!editor)
         return false;
@@ -506,7 +554,7 @@ bool QTuiAbstractItemView::edit(const QModelIndex &index)
     // A delegate can also write the value, or close the editor, itself
     connect(delegate, &QTuiItemDelegate::commitData, editor, [this](QTuiWidget *w) {
         if (w == m_editor && m_model && m_editIndex.isValid())
-            editingDelegate()->setModelData(w, m_model, m_editIndex);
+            itemDelegateForIndex(m_editIndex)->setModelData(w, m_model, m_editIndex);
     });
     connect(delegate, &QTuiItemDelegate::closeEditor, editor, [this](QTuiWidget *w) {
         if (w == m_editor)
@@ -554,7 +602,7 @@ void QTuiAbstractItemView::closeEditor(bool commit)
     // focus, and that must not close it again
     m_editor = nullptr;
     if (commit && m_model && m_editIndex.isValid())
-        editingDelegate()->setModelData(editor, m_model, m_editIndex);
+        itemDelegateForIndex(m_editIndex)->setModelData(editor, m_model, m_editIndex);
     m_editIndex = QPersistentModelIndex();
     m_watchedEditorWidgets.clear();
     editor->removeEventFilter(this);

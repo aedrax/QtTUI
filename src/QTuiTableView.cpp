@@ -189,12 +189,9 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
                 break;
             int availWidth = qMin(colWidths[c], geo.x() + viewWidth - xOff);
 
-            QString cellText;
             QModelIndex idx;
-            if (hasRow) {
+            if (hasRow)
                 idx = m_model->index(modelRow, c, rootIndex());
-                cellText = m_model->data(idx, Qt::DisplayRole).toString();
-            }
 
             bool isCurrent = (modelRow == m_currentRow && c == m_currentCol);
             const Cell style = itemStyle(idx, isCurrent, theme);
@@ -204,7 +201,7 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
             padStyle.bold = false;
             padStyle.inverse = false;
             fillRect(buffer, QRect(xOff, screenY, availWidth, 1), padStyle);
-            renderTextTruncated(buffer, xOff, screenY, cellText, availWidth, style, textElideMode());
+            paintItem(buffer, QRect(xOff, screenY, availWidth, 1), idx, style);
             xOff += availWidth;
 
             // Render separator space between columns. Between two selected

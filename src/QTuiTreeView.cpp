@@ -245,23 +245,9 @@ void QTuiTreeView::paintEvent(ScreenBuffer &buffer)
                        item.expanded ? QStringLiteral("▼") : QStringLiteral("▶"),
                        viewWidth - indentOffset, plain);
 
-        // Render item text with truncation
-        if (m_delegate) {
-            // Let delegate paint into the remaining area
-            int remainingWidth = viewWidth - indicatorOffset;
-            if (remainingWidth > 0) {
-                QRect delegateRect(geo.x() + indicatorOffset, screenY,
-                                   remainingWidth, 1);
-                m_delegate->paint(buffer, delegateRect, item.index);
-            }
-        } else {
-            QString text = m_model->data(item.index, Qt::DisplayRole).toString();
-            int remainingWidth = viewWidth - indicatorOffset;
-            if (remainingWidth > 0) {
-                renderTextTruncated(buffer, geo.x() + indicatorOffset, screenY,
-                                    text, remainingWidth, style, textElideMode());
-            }
-        }
+        // The delegate writes the text in the remaining area
+        paintItem(buffer, QRect(geo.x() + indicatorOffset, screenY, viewWidth - indicatorOffset, 1),
+                  item.index, style);
     }
 }
 

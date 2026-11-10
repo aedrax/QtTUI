@@ -110,7 +110,6 @@ void QTuiListView::paintEvent(ScreenBuffer &buffer)
         const int modelRow = logicalRow(m_scrollOffset + vr);
 
         QModelIndex idx = m_model->index(modelRow, 0, rootIndex());
-        QString itemText = m_model->data(idx, Qt::DisplayRole).toString();
 
         const Cell style = itemStyle(idx, modelRow == m_currentRow, theme);
 
@@ -118,8 +117,8 @@ void QTuiListView::paintEvent(ScreenBuffer &buffer)
         if (style.background != theme.background || style.underline)
             fillRect(buffer, QRect(geo.x(), screenY, viewWidth, 1), style);
 
-        // Render text with truncation
-        renderTextTruncated(buffer, geo.x(), screenY, itemText, viewWidth, style, textElideMode());
+        // The delegate writes the text
+        paintItem(buffer, QRect(geo.x(), screenY, viewWidth, 1), idx, style);
     }
 }
 

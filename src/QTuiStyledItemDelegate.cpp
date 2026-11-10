@@ -15,24 +15,6 @@ QTuiStyledItemDelegate::QTuiStyledItemDelegate(QObject *parent)
 {
 }
 
-void QTuiStyledItemDelegate::paint(ScreenBuffer &buffer, const QRect &rect,
-                                   const QModelIndex &index) const
-{
-    if (!index.isValid() || rect.isEmpty())
-        return;
-
-    // Query Theme_Engine for styled colors and text attributes
-    ThemeProperties props = Theme_Engine::instance()->properties(
-        QStringLiteral("QTuiStyledItemDelegate"));
-
-    QString text = index.data(Qt::DisplayRole).toString();
-
-    // Fill the first row of the rect with the theme, then write the text
-    const Cell style = cellStyle(props, props.foreground, props.background);
-    fillRect(buffer, QRect(rect.x(), rect.y(), rect.width(), 1), style);
-    renderText(buffer, rect.x(), rect.y(), text, rect.width(), style);
-}
-
 QTuiWidget *QTuiStyledItemDelegate::createEditor(QTuiWidget *parent,
                                                   const QModelIndex &index) const
 {

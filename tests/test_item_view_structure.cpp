@@ -118,6 +118,31 @@ public:
     }
 };
 
+// Writes the item text in upper case, and makes a spin box as the editor
+class UpperDelegate : public QTuiStyledItemDelegate {
+public:
+    mutable int paints = 0;
+    void paint(ScreenBuffer &buffer, const QTuiStyleOptionViewItem &option,
+               const QModelIndex &index) const override
+    {
+        ++paints;
+        renderText(buffer, option.rect.x(), option.rect.y(), index.data().toString().toUpper(),
+                   option.rect.width(), option.style);
+    }
+    QTuiWidget *createEditor(QTuiWidget *parent, const QModelIndex &) const override
+    {
+        return new QTuiSpinBox(parent);
+    }
+};
+
+class EditableGridModel : public GridModel {
+public:
+    Qt::ItemFlags flags(const QModelIndex &index) const override
+    {
+        return GridModel::flags(index) | Qt::ItemIsEditable;
+    }
+};
+
 static QString truncated(const QString &text, int width, Qt::TextElideMode mode)
 {
     ScreenBuffer buffer(width + 2, 1);
@@ -669,6 +694,125 @@ private slots:
         QCOMPARE(list.textElideMode(), Qt::ElideMiddle);
         QVERIFY(list.setProperty("alternatingRowColors", true));
         QVERIFY(list.alternatingRowColors());
+    }
+
+    // --- Delegates ---
+
+    void listAndTablePaintThroughTheDelegate()
+    {
+        QStringListModel strings(numberedRows(3));
+        UpperDelegate upper;
+        QTuiListView list;
+        list.setGeometry(QRect(0, 0, 20, 3));
+        list.setModel(&strings);
+        QCOMPARE(paintedLine(list, 1), QStringLiteral("row 1"));
+        list.clearDirtyRegions();
+        list.setItemDelegate(&upper);
+        QCOMPARE(list.dirtyRegion(), list.geometry());
+        QCOMPARE(paintedLine(list, 1), QStringLiteral("ROW 1"));
+
+        GridModel model;
+        QTuiTableView table;
+        table.setGeometry(QRect(0, 0, 20, 4));
+        table.setModel(&model);
+        table.setItemDelegate(&upper);
+        // The header does not use the delegate
+        QCOMPARE(paintedLine(table, 0), QStringLiteral("H0   H1   H2"));
+        QCOMPARE(paintedLine(table, 1), QStringLiteral("R0C0 R0C1 R0C2"));
+
+        // The delegate gets the colors of the item: the current cell
+        table.setFocus();
+        ScreenBuffer buffer(20, 4);
+        table.paintEvent(buffer);
+        const ThemeProperties theme = Theme_Engine::instance()->properties(QStringLiteral("QTuiTableView"));
+        QCOMPARE(buffer.backCell(0, 1).ch, U'R');
+        QCOMPARE(buffer.backCell(0, 1).background, theme.focusBackground);
+        QCOMPARE(buffer.backCell(5, 1).background, theme.background);
+    }
+
+    void delegatesForRowsAndColumns()
+    {
+        EditableGridModel model;
+        UpperDelegate upper;
+        QTuiStyledItemDelegate plain;
+        QTuiTableView table;
+        table.setGeometry(QRect(0, 0, 20, 4));
+        table.setModel(&model);
+
+        QVERIFY(!table.itemDelegate());
+        QTuiItemDelegate *standard = table.itemDelegateForIndex(model.index(0, 0));
+        QVERIFY(standard);
+        QVERIFY(qobject_cast<QTuiStyledItemDelegate *>(standard));
+
+        table.clearDirtyRegions();
+        table.setItemDelegateForColumn(1, &upper);
+        QCOMPARE(table.dirtyRegion(), table.geometry());
+        QCOMPARE(table.itemDelegateForColumn(1), &upper);
+        QVERIFY(!table.itemDelegateForColumn(0));
+        QCOMPARE(table.itemDelegateForIndex(model.index(2, 1)), &upper);
+        QCOMPARE(table.itemDelegateForIndex(model.index(2, 0)), standard);
+        QCOMPARE(paintedLine(table, 1), QStringLiteral("r0c0 R0C1 r0c2"));
+
+        // The delegate of a row comes before the delegate of a column
+        table.setItemDelegateForRow(1, &plain);
+        QCOMPARE(table.itemDelegateForRow(1), &plain);
+        QCOMPARE(table.itemDelegateForIndex(model.index(1, 1)), &plain);
+        QCOMPARE(paintedLine(table, 2), QStringLiteral("r1c0 r1c1 r1c2"));
+        QCOMPARE(paintedLine(table, 3), QStringLiteral("r2c0 R2C1 r2c2"));
+
+        // The delegate of the item also makes the editor
+        QVERIFY(table.edit(model.index(0, 1)));
+        QVERIFY(qobject_cast<QTuiSpinBox *>(table.editor()));
+        table.closeEditor(false);
+        QVERIFY(table.edit(model.index(0, 0)));
+        QVERIFY(qobject_cast<QTuiLineEdit *>(table.editor()));
+        // A new delegate closes the editor
+        table.setItemDelegateForRow(1, nullptr);
+        QVERIFY(!table.isEditing());
+        QCOMPARE(paintedLine(table, 2), QStringLiteral("r1c0 R1C1 r1c2"));
+
+        // The view delegate is for the items without a row or column delegate
+        table.setItemDelegate(&plain);
+        QCOMPARE(table.itemDelegateForIndex(model.index(0, 0)), &plain);
+        QCOMPARE(table.itemDelegateForIndex(model.index(0, 1)), &upper);
+    }
+
+    void deletedDelegateFallsBack()
+    {
+        GridModel model;
+        QTuiTableView table;
+        table.setGeometry(QRect(0, 0, 20, 4));
+        table.setModel(&model);
+        auto *upper = new UpperDelegate;
+        table.setItemDelegateForColumn(0, upper);
+        table.setItemDelegateForRow(0, upper);
+        delete upper;
+        QVERIFY(qobject_cast<QTuiStyledItemDelegate *>(table.itemDelegateForIndex(model.index(0, 0))));
+        QCOMPARE(paintedLine(table, 1), QStringLiteral("r0c0 r0c1 r0c2"));
+    }
+
+    void treePaintsThroughTheDelegate()
+    {
+        GroupModel model;
+        UpperDelegate upper;
+        QTuiStyledItemDelegate plain;
+        QTuiTreeView tree;
+        tree.setGeometry(QRect(0, 0, 20, 4));
+        tree.setModel(&model);
+        tree.expand(model.index(0, 0));
+        tree.setItemDelegateForRow(0, &upper);
+        // Row 0 of each parent: the group "A" and its child "A0"
+        QCOMPARE(paintedLine(tree, 0), QStringLiteral("▼ A"));
+        QCOMPARE(upper.paints, 2);
+        // A styled delegate keeps the selection colors
+        tree.setItemDelegate(&plain);
+        tree.setFocus();
+        tree.setCurrentIndex(model.index(1, 0, model.index(0, 0)));
+        ScreenBuffer buffer(20, 4);
+        tree.paintEvent(buffer);
+        const ThemeProperties theme = Theme_Engine::instance()->properties(QStringLiteral("QTuiTreeView"));
+        QCOMPARE(buffer.backCell(4, 2).ch, U'A');
+        QCOMPARE(buffer.backCell(4, 2).background, theme.focusBackground);
     }
 };
 

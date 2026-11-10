@@ -10,8 +10,6 @@ class QTuiStyledItemDelegate : public QTuiItemDelegate {
 public:
     explicit QTuiStyledItemDelegate(QObject *parent = nullptr);
 
-    void paint(ScreenBuffer &buffer, const QRect &rect,
-               const QModelIndex &index) const override;
     QTuiWidget *createEditor(QTuiWidget *parent,
                              const QModelIndex &index) const override;
     void setEditorData(QTuiWidget *editor,

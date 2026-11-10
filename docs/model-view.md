@@ -10,7 +10,8 @@ A view does not copy the data of the model. Each paint reads the model again
 with `QAbstractItemModel::data()`. A view shows the `Qt::DisplayRole` text
 of each item, in the colors of `Qt::ForegroundRole` and `Qt::BackgroundRole`
 (see [item colors](#item-colors)). It does not show icons, check states or
-other roles.
+other roles. The item delegate writes the text of each item in the list,
+table and tree views (see [QTuiItemDelegate](#qtuiitemdelegate)).
 
 `setModel()` connects the view to the model signals in the table below. When
 a signal comes, the view marks only the screen rows that changed as dirty,
@@ -188,7 +189,10 @@ edit triggers tell which actions open it. The default is
 | `AnyKeyPressed` | A printable character other than Space, without Ctrl, Alt or Meta. The character replaces the text of the item. |
 
 You can also call `edit()`. The item delegate makes the editor. If you do
-not set a delegate, the view uses a `QTuiStyledItemDelegate`. The editor
+not set a delegate, the view uses a `QTuiStyledItemDelegate`. A delegate
+for one row (`setItemDelegateForRow()`) comes before a delegate for one
+column (`setItemDelegateForColumn()`), and that comes before the delegate
+of the view, as in Qt. The editor
 covers the item, and its text is selected, so that typing replaces it.
 
 Enter writes the value to the model and closes the editor. Escape closes it
@@ -314,8 +318,13 @@ int main(int argc, char *argv[])
 | `virtual void selectAll()` | Selects all items in the three multiple modes. In the other modes, it does nothing. |
 | `EditTriggers editTriggers() const` | Returns the edit triggers. |
 | `void setEditTriggers(EditTriggers triggers)` | Sets the actions that open an editor. |
-| `void setItemDelegate(QTuiItemDelegate *delegate)` | Sets the delegate that makes the editors. The view does not take ownership. An open editor closes without a change. |
+| `void setItemDelegate(QTuiItemDelegate *delegate)` | Sets the delegate that paints the items and makes the editors. The view does not take ownership. An open editor closes without a change. |
 | `QTuiItemDelegate *itemDelegate() const` | Returns the delegate that you set, or `nullptr`. |
+| `void setItemDelegateForRow(int row, QTuiItemDelegate *delegate)` | Sets a delegate for the items of one model row. `nullptr` removes it. The view does not take ownership. |
+| `QTuiItemDelegate *itemDelegateForRow(int row) const` | Returns the delegate of the row, or `nullptr`. |
+| `void setItemDelegateForColumn(int column, QTuiItemDelegate *delegate)` | Sets a delegate for the items of one model column. `nullptr` removes it. The view does not take ownership. |
+| `QTuiItemDelegate *itemDelegateForColumn(int column) const` | Returns the delegate of the column, or `nullptr`. |
+| `virtual QTuiItemDelegate *itemDelegateForIndex(const QModelIndex &index) const` | Returns the delegate that the view uses for the item: of its row, then of its column, then of the view, then the default `QTuiStyledItemDelegate`. It does not return `nullptr`. |
 | `bool edit(const QModelIndex &index)` | Opens an editor on the item. Returns `false` if the item is not editable, not visible, or the delegate makes no editor. |
 | `bool isEditing() const` | Returns `true` if an editor is open. |
 | `QTuiWidget *editor() const` | Returns the open editor, or `nullptr`. |
@@ -358,6 +367,7 @@ Use these functions when you write a view.
 | `bool eventFilter(QObject *watched, QEvent *event) override` | Gives Enter and Escape in the editor to the view. |
 | `bool isSelected(const QModelIndex &index) const` | Returns `true` if the item is selected. |
 | `virtual Cell itemStyle(const QModelIndex &index, bool isCurrent, const ThemeProperties &theme) const` | Returns the colors and attributes of an item, as the selection and [item colors](#item-colors) sections tell. |
+| `void paintItem(ScreenBuffer &buffer, const QRect &rect, const QModelIndex &index, const Cell &style) const` | Calls `paint()` of the delegate of the item, with the style and the elide mode of the view. Fill the rectangle first. |
 | `virtual bool isAlternateRow(const QModelIndex &index) const` | Returns `true` if `alternatingRowColors` is on and the item is on a second row. `itemStyle()` calls it. |
 | `static Color alternateBackground(const ThemeProperties &theme)` | Returns the background of the alternate rows. |
 | `virtual QItemSelection selectionRange(const QModelIndex &from, const QModelIndex &to) const` | Returns the items from `from` to `to`. The default is the rectangle between the two items if they have the same parent. |
@@ -650,8 +660,8 @@ int main(int argc, char *argv[])
 
 Shows a tree model. Each level has an indent of 2 cells. An item with
 children has "▶" (collapsed) or "▼" (expanded) before its text. Different
-from Qt: the view shows only column 0 and has no header. If you set an item
-delegate, the view calls its `paint()` for the text of each item.
+from Qt: the view shows only column 0 and has no header. The item delegate
+writes the text of each item, after the indent and the indicator.
 
 ### Example
 
@@ -853,11 +863,26 @@ void example(QTuiWidget *parent)
 
 `#include <QtTUI/QTuiItemDelegate.h>` · Inherits: `QObject`
 
-The base class of the delegates. A delegate makes the editors for a view,
-and `QTuiTreeView` also uses it to paint the item text. Different from Qt:
-the list, table and column views always paint the text themselves, and no
-view calls `sizeHint()`. The base class makes no editor, so a view with a
-`QTuiItemDelegate` cannot edit.
+The base class of the delegates. A delegate writes the text of the items of
+a view and makes the editors. `QTuiListView`, `QTuiTableView` and
+`QTuiTreeView` call `paint()` for each item that shows. The view first fills
+the area of the item with the colors of the item, and then the delegate
+writes the text. Different from Qt: `QTuiColumnView` always paints the text
+itself, and no view calls `sizeHint()`. The base class makes no editor, so a
+view with a `QTuiItemDelegate` cannot edit.
+
+`paint()` gets a `QTuiStyleOptionViewItem`, like `QStyleOptionViewItem`:
+
+| Member | Description |
+| --- | --- |
+| `QRect rect` | The area of the item text, one line high. In a tree, it starts after the indent and the indicator. |
+| `Cell style` | The colors and attributes of the item, from `itemStyle()` of the view: the selection, the current item, the role colors and the alternate shade. |
+| `Qt::TextElideMode textElideMode` | The elide mode of the view. |
+
+Up to version 0.2.1, `paint()` had a `const QRect &rect` argument and no
+option, and only the tree view called it. A delegate that overrides the old
+function does not compile with `override`. Change the argument to
+`const QTuiStyleOptionViewItem &option` and use `option.rect`.
 
 ### Example
 
@@ -867,24 +892,27 @@ view calls `sizeHint()`. The base class makes no editor, so a view with a
 
 using namespace QtTUI;
 
-// Paints the item text in upper case, in yellow
+// Paints the item text in upper case. An item that is not selected is yellow.
 class UpperDelegate : public QTuiStyledItemDelegate {
 public:
     using QTuiStyledItemDelegate::QTuiStyledItemDelegate;
 
-    void paint(ScreenBuffer &buffer, const QRect &rect,
+    void paint(ScreenBuffer &buffer, const QTuiStyleOptionViewItem &option,
                const QModelIndex &index) const override
     {
-        const Cell style = cellStyle(Color(255, 220, 0), Color(0, 0, 0));
-        fillRect(buffer, QRect(rect.x(), rect.y(), rect.width(), 1), style);
-        renderText(buffer, rect.x(), rect.y(), index.data().toString().toUpper(),
-                   rect.width(), style);
+        Cell style = option.style;
+        if (style.background == Theme_Engine::instance()->properties("QTuiTableView").background)
+            style.foreground = Color(255, 220, 0);
+        renderTextTruncated(buffer, option.rect.x(), option.rect.y(),
+                            index.data().toString().toUpper(), option.rect.width(),
+                            style, option.textElideMode);
     }
 };
 
-void example(QTuiTreeView *tree)
+void example(QTuiTableView *table)
 {
-    tree->setItemDelegate(new UpperDelegate(tree));
+    // Only the items of column 1 use the delegate
+    table->setItemDelegateForColumn(1, new UpperDelegate(table));
 }
 ```
 
@@ -893,7 +921,7 @@ void example(QTuiTreeView *tree)
 | Function | Description |
 | --- | --- |
 | `QTuiItemDelegate(QObject *parent = nullptr)` | Makes a delegate. |
-| `virtual void paint(ScreenBuffer &buffer, const QRect &rect, const QModelIndex &index) const` | Writes the `Qt::DisplayRole` text in the rectangle. It changes only the characters, not the colors. |
+| `virtual void paint(ScreenBuffer &buffer, const QTuiStyleOptionViewItem &option, const QModelIndex &index) const` | Writes the `Qt::DisplayRole` text in `option.rect` with `option.style`. A text that is too long ends in "…", as `option.textElideMode` tells. It does not fill the area: the view does that first. |
 | `virtual QTuiWidget *createEditor(QTuiWidget *parent, const QModelIndex &index) const` | Returns a new editor for the item. The default returns `nullptr`. |
 | `virtual void setEditorData(QTuiWidget *editor, const QModelIndex &index) const` | Copies the value of the item to the editor. The default does nothing. |
 | `virtual void setModelData(QTuiWidget *editor, QAbstractItemModel *model, const QModelIndex &index) const` | Writes the value of the editor to the model. The default does nothing. |
@@ -910,8 +938,9 @@ void example(QTuiTreeView *tree)
 
 `#include <QtTUI/QTuiStyledItemDelegate.h>` · Inherits: `QTuiItemDelegate`
 
-The default delegate of the views. It selects the editor from the data of
-the item:
+The default delegate of the views. It paints as `QTuiItemDelegate` does, so
+a view with a `QTuiStyledItemDelegate` that you set looks the same as a view
+without a delegate. It selects the editor from the data of the item:
 
 | Data of the item | Editor |
 | --- | --- |
@@ -953,7 +982,6 @@ void example(QTuiTableView *table)
 | Function | Description |
 | --- | --- |
 | `QTuiStyledItemDelegate(QObject *parent = nullptr)` | Makes a delegate. |
-| `void paint(ScreenBuffer &buffer, const QRect &rect, const QModelIndex &index) const override` | Fills the first line of the rectangle with the colors of the `QTuiStyledItemDelegate` theme entry and writes the text. |
 | `QTuiWidget *createEditor(QTuiWidget *parent, const QModelIndex &index) const override` | Makes a combo box, a spin box or a line edit, as the table above tells. |
 | `void setEditorData(QTuiWidget *editor, const QModelIndex &index) const override` | Copies the `Qt::EditRole` value to the editor. A combo box selects the item with the same text. |
 | `void setModelData(QTuiWidget *editor, QAbstractItemModel *model, const QModelIndex &index) const override` | Writes the value of the editor with `Qt::EditRole`. |
