@@ -509,6 +509,36 @@ static QTuiWidget *createSelectionTab(QTuiWidget *parent, QTuiStatusBar *statusB
 }
 
 // ---------------------------------------------------------------------------
+// Tab builder: Browser
+// ---------------------------------------------------------------------------
+static QTuiWidget *createBrowserTab(QTuiWidget *parent, QTuiStatusBar *statusBar)
+{
+    auto *page = new TabPage(parent);
+    page->addWidget(sectionLabel("QTuiTextBrowser", page));
+    auto *browser = new QTuiTextBrowser(page);
+    QString text = QStringLiteral(
+        "**QTuiTextBrowser** shows long rich text. It is read-only.\n\n"
+        "Up, Down, Page Up, Page Down, Home and End scroll. The vim keys `j`, `k`, `g`, `G`, "
+        "`Ctrl+F` and `Ctrl+B` scroll too.\n\n"
+        "Tab, Shift+Tab, Left and Right go to the next and the previous link. Enter follows "
+        "the link. Try the [QtTUI documentation](https://example.com/qttui) or the "
+        "[settings](app:settings).\n\n"
+        "After `setSource()`, a link to a file opens the file. Alt+Left or Backspace goes "
+        "back, and Alt+Right goes forward.\n\n");
+    for (int i = 1; i <= 30; ++i)
+        text += QStringLiteral("Paragraph %1: *more text*, so that the browser can scroll.\n").arg(i);
+    text += QStringLiteral("\nThe [last link](app:end) is at the end.");
+    browser->setMarkdown(text);
+    // The links here are for the status bar only
+    browser->setOpenLinks(false);
+    QObject::connect(browser, &QTuiTextBrowser::anchorClicked, [statusBar](const QString &link) {
+        statusBar->showMessage(QStringLiteral("Link: %1").arg(link));
+    });
+    page->addWidget(browser, 1);
+    return page;
+}
+
+// ---------------------------------------------------------------------------
 // Tab builder: Model/View
 // ---------------------------------------------------------------------------
 static QTuiWidget *createModelViewTab(QTuiWidget *parent, QTuiStatusBar *statusBar)
@@ -933,7 +963,7 @@ void buildGallery(QTuiMainWindow &window)
                                   : QStringLiteral("Color canceled"));
     });
 
-    // Central tab widget with 10 category tabs
+    // Central tab widget with 11 category tabs
     auto *tabs = new QTuiTabWidget(&window);
     tabs->addTab(createButtonsTab(&window, statusBar),         "Buttons");
     tabs->addTab(createTextInputTab(&window, statusBar),       "Text");
@@ -945,6 +975,7 @@ void buildGallery(QTuiMainWindow &window)
     tabs->addTab(createLayoutsTab(&window, statusBar),         "Layouts");
     tabs->addTab(createMainWindowPartsTab(&window, statusBar), "Main Window");
     tabs->addTab(createSpecializedTab(&window, statusBar),     "Specialized");
+    tabs->addTab(createBrowserTab(&window, statusBar),         "Browser");
 
     // Show the key hints again when the user switches tabs
     QObject::connect(tabs, &QTuiTabWidget::currentChanged, [statusBar, keyHints](int) {

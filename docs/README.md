@@ -16,8 +16,8 @@ where it is different from Qt.
 
 - [Buttons](buttons.md): push buttons, check boxes, radio buttons, tool
   buttons and button groups.
-- [Text input](text-input.md): labels, line edits, key sequence edits,
-  text edits, validators, completers and combo boxes.
+- [Text input](text-input.md): labels, the text browser, line edits, key
+  sequence edits, text edits, validators, completers and combo boxes.
 - [Numbers and dates](numbers-and-dates.md): spin boxes, date and time
   edits, sliders, scroll bars, dials, the calendar, LCD numbers and
   progress bars.

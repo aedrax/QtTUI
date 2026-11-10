@@ -64,7 +64,7 @@ private slots:
             QStringLiteral("Buttons"), QStringLiteral("Text"), QStringLiteral("Numeric"),
             QStringLiteral("Selection"), QStringLiteral("Model/View"), QStringLiteral("Containers"),
             QStringLiteral("Panes"), QStringLiteral("Layouts"), QStringLiteral("Main Window"),
-            QStringLiteral("Specialized")};
+            QStringLiteral("Specialized"), QStringLiteral("Browser")};
         QCOMPARE(m_tabs->count(), names.size());
         for (int i = 0; i < names.size(); ++i)
             QCOMPARE(m_tabs->tabBar()->tabText(i), names.at(i));

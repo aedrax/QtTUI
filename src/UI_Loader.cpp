@@ -21,6 +21,7 @@
 #include <QtTUI/QTuiLCDNumber.h>
 #include <QtTUI/QTuiScrollBar.h>
 #include <QtTUI/QTuiScrollArea.h>
+#include <QtTUI/QTuiTextBrowser.h>
 #include <QtTUI/QTuiStackedWidget.h>
 #include <QtTUI/QTuiSplitter.h>
 #include <QtTUI/QTuiGroupBox.h>
@@ -162,6 +163,10 @@ UI_Loader::UI_Loader(QObject *parent)
 
     registerWidget(QStringLiteral("QTuiScrollArea"), [](QTuiWidget *parent) -> QTuiWidget * {
         return new QTuiScrollArea(parent);
+    });
+
+    registerWidget(QStringLiteral("QTuiTextBrowser"), [](QTuiWidget *parent) -> QTuiWidget * {
+        return new QTuiTextBrowser(parent);
     });
 
     registerWidget(QStringLiteral("QTuiStackedWidget"), [](QTuiWidget *parent) -> QTuiWidget * {
