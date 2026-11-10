@@ -31,10 +31,13 @@ class QTuiItemDelegate : public QObject {
 public:
     explicit QTuiItemDelegate(QObject *parent = nullptr);
 
-    // Writes the Qt::DisplayRole text of the item in option.rect, with
-    // option.style, and "…" as option.textElideMode tells if the text is
-    // too long. The view fills the area with the colors of the item before
-    // it calls this function, so an override can write only the text.
+    // Writes the item in option.rect with option.style: the check box
+    // ("[ ]", "[x]" or "[-]") if the item has a Qt::CheckStateRole value,
+    // the Qt::DecorationRole value if it is a string (a glyph), and the
+    // Qt::DisplayRole text, with "…" as option.textElideMode tells if the
+    // text is too long. The view fills the area with the colors of the
+    // item before it calls this function, so an override can write only
+    // the text.
     virtual void paint(ScreenBuffer &buffer, const QTuiStyleOptionViewItem &option,
                        const QModelIndex &index) const;
 
@@ -46,8 +49,14 @@ public:
     virtual void setModelData(QTuiWidget *editor, QAbstractItemModel *model,
                               const QModelIndex &index) const;
 
-    // Size
+    // The width that paint() needs for the item, and a height of 1. The
+    // table view calls it to measure a column.
     virtual QSize sizeHint(const QModelIndex &index) const;
+
+    // The text that paint() writes before the item text: the check box
+    // and the decoration, each with a space after it. Empty if the item
+    // has none.
+    static QString decorationText(const QModelIndex &index);
 
 signals:
     void commitData(QTuiWidget *editor);

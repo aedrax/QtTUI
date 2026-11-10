@@ -9,9 +9,11 @@ classes. For views that keep their own items, see [item widgets](item-widgets.md
 A view does not copy the data of the model. Each paint reads the model again
 with `QAbstractItemModel::data()`. A view shows the `Qt::DisplayRole` text
 of each item, in the colors of `Qt::ForegroundRole` and `Qt::BackgroundRole`
-(see [item colors](#item-colors)). It does not show icons, check states or
-other roles. The item delegate writes the text of each item in the list,
-table and tree views (see [QTuiItemDelegate](#qtuiitemdelegate)).
+(see [item colors](#item-colors)). Before the text, the list, table and
+tree views show the check box of an item that has a `Qt::CheckStateRole`
+value, and the `Qt::DecorationRole` value if it is a string (see
+[check boxes and glyphs](#check-boxes-and-glyphs)). The item delegate writes
+each item in these views (see [QTuiItemDelegate](#qtuiitemdelegate)).
 
 `setModel()` connects the view to the model signals in the table below. When
 a signal comes, the view marks only the screen rows that changed as dirty,
@@ -101,6 +103,40 @@ protected:
     }
 };
 ```
+
+## Check boxes and glyphs
+
+An item that has a `Qt::CheckStateRole` value shows a check box before its
+text: `[ ]` (`Qt::Unchecked`), `[x]` (`Qt::Checked`) or `[-]`
+(`Qt::PartiallyChecked`). An item without a value shows no check box.
+
+Space toggles the check box of the current item, and a left click on the
+check box toggles that item. The view calls `setData()` of the model with
+`Qt::CheckStateRole`, as Qt does. The item must have the flags
+`Qt::ItemIsUserCheckable` and `Qt::ItemIsEnabled`. With
+`Qt::ItemIsUserTristate`, the item goes through the three states.
+
+As in Qt, Space on a current item with a check box does not change the
+selection. Ctrl+Space toggles the selection of such an item in
+`MultiSelection` and `ExtendedSelection`. Different from Qt: a click on the
+check box also makes the item current and selects it.
+
+`QIcon` is in Qt GUI, so a view shows a `Qt::DecorationRole` value only if
+it is a string: a glyph, for example an emoji or a Nerd Font symbol. The
+glyph shows after the check box and before the text, with a space after it.
+
+```cpp
+QVariant data(const QModelIndex &index, int role) const override
+{
+    if (role == Qt::CheckStateRole)
+        return m_done.at(index.row()) ? Qt::Checked : Qt::Unchecked;
+    if (role == Qt::DecorationRole)
+        return QStringLiteral("★");
+    // ...
+}
+```
+
+`QTuiColumnView` does not show check boxes or glyphs.
 
 ## Long text
 
@@ -347,7 +383,9 @@ Use these functions when you write a view.
 | `void resetSelectionModel()` | Makes a new selection model. Call it at the end of `setModel()`, after you connect to the model signals. |
 | `void resetRootIndex()` | Sets the root to the invalid index and shows all rows. Call it in `setModel()`, after you set `m_model` and before you read the new model. |
 | `void selectCurrent(Qt::KeyboardModifiers modifiers, bool click)` | Updates the selection for the mode and the modifiers. Call it after a key or a click makes a different item current. |
-| `bool selectionKeyPressEvent(TuiKeyEvent *event)` | Handles Space, Ctrl+Space and Ctrl+A. Returns `true` if the key changed the selection. |
+| `bool selectionKeyPressEvent(TuiKeyEvent *event)` | Handles Space, Ctrl+Space and Ctrl+A. Returns `true` if the key changed the selection or the check state. |
+| `bool toggleCheckState(const QModelIndex &index)` | Toggles the check state of the item with `setData()`. Returns `false` if the item is not user-checkable or has no check state. |
+| `bool checkBoxPressEvent(const TuiMouseEvent *event, const QModelIndex &index)` | Toggles the check state if the event is a left press on the check box of the item (the first 3 cells of `visualRect()`). |
 | `bool editKeyPressEvent(TuiKeyEvent *event)` | Handles F2 and typed characters. Returns `true` if the key opened an editor. |
 | `bool cursorAction(const TuiKeyEvent *event, CursorAction *action, Qt::KeyboardModifiers *modifiers) const` | Reads the move of a navigation key (see [keys](#keys)). Returns `false` for other keys. `*modifiers` gets the modifiers to give to `selectCurrent()`. |
 | `static int movedRow(CursorAction action, int row, int rowCount, int visibleRows)` | Returns the view row after a vertical move. A page is `visibleRows - 1` rows. |
@@ -395,8 +433,8 @@ moves without a change to the selection (`ExtendedSelection`), as in Qt.
 | g (or gg), G | Go to the first or the last row. |
 | Ctrl+F, Ctrl+B | Move one page down or up. |
 | Ctrl+D, Ctrl+U | Move half a page down or up. |
-| Space | Selects the current item. In `MultiSelection`, toggles it. |
-| Ctrl+Space | Toggles the current item in `ExtendedSelection`. |
+| Space | Toggles the check box of the current item, if it has one. If not, selects the current item; in `MultiSelection`, toggles it. |
+| Ctrl+Space | Toggles the selection of the current item in `MultiSelection` and `ExtendedSelection`. |
 | Ctrl+A | Selects all items in the three multiple modes. |
 | F2 | Opens the editor (`EditKeyPressed`). |
 | A printable character | Opens the editor and types the character (`AnyKeyPressed`). |
@@ -868,7 +906,7 @@ a view and makes the editors. `QTuiListView`, `QTuiTableView` and
 `QTuiTreeView` call `paint()` for each item that shows. The view first fills
 the area of the item with the colors of the item, and then the delegate
 writes the text. Different from Qt: `QTuiColumnView` always paints the text
-itself, and no view calls `sizeHint()`. The base class makes no editor, so a
+itself, and only the table view calls `sizeHint()`, to measure a column. The base class makes no editor, so a
 view with a `QTuiItemDelegate` cannot edit.
 
 `paint()` gets a `QTuiStyleOptionViewItem`, like `QStyleOptionViewItem`:
@@ -921,11 +959,12 @@ void example(QTuiTableView *table)
 | Function | Description |
 | --- | --- |
 | `QTuiItemDelegate(QObject *parent = nullptr)` | Makes a delegate. |
-| `virtual void paint(ScreenBuffer &buffer, const QTuiStyleOptionViewItem &option, const QModelIndex &index) const` | Writes the `Qt::DisplayRole` text in `option.rect` with `option.style`. A text that is too long ends in "…", as `option.textElideMode` tells. It does not fill the area: the view does that first. |
+| `virtual void paint(ScreenBuffer &buffer, const QTuiStyleOptionViewItem &option, const QModelIndex &index) const` | Writes the check box, the glyph and the `Qt::DisplayRole` text in `option.rect` with `option.style`. A text that is too long ends in "…", as `option.textElideMode` tells. It does not fill the area: the view does that first. |
 | `virtual QTuiWidget *createEditor(QTuiWidget *parent, const QModelIndex &index) const` | Returns a new editor for the item. The default returns `nullptr`. |
 | `virtual void setEditorData(QTuiWidget *editor, const QModelIndex &index) const` | Copies the value of the item to the editor. The default does nothing. |
 | `virtual void setModelData(QTuiWidget *editor, QAbstractItemModel *model, const QModelIndex &index) const` | Writes the value of the editor to the model. The default does nothing. |
-| `virtual QSize sizeHint(const QModelIndex &index) const` | Returns the length of the text and a height of 1. |
+| `virtual QSize sizeHint(const QModelIndex &index) const` | Returns the width of the check box, the glyph and the text, and a height of 1. |
+| `static QString decorationText(const QModelIndex &index)` | Returns the text that `paint()` writes before the item text: the check box and the glyph, each with a space after it. |
 
 ### Signals
 

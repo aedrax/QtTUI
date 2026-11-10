@@ -20,6 +20,11 @@ public:
     Qt::ItemFlags flags() const;
     void setFlags(Qt::ItemFlags flags);
 
+    // The Qt::CheckStateRole data, as in Qt. An item shows a check box
+    // after setCheckState() (or setData()) gives it a state.
+    Qt::CheckState checkState() const;
+    void setCheckState(Qt::CheckState state);
+
     QVariant data(int role) const;
     void setData(int role, const QVariant &value);
 
@@ -32,7 +37,8 @@ private:
     friend class QTuiTableWidgetModel;
     QHash<int, QVariant> m_data;
     // Editable by default, as in Qt
-    Qt::ItemFlags m_flags = Qt::ItemIsEditable | Qt::ItemIsSelectable | Qt::ItemIsEnabled;
+    Qt::ItemFlags m_flags = Qt::ItemIsEditable | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable
+                            | Qt::ItemIsEnabled;
     QTuiTableWidget *m_tableWidget = nullptr;
     int m_row = -1;
     int m_column = -1;

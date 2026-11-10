@@ -101,14 +101,14 @@ void QTuiTreeWidgetItem::setText(int column, const QString &text)
     setData(column, Qt::DisplayRole, text);
 }
 
-int QTuiTreeWidgetItem::checkState(int column) const
+Qt::CheckState QTuiTreeWidgetItem::checkState(int column) const
 {
-    return data(column, Qt::CheckStateRole).toInt();
+    return Qt::CheckState(data(column, Qt::CheckStateRole).toInt());
 }
 
-void QTuiTreeWidgetItem::setCheckState(int column, int state)
+void QTuiTreeWidgetItem::setCheckState(int column, Qt::CheckState state)
 {
-    setData(column, Qt::CheckStateRole, state);
+    setData(column, Qt::CheckStateRole, int(state));
 }
 
 QVariant QTuiTreeWidgetItem::data(int column, int role) const

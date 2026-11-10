@@ -181,6 +181,7 @@ void QTuiListView::mousePressEvent(TuiMouseEvent *event)
         else if (!isSelected(currentIndex()))
             selectCurrent(Qt::NoModifier, true);
         if (event->button() == Qt::LeftButton && !drag) {
+            checkBoxPressEvent(event, currentIndex());
             emit clicked(m_model->index(m_currentRow, 0, rootIndex()));
             emit activated(m_model->index(m_currentRow, 0, rootIndex()));
         }

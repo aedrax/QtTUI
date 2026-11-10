@@ -7,6 +7,7 @@
 #include <QtTUI/RenderUtils.h>
 #include <QStringListModel>
 #include <QAbstractTableModel>
+#include <QAbstractListModel>
 
 using namespace QtTUI;
 
@@ -140,6 +141,48 @@ public:
     Qt::ItemFlags flags(const QModelIndex &index) const override
     {
         return GridModel::flags(index) | Qt::ItemIsEditable;
+    }
+};
+
+// A list with check boxes. Row 0 and 1 are checkable, row 2 goes through
+// the three states, row 3 has a check state that the user cannot change,
+// and row 4 has no check state. Row 1 has a glyph, row 4 a decoration
+// that is not a string.
+class CheckModel : public QAbstractListModel {
+public:
+    QList<int> states{Qt::Unchecked, Qt::Checked, Qt::Unchecked, Qt::Checked, -1};
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override
+    {
+        return parent.isValid() ? 0 : states.size();
+    }
+    QVariant data(const QModelIndex &index, int role) const override
+    {
+        if (role == Qt::DisplayRole)
+            return QStringLiteral("item %1").arg(index.row());
+        if (role == Qt::CheckStateRole && states.at(index.row()) >= 0)
+            return states.at(index.row());
+        if (role == Qt::DecorationRole && index.row() == 1)
+            return QStringLiteral("★");
+        if (role == Qt::DecorationRole && index.row() == 4)
+            return 42;
+        return {};
+    }
+    Qt::ItemFlags flags(const QModelIndex &index) const override
+    {
+        Qt::ItemFlags f = QAbstractListModel::flags(index);
+        if (index.row() != 3)
+            f |= Qt::ItemIsUserCheckable;
+        if (index.row() == 2)
+            f |= Qt::ItemIsUserTristate;
+        return f;
+    }
+    bool setData(const QModelIndex &index, const QVariant &value, int role) override
+    {
+        if (role != Qt::CheckStateRole)
+            return false;
+        states[index.row()] = value.toInt();
+        emit dataChanged(index, index, {role});
+        return true;
     }
 };
 
@@ -813,6 +856,170 @@ private slots:
         const ThemeProperties theme = Theme_Engine::instance()->properties(QStringLiteral("QTuiTreeView"));
         QCOMPARE(buffer.backCell(4, 2).ch, U'A');
         QCOMPARE(buffer.backCell(4, 2).background, theme.focusBackground);
+    }
+
+    // --- Check states and decorations ---
+
+    void checkStatesShowBeforeTheText()
+    {
+        CheckModel model;
+        QTuiListView list;
+        list.setGeometry(QRect(0, 0, 20, 5));
+        list.setModel(&model);
+        QCOMPARE(paintedLine(list, 0), QStringLiteral("[ ] item 0"));
+        QCOMPARE(paintedLine(list, 1), QStringLiteral("[x] ★ item 1"));
+        QCOMPARE(paintedLine(list, 3), QStringLiteral("[x] item 3"));
+        // No check state, and a decoration that is not a string
+        QCOMPARE(paintedLine(list, 4), QStringLiteral("item 4"));
+        model.states[2] = Qt::PartiallyChecked;
+        QCOMPARE(paintedLine(list, 2), QStringLiteral("[-] item 2"));
+
+        // The check box stays when the text is too long
+        list.setGeometry(QRect(0, 0, 8, 5));
+        QCOMPARE(paintedLine(list, 0), QStringLiteral("[ ] ite…"));
+        list.setTextElideMode(Qt::ElideLeft);
+        QCOMPARE(paintedLine(list, 0), QStringLiteral("[ ] …m 0"));
+
+        QTuiTableView table;
+        table.setGeometry(QRect(0, 0, 20, 5));
+        table.setModel(&model);
+        QCOMPARE(paintedLine(table, 2), QStringLiteral("[x] ★ item 1"));
+        // The natural width has space for the check box and the glyph
+        QCOMPARE(table.columnWidth(0), 12);
+
+        QTuiTreeView tree;
+        tree.setGeometry(QRect(0, 0, 20, 5));
+        tree.setModel(&model);
+        QCOMPARE(paintedLine(tree, 1), QStringLiteral("  [x] ★ item 1"));
+    }
+
+    void spaceTogglesTheCheckState()
+    {
+        CheckModel model;
+        QTuiListView list;
+        list.setGeometry(QRect(0, 0, 20, 5));
+        list.setModel(&model);
+        list.clearDirtyRegions();
+        sendKey(list, Qt::Key_Space, Qt::NoModifier, QStringLiteral(" "));
+        QCOMPARE(model.states.at(0), int(Qt::Checked));
+        // Only the row of the item repaints
+        QCOMPARE(list.dirtyRegion(), QRect(0, 0, 20, 1));
+        sendKey(list, Qt::Key_Space, Qt::NoModifier, QStringLiteral(" "));
+        QCOMPARE(model.states.at(0), int(Qt::Unchecked));
+
+        // Qt::ItemIsUserTristate goes through the three states
+        list.setCurrentIndex(model.index(2, 0));
+        sendKey(list, Qt::Key_Space);
+        QCOMPARE(model.states.at(2), int(Qt::PartiallyChecked));
+        sendKey(list, Qt::Key_Space);
+        QCOMPARE(model.states.at(2), int(Qt::Checked));
+        sendKey(list, Qt::Key_Space);
+        QCOMPARE(model.states.at(2), int(Qt::Unchecked));
+
+        // Without Qt::ItemIsUserCheckable, the state stays
+        list.setCurrentIndex(model.index(3, 0));
+        sendKey(list, Qt::Key_Space);
+        QCOMPARE(model.states.at(3), int(Qt::Checked));
+    }
+
+    void spaceInTheMultipleSelectionModes()
+    {
+        CheckModel model;
+        QTuiListView list;
+        list.setGeometry(QRect(0, 0, 20, 5));
+        list.setModel(&model);
+        list.setSelectionMode(QTuiAbstractItemView::MultiSelection);
+        QItemSelectionModel *selection = list.selectionModel();
+        // On an item with a check box, Space toggles the check box only
+        sendKey(list, Qt::Key_Space);
+        QCOMPARE(model.states.at(0), int(Qt::Checked));
+        QVERIFY(!selection->isSelected(model.index(0, 0)));
+        // Ctrl+Space toggles the selection
+        sendKey(list, Qt::Key_Space, Qt::ControlModifier);
+        QCOMPARE(model.states.at(0), int(Qt::Checked));
+        QVERIFY(selection->isSelected(model.index(0, 0)));
+        // On an item without a check box, Space toggles the selection
+        list.setCurrentIndex(model.index(4, 0));
+        sendKey(list, Qt::Key_Space);
+        QVERIFY(selection->isSelected(model.index(4, 0)));
+        // Space toggles the check box also in NoSelection
+        list.setSelectionMode(QTuiAbstractItemView::NoSelection);
+        list.setCurrentIndex(model.index(1, 0));
+        sendKey(list, Qt::Key_Space);
+        QCOMPARE(model.states.at(1), int(Qt::Unchecked));
+    }
+
+    void clickOnTheCheckBoxToggles()
+    {
+        CheckModel model;
+        QTuiListView list;
+        list.setGeometry(QRect(0, 0, 20, 5));
+        list.setModel(&model);
+        click(list, 1, 0);
+        QCOMPARE(model.states.at(0), int(Qt::Checked));
+        // A click on the text selects only
+        click(list, 6, 1);
+        QCOMPARE(model.states.at(1), int(Qt::Checked));
+        QCOMPARE(list.currentIndex().row(), 1);
+
+        QTuiTableView table;
+        table.setGeometry(QRect(0, 0, 20, 5));
+        table.setModel(&model);
+        click(table, 2, 2); // row 1 is on line 2
+        QCOMPARE(model.states.at(1), int(Qt::Unchecked));
+
+        // In the tree, the check box is after the indent
+        QTuiTreeView tree;
+        tree.setGeometry(QRect(0, 0, 20, 5));
+        tree.setModel(&model);
+        click(tree, 1, 0);
+        QCOMPARE(model.states.at(0), int(Qt::Checked));
+        click(tree, 3, 0);
+        QCOMPARE(model.states.at(0), int(Qt::Unchecked));
+    }
+
+    void itemWidgetsShowCheckStates()
+    {
+        QTuiListWidget list;
+        list.setGeometry(QRect(0, 0, 20, 3));
+        list.addItem(QStringLiteral("plain"));
+        auto *item = new QTuiListWidgetItem(QStringLiteral("task"));
+        item->setCheckState(Qt::Unchecked);
+        item->setIcon(QStringLiteral("★"));
+        list.addItem(item);
+        QVERIFY(item->flags() & Qt::ItemIsUserCheckable);
+        // An item without a check state has no check box
+        QCOMPARE(paintedLine(list, 0), QStringLiteral("plain"));
+        QCOMPARE(paintedLine(list, 1), QStringLiteral("[ ] ★ task"));
+        list.setCurrentRow(1);
+        sendKey(list, Qt::Key_Space);
+        QCOMPARE(item->checkState(), Qt::Checked);
+        QCOMPARE(paintedLine(list, 1), QStringLiteral("[x] ★ task"));
+        list.clearDirtyRegions();
+        item->setCheckState(Qt::PartiallyChecked);
+        QCOMPARE(list.dirtyRegion(), QRect(0, 1, 20, 1));
+        QCOMPARE(paintedLine(list, 1), QStringLiteral("[-] ★ task"));
+
+        // The table measures its columns one time: add the item first
+        QTuiTableWidget table(2, 1);
+        auto *cell = new QTuiTableWidgetItem(QStringLiteral("cell"));
+        cell->setCheckState(Qt::Checked);
+        table.setItem(0, 0, cell);
+        table.setGeometry(QRect(0, 0, 20, 3));
+        QCOMPARE(cell->checkState(), Qt::Checked);
+        QCOMPARE(paintedLine(table, 1), QStringLiteral("[x] cell"));
+        sendKey(table, Qt::Key_Space);
+        QCOMPARE(cell->checkState(), Qt::Unchecked);
+
+        QTuiTreeWidget tree;
+        tree.setGeometry(QRect(0, 0, 20, 3));
+        auto *node = new QTuiTreeWidgetItem({QStringLiteral("node")});
+        node->setCheckState(0, Qt::Checked);
+        tree.addTopLevelItem(node);
+        QCOMPARE(paintedLine(tree, 0), QStringLiteral("  [x] node"));
+        sendKey(tree, Qt::Key_Space);
+        QCOMPARE(node->checkState(0), Qt::Unchecked);
+        QCOMPARE(paintedLine(tree, 0), QStringLiteral("  [ ] node"));
     }
 };
 

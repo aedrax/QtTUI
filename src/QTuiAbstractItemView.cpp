@@ -197,11 +197,38 @@ void QTuiAbstractItemView::selectCurrent(Qt::KeyboardModifiers modifiers, bool c
     m_selectionAnchor = index;
 }
 
+bool QTuiAbstractItemView::toggleCheckState(const QModelIndex &index)
+{
+    if (!m_model || !index.isValid())
+        return false;
+    const Qt::ItemFlags flags = m_model->flags(index);
+    const QVariant value = index.data(Qt::CheckStateRole);
+    if (!(flags & Qt::ItemIsUserCheckable) || !(flags & Qt::ItemIsEnabled) || !value.isValid())
+        return false;
+    int state = value.toInt();
+    if (flags & Qt::ItemIsUserTristate)
+        state = (state + 1) % 3;
+    else
+        state = state == Qt::Checked ? Qt::Unchecked : Qt::Checked;
+    return m_model->setData(index, state, Qt::CheckStateRole);
+}
+
+bool QTuiAbstractItemView::checkBoxPressEvent(const TuiMouseEvent *event, const QModelIndex &index)
+{
+    if (event->mouseType() != TuiMouseEvent::Press || event->button() != Qt::LeftButton)
+        return false;
+    // The check box is the first 3 cells of the item
+    const int x = event->x() - visualRect(index).x();
+    return x >= 0 && x < 3 && toggleCheckState(index);
+}
+
 bool QTuiAbstractItemView::selectionKeyPressEvent(TuiKeyEvent *event)
 {
+    const bool ctrl = event->modifiers() & Qt::ControlModifier;
+    if (event->key() == Qt::Key_Space && !ctrl && toggleCheckState(currentIndex()))
+        return true;
     if (!m_selectionModel || m_selectionMode == NoSelection)
         return false;
-    const bool ctrl = event->modifiers() & Qt::ControlModifier;
     const bool multiple = m_selectionMode >= MultiSelection;
 
     if (event->key() == Qt::Key_A && ctrl && multiple) {

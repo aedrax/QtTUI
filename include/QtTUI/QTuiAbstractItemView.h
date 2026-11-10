@@ -194,8 +194,19 @@ protected:
     // current. It updates the selection for the mode and the modifiers.
     void selectCurrent(Qt::KeyboardModifiers modifiers, bool click);
     // Space, Ctrl+Space and Ctrl+A. Returns true if the key changed the
-    // selection.
+    // selection or the check state. As in Qt, Space on a current item with
+    // a check box toggles the check box and does not change the selection;
+    // Ctrl+Space then toggles the selection in the multiple modes.
     bool selectionKeyPressEvent(TuiKeyEvent *event);
+    // Toggles the check state of the item with setData(), as in Qt. A
+    // Qt::ItemIsUserTristate item goes through the three states. Returns
+    // false if the item is not enabled, does not have
+    // Qt::ItemIsUserCheckable, or has no Qt::CheckStateRole value.
+    bool toggleCheckState(const QModelIndex &index);
+    // A left press on the check box of the item toggles it. A view calls
+    // this after the press made the item current. Returns true if the
+    // check state changed.
+    bool checkBoxPressEvent(const TuiMouseEvent *event, const QModelIndex &index);
     // F2 and typed characters (the key edit triggers). Returns true if the
     // key opened an editor.
     bool editKeyPressEvent(TuiKeyEvent *event);

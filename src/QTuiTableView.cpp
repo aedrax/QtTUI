@@ -5,6 +5,7 @@
 #include <QtTUI/RenderUtils.h>
 #include <QtTUI/TuiEvents.h>
 #include <QtTUI/AnsiRenderer.h>
+#include <QtTUI/QTuiItemDelegate.h>
 #include <QDebug>
 
 namespace QtTUI {
@@ -502,8 +503,10 @@ void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
         selectCurrent(drag ? Qt::ShiftModifier : event->modifiers(), !drag);
     else if (!isSelected(currentIndex()))
         selectCurrent(Qt::NoModifier, true);
-    if (event->button() == Qt::LeftButton && !drag)
+    if (event->button() == Qt::LeftButton && !drag) {
+        checkBoxPressEvent(event, currentIndex());
         emit clicked(m_model->index(clickedRow, clickedCol, rootIndex()));
+    }
 }
 
 void QTuiTableView::onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)
@@ -727,8 +730,10 @@ int QTuiTableView::measureColumn(int column) const
     // Keep space for the sort indicator, so a sort does not cut the header
     int width = m_model->headerData(column, Qt::Horizontal, Qt::DisplayRole).toString().length()
                 + (m_sortingEnabled ? 2 : 0);
-    for (int r = first; r < end; ++r)
-        width = qMax(width, int(m_model->data(m_model->index(logicalRow(r), column, rootIndex()), Qt::DisplayRole).toString().length()));
+    for (int r = first; r < end; ++r) {
+        const QModelIndex index = m_model->index(logicalRow(r), column, rootIndex());
+        width = qMax(width, itemDelegateForIndex(index)->sizeHint(index).width());
+    }
     return qMax(1, width);
 }
 
