@@ -105,10 +105,15 @@ void renderTextTruncated(ScreenBuffer &buffer,
                          int x, int y,
                          const QString &text,
                          int maxWidth,
-                         const Cell &style)
+                         const Cell &style,
+                         Qt::TextElideMode mode)
 {
     if (maxWidth <= 0)
         return;
+    if (mode == Qt::ElideNone) {
+        renderText(buffer, x, y, text, maxWidth, style);
+        return;
+    }
 
     static constexpr char32_t ellipsis = U'…'; // U+2026 '…'
 
@@ -126,10 +131,13 @@ void renderTextTruncated(ScreenBuffer &buffer,
         return;
     }
 
-    // maxWidth >= 2 and text is wider: write a prefix filling maxWidth-1
-    // columns, then the ellipsis. A wide character that would straddle the
-    // truncation boundary is replaced by a space.
-    const int textCols = maxWidth - 1;
+    // maxWidth >= 2 and text is wider: write a prefix filling textCols
+    // columns, then the ellipsis, then the end of the text in tailCols
+    // columns. A wide character that would straddle a truncation boundary
+    // is replaced by a space.
+    const int tailCols = mode == Qt::ElideLeft ? maxWidth - 1
+                       : mode == Qt::ElideMiddle ? (maxWidth - 1) / 2 : 0;
+    const int textCols = maxWidth - 1 - tailCols;
     int col = 0;
     int i = 0;
     QtTuiUnicode::Cluster c;
@@ -148,6 +156,22 @@ void renderTextTruncated(ScreenBuffer &buffer,
         buffer.putChar(x + col, y, U' ', style);
 
     buffer.putChar(x + textCols, y, ellipsis, style);
+    if (tailCols == 0)
+        return;
+
+    // The tail starts at the first cluster from which the rest of the text
+    // fits in tailCols columns
+    int before = 0;
+    i = 0;
+    int start = 0;
+    while (totalCols - before > tailCols && QtTuiUnicode::nextCluster(text, i, c)) {
+        before += c.width;
+        start = i;
+    }
+    const int tailWidth = totalCols - before;
+    for (col = textCols + 1; col < maxWidth - tailWidth; ++col)
+        buffer.putChar(x + col, y, U' ', style);
+    renderText(buffer, x + maxWidth - tailWidth, y, text.mid(start), tailWidth, style);
 }
 
 } // namespace QtTUI

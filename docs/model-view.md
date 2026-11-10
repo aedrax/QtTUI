@@ -76,6 +76,14 @@ theme, as in Qt, where the selection replaces the item colors. In the
 `NoColor` mode (`NO_COLOR`, `QTTUI_COLOR=none`), the view ignores the role
 colors.
 
+With `setAlternatingRowColors(true)`, each second row that shows has a
+different shade of the background, as in Qt. The shade is the theme
+background with one part in eight of the theme foreground. A
+`Qt::BackgroundRole` color, the selection and the current item come before
+the shade. A hidden row does not count. In the tree, the lines alternate.
+The `NoColor` mode shows no shade, so the rows look the same as without
+the property.
+
 `itemStyle()` is virtual. Override it in a subclass of a view to use a
 different rule, for example a color for each log level:
 
@@ -92,6 +100,22 @@ protected:
     }
 };
 ```
+
+## Long text
+
+A text that is too long for its item ends in "…". `setTextElideMode()` sets
+where the "…" goes, as in Qt:
+
+| Mode | "a long line of text" in 8 columns |
+| --- | --- |
+| `Qt::ElideRight` (the default) | `a long …` |
+| `Qt::ElideLeft` | `…of text` |
+| `Qt::ElideMiddle` | `a lo…ext` |
+| `Qt::ElideNone` | `a long l` |
+
+`Qt::ElideLeft` is useful for paths. The mode applies to the items of the
+list, table and tree views. The headers always use `Qt::ElideRight`, and
+`QTuiColumnView` always cuts the text.
 
 ## Selection
 
@@ -266,7 +290,8 @@ int main(int argc, char *argv[])
 
 ### Properties
 
-`selectionMode`, `selectionBehavior`, `editTriggers`, `wheelScrollLines`.
+`selectionMode`, `selectionBehavior`, `editTriggers`, `wheelScrollLines`,
+`alternatingRowColors`, `textElideMode`.
 
 ### Functions
 
@@ -297,6 +322,10 @@ int main(int argc, char *argv[])
 | `void closeEditor(bool commit = true)` | Closes the editor. With `commit`, the editor writes its value to the model first. |
 | `virtual void scrollTo(const QModelIndex &index, ScrollHint hint = EnsureVisible)` | Scrolls the view so that the item is visible. |
 | `virtual QRect visualRect(const QModelIndex &index) const` | Returns the screen area of the item, or an empty rectangle if the item is not visible. |
+| `bool alternatingRowColors() const` | Returns `true` if each second row has a different shade. The default is `false`. |
+| `void setAlternatingRowColors(bool enable)` | Turns the shade of each second row on or off. See [item colors](#item-colors). |
+| `Qt::TextElideMode textElideMode() const` | Returns where the "…" goes in a long text. The default is `Qt::ElideRight`. |
+| `void setTextElideMode(Qt::TextElideMode mode)` | Sets where the "…" goes. See [long text](#long-text). |
 | `int wheelScrollLines() const` | Returns the rows that one notch of the mouse wheel scrolls. The default is 3. |
 | `void setWheelScrollLines(int lines)` | Sets the rows for one notch. The minimum is 1. |
 
@@ -329,6 +358,8 @@ Use these functions when you write a view.
 | `bool eventFilter(QObject *watched, QEvent *event) override` | Gives Enter and Escape in the editor to the view. |
 | `bool isSelected(const QModelIndex &index) const` | Returns `true` if the item is selected. |
 | `virtual Cell itemStyle(const QModelIndex &index, bool isCurrent, const ThemeProperties &theme) const` | Returns the colors and attributes of an item, as the selection and [item colors](#item-colors) sections tell. |
+| `virtual bool isAlternateRow(const QModelIndex &index) const` | Returns `true` if `alternatingRowColors` is on and the item is on a second row. `itemStyle()` calls it. |
+| `static Color alternateBackground(const ThemeProperties &theme)` | Returns the background of the alternate rows. |
 | `virtual QItemSelection selectionRange(const QModelIndex &from, const QModelIndex &to) const` | Returns the items from `from` to `to`. The default is the rectangle between the two items if they have the same parent. |
 
 ### Signals

@@ -119,7 +119,7 @@ void QTuiListView::paintEvent(ScreenBuffer &buffer)
             fillRect(buffer, QRect(geo.x(), screenY, viewWidth, 1), style);
 
         // Render text with truncation
-        renderTextTruncated(buffer, geo.x(), screenY, itemText, viewWidth, style);
+        renderTextTruncated(buffer, geo.x(), screenY, itemText, viewWidth, style, textElideMode());
     }
 }
 

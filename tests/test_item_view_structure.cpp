@@ -4,6 +4,7 @@
 
 #include <QtTest/QtTest>
 #include <QtTUI/QtTUI>
+#include <QtTUI/RenderUtils.h>
 #include <QStringListModel>
 #include <QAbstractTableModel>
 
@@ -105,6 +106,24 @@ public:
         endResetModel();
     }
 };
+
+// Row 2 has a blue Qt::BackgroundRole
+class BlueRowModel : public GridModel {
+public:
+    QVariant data(const QModelIndex &index, int role) const override
+    {
+        if (role == Qt::BackgroundRole && index.row() == 2)
+            return 0x0000ff;
+        return GridModel::data(index, role);
+    }
+};
+
+static QString truncated(const QString &text, int width, Qt::TextElideMode mode)
+{
+    ScreenBuffer buffer(width + 2, 1);
+    renderTextTruncated(buffer, 0, 0, text, width, Cell(), mode);
+    return lineText(buffer, 0);
+}
 
 // A tree of two levels: groups "A", "B", ... and their children "A0",
 // "A1", ... Each item has two columns; column 1 has the text and "+".
@@ -509,6 +528,147 @@ private slots:
         list.setModel(&strings);
         QVERIFY(!list.rootIndex().isValid());
         QCOMPARE(paintedLine(list, 2), QStringLiteral("row 2"));
+    }
+
+    // --- Alternating row colors ---
+
+    void alternatingRowColors()
+    {
+        BlueRowModel model;
+        QTuiTableView view;
+        view.setGeometry(QRect(0, 0, 30, 8));
+        view.setModel(&model);
+        const ThemeProperties theme = Theme_Engine::instance()->properties(QStringLiteral("QTuiTableView"));
+        ScreenBuffer buffer(30, 8);
+        view.paintEvent(buffer);
+        QCOMPARE(buffer.backCell(0, 2).background, theme.background);
+
+        QVERIFY(!view.alternatingRowColors());
+        view.clearDirtyRegions();
+        view.setAlternatingRowColors(true);
+        QVERIFY(view.alternatingRowColors());
+        QCOMPARE(view.dirtyRegion(), view.geometry());
+        view.paintEvent(buffer);
+        // Line 0 is the header. Rows 1, 3 and 5 have the shade, also in
+        // the separators and after the last column.
+        const Color shade = buffer.backCell(0, 2).background;
+        QVERIFY(shade != theme.background);
+        QCOMPARE(buffer.backCell(4, 2).background, shade);
+        QCOMPARE(buffer.backCell(29, 2).background, shade);
+        QCOMPARE(buffer.backCell(0, 4).background, shade);
+        QCOMPARE(buffer.backCell(0, 5).background, theme.background);
+        // The text stays readable on the shade
+        QCOMPARE(buffer.backCell(0, 2).foreground, theme.foreground);
+        // The header has no shade, and the current row 0 has the focus colors
+        QCOMPARE(buffer.backCell(0, 0).background, theme.background);
+        // The color of the model comes before the shade
+        QCOMPARE(buffer.backCell(0, 3).background, Color(0, 0, 255));
+
+        // The selection comes before the shade
+        view.setFocus();
+        view.setCurrentIndex(model.index(1, 0));
+        view.paintEvent(buffer);
+        QCOMPARE(buffer.backCell(0, 2).background, theme.focusBackground);
+        view.setCurrentIndex(model.index(0, 0));
+
+        // A hidden row does not count
+        view.setRowHidden(1, true);
+        view.paintEvent(buffer);
+        QCOMPARE(buffer.backCell(0, 2).background, Color(0, 0, 255)); // row 2
+        QCOMPARE(buffer.backCell(0, 3).background, theme.background); // row 3
+        QCOMPARE(buffer.backCell(0, 4).background, shade);            // row 4
+
+        // The NoColor mode shows no shade
+        AnsiRenderer::setColorMode(AnsiRenderer::NoColor);
+        view.paintEvent(buffer);
+        QCOMPARE(buffer.backCell(0, 4).background, theme.background);
+    }
+
+    void alternatingRowColorsInTheOtherViews()
+    {
+        GroupModel model;
+        QTuiListView list;
+        list.setGeometry(QRect(0, 0, 20, 5));
+        list.setModel(&model);
+        list.setAlternatingRowColors(true);
+        ScreenBuffer buffer(20, 5);
+        list.paintEvent(buffer);
+        const Color plain = buffer.backCell(19, 2).background;
+        const Color shade = buffer.backCell(19, 1).background;
+        QVERIFY(shade != plain);
+
+        // In the tree, the lines alternate, not the rows of each parent
+        QTuiTreeView tree;
+        tree.setGeometry(QRect(0, 0, 20, 5));
+        tree.setModel(&model);
+        tree.setAlternatingRowColors(true);
+        tree.expand(model.index(0, 0));
+        tree.setCurrentIndex(model.index(2, 0));
+        tree.scrollTo(model.index(0, 0));
+        tree.paintEvent(buffer);
+        // Lines: A, A0, A1, A2, A3
+        QCOMPARE(buffer.backCell(19, 0).background, plain);
+        QCOMPARE(buffer.backCell(19, 1).background, shade);
+        QCOMPARE(buffer.backCell(19, 2).background, plain);
+        QCOMPARE(buffer.backCell(19, 3).background, shade);
+    }
+
+    // --- Elide mode ---
+
+    void renderTextTruncatedModes()
+    {
+        const QString text = QStringLiteral("abcdefghij");
+        QCOMPARE(truncated(text, 10, Qt::ElideLeft), text);
+        QCOMPARE(truncated(text, 6, Qt::ElideRight), QStringLiteral("abcde…"));
+        QCOMPARE(truncated(text, 6, Qt::ElideLeft), QStringLiteral("…fghij"));
+        QCOMPARE(truncated(text, 6, Qt::ElideMiddle), QStringLiteral("abc…ij"));
+        QCOMPARE(truncated(text, 7, Qt::ElideMiddle), QStringLiteral("abc…hij"));
+        QCOMPARE(truncated(text, 6, Qt::ElideNone), QStringLiteral("abcdef"));
+        QCOMPARE(truncated(text, 1, Qt::ElideLeft), QStringLiteral("…"));
+        QCOMPARE(truncated(text, 2, Qt::ElideMiddle), QStringLiteral("a…"));
+        QCOMPARE(truncated(text, 2, Qt::ElideLeft), QStringLiteral("…j"));
+        // A wide character that does not fit becomes a space
+        const QString wide = QStringLiteral("ab日本語cd");
+        QCOMPARE(truncated(wide, 6, Qt::ElideLeft), QStringLiteral("… 語cd"));
+        QCOMPARE(truncated(wide, 7, Qt::ElideLeft), QStringLiteral("…本語cd"));
+        QCOMPARE(truncated(wide, 8, Qt::ElideMiddle), QStringLiteral("ab日… cd"));
+        QCOMPARE(truncated(wide, 7, Qt::ElideMiddle), QStringLiteral("ab … cd"));
+    }
+
+    void textElideModeInTheViews()
+    {
+        QStringListModel model({QStringLiteral("a long line of text")});
+        QTuiListView list;
+        list.setGeometry(QRect(0, 0, 8, 2));
+        list.setModel(&model);
+        QCOMPARE(list.textElideMode(), Qt::ElideRight);
+        QCOMPARE(paintedLine(list, 0), QStringLiteral("a long …"));
+        list.clearDirtyRegions();
+        list.setTextElideMode(Qt::ElideLeft);
+        QCOMPARE(list.dirtyRegion(), list.geometry());
+        QCOMPARE(paintedLine(list, 0), QStringLiteral("…of text"));
+        list.setTextElideMode(Qt::ElideMiddle);
+        QCOMPARE(paintedLine(list, 0), QStringLiteral("a lo…ext"));
+        list.setTextElideMode(Qt::ElideNone);
+        QCOMPARE(paintedLine(list, 0), QStringLiteral("a long l"));
+
+        QTuiTableView table;
+        table.setGeometry(QRect(0, 0, 8, 2));
+        table.setModel(&model);
+        table.setTextElideMode(Qt::ElideLeft);
+        QCOMPARE(paintedLine(table, 1), QStringLiteral("…of text"));
+
+        QTuiTreeView tree;
+        tree.setGeometry(QRect(0, 0, 10, 2));
+        tree.setModel(&model);
+        tree.setTextElideMode(Qt::ElideLeft);
+        QCOMPARE(paintedLine(tree, 0), QStringLiteral("  …of text"));
+
+        // The property works by name, as UI_Loader sets it
+        QVERIFY(list.setProperty("textElideMode", QStringLiteral("ElideMiddle")));
+        QCOMPARE(list.textElideMode(), Qt::ElideMiddle);
+        QVERIFY(list.setProperty("alternatingRowColors", true));
+        QVERIFY(list.alternatingRowColors());
     }
 };
 

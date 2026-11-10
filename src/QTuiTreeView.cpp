@@ -259,7 +259,7 @@ void QTuiTreeView::paintEvent(ScreenBuffer &buffer)
             int remainingWidth = viewWidth - indicatorOffset;
             if (remainingWidth > 0) {
                 renderTextTruncated(buffer, geo.x() + indicatorOffset, screenY,
-                                    text, remainingWidth, style);
+                                    text, remainingWidth, style, textElideMode());
             }
         }
     }
@@ -379,6 +379,21 @@ void QTuiTreeView::mousePressEvent(TuiMouseEvent *event)
         if (event->button() == Qt::LeftButton && !drag)
             emit clicked(m_flatList.at(clickedRow).index);
     }
+}
+
+bool QTuiTreeView::isAlternateRow(const QModelIndex &index) const
+{
+    if (!alternatingRowColors())
+        return false;
+    // ponytail: a search in the rows that show for each item, so a paint
+    // costs the square of the view height. Give the row to itemStyle() if
+    // a view is high enough to see it.
+    const int end = qMin(int(m_flatList.size()), m_scrollOffset + geometry().height());
+    for (int row = qMax(0, m_scrollOffset); row < end; ++row) {
+        if (m_flatList.at(row).index == index)
+            return row & 1;
+    }
+    return false;
 }
 
 QItemSelection QTuiTreeView::selectionRange(const QModelIndex &from, const QModelIndex &to) const

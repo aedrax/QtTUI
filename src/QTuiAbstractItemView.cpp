@@ -268,6 +268,8 @@ Cell QTuiAbstractItemView::itemStyle(const QModelIndex &index, bool isCurrent,
     style.underline = cursor && multiple;
     // The selection and the current item keep the focus colors, as in Qt
     if (!highlight && index.isValid() && AnsiRenderer::colorMode() != AnsiRenderer::NoColor) {
+        if (isAlternateRow(index))
+            style.background = alternateBackground(theme);
         Color color;
         if (colorFromRole(index.data(Qt::ForegroundRole), &color))
             style.foreground = color;
@@ -286,6 +288,45 @@ Cell QTuiAbstractItemView::itemStyle(const QModelIndex &index, bool isCurrent,
         style.bold = true;
     }
     return style;
+}
+
+bool QTuiAbstractItemView::alternatingRowColors() const
+{
+    return m_alternatingRowColors;
+}
+
+void QTuiAbstractItemView::setAlternatingRowColors(bool enable)
+{
+    if (m_alternatingRowColors == enable)
+        return;
+    m_alternatingRowColors = enable;
+    markDirty();
+}
+
+Qt::TextElideMode QTuiAbstractItemView::textElideMode() const
+{
+    return m_textElideMode;
+}
+
+void QTuiAbstractItemView::setTextElideMode(Qt::TextElideMode mode)
+{
+    if (m_textElideMode == mode)
+        return;
+    m_textElideMode = mode;
+    markDirty();
+}
+
+bool QTuiAbstractItemView::isAlternateRow(const QModelIndex &index) const
+{
+    return m_alternatingRowColors && index.isValid() && (visualRow(index.row()) & 1);
+}
+
+Color QTuiAbstractItemView::alternateBackground(const ThemeProperties &theme)
+{
+    const auto mix = [](uint8_t bg, uint8_t fg) { return uint8_t((bg * 7 + fg) / 8); };
+    return Color(mix(theme.background.r, theme.foreground.r),
+                 mix(theme.background.g, theme.foreground.g),
+                 mix(theme.background.b, theme.foreground.b));
 }
 
 QItemSelection QTuiAbstractItemView::selectionRange(const QModelIndex &from,

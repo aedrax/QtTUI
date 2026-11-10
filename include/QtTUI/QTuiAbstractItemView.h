@@ -46,6 +46,8 @@ class QTuiAbstractItemView : public QTuiAbstractScrollArea {
     Q_PROPERTY(SelectionBehavior selectionBehavior READ selectionBehavior WRITE setSelectionBehavior)
     Q_PROPERTY(EditTriggers editTriggers READ editTriggers WRITE setEditTriggers)
     Q_PROPERTY(int wheelScrollLines READ wheelScrollLines WRITE setWheelScrollLines)
+    Q_PROPERTY(bool alternatingRowColors READ alternatingRowColors WRITE setAlternatingRowColors)
+    Q_PROPERTY(Qt::TextElideMode textElideMode READ textElideMode WRITE setTextElideMode)
 public:
     enum SelectionMode {
         NoSelection,
@@ -137,6 +139,19 @@ public:
     // current item, as in Qt.
     int wheelScrollLines() const;
     void setWheelScrollLines(int lines);
+
+    // With alternatingRowColors, each second row that shows has a different
+    // shade of the background, as in Qt. The default is false. A
+    // Qt::BackgroundRole color of the model and the selection colors come
+    // before the shade. The NoColor mode shows no shade.
+    bool alternatingRowColors() const;
+    void setAlternatingRowColors(bool enable);
+
+    // Where the "…" goes in a text that is too long for its item, as in
+    // Qt: Qt::ElideRight (the default), Qt::ElideLeft, Qt::ElideMiddle, or
+    // Qt::ElideNone (no "…"). The column view always cuts the text.
+    Qt::TextElideMode textElideMode() const;
+    void setTextElideMode(Qt::TextElideMode mode);
 
     // Scrolls the view so that the item is visible. A tree view also
     // expands the parents of the item.
@@ -243,6 +258,13 @@ protected:
     // Override this function to use a different rule.
     virtual Cell itemStyle(const QModelIndex &index, bool isCurrent,
                            const ThemeProperties &theme) const;
+    // True if alternatingRowColors is on and the item is on a second row.
+    // The default counts the rows that show before the row of the item. A
+    // view where the rows are not the rows of one parent overrides it.
+    virtual bool isAlternateRow(const QModelIndex &index) const;
+    // The background of the alternate rows: the theme background with a
+    // part of the theme foreground
+    static Color alternateBackground(const ThemeProperties &theme);
     // The items from `from` to `to` in the order of the view. The default
     // is the rectangle between the two indexes if they have the same parent.
     virtual QItemSelection selectionRange(const QModelIndex &from, const QModelIndex &to) const;
@@ -278,6 +300,8 @@ private:
     QList<QPointer<QTuiWidget>> m_watchedEditorWidgets;
     EditTriggers m_editTriggers = EditTriggers(DoubleClicked | EditKeyPressed);
     int m_wheelScrollLines = 3;
+    bool m_alternatingRowColors = false;
+    Qt::TextElideMode m_textElideMode = Qt::ElideRight;
     QTuiItemDelegate *m_defaultDelegate = nullptr;
     // True while the view follows a current index set on the selection
     // model, so that selectCurrent() does not change the selection

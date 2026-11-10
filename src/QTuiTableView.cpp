@@ -4,6 +4,7 @@
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/RenderUtils.h>
 #include <QtTUI/TuiEvents.h>
+#include <QtTUI/AnsiRenderer.h>
 #include <QDebug>
 
 namespace QtTUI {
@@ -173,7 +174,12 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
         const bool hasRow = m_scrollOffset + vr < rows;
         const int modelRow = hasRow ? logicalRow(m_scrollOffset + vr) : -1;
         int screenY = geo.y() + m_headerHeight + vr;
-        fillRect(buffer, QRect(geo.x(), screenY, viewWidth, 1), plain);
+        // The separators and the rest of an alternate row have its shade
+        Cell rowStyle = plain;
+        if (hasRow && AnsiRenderer::colorMode() != AnsiRenderer::NoColor
+            && isAlternateRow(m_model->index(modelRow, 0, rootIndex())))
+            rowStyle.background = alternateBackground(theme);
+        fillRect(buffer, QRect(geo.x(), screenY, viewWidth, 1), rowStyle);
 
         int xOff = geo.x();
         for (int c = firstVisibleCol; c < cols; ++c) {
@@ -198,7 +204,7 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
             padStyle.bold = false;
             padStyle.inverse = false;
             fillRect(buffer, QRect(xOff, screenY, availWidth, 1), padStyle);
-            renderTextTruncated(buffer, xOff, screenY, cellText, availWidth, style);
+            renderTextTruncated(buffer, xOff, screenY, cellText, availWidth, style, textElideMode());
             xOff += availWidth;
 
             // Render separator space between columns. Between two selected

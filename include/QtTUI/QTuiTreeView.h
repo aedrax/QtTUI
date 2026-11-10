@@ -49,6 +49,7 @@ protected:
     void keyPressEvent(TuiKeyEvent *event) override;
     void mousePressEvent(TuiMouseEvent *event) override;
     QItemSelection selectionRange(const QModelIndex &from, const QModelIndex &to) const override;
+    bool isAlternateRow(const QModelIndex &index) const override;
 
 private slots:
     void onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight);
