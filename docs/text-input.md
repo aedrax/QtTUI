@@ -1,9 +1,9 @@
 # Text and input
 
 This page covers the widgets that show text or take text from the user: the
-label, the line edit, the key sequence edit, the text edits and the combo
-box. It also covers the syntax highlighter for the text edits, and the
-validators and the completer for `QTuiLineEdit`.
+label, the text browser, the line edit, the key sequence edit, the text edits
+and the combo box. It also covers the syntax highlighter for the text edits,
+and the validators and the completer for `QTuiLineEdit`.
 ## QTuiLabel
 
 
@@ -82,7 +82,19 @@ QObject::connect(about, &QTuiLabel::linkActivated, [](const QString &link) {
 });
 ```
 
-A label can have 255 links.
+A link whose target has a URL scheme (`https:`, `file:`, `mailto:`, ...) is
+also a hyperlink of the terminal (OSC 8). A terminal that knows OSC 8 can then
+open the link, for example with Ctrl and a click. A target without a scheme
+(`#section`, `settings`, `page.md`) is never a terminal hyperlink. A scheme has
+two or more characters, so the drive in `C:\dir` is not a scheme. The label
+cannot know if a scheme is for the application only (`help:manual`), and it
+cannot know if the text is safe. Thus `setTerminalHyperlinks(false)` turns the
+terminal hyperlinks off. `linkActivated()` does not change.
+
+The label keeps the parsed text and its lines until the text, the format, the
+buddy or the width changes. Thus a paint of a long text is fast. `render()`
+paints a part of a label that is larger than the screen; `QTuiTextBrowser`
+uses it.
 
 ### Example
 
@@ -118,6 +130,13 @@ void example(QTuiWidget *parent)
 | `Qt::TextFormat textFormat() const` | Returns the text format. Property `textFormat`. |
 | `void setTextFormat(Qt::TextFormat format)` | Sets the text format. See [Text formats](#text-formats). |
 | `QString displayText() const` | Returns the text as it shows, without the markup. |
+| `bool terminalHyperlinks() const` | Returns true if a link with a URL scheme is also a hyperlink of the terminal. Property `terminalHyperlinks`. The default is true. |
+| `void setTerminalHyperlinks(bool on)` | Turns the terminal hyperlinks on or off. See [Links](#links). |
+| `static QString linkScheme(const QString &link)` | Returns the scheme of a link target in lower case, for example `https`. Returns an empty string if the target has no scheme. |
+| `int currentLink() const` | Returns the index of the current link (from 0), or -1 if the text has no links. |
+| `QRect linkRect(int index) const` | Returns the cells of a link, in the coordinates of `geometry()`. Returns an empty rectangle if the link does not show. |
+| `int heightForWidth(int width) const` | Returns the height that shows all the text in a label of this width. With word wrap, it counts the wrapped lines. |
+| `void render(ScreenBuffer &buffer, const QPoint &offset, const QRect &clip, bool showLinkFocus)` | Paints the label moved by `offset`, and only inside `clip` (in buffer coordinates). The paint time depends on the clip, not on the length of the text. `showLinkFocus` shows the current link in the focus colors. A clipped label shows no frame. |
 | `QTuiWidget *buddy() const` | Returns the buddy widget, or `nullptr`. |
 | `void setBuddy(QTuiWidget *buddy)` | Sets the buddy widget, or removes it with `nullptr`. Marks the label dirty. The label does not take ownership. If the buddy is deleted, the label has no buddy. See "Buddy and mnemonic". |
 | `QChar mnemonic() const` | Returns the mnemonic character, or a null `QChar` if there is none. |
@@ -156,6 +175,158 @@ use the arrow keys there.
 
 - A left press on a link makes it the current link and emits
   `linkActivated()`.
+
+## QTuiTextBrowser
+
+`#include <QtTUI/QTuiTextBrowser.h>` · Inherits: QTuiScrollArea
+
+`QTuiTextBrowser` is a read-only viewer for long rich text, like
+`QTextBrowser`. It scrolls, and the user follows links with the keyboard or
+the mouse. Use it for help pages, release notes and license texts.
+
+The content is a word-wrapped `QTuiLabel` in a scroll area. Thus the text
+formats and the links are those of the label: see
+[Text formats](#text-formats) and [Links](#links). The width of the text
+follows the width of the viewport, so there is no horizontal scroll. The
+browser paints only the rows that show. A paint of a file with 5000 lines
+takes the same time as a paint of a short file.
+
+The browser reads only local files. It never gets data from the network and
+it never starts a program.
+
+### Source and links
+
+`setSource()` reads a local file and shows it. The file name gives the format:
+
+| File name | Format |
+| --- | --- |
+| `.md`, `.markdown` | Markdown (`Qt::MarkdownText`) |
+| `.html`, `.htm` | Rich text (`Qt::RichText`) |
+| All others | Plain text |
+
+The file must be UTF-8. If the browser cannot read the file (it is missing,
+it is a directory, or it is not a regular file), the browser writes a warning
+and shows no text. The path still becomes the source.
+
+When the user activates a link, the browser emits `anchorClicked()`. Then,
+if `openLinks()` is true (the default):
+
+- A link without a scheme (`page.md`, `sub/page.md`, `/usr/share/doc/a.txt`)
+  is a file path. A relative path starts at the directory of `source()`. The
+  browser opens the file with `setSource()`.
+- A `file:` link opens the local file of the URL.
+- A link with a different scheme (`https:`, `mailto:`, `help:`) does nothing
+  more. Connect to `anchorClicked()` to handle it.
+- The browser removes `#fragment` from a file link and does not scroll to it.
+  A link that is only `#fragment` does nothing more.
+
+If the application uses link targets that are not files (`settings`), call
+`setOpenLinks(false)` and handle all links in `anchorClicked()`.
+
+A link with a scheme is also a hyperlink of the terminal, as in `QTuiLabel`.
+To turn that off, call `setTerminalHyperlinks(false)` on the label:
+`static_cast<QTuiLabel *>(browser->widget())`.
+
+### History
+
+Each `setSource()` with a new path adds the path to the history and removes
+the entries after the current entry. `backward()` and `forward()` go through
+the history. `home()` goes to the first file of the history, and adds it as a
+new entry. `setMarkdown()`, `setHtml()` and `setPlainText()` do not change
+the source or the history.
+
+### Limits
+
+- The text formats are the small subsets of `QTuiLabel`. Markdown has no
+  headings, lists or tables: these show as their source text. A line break in
+  the source is a line break on the screen. In an HTML file, the browser
+  removes unknown tags but shows their content.
+- The browser shows at most 16 MiB of a file.
+- New text always starts at the top. The history does not keep the scroll
+  position of each file.
+- The current link does not follow the scroll position. After a long scroll,
+  Tab goes to the link after the current link, and that link can be far away.
+- Do not call `setWidget()`.
+
+### Example
+
+```cpp
+#include <QtTUI/QtTUI>
+
+using namespace QtTUI;
+
+void example(QTuiWidget *parent)
+{
+    auto *help = new QTuiTextBrowser(parent);
+    help->setSource(QStringLiteral("/usr/share/doc/myapp/index.md"));
+    QObject::connect(help, &QTuiTextBrowser::anchorClicked, [](const QString &link) {
+        if (QTuiLabel::linkScheme(link) == QLatin1String("https"))
+            qDebug() << "The user asks for" << link;
+    });
+}
+```
+
+### Functions
+
+| Function | Description |
+| --- | --- |
+| `explicit QTuiTextBrowser(QTuiWidget *parent = nullptr)` | Makes an empty browser. It takes the focus (`Qt::StrongFocus`). |
+| `QString toPlainText() const` | Returns the text as it shows, without the markup. |
+| `QString source() const` | Returns the path of the file that shows, or an empty string. Property `source`. |
+| `bool openLinks() const` | Returns true if a link to a file opens the file. Property `openLinks`. The default is true. |
+| `void setOpenLinks(bool open)` | Sets `openLinks`. See [Source and links](#source-and-links). |
+| `bool isBackwardAvailable() const` | Returns true if `backward()` can go to a file. |
+| `bool isForwardAvailable() const` | Returns true if `forward()` can go to a file. |
+
+### Slots
+
+| Slot | Description |
+| --- | --- |
+| `void setMarkdown(const QString &markdown)` | Shows Markdown text, from the top. |
+| `void setHtml(const QString &html)` | Shows rich text, from the top. |
+| `void setPlainText(const QString &text)` | Shows plain text, from the top. |
+| `void setSource(const QString &path)` | Reads and shows a local file, and adds it to the history. Emits `sourceChanged()`. |
+| `void backward()` | Goes to the previous file of the history. Does nothing at the first file. |
+| `void forward()` | Goes to the next file of the history. Does nothing at the last file. |
+| `void home()` | Goes to the first file of the history. |
+
+### Signals
+
+| Signal | Description |
+| --- | --- |
+| `void anchorClicked(const QString &link)` | The user activated a link with Enter or with a left click. `link` is the target as it is in the text. |
+| `void sourceChanged(const QString &path)` | The browser read a file, also after `backward()` and `forward()`. |
+| `void backwardAvailable(bool available)` | `isBackwardAvailable()` changed. |
+| `void forwardAvailable(bool available)` | `isForwardAvailable()` changed. |
+
+### Protected functions
+
+| Function | Description |
+| --- | --- |
+| `void keyPressEvent(TuiKeyEvent *event) override` | See the keys below. |
+| `bool focusNextPrevChild(bool next) override` | Goes to the next or the previous link. At the last and the first link, the focus goes to the next widget. |
+| `void paintContent(ScreenBuffer &buffer, const QRect &viewport) override` | Paints only the rows of the text that show. |
+
+### Keys
+
+| Key | Action |
+| --- | --- |
+| Up, Down, k, j | Scrolls 1 row. |
+| Page Up, Page Down, Ctrl+B, Ctrl+F | Scrolls 1 viewport height. |
+| Home, g | Scrolls to the top. |
+| End, G | Scrolls to the bottom. |
+| Tab, Right | Goes to the next link and scrolls to it. In a `QTuiMainWindow`, Tab at the last link goes to the next widget. |
+| Shift+Tab, Left | Goes to the previous link and scrolls to it. |
+| Enter, Return | Follows the current link. |
+| Alt+Left, Backspace | Goes back in the history. |
+| Alt+Right | Goes forward in the history. |
+
+While the browser has the focus, the current link shows in the focus colors.
+
+### Mouse
+
+- The wheel scrolls 3 rows for each step.
+- A left press on a link makes it the current link and follows it.
 
 ## QTuiLineEdit
 

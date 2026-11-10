@@ -8,6 +8,7 @@
 #include <QStringList>
 #include <QVector>
 #include <Qt>
+#include <climits>
 #include <functional>
 
 namespace QtTUI {
@@ -18,6 +19,7 @@ class QTuiLabel : public QTuiFrame {
     Q_PROPERTY(Qt::Alignment alignment READ alignment WRITE setAlignment)
     Q_PROPERTY(bool wordWrap READ wordWrap WRITE setWordWrap)
     Q_PROPERTY(Qt::TextFormat textFormat READ textFormat WRITE setTextFormat)
+    Q_PROPERTY(bool terminalHyperlinks READ terminalHyperlinks WRITE setTerminalHyperlinks)
 public:
     explicit QTuiLabel(const QString &text = QString(), QTuiWidget *parent = nullptr);
 
@@ -46,6 +48,32 @@ public:
     void setTextFormat(Qt::TextFormat format);
     // The text as it shows, without markup
     QString displayText() const;
+
+    // Terminal hyperlinks (OSC 8). If on (the default), a link whose target
+    // has a URL scheme (https:, file:, mailto:, ...) is also a hyperlink of
+    // the terminal, so the terminal can open it. A target without a scheme
+    // ("#section", "settings", "page.md") is never a terminal hyperlink.
+    // Set it to false if the text is not trusted, or if the application
+    // uses its own schemes ("action:quit") as link targets.
+    bool terminalHyperlinks() const;
+    void setTerminalHyperlinks(bool on);
+    // The scheme of a link target in lower case ("https"), or an empty
+    // string if the target has no scheme. A scheme has two or more
+    // characters, so the drive of "C:\dir" is not a scheme.
+    static QString linkScheme(const QString &link);
+
+    // The index of the current link (from 0), or -1 if there are no links
+    int currentLink() const;
+    // The cells of a link, in the coordinates of geometry(). Returns an
+    // empty rectangle if the link does not show.
+    QRect linkRect(int index) const;
+    // The height that shows all the text in a label of the given width
+    int heightForWidth(int width) const;
+    // Paints the label moved by offset, and only inside clip (in buffer
+    // coordinates). A widget that shows a part of a large label uses it;
+    // the paint time depends on the clip, not on the length of the text.
+    // showLinkFocus shows the current link in the focus colors.
+    void render(ScreenBuffer &buffer, const QPoint &offset, const QRect &clip, bool showLinkFocus);
 
     // The buddy widget, as in QLabel. With a buddy, an & in the text marks
     // the next character as the mnemonic: the label does not show the &,
@@ -79,14 +107,36 @@ private:
     Qt::TextFormat m_textFormat = Qt::PlainText;
 
     // Style per UTF-16 unit of displayText(): the low byte has the style
-    // bits, the high byte has the number of the link (from 1; 0: no link)
+    // bits, the bits above it have the number of the link (from 1; 0: no
+    // link)
     enum StyleBit : quint8 { Bold = 1, Italic = 2, Underline = 4, Strike = 8, Code = 16 };
     // Returns the mnemonic character
-    QChar parse(QString *shown, QVector<quint16> *styles, QStringList *links = nullptr) const;
-    // Calls visit for each character that shows, with its screen cell and
-    // its style. The paint and the mouse use the same positions.
+    QChar parse(QString *shown, QVector<quint32> *styles, QStringList *links = nullptr) const;
+    // Calls visit for each character that shows in the rows firstY to
+    // lastY, with its cell (in the coordinates of geometry()) and its
+    // style. The paint and the mouse use the same positions.
     void layoutText(const std::function<void(int x, int y, const QtTuiUnicode::Cluster &c,
-                                             quint16 style)> &visit) const;
+                                             quint32 style)> &visit,
+                    int firstY = 0, int lastY = INT_MAX) const;
+
+    // The parsed text and its lines for one width. The parse and the wrap
+    // of a long text take much longer than a paint, so the label keeps
+    // them until the text, the format, the buddy or the width changes.
+    struct TextLayout {
+        bool parsed = false;
+        QString shown;           // displayText()
+        QVector<quint32> styles; // one per UTF-16 unit of shown
+        QChar mnemonic;
+        int width = -1;          // the width of lines, or -1: no lines
+        QStringList lines;
+        QVector<int> lineSrc;    // the index in shown where each line starts
+    };
+    const TextLayout &parsedText() const;
+    const TextLayout &textLayout(int width) const;
+    // The row in contentsRect() of the first line, from the alignment
+    int firstTextRow(const TextLayout &l) const;
+    mutable TextLayout m_layout;
+    bool m_terminalHyperlinks = true;
     // Reads the links again after a change of the text or the format
     void updateLinks();
 

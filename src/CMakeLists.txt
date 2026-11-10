@@ -45,6 +45,7 @@ set(QTTUI_SOURCES
     QTuiLCDNumber.cpp
     QTuiScrollBar.cpp
     QTuiScrollArea.cpp
+    QTuiTextBrowser.cpp
     QTuiGroupBox.cpp
     QTuiCollapsible.cpp
     QTuiTabBar.cpp
@@ -153,6 +154,7 @@ set(QTTUI_HEADERS
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiLCDNumber.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiScrollBar.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiScrollArea.h
+    ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiTextBrowser.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiGroupBox.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiCollapsible.h
     ${PROJECT_SOURCE_DIR}/include/QtTUI/QTuiTabBar.h

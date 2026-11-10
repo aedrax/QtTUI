@@ -77,6 +77,7 @@
 // Scroll widgets
 #include <QtTUI/QTuiScrollBar.h>
 #include <QtTUI/QTuiScrollArea.h>
+#include <QtTUI/QTuiTextBrowser.h>
 
 // Container widgets
 #include <QtTUI/QTuiGroupBox.h>
