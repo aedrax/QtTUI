@@ -160,6 +160,16 @@ void QTuiLabel::setTerminalHyperlinks(bool on)
     markDirty();
 }
 
+// Only the schemes that a terminal can open go to the terminal. A scheme
+// of the application (for example "app:settings") stays in the application.
+static bool isTerminalScheme(const QString &scheme)
+{
+    static const QStringList schemes = {QStringLiteral("http"), QStringLiteral("https"),
+                                        QStringLiteral("file"), QStringLiteral("mailto"),
+                                        QStringLiteral("ftp")};
+    return schemes.contains(scheme);
+}
+
 QString QTuiLabel::linkScheme(const QString &link)
 {
     static const QRegularExpression scheme(QStringLiteral("^([A-Za-z][A-Za-z0-9+.-]+):"));
@@ -701,7 +711,7 @@ void QTuiLabel::render(ScreenBuffer &buffer, const QPoint &offset, const QRect &
             if (link != idLink) {
                 idLink = link;
                 const QString url = m_links.value(link - 1);
-                id = m_terminalHyperlinks && !linkScheme(url).isEmpty() ? buffer.linkId(url) : 0;
+                id = m_terminalHyperlinks && isTerminalScheme(linkScheme(url)) ? buffer.linkId(url) : 0;
             }
             styled.link = id;
         }

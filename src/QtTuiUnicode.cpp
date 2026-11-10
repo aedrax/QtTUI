@@ -160,6 +160,8 @@ int charWidth(char32_t ch)
     // column so buffer arithmetic stays sane (they should never be written).
     if (ch < 0x20 || (ch >= 0x7F && ch < 0xA0))
         return 1;
+    if (ch < 0x7F)
+        return 1; // ASCII: the common case needs no table search
 
     if (ch == 0x00AD)
         return 1; // soft hyphen: category Cf but width 1 per wcwidth
