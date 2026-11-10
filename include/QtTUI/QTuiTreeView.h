@@ -28,6 +28,12 @@ public:
     void collapse(const QModelIndex &index);
     bool isExpanded(const QModelIndex &index) const;
 
+    // Hidden rows, as in QTreeView. A hidden item and its children do not
+    // show. If the current item becomes hidden, the item at its row becomes
+    // current. A model reset shows all items again.
+    bool isRowHidden(int row, const QModelIndex &parent) const;
+    void setRowHidden(int row, const QModelIndex &parent, bool hide);
+
     // Selects all visible items in the three multiple modes
     void selectAll() override;
 
@@ -67,6 +73,7 @@ private:
 
     QList<FlattenedItem> m_flatList;
     QSet<QPersistentModelIndex> m_expandedItems;
+    QSet<QPersistentModelIndex> m_hiddenItems;
     int m_currentRow = 0;
     // Flat row affected by an in-flight removal, captured in
     // onRowsAboutToBeRemoved while the indexes are still valid.

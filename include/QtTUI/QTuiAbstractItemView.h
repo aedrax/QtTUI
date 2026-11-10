@@ -180,6 +180,32 @@ protected:
     // Marks the visible rows from `first` to `last` as dirty. The first row
     // of the view is `top` lines below the top of the widget.
     void markRowsDirty(int first, int last, int top = 0);
+    // The hidden rows of the list and the table view. A view row is the
+    // position of a row among the rows that show. movedRow(), wheelScroll(),
+    // scrollToRow(), markRowsDirty() and m_scrollOffset use view rows; the
+    // current row of a view is a model row. Each function costs a search in
+    // the hidden rows, not a loop on the rows of the model.
+    bool isHiddenRow(int row) const;
+    // Returns false if the row already has that state
+    bool setHiddenRow(int row, bool hide);
+    void clearHiddenRows();
+    // The number of rows that show
+    int shownRows() const;
+    // The view row of a model row. For a hidden row, this is the view row
+    // of the next row that shows.
+    int visualRow(int row) const;
+    // The model row of a view row
+    int logicalRow(int visualRow) const;
+    // The row that shows at `row` or after it, or the last row that shows.
+    // Returns -1 if no row shows.
+    int shownRowNear(int row) const;
+    // Keeps m_scrollOffset in the rows that show, for a view of
+    // visibleRows lines
+    void clampScrollOffset(int visibleRows);
+    // Moves the hidden rows after the model inserts (count > 0) or removes
+    // (count < 0) rows at `first`. A view calls it first in its
+    // rowsInserted and rowsRemoved slots.
+    void shiftHiddenRows(int first, int count);
     // Moves the editor to the item after the rows of the view change, or
     // closes it (with commit) if the item is no longer visible
     void updateEditorGeometry();
@@ -221,6 +247,10 @@ private:
     // inserts, removes and sorts
     void followSelectionModel();
 
+    // ponytail: the hidden rows are row numbers, sorted. A sort of the model
+    // keeps the numbers, not the items. Use persistent indexes if the
+    // hidden rows must follow a sort.
+    QList<int> m_hiddenRows;
     QItemSelectionModel *m_selectionModel = nullptr;
     SelectionMode m_selectionMode = SingleSelection;
     SelectionBehavior m_selectionBehavior = SelectItems;

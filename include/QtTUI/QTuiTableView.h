@@ -60,6 +60,16 @@ public:
     void hideColumn(int column) { setColumnHidden(column, true); }
     void showColumn(int column) { setColumnHidden(column, false); }
 
+    // Hidden rows, as in QTableView. A hidden row does not show, the keys
+    // go past it, and a range that Shift selects does not contain it. If
+    // the current row becomes hidden, the next row that shows becomes
+    // current. A model reset shows all rows again. A sort of the model
+    // keeps the row numbers that are hidden, not the items.
+    bool isRowHidden(int row) const;
+    void setRowHidden(int row, bool hide);
+    void hideRow(int row) { setRowHidden(row, true); }
+    void showRow(int row) { setRowHidden(row, false); }
+
     // The header of the columns. The table paints the header row itself:
     // this widget stays hidden and keeps the resize modes and the sizes.
     QTuiHeaderView *horizontalHeader() const;

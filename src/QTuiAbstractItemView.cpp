@@ -5,6 +5,7 @@
 #include <QtTUI/AnsiRenderer.h>
 #include <QCoreApplication>
 #include <QDebug>
+#include <algorithm>
 
 namespace QtTUI {
 
@@ -81,7 +82,7 @@ void QTuiAbstractItemView::selectAll()
     const int columns = m_model->columnCount();
     if (rows == 0 || columns == 0)
         return;
-    m_selectionModel->select(QItemSelection(m_model->index(0, 0),
+    m_selectionModel->select(selectionRange(m_model->index(0, 0),
                                             m_model->index(rows - 1, columns - 1)),
                              QItemSelectionModel::ClearAndSelect);
 }
@@ -264,9 +265,99 @@ QItemSelection QTuiAbstractItemView::selectionRange(const QModelIndex &from,
     if (!m_model || from.parent() != to.parent())
         return QItemSelection(to, to);
     const QModelIndex parent = to.parent();
-    return QItemSelection(
-        m_model->index(qMin(from.row(), to.row()), qMin(from.column(), to.column()), parent),
-        m_model->index(qMax(from.row(), to.row()), qMax(from.column(), to.column()), parent));
+    const int left = qMin(from.column(), to.column());
+    const int right = qMax(from.column(), to.column());
+    const int bottom = qMax(from.row(), to.row());
+    int top = qMin(from.row(), to.row());
+    // The range does not contain the hidden rows: one part for each group
+    // of rows that show
+    QItemSelection range;
+    const auto add = [&](int first, int last) {
+        if (first <= last)
+            range.select(m_model->index(first, left, parent), m_model->index(last, right, parent));
+    };
+    if (!parent.isValid()) {
+        auto it = std::lower_bound(m_hiddenRows.cbegin(), m_hiddenRows.cend(), top);
+        for (; it != m_hiddenRows.cend() && *it <= bottom; ++it) {
+            add(top, *it - 1);
+            top = *it + 1;
+        }
+    }
+    add(top, bottom);
+    return range;
+}
+
+bool QTuiAbstractItemView::isHiddenRow(int row) const
+{
+    return std::binary_search(m_hiddenRows.cbegin(), m_hiddenRows.cend(), row);
+}
+
+bool QTuiAbstractItemView::setHiddenRow(int row, bool hide)
+{
+    const auto it = std::lower_bound(m_hiddenRows.begin(), m_hiddenRows.end(), row);
+    const bool hidden = it != m_hiddenRows.end() && *it == row;
+    if (hidden == hide)
+        return false;
+    if (hide)
+        m_hiddenRows.insert(it, row);
+    else
+        m_hiddenRows.erase(it);
+    return true;
+}
+
+void QTuiAbstractItemView::clearHiddenRows()
+{
+    m_hiddenRows.clear();
+}
+
+int QTuiAbstractItemView::shownRows() const
+{
+    return m_model ? qMax(0, m_model->rowCount() - int(m_hiddenRows.size())) : 0;
+}
+
+int QTuiAbstractItemView::visualRow(int row) const
+{
+    return row - int(std::lower_bound(m_hiddenRows.cbegin(), m_hiddenRows.cend(), row)
+                     - m_hiddenRows.cbegin());
+}
+
+int QTuiAbstractItemView::logicalRow(int visualRow) const
+{
+    // m_hiddenRows[i] - i is the number of rows that show before hidden row
+    // i. It does not decrease, so a binary search finds the number of
+    // hidden rows before the view row.
+    int low = 0;
+    int high = m_hiddenRows.size();
+    while (low < high) {
+        const int middle = (low + high) / 2;
+        if (m_hiddenRows.at(middle) - middle <= visualRow)
+            low = middle + 1;
+        else
+            high = middle;
+    }
+    return visualRow + low;
+}
+
+int QTuiAbstractItemView::shownRowNear(int row) const
+{
+    const int shown = shownRows();
+    return shown > 0 ? logicalRow(qBound(0, visualRow(row), shown - 1)) : -1;
+}
+
+void QTuiAbstractItemView::clampScrollOffset(int visibleRows)
+{
+    if (visibleRows > 0)
+        m_scrollOffset = qBound(0, m_scrollOffset, qMax(0, shownRows() - visibleRows));
+}
+
+void QTuiAbstractItemView::shiftHiddenRows(int first, int count)
+{
+    auto it = std::lower_bound(m_hiddenRows.begin(), m_hiddenRows.end(), first);
+    // The removed rows are no longer hidden rows
+    if (count < 0)
+        it = m_hiddenRows.erase(it, std::lower_bound(it, m_hiddenRows.end(), first - count));
+    for (; it != m_hiddenRows.end(); ++it)
+        *it += count;
 }
 
 void QTuiAbstractItemView::followSelectionModel()

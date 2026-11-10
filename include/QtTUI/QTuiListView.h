@@ -22,6 +22,13 @@ public:
     QRect visualRect(const QModelIndex &index) const override;
     QRect hoverRect() const override;
 
+    // Hidden rows, as in QListView. A hidden row does not show, the keys
+    // go past it, and a range that Shift selects does not contain it. If
+    // the current row becomes hidden, the next row that shows becomes
+    // current. A model reset shows all rows again. A sort of the model
+    // keeps the row numbers that are hidden, not the items.
+    bool isRowHidden(int row) const;
+    void setRowHidden(int row, bool hide);
 
     void paintEvent(ScreenBuffer &buffer) override;
 

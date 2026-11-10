@@ -107,6 +107,29 @@ selected item has a dimmer background and bold text. In the multiple modes,
 the current item has an underline, because it can be current but not
 selected.
 
+## Hidden rows
+
+`QTuiListView` and `QTuiTableView` have `setRowHidden(row, hide)` and
+`isRowHidden(row)`, and the table also has `hideRow()` and `showRow()`.
+`QTuiTreeView` has `setRowHidden(row, parent, hide)` and
+`isRowHidden(row, parent)`; a hidden item also hides its children.
+
+A hidden row takes no line. The keys, the pages, the wheel, a click,
+`scrollTo()` and `visualRect()` all go past it. A hidden row cannot be
+current: if the current row becomes hidden, the next row that shows becomes
+current. An editor on a row that becomes hidden writes its value and closes.
+
+A range that Shift or a drag selects does not contain the hidden rows, and
+`selectAll()` does not select them. Different from Qt: `QTableView` selects
+the hidden rows in a range and removes them only in `selectedIndexes()`.
+
+The list and the table keep the hidden rows as sorted row numbers. Each
+paint and each key costs a search in the hidden rows, not a loop on the rows
+of the model. When the model inserts or removes rows, the hidden rows move
+with their items. A model reset and `setModel()` show all rows again.
+Different from Qt: a sort (`layoutChanged`) keeps the hidden row numbers,
+not the items. In the tree, the hidden items follow a sort.
+
 ## Editing
 
 An editor opens on an item that has `Qt::ItemIsEditable` in its flags. The
@@ -265,10 +288,19 @@ Use these functions when you write a view.
 | `bool selectionKeyPressEvent(TuiKeyEvent *event)` | Handles Space, Ctrl+Space and Ctrl+A. Returns `true` if the key changed the selection. |
 | `bool editKeyPressEvent(TuiKeyEvent *event)` | Handles F2 and typed characters. Returns `true` if the key opened an editor. |
 | `bool cursorAction(const TuiKeyEvent *event, CursorAction *action, Qt::KeyboardModifiers *modifiers) const` | Reads the move of a navigation key (see [keys](#keys)). Returns `false` for other keys. `*modifiers` gets the modifiers to give to `selectCurrent()`. |
-| `static int movedRow(CursorAction action, int row, int rowCount, int visibleRows)` | Returns the row after a vertical move. A page is `visibleRows - 1` rows. |
+| `static int movedRow(CursorAction action, int row, int rowCount, int visibleRows)` | Returns the view row after a vertical move. A page is `visibleRows - 1` rows. |
 | `bool wheelScroll(const TuiMouseEvent *event, int *offset, int visibleRows, int rowCount)` | Scrolls `*offset` for a wheel event, with the limits of `scrollToRow()`. Returns `false` if the event is not a wheel event. |
 | `void scrollToRow(int row, int visibleRows, int rowCount, ScrollHint hint)` | Moves the scroll offset to show the row, as the hint tells. |
 | `void markRowsDirty(int first, int last, int top = 0)` | Marks the visible rows from `first` to `last` as dirty. `top` is the number of lines above the first row (for example a header). |
+| `bool isHiddenRow(int row) const` | Returns `true` if the row is hidden. |
+| `bool setHiddenRow(int row, bool hide)` | Hides or shows a row. Returns `false` if the row already has that state. The view must then repaint and move its current row. |
+| `void clearHiddenRows()` | Shows all rows. |
+| `int shownRows() const` | Returns the number of rows that show. |
+| `int visualRow(int row) const` | Returns the view row of a model row: its position in the rows that show. `movedRow()`, `wheelScroll()`, `scrollToRow()` and `markRowsDirty()` use view rows. |
+| `int logicalRow(int visualRow) const` | Returns the model row of a view row. |
+| `int shownRowNear(int row) const` | Returns the row that shows at `row` or after it, or the last row that shows, or -1. |
+| `void clampScrollOffset(int visibleRows)` | Keeps the scroll offset in the rows that show. |
+| `void shiftHiddenRows(int first, int count)` | Moves the hidden rows after the model inserts (`count` > 0) or removes (`count` < 0) rows at `first`. Call it first in the `rowsInserted` and `rowsRemoved` slots. |
 | `void updateEditorGeometry()` | Moves the editor to its item. If the item is not visible, it closes the editor and writes the value. |
 | `bool eventFilter(QObject *watched, QEvent *event) override` | Gives Enter and Escape in the editor to the view. |
 | `bool isSelected(const QModelIndex &index) const` | Returns `true` if the item is selected. |
@@ -361,6 +393,8 @@ void example(QTuiWidget *parent)
 | `void scrollTo(const QModelIndex &index, ScrollHint hint = EnsureVisible)` | Scrolls to a top-level row. |
 | `QRect visualRect(const QModelIndex &index) const` | Returns the line of the row. |
 | `QRect hoverRect() const override` | Returns the row under the mouse, for the hover highlight. |
+| `bool isRowHidden(int row) const` | Returns `true` if the row is hidden. |
+| `void setRowHidden(int row, bool hide)` | Hides or shows the row. See [hidden rows](#hidden-rows). |
 | `void paintEvent(ScreenBuffer &buffer) override` | Paints the visible rows. Long text is truncated. |
 
 ### Keys
@@ -526,6 +560,10 @@ int main(int argc, char *argv[])
 | `void setColumnHidden(int column, bool hide)` | Hides or shows the column. A hidden column takes no space, and the Left and Right keys go past it. If the current column becomes hidden, the next column that shows becomes current. `horizontalHeader()->setSectionHidden()` does the same. |
 | `void hideColumn(int column)` | Calls `setColumnHidden(column, true)`. |
 | `void showColumn(int column)` | Calls `setColumnHidden(column, false)`. |
+| `bool isRowHidden(int row) const` | Returns `true` if the row is hidden. |
+| `void setRowHidden(int row, bool hide)` | Hides or shows the row. See [hidden rows](#hidden-rows). |
+| `void hideRow(int row)` | Calls `setRowHidden(row, true)`. |
+| `void showRow(int row)` | Calls `setRowHidden(row, false)`. |
 | `void resizeColumnToContents(int column)` | Sets the width of the column to the widest of the header and the visible cells, as `setColumnWidth()` does. |
 | `void resizeColumnsToContents()` | Calls `resizeColumnToContents()` for each column. |
 | `QTuiHeaderView *horizontalHeader() const` | Returns the hidden header that keeps the resize modes and the sizes of the columns. |
@@ -594,6 +632,8 @@ void example(QTuiWidget *parent, QAbstractItemModel *model)
 | `void expand(const QModelIndex &index)` | Shows the children of the item and emits `expanded()`. |
 | `void collapse(const QModelIndex &index)` | Hides the children of the item and emits `collapsed()`. |
 | `bool isExpanded(const QModelIndex &index) const` | Returns `true` if the item is expanded. |
+| `bool isRowHidden(int row, const QModelIndex &parent) const` | Returns `true` if the item is hidden. |
+| `void setRowHidden(int row, const QModelIndex &parent, bool hide)` | Hides or shows the item and its children. See [hidden rows](#hidden-rows). |
 | `void selectAll() override` | Selects all visible items in the three multiple modes. |
 | `void paintEvent(ScreenBuffer &buffer) override` | Paints the visible rows. |
 | `QItemSelection selectionRange(const QModelIndex &from, const QModelIndex &to) const override` | Returns the visible rows between the two items, at all levels. |

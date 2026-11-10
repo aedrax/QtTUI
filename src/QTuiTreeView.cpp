@@ -39,6 +39,7 @@ void QTuiTreeView::setModel(QAbstractItemModel *model)
     m_scrollOffset = 0;
     m_pendingRemovalFlatRow = -1;
     m_expandedItems.clear();
+    m_hiddenItems.clear();
     m_flatList.clear();
 
     if (m_model) {
@@ -125,6 +126,35 @@ void QTuiTreeView::collapse(const QModelIndex &index)
     markRowsDirty(toggledRow >= 0 ? toggledRow : 0, INT_MAX);
 
     emit collapsed(index);
+}
+
+bool QTuiTreeView::isRowHidden(int row, const QModelIndex &parent) const
+{
+    return m_model && m_hiddenItems.contains(QPersistentModelIndex(m_model->index(row, 0, parent)));
+}
+
+void QTuiTreeView::setRowHidden(int row, const QModelIndex &parent, bool hide)
+{
+    const QModelIndex index = m_model ? m_model->index(row, 0, parent) : QModelIndex();
+    if (!index.isValid() || hide == isRowHidden(row, parent))
+        return;
+    if (hide)
+        m_hiddenItems.insert(QPersistentModelIndex(index));
+    else
+        m_hiddenItems.remove(QPersistentModelIndex(index));
+
+    // Keep the current item. If it is now hidden, the item at its row
+    // becomes current.
+    const QModelIndex current = currentIndex();
+    rebuildFlatList();
+    const int currentRow = flatRowForIndex(current);
+    m_currentRow = currentRow >= 0 ? currentRow
+                                   : qBound(0, m_currentRow, qMax(0, int(m_flatList.size()) - 1));
+    m_scrollOffset = qBound(0, m_scrollOffset, qMax(0, int(m_flatList.size()) - geometry().height()));
+    scrollToVisible();
+    if (currentRow < 0)
+        selectCurrent(Qt::NoModifier, false);
+    markDirty();
 }
 
 bool QTuiTreeView::isExpanded(const QModelIndex &index) const
@@ -488,6 +518,7 @@ void QTuiTreeView::onModelReset()
     m_currentRow = 0;
     m_scrollOffset = 0;
     m_expandedItems.clear();
+    m_hiddenItems.clear();
     m_flatList.clear();
     rebuildFlatList();
     markDirty();
@@ -553,6 +584,8 @@ void QTuiTreeView::buildFlatListRecursive(const QModelIndex &parent, int depth)
     const int rowCount = m_model->rowCount(parent);
     for (int r = 0; r < rowCount; ++r) {
         QModelIndex idx = m_model->index(r, 0, parent);
+        if (!m_hiddenItems.isEmpty() && m_hiddenItems.contains(QPersistentModelIndex(idx)))
+            continue;
         bool isExpanded = m_expandedItems.contains(QPersistentModelIndex(idx));
 
         FlattenedItem item;

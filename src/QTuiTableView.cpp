@@ -27,10 +27,7 @@ QTuiTableView::QTuiTableView(QTuiWidget *parent)
     connect(this, &QTuiWidget::geometryChanged, this, [this](const QRect &) {
         if (!m_model)
             return;
-        const int rows = m_model->rowCount();
-        const int visibleDataRows = geometry().height() - m_headerHeight;
-        if (visibleDataRows > 0)
-            m_scrollOffset = qBound(0, m_scrollOffset, qMax(0, rows - visibleDataRows));
+        clampScrollOffset(geometry().height() - m_headerHeight);
         clampCurrentIndex();
         ensureCurrentVisible();
         ensureColumnVisible(m_currentCol);
@@ -49,6 +46,7 @@ void QTuiTableView::setModel(QAbstractItemModel *model)
     m_currentCol = 0;
     m_scrollOffset = 0;
     m_horizontalScrollOffset = 0;
+    clearHiddenRows();
     remeasureColumnWidths();
 
     if (m_model)
@@ -59,16 +57,17 @@ void QTuiTableView::setModel(QAbstractItemModel *model)
 
 QModelIndex QTuiTableView::currentIndex() const
 {
-    if (!m_model || m_model->rowCount() == 0 || m_model->columnCount() == 0)
+    if (shownRows() == 0 || m_model->columnCount() == 0)
         return QModelIndex();
     return m_model->index(m_currentRow, m_currentCol);
 }
 
 void QTuiTableView::setCurrentIndex(const QModelIndex &index)
 {
-    if (!m_model)
+    if (shownRows() == 0)
         return;
-    int row = qBound(0, index.row(), qMax(0, m_model->rowCount() - 1));
+    // A hidden row cannot be current: the next row that shows is
+    const int row = shownRowNear(index.row());
     int col = qBound(0, index.column(), qMax(0, m_model->columnCount() - 1));
     if (row != m_currentRow || col != m_currentCol) {
         m_currentRow = row;
@@ -85,7 +84,8 @@ void QTuiTableView::scrollTo(const QModelIndex &index, ScrollHint hint)
     if (!m_model || index.model() != m_model || index.parent().isValid())
         return;
     ensureColumnVisible(index.column());
-    scrollToRow(index.row(), geometry().height() - m_headerHeight, m_model->rowCount(), hint);
+    if (!isHiddenRow(index.row()))
+        scrollToRow(visualRow(index.row()), geometry().height() - m_headerHeight, shownRows(), hint);
 }
 
 QRect QTuiTableView::visualRect(const QModelIndex &index) const
@@ -93,8 +93,8 @@ QRect QTuiTableView::visualRect(const QModelIndex &index) const
     if (!m_model || index.model() != m_model || index.parent().isValid())
         return QRect();
     const QRect geo = geometry();
-    const int line = index.row() - m_scrollOffset;
-    if (line < 0 || line >= geo.height() - m_headerHeight)
+    const int line = visualRow(index.row()) - m_scrollOffset;
+    if (line < 0 || line >= geo.height() - m_headerHeight || isHiddenRow(index.row()))
         return QRect();
     // The same column positions as paintEvent: a separator after each column
     const QVector<int> colWidths = effectiveColumnWidths();
@@ -123,7 +123,7 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
 
     const auto theme = themeProperties();
     const int cols = m_model->columnCount();
-    const int rows = m_model->rowCount();
+    const int rows = shownRows();
     const int viewWidth = geo.width();
     const int viewHeight = geo.height();
 
@@ -170,7 +170,8 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
 
     // --- Render visible data rows ---
     for (int vr = 0; vr < visibleDataRows; ++vr) {
-        int modelRow = m_scrollOffset + vr;
+        const bool hasRow = m_scrollOffset + vr < rows;
+        const int modelRow = hasRow ? logicalRow(m_scrollOffset + vr) : -1;
         int screenY = geo.y() + m_headerHeight + vr;
         fillRect(buffer, QRect(geo.x(), screenY, viewWidth, 1), plain);
 
@@ -184,12 +185,12 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
 
             QString cellText;
             QModelIndex idx;
-            if (modelRow < rows) {
+            if (hasRow) {
                 idx = m_model->index(modelRow, c);
                 cellText = m_model->data(idx, Qt::DisplayRole).toString();
             }
 
-            bool isCurrent = (modelRow == m_currentRow && c == m_currentCol && modelRow < rows);
+            bool isCurrent = (modelRow == m_currentRow && c == m_currentCol);
             const Cell style = itemStyle(idx, isCurrent, theme);
 
             // The space after the text has the item colors, without bold or inverse
@@ -214,7 +215,7 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
 
 void QTuiTableView::keyPressEvent(TuiKeyEvent *event)
 {
-    if (!m_model || m_model->rowCount() == 0 || m_model->columnCount() == 0)
+    if (shownRows() == 0 || m_model->columnCount() == 0)
         return;
 
     if (editKeyPressEvent(event) || selectionKeyPressEvent(event))
@@ -253,8 +254,8 @@ void QTuiTableView::keyPressEvent(TuiKeyEvent *event)
             m_currentCol = movedColumn(m_currentCol, action == MoveLeft ? -1 : 1);
             ensureColumnVisible(m_currentCol);
         } else {
-            m_currentRow = movedRow(action, m_currentRow, m_model->rowCount(),
-                                    geometry().height() - m_headerHeight);
+            m_currentRow = logicalRow(movedRow(action, visualRow(m_currentRow), shownRows(),
+                                               geometry().height() - m_headerHeight));
             ensureCurrentVisible();
         }
     } else if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
@@ -334,6 +335,25 @@ void QTuiTableView::setColumnHidden(int column, bool hide)
     markDirty();
 }
 
+bool QTuiTableView::isRowHidden(int row) const
+{
+    return isHiddenRow(row);
+}
+
+void QTuiTableView::setRowHidden(int row, bool hide)
+{
+    if (!m_model || row < 0 || row >= m_model->rowCount() || !setHiddenRow(row, hide))
+        return;
+    // The current cell must be in a row that shows
+    if (hide && row == m_currentRow && shownRows() > 0)
+        setCurrentIndex(m_model->index(row, m_currentCol));
+    clampScrollOffset(geometry().height() - m_headerHeight);
+    ensureCurrentVisible();
+    invalidateColumnWidths();
+    updateEditorGeometry();
+    markRowsDirty(visualRow(row), INT_MAX, m_headerHeight);
+}
+
 int QTuiTableView::movedColumn(int column, int step) const
 {
     const int cols = m_model ? m_model->columnCount() : 0;
@@ -370,7 +390,7 @@ void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
         return;
     }
     if (m_model && wheelScroll(event, &m_scrollOffset, geometry().height() - m_headerHeight,
-                               m_model->rowCount()))
+                               shownRows()))
         return;
     // The Press before the DoubleClick already made the item current
     if (event->mouseType() == TuiMouseEvent::DoubleClick) {
@@ -400,20 +420,20 @@ void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
     const bool drag = event->mouseType() == TuiMouseEvent::Move && event->button() == Qt::LeftButton;
     if (event->mouseType() != TuiMouseEvent::Press && !drag)
         return;
-    if (!m_model || m_model->rowCount() == 0 || m_model->columnCount() == 0)
+    if (shownRows() == 0 || m_model->columnCount() == 0)
         return;
 
     const QRect geo = geometry();
     const int cols = m_model->columnCount();
-    const int rows = m_model->rowCount();
 
     // Calculate clicked row (subtract 1 for header)
     const bool onHeader = event->y() - geo.y() < m_headerHeight;
-    int clickedRow = (event->y() - geo.y() - m_headerHeight) + m_scrollOffset;
+    const int clickedLine = (event->y() - geo.y() - m_headerHeight) + m_scrollOffset;
     if (drag && onHeader)
         return;
-    if (!onHeader && (clickedRow < 0 || clickedRow >= rows))
+    if (!onHeader && (clickedLine < 0 || clickedLine >= shownRows()))
         return;
+    const int clickedRow = logicalRow(clickedLine);
 
     // Same final column widths as paintEvent
     const QVector<int> colWidths = effectiveColumnWidths();
@@ -479,35 +499,31 @@ void QTuiTableView::onDataChanged(const QModelIndex &topLeft, const QModelIndex 
 
     invalidateColumnWidths();
     const int lastRow = m_model->rowCount() - 1;
-    markRowsDirty(qBound(0, topLeft.row(), lastRow), qBound(0, bottomRight.row(), lastRow),
-                  m_headerHeight);
+    markRowsDirty(visualRow(qBound(0, topLeft.row(), lastRow)),
+                  visualRow(qBound(0, bottomRight.row(), lastRow)), m_headerHeight);
 }
 
 void QTuiTableView::onRowsInserted(const QModelIndex &parent, int first, int last)
 {
-    Q_UNUSED(parent);
-    Q_UNUSED(last);
-
-    if (!m_model)
+    if (!m_model || parent.isValid())
         return;
 
+    shiftHiddenRows(first, last - first + 1);
     invalidateColumnWidths();
     // Mark from the insertion point to the bottom of the view
-    markRowsDirty(first, INT_MAX, m_headerHeight);
+    markRowsDirty(visualRow(first), INT_MAX, m_headerHeight);
     clampCurrentIndex();
 }
 
 void QTuiTableView::onRowsRemoved(const QModelIndex &parent, int first, int last)
 {
-    Q_UNUSED(parent);
-    Q_UNUSED(last);
-
-    if (!m_model)
+    if (!m_model || parent.isValid())
         return;
 
+    shiftHiddenRows(first, first - last - 1);
     invalidateColumnWidths();
     // Mark from the removal point to the bottom of the view
-    markRowsDirty(first, INT_MAX, m_headerHeight);
+    markRowsDirty(visualRow(first), INT_MAX, m_headerHeight);
     clampCurrentIndex();
     ensureCurrentVisible();
 }
@@ -559,6 +575,7 @@ void QTuiTableView::onModelReset()
     m_currentCol = 0;
     m_scrollOffset = 0;
     m_horizontalScrollOffset = 0;
+    clearHiddenRows();
     remeasureColumnWidths();
     markDirty();
 }
@@ -620,7 +637,7 @@ void QTuiTableView::ensureCurrentVisible()
     if (!m_model)
         return;
 
-    scrollRowIntoView(m_currentRow, geometry().height() - m_headerHeight);
+    scrollRowIntoView(visualRow(m_currentRow), geometry().height() - m_headerHeight);
 }
 
 void QTuiTableView::ensureColumnVisible(int column)
@@ -688,7 +705,7 @@ int QTuiTableView::measureColumn(int column) const
     // geometry has no data rows yet, sample a bounded number of rows from
     // the top of the model.
     static constexpr int FallbackSampleRows = 100;
-    const int rows = m_model->rowCount();
+    const int rows = shownRows();
     const int visibleDataRows = geometry().height() - m_headerHeight;
     const int first = qBound(0, m_scrollOffset, qMax(0, rows - 1));
     const int end = qMin(rows, first + (visibleDataRows > 0 ? visibleDataRows : FallbackSampleRows));
@@ -697,7 +714,7 @@ int QTuiTableView::measureColumn(int column) const
     int width = m_model->headerData(column, Qt::Horizontal, Qt::DisplayRole).toString().length()
                 + (m_sortingEnabled ? 2 : 0);
     for (int r = first; r < end; ++r)
-        width = qMax(width, int(m_model->data(m_model->index(r, column), Qt::DisplayRole).toString().length()));
+        width = qMax(width, int(m_model->data(m_model->index(logicalRow(r), column), Qt::DisplayRole).toString().length()));
     return qMax(1, width);
 }
 
@@ -800,12 +817,12 @@ const QVector<int> &QTuiTableView::effectiveColumnWidths() const
 
 void QTuiTableView::clampCurrentIndex()
 {
-    if (!m_model || m_model->rowCount() == 0) {
+    if (shownRows() == 0) {
         m_currentRow = 0;
         m_currentCol = 0;
         return;
     }
-    m_currentRow = qBound(0, m_currentRow, m_model->rowCount() - 1);
+    m_currentRow = shownRowNear(m_currentRow);
     m_currentCol = qBound(0, m_currentCol, qMax(0, m_model->columnCount() - 1));
 }
 
@@ -817,7 +834,7 @@ QRect QTuiTableView::hoverRect() const
     if (line >= 0 && line < m_headerHeight)
         return QRect(geo.x(), geo.y(), geo.width(), m_headerHeight);
     const int row = line - m_headerHeight + m_scrollOffset;
-    if (!m_model || row < 0 || row >= m_model->rowCount())
+    if (row < 0 || row >= shownRows())
         return QRect();
     return QRect(geo.x(), hoverPos().y(), geo.width(), 1);
 }
