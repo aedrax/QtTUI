@@ -34,7 +34,7 @@ void QTuiListView::setModel(QAbstractItemModel *model)
     m_model = model;
     m_currentRow = 0;
     m_scrollOffset = 0;
-    clearHiddenRows();
+    resetRootIndex();
 
     if (m_model)
         connectModel();
@@ -45,12 +45,12 @@ QModelIndex QTuiListView::currentIndex() const
 {
     if (shownRows() == 0)
         return QModelIndex();
-    return m_model->index(m_currentRow, 0);
+    return m_model->index(m_currentRow, 0, rootIndex());
 }
 
 void QTuiListView::setCurrentIndex(const QModelIndex &index)
 {
-    if (shownRows() == 0)
+    if (shownRows() == 0 || (index.isValid() && index.parent() != rootIndex()))
         return;
     // A hidden row cannot be current: the next row that shows is
     const int row = shownRowNear(index.row());
@@ -64,7 +64,7 @@ void QTuiListView::setCurrentIndex(const QModelIndex &index)
 
 void QTuiListView::scrollTo(const QModelIndex &index, ScrollHint hint)
 {
-    if (!m_model || index.model() != m_model || index.parent().isValid())
+    if (!m_model || index.model() != m_model || index.parent() != rootIndex())
         return;
     if (!isHiddenRow(index.row()))
         scrollToRow(visualRow(index.row()), geometry().height(), shownRows(), hint);
@@ -72,7 +72,7 @@ void QTuiListView::scrollTo(const QModelIndex &index, ScrollHint hint)
 
 QRect QTuiListView::visualRect(const QModelIndex &index) const
 {
-    if (!m_model || index.model() != m_model || index.parent().isValid())
+    if (!m_model || index.model() != m_model || index.parent() != rootIndex())
         return QRect();
     const QRect geo = geometry();
     const int line = visualRow(index.row()) - m_scrollOffset;
@@ -109,7 +109,7 @@ void QTuiListView::paintEvent(ScreenBuffer &buffer)
             break;
         const int modelRow = logicalRow(m_scrollOffset + vr);
 
-        QModelIndex idx = m_model->index(modelRow, 0);
+        QModelIndex idx = m_model->index(modelRow, 0, rootIndex());
         QString itemText = m_model->data(idx, Qt::DisplayRole).toString();
 
         const Cell style = itemStyle(idx, modelRow == m_currentRow, theme);
@@ -139,7 +139,7 @@ void QTuiListView::keyPressEvent(TuiKeyEvent *event)
                                            geometry().height()));
         ensureCurrentVisible();
     } else if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
-        emit activated(m_model->index(m_currentRow, 0));
+        emit activated(m_model->index(m_currentRow, 0, rootIndex()));
     }
 
     if (m_currentRow != previousRow)
@@ -182,25 +182,25 @@ void QTuiListView::mousePressEvent(TuiMouseEvent *event)
         else if (!isSelected(currentIndex()))
             selectCurrent(Qt::NoModifier, true);
         if (event->button() == Qt::LeftButton && !drag) {
-            emit clicked(m_model->index(m_currentRow, 0));
-            emit activated(m_model->index(m_currentRow, 0));
+            emit clicked(m_model->index(m_currentRow, 0, rootIndex()));
+            emit activated(m_model->index(m_currentRow, 0, rootIndex()));
         }
     }
 }
 
 void QTuiListView::onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)
 {
-    if (!m_model)
+    if (!m_model || topLeft.parent() != rootIndex())
         return;
 
-    const int lastRow = m_model->rowCount() - 1;
+    const int lastRow = m_model->rowCount(rootIndex()) - 1;
     markRowsDirty(visualRow(qBound(0, topLeft.row(), lastRow)),
                   visualRow(qBound(0, bottomRight.row(), lastRow)));
 }
 
 void QTuiListView::onRowsInserted(const QModelIndex &parent, int first, int last)
 {
-    if (!m_model || parent.isValid())
+    if (!m_model || parent != rootIndex())
         return;
 
     shiftHiddenRows(first, last - first + 1);
@@ -211,7 +211,7 @@ void QTuiListView::onRowsInserted(const QModelIndex &parent, int first, int last
 
 void QTuiListView::onRowsRemoved(const QModelIndex &parent, int first, int last)
 {
-    if (!m_model || parent.isValid())
+    if (!m_model || parent != rootIndex())
         return;
 
     shiftHiddenRows(first, first - last - 1);
@@ -292,6 +292,13 @@ void QTuiListView::clampCurrentIndex()
     m_currentRow = qMax(0, shownRowNear(m_currentRow));
 }
 
+void QTuiListView::setRootIndex(const QModelIndex &index)
+{
+    QTuiAbstractItemView::setRootIndex(index);
+    m_currentRow = 0;
+    selectCurrent(Qt::NoModifier, false);
+}
+
 bool QTuiListView::isRowHidden(int row) const
 {
     return isHiddenRow(row);
@@ -299,11 +306,11 @@ bool QTuiListView::isRowHidden(int row) const
 
 void QTuiListView::setRowHidden(int row, bool hide)
 {
-    if (!m_model || row < 0 || row >= m_model->rowCount() || !setHiddenRow(row, hide))
+    if (!m_model || row < 0 || row >= m_model->rowCount(rootIndex()) || !setHiddenRow(row, hide))
         return;
     // The current row must be a row that shows
     if (hide && row == m_currentRow && shownRows() > 0)
-        setCurrentIndex(m_model->index(row, 0));
+        setCurrentIndex(m_model->index(row, 0, rootIndex()));
     clampScrollOffset(geometry().height());
     ensureCurrentVisible();
     updateEditorGeometry();

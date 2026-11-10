@@ -28,6 +28,7 @@ void QTuiHeaderView::setModel(QAbstractItemModel *model)
     }
 
     m_model = model;
+    m_rootIndex = QPersistentModelIndex();
 
     if (m_model) {
         connect(m_model, &QAbstractItemModel::headerDataChanged,
@@ -65,6 +66,17 @@ void QTuiHeaderView::setModel(QAbstractItemModel *model)
 QAbstractItemModel *QTuiHeaderView::model() const
 {
     return m_model;
+}
+
+void QTuiHeaderView::setRootIndex(const QModelIndex &index)
+{
+    m_rootIndex = index;
+    initSections();
+}
+
+QModelIndex QTuiHeaderView::rootIndex() const
+{
+    return m_rootIndex;
 }
 
 Qt::Orientation QTuiHeaderView::orientation() const
@@ -165,8 +177,8 @@ int QTuiHeaderView::count() const
     if (!m_model)
         return 0;
     return (m_orientation == Qt::Horizontal)
-        ? m_model->columnCount()
-        : m_model->rowCount();
+        ? m_model->columnCount(m_rootIndex)
+        : m_model->rowCount(m_rootIndex);
 }
 
 QSize QTuiHeaderView::minimumSize() const

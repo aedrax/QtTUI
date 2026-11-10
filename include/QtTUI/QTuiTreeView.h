@@ -23,6 +23,7 @@ public:
     void scrollTo(const QModelIndex &index, ScrollHint hint = EnsureVisible) override;
     QRect visualRect(const QModelIndex &index) const override;
     QRect hoverRect() const override;
+    void setRootIndex(const QModelIndex &index) override;
 
     void expand(const QModelIndex &index);
     void collapse(const QModelIndex &index);

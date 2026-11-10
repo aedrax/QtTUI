@@ -21,6 +21,7 @@ public:
     void scrollTo(const QModelIndex &index, ScrollHint hint = EnsureVisible) override;
     QRect visualRect(const QModelIndex &index) const override;
     QRect hoverRect() const override;
+    void setRootIndex(const QModelIndex &index) override;
 
     // Hidden rows, as in QListView. A hidden row does not show, the keys
     // go past it, and a range that Shift selects does not contain it. If

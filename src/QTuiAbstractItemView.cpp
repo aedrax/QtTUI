@@ -20,6 +20,31 @@ QAbstractItemModel *QTuiAbstractItemView::model() const
     return m_model;
 }
 
+void QTuiAbstractItemView::setRootIndex(const QModelIndex &index)
+{
+    if (index.isValid() && index.model() != m_model)
+        return;
+    closeEditor(false);
+    m_rootIndex = index;
+    m_hasRootIndex = index.isValid();
+    m_selectionAnchor = QPersistentModelIndex();
+    m_hiddenRows.clear();
+    m_scrollOffset = 0;
+    markDirty();
+}
+
+QModelIndex QTuiAbstractItemView::rootIndex() const
+{
+    return m_rootIndex;
+}
+
+void QTuiAbstractItemView::resetRootIndex()
+{
+    m_rootIndex = QPersistentModelIndex();
+    m_hasRootIndex = false;
+    m_hiddenRows.clear();
+}
+
 QItemSelectionModel *QTuiAbstractItemView::selectionModel() const
 {
     return m_selectionModel;
@@ -78,12 +103,12 @@ void QTuiAbstractItemView::selectAll()
 {
     if (!m_selectionModel || !m_model || m_selectionMode < MultiSelection)
         return;
-    const int rows = m_model->rowCount();
-    const int columns = m_model->columnCount();
+    const int rows = m_model->rowCount(rootIndex());
+    const int columns = m_model->columnCount(rootIndex());
     if (rows == 0 || columns == 0)
         return;
-    m_selectionModel->select(selectionRange(m_model->index(0, 0),
-                                            m_model->index(rows - 1, columns - 1)),
+    m_selectionModel->select(selectionRange(m_model->index(0, 0, rootIndex()),
+                                            m_model->index(rows - 1, columns - 1, rootIndex())),
                              QItemSelectionModel::ClearAndSelect);
 }
 
@@ -107,7 +132,11 @@ void QTuiAbstractItemView::resetSelectionModel()
         connect(m_model, &M::columnsInserted, this, follow),
         connect(m_model, &M::columnsRemoved, this, follow),
         connect(m_model, &M::layoutChanged, this, follow),
-        connect(m_model, &M::modelReset, this, [this]() { closeEditor(false); }),
+        connect(m_model, &M::modelReset, this, [this]() {
+            closeEditor(false);
+            if (m_hasRootIndex)
+                setRootIndex(QModelIndex());
+        }),
     };
 }
 
@@ -151,7 +180,7 @@ void QTuiAbstractItemView::selectCurrent(Qt::KeyboardModifiers modifiers, bool c
         // first item in a new view).
         if (shift && !m_selectionAnchor.isValid()) {
             m_selectionAnchor = m_selectionModel->currentIndex().isValid()
-                ? m_selectionModel->currentIndex() : m_model->index(0, 0);
+                ? m_selectionModel->currentIndex() : m_model->index(0, 0, rootIndex());
         }
         if (shift && m_selectionAnchor.isValid()) {
             m_selectionModel->setCurrentIndex(index, F::NoUpdate);
@@ -276,7 +305,7 @@ QItemSelection QTuiAbstractItemView::selectionRange(const QModelIndex &from,
         if (first <= last)
             range.select(m_model->index(first, left, parent), m_model->index(last, right, parent));
     };
-    if (!parent.isValid()) {
+    if (parent == rootIndex()) {
         auto it = std::lower_bound(m_hiddenRows.cbegin(), m_hiddenRows.cend(), top);
         for (; it != m_hiddenRows.cend() && *it <= bottom; ++it) {
             add(top, *it - 1);
@@ -312,7 +341,7 @@ void QTuiAbstractItemView::clearHiddenRows()
 
 int QTuiAbstractItemView::shownRows() const
 {
-    return m_model ? qMax(0, m_model->rowCount() - int(m_hiddenRows.size())) : 0;
+    return m_model ? qMax(0, m_model->rowCount(rootIndex()) - int(m_hiddenRows.size())) : 0;
 }
 
 int QTuiAbstractItemView::visualRow(int row) const
@@ -362,6 +391,9 @@ void QTuiAbstractItemView::shiftHiddenRows(int first, int count)
 
 void QTuiAbstractItemView::followSelectionModel()
 {
+    // The model removed the root: show the top-level rows again
+    if (m_hasRootIndex && !m_rootIndex.isValid())
+        setRootIndex(QModelIndex());
     if (m_selectionModel)
         onSelectionCurrentChanged(m_selectionModel->currentIndex());
     // The edited item can move or go away

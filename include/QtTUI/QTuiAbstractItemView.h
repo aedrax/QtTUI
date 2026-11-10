@@ -92,6 +92,15 @@ public:
     virtual QModelIndex currentIndex() const = 0;
     virtual void setCurrentIndex(const QModelIndex &index) = 0;
 
+    // The parent of the rows that the view shows, as in Qt. The default is
+    // the invalid index: the view shows the top-level rows. A new root
+    // makes its first row current, clears the selection anchor and shows
+    // the hidden rows again. An index of a different model has no effect.
+    // If the model removes the root or resets, the root is again the
+    // invalid index. setModel() also resets it.
+    virtual void setRootIndex(const QModelIndex &index);
+    QModelIndex rootIndex() const;
+
     QItemSelectionModel *selectionModel() const;
     // The view does not take ownership of the selection model
     void setSelectionModel(QItemSelectionModel *selectionModel);
@@ -149,6 +158,10 @@ protected:
     // the model signals. The base then connects to the row signals after
     // the view, so the view updates its rows first.
     void resetSelectionModel();
+    // Each view calls this in setModel(), after it sets m_model and before
+    // it reads the new model: the root is the invalid index and all rows
+    // show.
+    void resetRootIndex();
     // Each view calls this after a key or a click makes a different item
     // current. It updates the selection for the mode and the modifiers.
     void selectCurrent(Qt::KeyboardModifiers modifiers, bool click);
@@ -251,6 +264,9 @@ private:
     // keeps the numbers, not the items. Use persistent indexes if the
     // hidden rows must follow a sort.
     QList<int> m_hiddenRows;
+    QPersistentModelIndex m_rootIndex;
+    // True while the root is a valid index, to see that the model removed it
+    bool m_hasRootIndex = false;
     QItemSelectionModel *m_selectionModel = nullptr;
     SelectionMode m_selectionMode = SingleSelection;
     SelectionBehavior m_selectionBehavior = SelectItems;

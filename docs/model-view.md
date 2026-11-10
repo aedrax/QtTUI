@@ -34,6 +34,27 @@ Use any `QAbstractItemModel`. QtTUI uses Qt Core only, so
 `QStandardItemModel` is not available. Use `QStringListModel`, a
 `QSortFilterProxyModel`, or your own model.
 
+## Root index
+
+`setRootIndex()` sets the parent of the rows that a view shows, as in Qt.
+The default is the invalid index: the view shows the top-level rows. With a
+root, `QTuiListView` and `QTuiTableView` show the children of the root,
+`QTuiTreeView` shows the tree below the root, and `QTuiColumnView` shows the
+children of the root in its first column. `QTuiTableView` also counts the
+columns below the root.
+
+A new root makes its first row current and shows all [hidden rows](#hidden-rows)
+again. The view ignores the model signals for rows of a different parent.
+If the model removes the root or resets, the root is again the invalid
+index. `setModel()` also resets the root. An index of a different model has
+no effect.
+
+```cpp
+// Show the files of one directory of a tree model in a list
+list->setModel(treeModel);
+list->setRootIndex(treeModel->index(2, 0));
+```
+
 ## Item colors
 
 `itemStyle()` reads `Qt::ForegroundRole` (the text color) and
@@ -256,6 +277,8 @@ int main(int argc, char *argv[])
 | `QAbstractItemModel *model() const` | Returns the model, or `nullptr`. |
 | `virtual QModelIndex currentIndex() const` | Returns the current item. |
 | `virtual void setCurrentIndex(const QModelIndex &index)` | Makes the item current and scrolls to it. It also selects the item, but not in `NoSelection` or `MultiSelection`. |
+| `virtual void setRootIndex(const QModelIndex &index)` | Sets the parent of the rows that the view shows. See [root index](#root-index). |
+| `QModelIndex rootIndex() const` | Returns the root index. The default is the invalid index. |
 | `QItemSelectionModel *selectionModel() const` | Returns the selection model. |
 | `void setSelectionModel(QItemSelectionModel *selectionModel)` | Sets a selection model. The view does not take ownership. A selection model for a different model gives a warning, and the view ignores it. |
 | `SelectionMode selectionMode() const` | Returns the selection mode. |
@@ -284,6 +307,7 @@ Use these functions when you write a view.
 | Function | Description |
 | --- | --- |
 | `void resetSelectionModel()` | Makes a new selection model. Call it at the end of `setModel()`, after you connect to the model signals. |
+| `void resetRootIndex()` | Sets the root to the invalid index and shows all rows. Call it in `setModel()`, after you set `m_model` and before you read the new model. |
 | `void selectCurrent(Qt::KeyboardModifiers modifiers, bool click)` | Updates the selection for the mode and the modifiers. Call it after a key or a click makes a different item current. |
 | `bool selectionKeyPressEvent(TuiKeyEvent *event)` | Handles Space, Ctrl+Space and Ctrl+A. Returns `true` if the key changed the selection. |
 | `bool editKeyPressEvent(TuiKeyEvent *event)` | Handles F2 and typed characters. Returns `true` if the key opened an editor. |
@@ -356,7 +380,8 @@ mouse. The next key that moves the current item scrolls back to it.
 
 `#include <QtTUI/QTuiListView.h>` · Inherits: `QTuiAbstractItemView`
 
-Shows column 0 of the top-level rows of a model, one row for each line.
+Shows column 0 of the rows below the [root index](#root-index) of a model
+(by default the top-level rows), one row for each line.
 Different from Qt: each left click emits `activated()`, and a double click
 emits only `doubleClicked()`.
 
@@ -390,7 +415,7 @@ void example(QTuiWidget *parent)
 | `void setModel(QAbstractItemModel *model)` | Sets the model. The first row becomes current. |
 | `QModelIndex currentIndex() const` | Returns the current row in column 0, or an invalid index if the model is empty. |
 | `void setCurrentIndex(const QModelIndex &index)` | Makes the row current. A row out of range goes to the nearest row. |
-| `void scrollTo(const QModelIndex &index, ScrollHint hint = EnsureVisible)` | Scrolls to a top-level row. |
+| `void scrollTo(const QModelIndex &index, ScrollHint hint = EnsureVisible)` | Scrolls to a row of the root. |
 | `QRect visualRect(const QModelIndex &index) const` | Returns the line of the row. |
 | `QRect hoverRect() const override` | Returns the row under the mouse, for the hover highlight. |
 | `bool isRowHidden(int row) const` | Returns `true` if the row is hidden. |
@@ -763,7 +788,9 @@ void example(QTuiWidget *parent)
 | `void resizeSection(int logicalIndex, int size)` | Sets the size of the section and emits `sectionResized()`. |
 | `bool isSectionHidden(int logicalIndex) const` | Returns `true` if the section is hidden. |
 | `void setSectionHidden(int logicalIndex, bool hide)` | Hides or shows the section. |
-| `int count() const` | Returns the number of sections: the columns or the rows of the model. |
+| `int count() const` | Returns the number of sections: the columns or the rows of the model, below the root index. |
+| `void setRootIndex(const QModelIndex &index)` | Sets the parent of the columns or rows that the header counts. `QTuiTableView::setRootIndex()` calls it. |
+| `QModelIndex rootIndex() const` | Returns the root index. |
 | `void setSectionResizeMode(ResizeMode mode)` | Sets the resize mode of all sections: `Interactive` (the default), `Stretch`, `Fixed` or `ResizeToContents`. The values are the same as in Qt. See [QTuiTableView](#qtuitableview). |
 | `void setSectionResizeMode(int logicalIndex, ResizeMode mode)` | Sets the resize mode of one section. |
 | `ResizeMode sectionResizeMode(int logicalIndex) const` | Returns the resize mode of the section. |

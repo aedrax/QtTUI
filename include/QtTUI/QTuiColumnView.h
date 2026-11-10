@@ -20,6 +20,8 @@ public:
     // Scrolls to the column of the item, if the view shows that column
     void scrollTo(const QModelIndex &index, ScrollHint hint = EnsureVisible) override;
     QRect visualRect(const QModelIndex &index) const override;
+    // The first column shows the children of the root
+    void setRootIndex(const QModelIndex &index) override;
 
     int defaultColumnWidth() const;
     void setDefaultColumnWidth(int width);

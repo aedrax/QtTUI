@@ -5,6 +5,7 @@
 #include <QList>
 #include <QHash>
 #include <QSet>
+#include <QPersistentModelIndex>
 
 class QAbstractItemModel;
 
@@ -38,6 +39,10 @@ public:
 
     void setModel(QAbstractItemModel *model);
     QAbstractItemModel *model() const;
+
+    // The parent of the columns or rows that the header counts, as in Qt
+    void setRootIndex(const QModelIndex &index);
+    QModelIndex rootIndex() const;
 
     Qt::Orientation orientation() const;
 
@@ -79,6 +84,7 @@ private:
     int nextVisibleSection(int from, int direction) const;
 
     QAbstractItemModel *m_model = nullptr;
+    QPersistentModelIndex m_rootIndex;
     Qt::Orientation m_orientation;
     QList<int> m_sectionSizes;
     QSet<int> m_hiddenSections;

@@ -41,6 +41,7 @@ void QTuiTreeView::setModel(QAbstractItemModel *model)
     m_expandedItems.clear();
     m_hiddenItems.clear();
     m_flatList.clear();
+    resetRootIndex();
 
     if (m_model) {
         connectModel();
@@ -128,6 +129,14 @@ void QTuiTreeView::collapse(const QModelIndex &index)
     emit collapsed(index);
 }
 
+void QTuiTreeView::setRootIndex(const QModelIndex &index)
+{
+    QTuiAbstractItemView::setRootIndex(index);
+    m_currentRow = 0;
+    rebuildFlatList();
+    selectCurrent(Qt::NoModifier, false);
+}
+
 bool QTuiTreeView::isRowHidden(int row, const QModelIndex &parent) const
 {
     return m_model && m_hiddenItems.contains(QPersistentModelIndex(m_model->index(row, 0, parent)));
@@ -168,7 +177,7 @@ void QTuiTreeView::scrollTo(const QModelIndex &index, ScrollHint hint)
         return;
     // Expand the parents, so that the item has a row
     QList<QModelIndex> parents;
-    for (QModelIndex p = index.parent(); p.isValid(); p = p.parent())
+    for (QModelIndex p = index.parent(); p.isValid() && p != rootIndex(); p = p.parent())
         parents.prepend(p);
     for (const QModelIndex &p : parents)
         expand(p);
@@ -575,7 +584,7 @@ void QTuiTreeView::rebuildFlatList()
     m_flatList.clear();
     if (!m_model)
         return;
-    buildFlatListRecursive(QModelIndex(), 0);
+    buildFlatListRecursive(rootIndex(), 0);
     updateEditorGeometry();
 }
 

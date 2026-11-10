@@ -22,6 +22,7 @@ public:
     void scrollTo(const QModelIndex &index, ScrollHint hint = EnsureVisible) override;
     QRect visualRect(const QModelIndex &index) const override;
     QRect hoverRect() const override;
+    void setRootIndex(const QModelIndex &index) override;
 
     int horizontalScrollOffset() const;
 

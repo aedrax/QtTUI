@@ -106,6 +106,72 @@ public:
     }
 };
 
+// A tree of two levels: groups "A", "B", ... and their children "A0",
+// "A1", ... Each item has two columns; column 1 has the text and "+".
+class GroupModel : public QAbstractItemModel {
+public:
+    QList<QStringList> groups;
+    explicit GroupModel(int groupCount = 3, int children = 4)
+    {
+        for (int g = 0; g < groupCount; ++g) {
+            QStringList names;
+            for (int c = 0; c < children; ++c)
+                names << QStringLiteral("%1%2").arg(QChar('A' + g)).arg(c);
+            groups << names;
+        }
+    }
+    // The internal id is 0 for a group and the group row + 1 for a child
+    QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const override
+    {
+        if (!hasIndex(row, column, parent))
+            return QModelIndex();
+        return createIndex(row, column, quintptr(parent.isValid() ? parent.row() + 1 : 0));
+    }
+    QModelIndex parent(const QModelIndex &child) const override
+    {
+        const int group = int(child.internalId()) - 1;
+        return group < 0 ? QModelIndex() : createIndex(group, 0, quintptr(0));
+    }
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override
+    {
+        if (!parent.isValid())
+            return groups.size();
+        return parent.internalId() == 0 && parent.column() == 0 ? groups.at(parent.row()).size() : 0;
+    }
+    int columnCount(const QModelIndex & = QModelIndex()) const override { return 2; }
+    QVariant data(const QModelIndex &index, int role) const override
+    {
+        if (role != Qt::DisplayRole)
+            return {};
+        const int group = int(index.internalId()) - 1;
+        const QString name = group < 0 ? QString(QChar('A' + index.row()))
+                                       : groups.at(group).at(index.row());
+        return index.column() == 0 ? name : name + QLatin1Char('+');
+    }
+    QVariant headerData(int section, Qt::Orientation, int role) const override
+    {
+        return role == Qt::DisplayRole ? QVariant(QStringLiteral("H%1").arg(section)) : QVariant();
+    }
+    void removeGroup(int row)
+    {
+        beginRemoveRows(QModelIndex(), row, row);
+        groups.removeAt(row);
+        endRemoveRows();
+    }
+    void addChild(int group, const QString &name)
+    {
+        const int row = groups.at(group).size();
+        beginInsertRows(index(group, 0), row, row);
+        groups[group] << name;
+        endInsertRows();
+    }
+    void reset()
+    {
+        beginResetModel();
+        endResetModel();
+    }
+};
+
 class TestItemViewStructure : public QObject {
     Q_OBJECT
 
@@ -324,6 +390,125 @@ private slots:
         QCOMPARE(view.editor()->geometry().y(), 1);
         view.setRowHidden(2, true);
         QVERIFY(!view.isEditing());
+    }
+
+    // --- Root index ---
+
+    void rootIndexInTheListView()
+    {
+        GroupModel model;
+        QTuiListView view;
+        view.setGeometry(QRect(0, 0, 20, 5));
+        view.setModel(&model);
+        QCOMPARE(paintedLine(view, 1), QStringLiteral("B"));
+        sendKey(view, Qt::Key_Down);
+
+        const QModelIndex root = model.index(1, 0);
+        view.setRootIndex(root);
+        QCOMPARE(view.rootIndex(), root);
+        QCOMPARE(paintedLine(view, 0), QStringLiteral("B0"));
+        QCOMPARE(paintedLine(view, 3), QStringLiteral("B3"));
+        QCOMPARE(paintedLine(view, 4), QString());
+        // The first row of the root is current, and the keys stay in it
+        QCOMPARE(view.currentIndex(), model.index(0, 0, root));
+        sendKey(view, Qt::Key_End);
+        QCOMPARE(view.currentIndex(), model.index(3, 0, root));
+        QVERIFY(view.selectionModel()->isSelected(model.index(3, 0, root)));
+        click(view, 1, 1);
+        QCOMPARE(view.currentIndex(), model.index(1, 0, root));
+        QCOMPARE(view.visualRect(model.index(2, 0, root)).y(), 2);
+        QVERIFY(view.visualRect(model.index(2, 0)).isEmpty());
+
+        // Rows of the root repaint; rows of a different parent do not
+        view.clearDirtyRegions();
+        model.addChild(0, QStringLiteral("A4"));
+        QVERIFY(view.dirtyRegion().isNull());
+        model.addChild(1, QStringLiteral("B4"));
+        QCOMPARE(view.dirtyRegion(), QRect(0, 4, 20, 1));
+        QCOMPARE(paintedLine(view, 4), QStringLiteral("B4"));
+
+        // An index of a different model has no effect
+        GroupModel other;
+        view.setRootIndex(other.index(0, 0));
+        QCOMPARE(view.rootIndex(), root);
+    }
+
+    void rootIndexInTheTableView()
+    {
+        GroupModel model;
+        QTuiTableView view;
+        view.setGeometry(QRect(0, 0, 20, 6));
+        view.setModel(&model);
+        const QModelIndex root = model.index(2, 0);
+        view.setRootIndex(root);
+        QCOMPARE(paintedLine(view, 0), QStringLiteral("H0 H1"));
+        QCOMPARE(paintedLine(view, 1), QStringLiteral("C0 C0+"));
+        QCOMPARE(paintedLine(view, 4), QStringLiteral("C3 C3+"));
+        QCOMPARE(paintedLine(view, 5), QString());
+        sendKey(view, Qt::Key_Down);
+        sendKey(view, Qt::Key_Right);
+        QCOMPARE(view.currentIndex(), model.index(1, 1, root));
+        view.setSelectionMode(QTuiAbstractItemView::ExtendedSelection);
+        view.selectAll();
+        QVERIFY(view.selectionModel()->isSelected(model.index(3, 1, root)));
+        QVERIFY(!view.selectionModel()->isSelected(model.index(0, 0)));
+    }
+
+    void rootIndexInTheTreeAndColumnViews()
+    {
+        GroupModel model;
+        QTuiTreeView tree;
+        tree.setGeometry(QRect(0, 0, 20, 6));
+        tree.setModel(&model);
+        tree.setRootIndex(model.index(0, 0));
+        QCOMPARE(paintedLine(tree, 0).trimmed(), QStringLiteral("A0"));
+        QCOMPARE(paintedLine(tree, 4), QString());
+        QCOMPARE(tree.currentIndex(), model.index(0, 0, model.index(0, 0)));
+
+        QTuiColumnView columns;
+        columns.setGeometry(QRect(0, 0, 40, 6));
+        columns.setModel(&model);
+        columns.setRootIndex(model.index(1, 0));
+        QVERIFY(paintedLine(columns, 0).startsWith(QStringLiteral("B0")));
+        QCOMPARE(columns.currentIndex(), model.index(0, 0, model.index(1, 0)));
+        columns.setCurrentIndex(model.index(2, 0, model.index(1, 0)));
+        QVERIFY(paintedLine(columns, 0).startsWith(QStringLiteral("B0")));
+        QCOMPARE(columns.currentIndex(), model.index(2, 0, model.index(1, 0)));
+    }
+
+    void removedRootResetsToTheInvalidIndex()
+    {
+        GroupModel model;
+        QTuiListView list;
+        list.setGeometry(QRect(0, 0, 20, 5));
+        list.setModel(&model);
+        list.setRootIndex(model.index(1, 0));
+        list.setRowHidden(0, true);
+        list.clearDirtyRegions();
+        model.removeGroup(1);
+        QVERIFY(!list.rootIndex().isValid());
+        QCOMPARE(list.dirtyRegion(), list.geometry());
+        QCOMPARE(paintedLine(list, 0), QStringLiteral("A"));
+        // The two groups that stay have the names of their rows
+        QCOMPARE(paintedLine(list, 1), QStringLiteral("B"));
+        QCOMPARE(paintedLine(list, 2), QString());
+        QVERIFY(!list.isRowHidden(0));
+        QCOMPARE(list.currentIndex(), model.index(0, 0));
+
+        QTuiTreeView tree;
+        tree.setGeometry(QRect(0, 0, 20, 5));
+        tree.setModel(&model);
+        tree.setRootIndex(model.index(0, 0));
+        model.reset();
+        QVERIFY(!tree.rootIndex().isValid());
+        QCOMPARE(paintedLine(tree, 0).trimmed(), QStringLiteral("▶ A"));
+
+        // A new model starts at the invalid index
+        list.setRootIndex(model.index(0, 0));
+        QStringListModel strings(numberedRows(3));
+        list.setModel(&strings);
+        QVERIFY(!list.rootIndex().isValid());
+        QCOMPARE(paintedLine(list, 2), QStringLiteral("row 2"));
     }
 };
 
