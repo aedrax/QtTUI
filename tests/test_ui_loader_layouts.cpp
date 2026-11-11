@@ -1,5 +1,9 @@
 #include <QtTest/QtTest>
 #include <QtTUI/UI_Loader.h>
+#include <QtTUI/QTuiTextBrowser.h>
+#include <QtTUI/QTuiTableWidget.h>
+#include <QtTUI/QTuiTreeWidget.h>
+#include <QtTUI/QTuiHeaderView.h>
 #include <QtTUI/QTuiWidget.h>
 #include <QtTUI/QTuiLabel.h>
 #include <QtTUI/QTuiLineEdit.h>
@@ -46,6 +50,7 @@ private slots:
     void testWrongPagesInput();
     void testSerializeLayoutsAndPages();
     void testRoundTrip();
+    void testRoundTripOfWidgetsWithOwnChildren();
     void testDocExamples();
 };
 
@@ -679,6 +684,37 @@ void TestUILoaderLayouts::testSerializeLayoutsAndPages()
     QCOMPARE(splitterObj[QStringLiteral("type")].toString(), QStringLiteral("QTuiSplitter"));
     QCOMPARE(splitterObj[QStringLiteral("pages")].toArray().size(), 2);
     QVERIFY(!splitterObj.contains(QStringLiteral("children")));
+}
+
+// A text browser, a table with a vertical header and a tree with a header
+// make child widgets themselves. serialize() must not write them, and a
+// load of the output must give the same output again.
+void TestUILoaderLayouts::testRoundTripOfWidgetsWithOwnChildren()
+{
+    UI_Loader loader;
+    QTuiWidget root;
+    root.setGeometry(QRect(0, 0, 60, 20));
+    auto *browser = new QTuiTextBrowser(&root);
+    browser->setGeometry(QRect(0, 0, 30, 5));
+    browser->setMarkdown(QStringLiteral("A [link](https://example.org) in **text**"));
+    auto *table = new QTuiTableWidget(&root);
+    table->setGeometry(QRect(0, 6, 30, 5));
+    table->verticalHeader()->setVisible(true);
+    auto *tree = new QTuiTreeWidget(&root);
+    tree->setGeometry(QRect(0, 12, 30, 5));
+    tree->setHeaderHidden(false);
+
+    const QByteArray data = loader.serialize(&root);
+    std::unique_ptr<QTuiWidget> second(loader.loadFromData(data));
+    QVERIFY(second);
+    QCOMPARE(loader.serialize(second.get()), data);
+    QCOMPARE(second->childWidgets().size(), 3);
+    const QJsonArray children = QJsonDocument::fromJson(data).object().value(QStringLiteral("children")).toArray();
+    QCOMPARE(children.size(), 3);
+    for (const QJsonValue &child : children) {
+        QVERIFY2(!child.toObject().contains(QStringLiteral("children")), data.constData());
+        QVERIFY2(!child.toObject().contains(QStringLiteral("pages")), data.constData());
+    }
 }
 
 // load(serialize(tree)) gives an equal tree
