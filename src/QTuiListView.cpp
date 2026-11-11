@@ -284,7 +284,11 @@ void QTuiListView::ensureCurrentVisible()
     if (!m_model)
         return;
 
+    // A scroll changes all lines
+    const int offset = m_scrollOffset;
     scrollRowIntoView(visualRow(m_currentRow), geometry().height());
+    if (m_scrollOffset != offset)
+        markDirty();
 }
 
 void QTuiListView::clampCurrentIndex()
@@ -309,12 +313,17 @@ void QTuiListView::setRowHidden(int row, bool hide)
     if (!m_model || row < 0 || row >= m_model->rowCount(rootIndex()) || !setHiddenRow(row, hide))
         return;
     // The current row must be a row that shows
-    if (hide && row == m_currentRow && shownRows() > 0)
-        setCurrentIndex(m_model->index(row, 0, rootIndex()));
+    if (isHiddenRow(m_currentRow) && shownRows() > 0)
+        setCurrentIndex(m_model->index(m_currentRow, 0, rootIndex()));
+    const int offset = m_scrollOffset;
     clampScrollOffset(geometry().height());
     ensureCurrentVisible();
     updateEditorGeometry();
-    markRowsDirty(visualRow(row), INT_MAX);
+    // The lines from the row down change, or all lines if the view scrolls
+    if (m_scrollOffset != offset)
+        markDirty();
+    else
+        markRowsDirty(visualRow(row), INT_MAX);
 }
 
 QRect QTuiListView::hoverRect() const

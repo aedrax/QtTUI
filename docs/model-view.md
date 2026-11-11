@@ -830,8 +830,8 @@ void example(QTuiWidget *parent, QAbstractItemModel *model)
 | `void hideColumn(int column)` | Calls `setColumnHidden(column, true)`. |
 | `void showColumn(int column)` | Calls `setColumnHidden(column, false)`. |
 | `int horizontalScrollOffset() const` | Returns the first visible column. |
-| `void expand(const QModelIndex &index)` | Shows the children of the item and emits `expanded()`. |
-| `void collapse(const QModelIndex &index)` | Hides the children of the item and emits `collapsed()`. |
+| `void expand(const QModelIndex &index)` | Shows the children of the item and emits `expanded()`. The current item stays current. |
+| `void collapse(const QModelIndex &index)` | Hides the children of the item and emits `collapsed()`. If the current item is below the item, the item becomes current, as in Qt. |
 | `bool isExpanded(const QModelIndex &index) const` | Returns `true` if the item is expanded. |
 | `bool isRowHidden(int row, const QModelIndex &parent) const` | Returns `true` if the item is hidden. |
 | `void setRowHidden(int row, const QModelIndex &parent, bool hide)` | Hides or shows the item and its children. See [hidden rows](#hidden-rows). |

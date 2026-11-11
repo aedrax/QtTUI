@@ -356,13 +356,18 @@ void QTuiTableView::setRowHidden(int row, bool hide)
     if (!m_model || row < 0 || row >= m_model->rowCount(rootIndex()) || !setHiddenRow(row, hide))
         return;
     // The current cell must be in a row that shows
-    if (hide && row == m_currentRow && shownRows() > 0)
-        setCurrentIndex(m_model->index(row, m_currentCol, rootIndex()));
+    if (isHiddenRow(m_currentRow) && shownRows() > 0)
+        setCurrentIndex(m_model->index(m_currentRow, m_currentCol, rootIndex()));
+    const int offset = m_scrollOffset;
     clampScrollOffset(geometry().height() - headerHeight());
     ensureCurrentVisible();
     invalidateColumnWidths();
     updateEditorGeometry();
-    markRowsDirty(visualRow(row), INT_MAX, headerHeight());
+    // The lines from the row down change, or all lines if the view scrolls
+    if (m_scrollOffset != offset)
+        markDirty();
+    else
+        markRowsDirty(visualRow(row), INT_MAX, headerHeight());
 }
 
 QTuiHeaderView *QTuiTableView::horizontalHeader() const
@@ -441,9 +446,12 @@ void QTuiTableView::shiftSpans(int first, int count)
     for (int i = m_spans.size() - 1; i >= 0; --i) {
         Span &span = m_spans[i];
         const int lastRemoved = first - count - 1;
-        if (count < 0 && span.row <= lastRemoved && span.bottom() >= first)
-            m_spans.removeAt(i); // removed rows in the span
-        else if (span.row >= first)
+        if (count < 0 && span.row <= lastRemoved && span.bottom() >= first) {
+            // Removed rows in the span: its rows above them are again
+            // cells of their own
+            markSpanDirty(span);
+            m_spans.removeAt(i);
+        } else if (span.row >= first)
             span.row += count;
     }
 }
@@ -723,7 +731,11 @@ void QTuiTableView::ensureCurrentVisible()
     if (!m_model)
         return;
 
+    // A scroll changes all lines
+    const int offset = m_scrollOffset;
     scrollRowIntoView(visualRow(m_currentRow), geometry().height() - headerHeight());
+    if (m_scrollOffset != offset)
+        markDirty();
 }
 
 void QTuiTableView::remeasureColumnWidths()

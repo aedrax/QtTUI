@@ -61,6 +61,37 @@ static QString paintedLine(QTuiWidget &view, int y)
     return lineText(buffer, y);
 }
 
+// Paints the view, runs `change`, and paints again. Returns an empty string
+// if the dirty region of the view contains each cell that is different, or
+// a text that tells what is not covered. This finds a change that marks
+// too small a region.
+template <typename Change>
+static QString uncoveredChange(QTuiWidget &view, Change change)
+{
+    const QRect geo = view.geometry();
+    ScreenBuffer before(geo.right() + 1, geo.bottom() + 1);
+    ScreenBuffer after(geo.right() + 1, geo.bottom() + 1);
+    view.paintEvent(before);
+    view.clearDirtyRegions();
+    change();
+    view.paintEvent(after);
+    QRect changed;
+    for (int y = 0; y < before.height(); ++y) {
+        for (int x = 0; x < before.width(); ++x) {
+            if (before.backCell(x, y) != after.backCell(x, y))
+                changed |= QRect(x, y, 1, 1);
+        }
+    }
+    const QRect dirty = view.dirtyRegion();
+    if (changed.isNull() || dirty.contains(changed))
+        return QString();
+    return QStringLiteral("changed (%1,%2 %3x%4) is not in dirty (%5,%6 %7x%8)")
+        .arg(changed.x()).arg(changed.y()).arg(changed.width()).arg(changed.height())
+        .arg(dirty.x()).arg(dirty.y()).arg(dirty.width()).arg(dirty.height());
+}
+
+#define DIRTY_COVERS(view, change) QCOMPARE(uncoveredChange(view, [&]() { change; }), QString())
+
 // A table model with a row count that the test sets. It counts the calls
 // of data(), so a test can show that a view does not read all rows.
 class GridModel : public QAbstractTableModel {
@@ -1545,6 +1576,149 @@ private slots:
         // A reset removes the spans
         model.reset();
         QCOMPARE(table.columnSpan(0, 0), 1);
+    }
+
+    // --- The dirty region covers each change ---
+
+    void dirtyRegionCoversHiddenRowChanges()
+    {
+        QStringListModel model(numberedRows(20));
+        QTuiListView list;
+        list.setGeometry(QRect(0, 0, 20, 5));
+        list.setModel(&model);
+        // The view is at the bottom, and the current row is not the last
+        sendKey(list, Qt::Key_End);
+        sendKey(list, Qt::Key_Up);
+        DIRTY_COVERS(list, list.setRowHidden(19, true));
+        DIRTY_COVERS(list, list.setRowHidden(3, true));
+        DIRTY_COVERS(list, list.setRowHidden(19, false));
+        DIRTY_COVERS(list, list.setRowHidden(3, false));
+        // The current row is on the last line, and a row above it shows again
+        list.setRowHidden(16, true);
+        sendKey(list, Qt::Key_End);
+        DIRTY_COVERS(list, list.setRowHidden(16, false));
+        // The current row is on the first line and becomes hidden
+        sendKey(list, Qt::Key_Home);
+        DIRTY_COVERS(list, list.setRowHidden(0, true));
+        DIRTY_COVERS(list, list.setRowHidden(0, false));
+        // Rows come and go while rows are hidden
+        list.setRowHidden(2, true);
+        DIRTY_COVERS(list, model.insertRows(1, 2));
+        DIRTY_COVERS(list, model.removeRows(0, 2));
+        sendKey(list, Qt::Key_End);
+        DIRTY_COVERS(list, model.removeRows(4, 2));
+        DIRTY_COVERS(list, model.removeRows(model.rowCount() - 1, 1));
+        DIRTY_COVERS(list, model.insertRows(model.rowCount(), 3));
+
+        // After all rows were hidden, a row that shows again is current
+        QStringListModel few(numberedRows(3));
+        list.setModel(&few);
+        for (int row = 0; row < 3; ++row)
+            list.setRowHidden(row, true);
+        list.setRowHidden(2, false);
+        QCOMPARE(list.currentIndex().row(), 2);
+    }
+
+    void dirtyRegionCoversTableChanges()
+    {
+        GridModel model;
+        QTuiTableView table;
+        table.setGeometry(QRect(0, 0, 30, 6));
+        table.setModel(&model);
+        table.setFocus();
+        sendKey(table, Qt::Key_End);
+        sendKey(table, Qt::Key_Up);
+        DIRTY_COVERS(table, table.setRowHidden(49, true));
+        DIRTY_COVERS(table, table.setRowHidden(10, true));
+        DIRTY_COVERS(table, table.setRowHidden(49, false));
+        DIRTY_COVERS(table, model.insertAt(0, 2));
+        DIRTY_COVERS(table, model.removeAt(0, 2));
+        DIRTY_COVERS(table, model.removeAt(model.rows - 1, 1));
+        sendKey(table, Qt::Key_Home);
+        DIRTY_COVERS(table, table.setRowHidden(0, true));
+
+        // Spans
+        DIRTY_COVERS(table, table.setSpan(2, 0, 3, 2));
+        DIRTY_COVERS(table, table.setSpan(2, 0, 2, 1));
+        DIRTY_COVERS(table, model.insertAt(1, 1));
+        DIRTY_COVERS(table, model.removeAt(1, 1));
+        // The removed row cuts the span: its first row is a cell again
+        DIRTY_COVERS(table, model.removeAt(3, 1));
+        QCOMPARE(table.rowSpan(2, 0), 1);
+        table.setSpan(1, 0, 1, 3);
+        DIRTY_COVERS(table, table.clearSpans());
+        table.setSpan(1, 0, 1, 3);
+        DIRTY_COVERS(table, model.reset());
+
+        // Columns and headers
+        DIRTY_COVERS(table, table.setColumnHidden(1, true));
+        DIRTY_COVERS(table, table.setColumnHidden(1, false));
+        DIRTY_COVERS(table, table.setColumnWidth(0, 8));
+        DIRTY_COVERS(table, table.verticalHeader()->setVisible(true));
+        DIRTY_COVERS(table, table.horizontalHeader()->setVisible(false));
+        DIRTY_COVERS(table, table.setRowHidden(2, true));
+        DIRTY_COVERS(table, model.insertAt(0, 60));
+        DIRTY_COVERS(table, table.horizontalHeader()->setVisible(true));
+        DIRTY_COVERS(table, table.verticalHeader()->setVisible(false));
+        DIRTY_COVERS(table, table.sortByColumn(1, Qt::AscendingOrder));
+        DIRTY_COVERS(table, table.setSortingEnabled(true));
+        DIRTY_COVERS(table, table.setAlternatingRowColors(true));
+        DIRTY_COVERS(table, table.setTextElideMode(Qt::ElideLeft));
+        const QModelIndex root = model.index(0, 0);
+        DIRTY_COVERS(table, table.setRootIndex(root));
+    }
+
+    void dirtyRegionCoversCheckToggles()
+    {
+        CheckModel model;
+        QTuiListView list;
+        list.setGeometry(QRect(0, 0, 20, 5));
+        list.setModel(&model);
+        list.setFocus();
+        DIRTY_COVERS(list, sendKey(list, Qt::Key_Space));
+        DIRTY_COVERS(list, click(list, 1, 2));
+        QTuiTableView table;
+        table.setGeometry(QRect(0, 0, 20, 5));
+        table.setModel(&model);
+        table.verticalHeader()->setVisible(true);
+        DIRTY_COVERS(table, sendKey(table, Qt::Key_Space));
+        QTuiTreeView tree;
+        tree.setGeometry(QRect(0, 0, 20, 5));
+        tree.setModel(&model);
+        tree.setHeaderHidden(false);
+        DIRTY_COVERS(tree, sendKey(tree, Qt::Key_Space));
+        DIRTY_COVERS(tree, click(tree, 3, 3));
+    }
+
+    void dirtyRegionCoversTreeChanges()
+    {
+        GroupModel model(4, 6);
+        QTuiTreeView tree;
+        tree.setGeometry(QRect(0, 0, 30, 6));
+        tree.setModel(&model);
+        tree.setFocus();
+        DIRTY_COVERS(tree, tree.setHeaderHidden(false));
+        DIRTY_COVERS(tree, tree.expand(model.index(3, 0)));
+        DIRTY_COVERS(tree, sendKey(tree, Qt::Key_End));
+        DIRTY_COVERS(tree, tree.expand(model.index(0, 0)));
+        DIRTY_COVERS(tree, tree.collapse(model.index(3, 0)));
+        DIRTY_COVERS(tree, tree.collapse(model.index(0, 0)));
+        DIRTY_COVERS(tree, tree.expand(model.index(1, 0)));
+        DIRTY_COVERS(tree, tree.setRowHidden(0, QModelIndex(), true));
+        DIRTY_COVERS(tree, tree.setRowHidden(2, model.index(1, 0), true));
+        DIRTY_COVERS(tree, tree.setRowHidden(0, QModelIndex(), false));
+        DIRTY_COVERS(tree, model.addChild(1, QStringLiteral("a new child with a long name")));
+        DIRTY_COVERS(tree, sendKey(tree, Qt::Key_Right));
+        DIRTY_COVERS(tree, sendKey(tree, Qt::Key_Left));
+        DIRTY_COVERS(tree, sendKey(tree, Qt::Key_Right, Qt::AltModifier));
+        DIRTY_COVERS(tree, tree.setColumnHidden(1, true));
+        DIRTY_COVERS(tree, tree.setColumnHidden(1, false));
+        DIRTY_COVERS(tree, tree.setColumnHidden(0, true));
+        DIRTY_COVERS(tree, tree.setColumnHidden(0, false));
+        DIRTY_COVERS(tree, tree.setHeaderHidden(true));
+        DIRTY_COVERS(tree, tree.setAlternatingRowColors(true));
+        DIRTY_COVERS(tree, tree.setRootIndex(model.index(1, 0)));
+        DIRTY_COVERS(tree, model.removeGroup(1));
     }
 };
 

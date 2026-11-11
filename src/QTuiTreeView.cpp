@@ -111,13 +111,15 @@ void QTuiTreeView::expand(const QModelIndex &anyColumn)
 
     // Find the flat row of the toggled node before rebuild
     int toggledRow = flatRowForIndex(index);
+    const QModelIndex current = currentIndex();
 
     rebuildFlatList();
 
-    // Restore current row to point to the same index after rebuild
-    int row = flatRowForIndex(index);
-    if (row >= 0)
-        m_currentRow = row;
+    // The current item stays current: find its row after the rebuild
+    const int currentRow = flatRowForIndex(current);
+    if (currentRow >= 0)
+        m_currentRow = currentRow;
+    const int row = flatRowForIndex(index);
     scrollToVisible();
 
     // Mark from toggled row to bottom of visible area as dirty
@@ -145,10 +147,15 @@ void QTuiTreeView::collapse(const QModelIndex &anyColumn)
 
     // Find the flat row of the toggled node before rebuild
     int toggledRow = flatRowForIndex(index);
+    const QModelIndex current = currentIndex();
 
     m_expandedItems.remove(persistent);
     rebuildFlatList();
-    int row = flatRowForIndex(index);
+    // The current item stays current. If it was below the collapsed item,
+    // that item becomes current, as in Qt.
+    int row = flatRowForIndex(current);
+    if (row < 0)
+        row = flatRowForIndex(index);
     if (row >= 0)
         m_currentRow = row;
     // Clamp current row if it's now beyond the list
@@ -158,6 +165,10 @@ void QTuiTreeView::collapse(const QModelIndex &anyColumn)
 
     // Mark from toggled row to bottom of visible area as dirty
     markRowsDirty(toggledRow >= 0 ? toggledRow : 0, INT_MAX, headerHeight());
+    if (currentIndex() != current) {
+        selectCurrent(Qt::NoModifier, false);
+        markDirty();
+    }
 
     emit collapsed(index);
 }
@@ -747,7 +758,11 @@ void QTuiTreeView::buildFlatListRecursive(const QModelIndex &parent, int depth)
 
 void QTuiTreeView::scrollToVisible()
 {
+    // A scroll changes all lines
+    const int offset = m_scrollOffset;
     scrollRowIntoView(m_currentRow, viewRows());
+    if (m_scrollOffset != offset)
+        markDirty();
 }
 
 int QTuiTreeView::viewRows() const
