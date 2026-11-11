@@ -71,9 +71,17 @@ public:
     void hideRow(int row) { setRowHidden(row, true); }
     void showRow(int row) { setRowHidden(row, false); }
 
-    // The header of the columns. The table paints the header row itself:
-    // this widget stays hidden and keeps the resize modes and the sizes.
+    // The header of the columns, as in QTableView. It keeps the resize
+    // modes, the sizes and the sort indicator, and paints the header row.
+    // horizontalHeader()->setVisible(false) hides the header row.
     QTuiHeaderView *horizontalHeader() const;
+    // The header of the rows: the vertical header data of the model (by
+    // default the row numbers) in a column at the left. Different from Qt:
+    // it is hidden by default; verticalHeader()->setVisible(true) shows
+    // it. Its width does not change when the view scrolls: it has space
+    // for the labels of the rows that show at the first paint and for the
+    // number of the last row.
+    QTuiHeaderView *verticalHeader() const;
 
     void paintEvent(ScreenBuffer &buffer) override;
 
@@ -94,8 +102,12 @@ private slots:
     void onModelReset();
 
 private:
-    // Header text with the sort indicator
-    QString headerText(int column) const;
+    // 1 if the header row shows, or 0
+    int headerHeight() const;
+    // The width of the vertical header and its separator, or 0
+    int columnsLeft() const;
+    // Repaints all if the width of the vertical header is not as painted
+    void updateColumnsLeft();
     void disconnectModel();
     void connectModel();
     void ensureCurrentVisible();
@@ -113,13 +125,15 @@ private:
     int m_currentRow = 0;
     int m_currentCol = 0;
     int m_horizontalScrollOffset = 0;
-    static constexpr int m_headerHeight = 1;
     bool m_sortingEnabled = false;
     QTuiHeaderView *m_header = nullptr;
+    QTuiHeaderView *m_verticalHeader = nullptr;
+    // The widest label of the vertical header, measured one time. -1: not
+    // measured.
+    mutable int m_verticalLabelWidth = -1;
+    mutable int m_paintedColumnsLeft = 0;
     int m_resizingColumn = -1; // column that a header drag resizes
     int m_resizeColumnX = 0;   // its left edge, relative to the view
-    int m_sortColumn = -1;
-    Qt::SortOrder m_sortOrder = Qt::AscendingOrder;
 
     // Natural width per column, measured one time. Empty: not measured.
     mutable QVector<int> m_naturalWidths;

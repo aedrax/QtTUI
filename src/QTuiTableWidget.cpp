@@ -76,7 +76,8 @@ QVariant QTuiTableWidgetModel::headerData(int section, Qt::Orientation orientati
         return {};
     if (orientation == Qt::Horizontal)
         return m_horizontalHeaders.value(section);
-    return m_verticalHeaders.value(section);
+    // A row without a label has its number, as in Qt
+    return m_verticalHeaders.value(section, section + 1);
 }
 
 bool QTuiTableWidgetModel::setHeaderData(int section, Qt::Orientation orientation,

@@ -150,8 +150,9 @@ void example(QTuiListWidget *list)
 A table of `QTuiTableWidgetItem` objects. A cell can be empty. The widget
 owns its items and deletes them when it is deleted. `cellClicked()` comes
 from a left click on a cell, as in Qt, and also from Enter on the current
-cell. The vertical header labels are stored, but the table does not show
-them. A sort puts the rows in the order of the text in the sort column.
+cell. Different from Qt: the vertical header is hidden by default. Call
+`verticalHeader()->setVisible(true)` to show the row labels; a row without a
+label shows its number. A sort puts the rows in the order of the text in the sort column.
 Empty cells go last.
 
 ### Example
@@ -191,7 +192,7 @@ void example(QTuiWidget *parent)
 | `QTuiTableWidgetItem *item(int row, int column) const` | Returns the item in the cell, or `nullptr`. |
 | `QTuiTableWidgetItem *takeItem(int row, int column)` | Removes the item from the cell and returns it. You own it. |
 | `void setHorizontalHeaderLabels(const QStringList &labels)` | Sets the column headers. Labels after the last column have no effect. |
-| `void setVerticalHeaderLabels(const QStringList &labels)` | Sets the row headers. The table does not show them. |
+| `void setVerticalHeaderLabels(const QStringList &labels)` | Sets the row headers. They show if the vertical header shows (see [QTuiTableView](model-view.md#qtuitableview)). |
 | `QList<QTuiTableWidgetSelectionRange> selectedRanges() const` | Returns the selected ranges. |
 | `QList<QTuiTableWidgetItem *> selectedItems() const` | Returns the selected cells that have an item. |
 | `void keyPressEvent(TuiKeyEvent *event) override` | Handles the keys of `QTuiTableView` and emits the signals below. |

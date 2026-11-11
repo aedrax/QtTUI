@@ -2,6 +2,7 @@
 #define QTTUI_QTUIHEADERVIEW_H
 
 #include <QtTUI/QTuiWidget.h>
+#include <QtTUI/ScreenBuffer.h>
 #include <QList>
 #include <QHash>
 #include <QSet>
@@ -12,9 +13,15 @@ class QAbstractItemModel;
 namespace QtTUI {
 
 // The sections of a header, as in QHeaderView. QTuiTableView keeps a
-// hidden QTuiHeaderView for its columns (horizontalHeader()): the resize
-// modes and the section sizes of that header set the column widths, and
-// the table paints the header row itself.
+// QTuiHeaderView for its columns (horizontalHeader()) and one for its rows
+// (verticalHeader()). The resize modes and the section sizes of the
+// horizontal header set the column widths. The table gives each header its
+// place and paints it with paintSections() and paintSection(); such a
+// header is not a focus stop and does not take the mouse.
+//
+// The header keeps a size, a resize mode and a hidden state only for the
+// sections that have one, so a vertical header of a model with millions of
+// rows costs nothing for each row.
 class QTuiHeaderView : public QTuiWidget {
     Q_OBJECT
     Q_PROPERTY(Qt::Orientation orientation READ orientation)
@@ -66,6 +73,26 @@ public:
     bool stretchLastSection() const;
     void setStretchLastSection(bool stretch);
 
+    // The sort indicator, as in QHeaderView: "▲" (ascending) or "▼"
+    // (descending) after the text of one section. It shows only if
+    // isSortIndicatorShown(). The default is not shown, and section -1.
+    void setSortIndicator(int logicalIndex, Qt::SortOrder order);
+    int sortIndicatorSection() const;
+    Qt::SortOrder sortIndicatorOrder() const;
+    bool isSortIndicatorShown() const;
+    void setSortIndicatorShown(bool show);
+
+    // Fills rect with style and writes the text of the section and its
+    // sort indicator. A text that is too long ends in "…".
+    void paintSection(ScreenBuffer &buffer, const QRect &rect, int logicalIndex,
+                      const Cell &style) const;
+    // Paints the sections from `first` in the row `rect`, from left to
+    // right. sizes has the width of each section. `spacing` cells separate
+    // two sections. A hidden section takes no space. If the header has the
+    // focus, its focused section has the focus colors.
+    void paintSections(ScreenBuffer &buffer, const QRect &rect, int first,
+                       const QList<int> &sizes, int spacing, const Cell &style) const;
+
     void paintEvent(ScreenBuffer &buffer) override;
     QSize minimumSize() const override;
 
@@ -86,7 +113,11 @@ private:
     QAbstractItemModel *m_model = nullptr;
     QPersistentModelIndex m_rootIndex;
     Qt::Orientation m_orientation;
-    QList<int> m_sectionSizes;
+    // The sizes of the sections that resizeSection() set
+    QHash<int, int> m_sectionSizes;
+    int m_sortSection = -1;
+    Qt::SortOrder m_sortOrder = Qt::AscendingOrder;
+    bool m_sortIndicatorShown = false;
     QSet<int> m_hiddenSections;
     QSet<int> m_resizedSections;
     QHash<int, ResizeMode> m_resizeModes;

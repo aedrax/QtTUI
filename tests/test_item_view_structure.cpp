@@ -1021,6 +1021,162 @@ private slots:
         QCOMPARE(node->checkState(0), Qt::Unchecked);
         QCOMPARE(paintedLine(tree, 0), QStringLiteral("  [ ] node"));
     }
+
+    // --- Table headers ---
+
+    void tableHeadersAreNotWidgetsOnTheScreen()
+    {
+        QTuiTableView table;
+        for (QTuiHeaderView *header : {table.horizontalHeader(), table.verticalHeader()}) {
+            QCOMPARE(header->focusPolicy(), Qt::NoFocus);
+            QVERIFY(header->isPaintedByParent());
+        }
+        QVERIFY(table.horizontalHeader()->isVisible());
+        QVERIFY(!table.verticalHeader()->isVisible());
+    }
+
+    void tablePaintsTheHeaderRowWithTheHeaderView()
+    {
+        GridModel model;
+        QTuiTableView table;
+        table.setGeometry(QRect(0, 0, 30, 6));
+        table.setModel(&model);
+        table.setSortingEnabled(true);
+        table.sortByColumn(1, Qt::DescendingOrder);
+        QCOMPARE(table.horizontalHeader()->sortIndicatorSection(), 1);
+        QCOMPARE(table.horizontalHeader()->sortIndicatorOrder(), Qt::DescendingOrder);
+        QVERIFY(table.horizontalHeader()->isSortIndicatorShown());
+        QCOMPARE(table.sortColumn(), 1);
+        QCOMPARE(paintedLine(table, 0), QStringLiteral("H0   H1 ▼ H2"));
+        // The header keeps the indicator
+        table.clearDirtyRegions();
+        table.horizontalHeader()->setSortIndicator(0, Qt::AscendingOrder);
+        QCOMPARE(table.dirtyRegion(), table.geometry());
+        QCOMPARE(paintedLine(table, 0), QStringLiteral("H0 ▲ H1   H2"));
+        table.hideColumn(0);
+        QCOMPARE(paintedLine(table, 0), QStringLiteral("H1   H2"));
+
+        // A header without a view shows the indicator in the same way
+        QTuiHeaderView header(Qt::Horizontal);
+        header.setGeometry(QRect(0, 0, 30, 1));
+        header.setModel(&model);
+        header.setSortIndicator(2, Qt::AscendingOrder);
+        QCOMPARE(paintedLine(header, 0), QStringLiteral("H0        H1        H2"));
+        header.setSortIndicatorShown(true);
+        QCOMPARE(paintedLine(header, 0), QStringLiteral("H0        H1        H2 ▲"));
+        header.resizeSection(0, 2);
+        QCOMPARE(paintedLine(header, 0), QStringLiteral("H0H1        H2 ▲"));
+    }
+
+    void horizontalHeaderCanHide()
+    {
+        GridModel model;
+        QTuiTableView table;
+        table.setGeometry(QRect(0, 0, 30, 6));
+        table.setModel(&model);
+        sendKey(table, Qt::Key_End);
+        table.clearDirtyRegions();
+        table.horizontalHeader()->setVisible(false);
+        QCOMPARE(table.dirtyRegion(), table.geometry());
+        // 6 lines of rows: the last row stays at the bottom
+        QVERIFY(paintedLine(table, 0).startsWith(QStringLiteral("r44c0")));
+        QVERIFY(paintedLine(table, 5).startsWith(QStringLiteral("r49c0")));
+        QCOMPARE(table.visualRect(model.index(44, 0)).y(), 0);
+        click(table, 1, 0);
+        QCOMPARE(table.currentIndex().row(), 44);
+        sendKey(table, Qt::Key_PageDown);
+        QCOMPARE(table.currentIndex().row(), 49);
+        table.horizontalHeader()->setVisible(true);
+        QVERIFY(paintedLine(table, 0).startsWith(QStringLiteral("H0")));
+        QVERIFY(paintedLine(table, 5).startsWith(QStringLiteral("r49c0")));
+    }
+
+    void verticalHeader()
+    {
+        GridModel model;
+        QTuiTableView table;
+        table.setGeometry(QRect(0, 0, 30, 6));
+        table.setModel(&model);
+        QCOMPARE(paintedLine(table, 1), QStringLiteral("r0c0 r0c1 r0c2"));
+        table.clearDirtyRegions();
+        table.verticalHeader()->setVisible(true);
+        QCOMPARE(table.dirtyRegion(), table.geometry());
+        // 50 rows: 2 cells for the number, and a separator
+        QCOMPARE(paintedLine(table, 0), QStringLiteral("   H0   H1   H2"));
+        QCOMPARE(paintedLine(table, 1), QStringLiteral("1  r0c0 r0c1 r0c2"));
+        QCOMPARE(paintedLine(table, 5), QStringLiteral("5  r4c0 r4c1 r4c2"));
+        QCOMPARE(table.visualRect(model.index(0, 0)), QRect(3, 1, 4, 1));
+
+        // The width stays when the view scrolls to the wider numbers
+        sendKey(table, Qt::Key_End);
+        // (the columns keep the widths of the first rows)
+        QCOMPARE(paintedLine(table, 5), QStringLiteral("50 r49… r49… r49…"));
+        QCOMPARE(table.visualRect(model.index(49, 0)).x(), 3);
+        sendKey(table, Qt::Key_Home);
+
+        // A click uses the same columns. A click on the header does nothing.
+        click(table, 8, 2);
+        QCOMPARE(table.currentIndex(), model.index(1, 1));
+        click(table, 0, 4);
+        QCOMPARE(table.currentIndex(), model.index(1, 1));
+
+        // A hidden row keeps the numbers of the other rows
+        table.setRowHidden(1, true);
+        QCOMPARE(paintedLine(table, 2), QStringLiteral("3  r2c0 r2c1 r2c2"));
+        table.setRowHidden(1, false);
+
+        // The last column that stretches ends at the edge of the view
+        table.horizontalHeader()->setStretchLastSection(true);
+        QCOMPARE(table.visualRect(model.index(0, 2)).right(), 29);
+    }
+
+    void verticalHeaderGrowsWithTheRowCount()
+    {
+        GridModel model;
+        QTuiTableView table;
+        table.setGeometry(QRect(0, 0, 30, 6));
+        table.setModel(&model);
+        table.verticalHeader()->setVisible(true);
+        ScreenBuffer buffer(30, 6);
+        table.paintEvent(buffer);
+        table.clearDirtyRegions();
+        // Rows below the view: nothing to repaint
+        model.insertAt(50, 10);
+        QVERIFY(table.dirtyRegion().isNull());
+        // 100 rows need 3 cells: all columns move
+        model.insertAt(60, 40);
+        QCOMPARE(table.dirtyRegion(), table.geometry());
+        QCOMPARE(paintedLine(table, 1), QStringLiteral("1   r0c0 r0c1 r0c2"));
+
+        // A large model costs nothing for each row
+        model.rows = 2600000;
+        model.reset();
+        model.dataCalls = 0;
+        model.insertAt(2600000, 1);
+        QCOMPARE(paintedLine(table, 1), QStringLiteral("1       r0c0 r0c1 r0c2"));
+        QVERIFY2(model.dataCalls < 1000, qPrintable(QString::number(model.dataCalls)));
+    }
+
+    void tableWidgetShowsVerticalHeaderLabels()
+    {
+        QTuiTableWidget table(3, 1);
+        table.setItem(0, 0, new QTuiTableWidgetItem(QStringLiteral("a")));
+        table.setHorizontalHeaderLabels({QStringLiteral("Value")});
+        table.setVerticalHeaderLabels({QStringLiteral("first"), QStringLiteral("second")});
+        table.setGeometry(QRect(0, 0, 20, 4));
+        table.verticalHeader()->setVisible(true);
+        QCOMPARE(paintedLine(table, 0), QStringLiteral("       Value"));
+        QCOMPARE(paintedLine(table, 1), QStringLiteral("first  a"));
+        QCOMPARE(paintedLine(table, 2), QStringLiteral("second"));
+        // A row without a label has its number
+        QCOMPARE(paintedLine(table, 3), QStringLiteral("3"));
+
+        // A new label can be wider: the view measures again
+        table.clearDirtyRegions();
+        table.setVerticalHeaderLabels({QStringLiteral("the first row")});
+        QCOMPARE(table.dirtyRegion(), table.geometry());
+        QCOMPARE(paintedLine(table, 1), QStringLiteral("the first row a"));
+    }
 };
 
 QTEST_MAIN(TestItemViewStructure)

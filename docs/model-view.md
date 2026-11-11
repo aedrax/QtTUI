@@ -25,7 +25,7 @@ and the next render pass paints them. See
 | `dataChanged` | The changed rows. `QTuiColumnView` repaints all. |
 | `rowsInserted`, `rowsRemoved` | The rows from the first changed row to the bottom of the view. |
 | `columnsInserted`, `columnsRemoved` | All (`QTuiTableView` only). |
-| `headerDataChanged` | The header row (`QTuiTableView` only). |
+| `headerDataChanged` | The header row, or all for the vertical header if it shows (`QTuiTableView` only). |
 | `layoutChanged`, `modelReset` | All. |
 
 The current item follows its item through inserts, removes, moves and
@@ -520,11 +520,34 @@ void example(QTuiWidget *parent)
 
 `#include <QtTUI/QTuiTableView.h>` · Inherits: `QTuiAbstractItemView`
 
-Shows a table model with a header row. A space separates the columns. The
-view paints its own header row and does not show the vertical header.
+Shows a table model with a header row. A space separates the columns.
 
-The view keeps a hidden `QTuiHeaderView` for the columns, which
-`horizontalHeader()` returns. Its resize modes set the column widths:
+The view has two `QTuiHeaderView` objects, as `QTableView` has:
+`horizontalHeader()` for the columns and `verticalHeader()` for the rows.
+The table gives each header its place and paints it with the paint
+functions of the header, so the headers are not focus stops and do not take
+the mouse. The keys and the mouse of the table do the header actions (see
+below).
+
+- `horizontalHeader()->setVisible(false)` hides the header row.
+- `verticalHeader()->setVisible(true)` shows a column at the left with the
+  vertical header data of the model. The default data of a model is the row
+  number. Different from Qt: the vertical header is hidden by default.
+
+The width of the vertical header does not change when the view scrolls. It
+has space for the labels of the rows that show at the first paint, and for
+the number of the last row. It becomes wider when the row count gets one
+more digit, and the view measures the labels again when the model emits
+`headerDataChanged` for the rows. A click on the vertical header does
+nothing. `verticalHeader()->setSectionHidden()` has no effect on the table:
+use `setRowHidden()`.
+
+```cpp
+table->verticalHeader()->setVisible(true);   // row numbers
+table->horizontalHeader()->setVisible(false); // no header row
+```
+
+The resize modes of the horizontal header set the column widths:
 
 | Mode | Width of the column |
 | --- | --- |
@@ -670,7 +693,8 @@ int main(int argc, char *argv[])
 | `void showRow(int row)` | Calls `setRowHidden(row, false)`. |
 | `void resizeColumnToContents(int column)` | Sets the width of the column to the widest of the header and the visible cells, as `setColumnWidth()` does. |
 | `void resizeColumnsToContents()` | Calls `resizeColumnToContents()` for each column. |
-| `QTuiHeaderView *horizontalHeader() const` | Returns the hidden header that keeps the resize modes and the sizes of the columns. |
+| `QTuiHeaderView *horizontalHeader() const` | Returns the header of the columns. It keeps the resize modes, the sizes and the sort indicator. Hide it to hide the header row. |
+| `QTuiHeaderView *verticalHeader() const` | Returns the header of the rows. It is hidden by default; show it to see the row numbers or the row labels of the model. |
 | `void paintEvent(ScreenBuffer &buffer) override` | Paints the header and the visible rows. |
 
 ### Keys
@@ -828,11 +852,18 @@ void example(QTuiWidget *parent, QAbstractItemModel *model)
 `#include <QtTUI/QTuiHeaderView.h>` · Inherits: `QTuiWidget`
 
 A row (horizontal) or a column (vertical) of header labels from a model.
-Different from Qt: it is a separate widget that you put in a layout, and it
-does not take the mouse. `QTuiTableView` keeps a hidden header for its
-columns (`horizontalHeader()`) and uses its resize modes and sizes, but
-paints the header row itself. Each section has a size. The default size is
-10 and the minimum is 2.
+You can put a header in a layout as a widget of its own; it then takes the
+focus and the keys below. Different from Qt: it does not take the mouse.
+
+`QTuiTableView` has a header for its columns (`horizontalHeader()`) and one
+for its rows (`verticalHeader()`). The table uses the resize modes, the
+sizes, the hidden state and the sort indicator of the horizontal header,
+and paints both headers with `paintSections()` and `paintSection()`. A
+header of a table is not a focus stop.
+
+Each section has a size. The default size is 10 and the minimum is 2. The
+header keeps a size, a mode and a hidden state only for the sections that
+have one, so a vertical header of a model with millions of rows is cheap.
 
 ### Example
 
@@ -876,6 +907,13 @@ void example(QTuiWidget *parent)
 | `bool isSectionResized(int logicalIndex) const` | Returns `true` after `resizeSection()` set the size of the section. |
 | `bool stretchLastSection() const` | Returns `true` if the last section gets the free width. |
 | `void setStretchLastSection(bool stretch)` | Gives the free width also to the last section (also a property). The default is `false`. |
+| `void setSortIndicator(int logicalIndex, Qt::SortOrder order)` | Sets the section and the order of the sort indicator: "▲" (ascending) or "▼" (descending) after the text of the section. It does not sort; `QTuiTableView::sortByColumn()` calls it. |
+| `int sortIndicatorSection() const` | Returns the section of the sort indicator, or -1. |
+| `Qt::SortOrder sortIndicatorOrder() const` | Returns the order of the sort indicator. |
+| `bool isSortIndicatorShown() const` | Returns `true` if the sort indicator shows. The default is `false`. |
+| `void setSortIndicatorShown(bool show)` | Shows or hides the sort indicator. `QTuiTableView::setSortingEnabled()` calls it. |
+| `void paintSection(ScreenBuffer &buffer, const QRect &rect, int logicalIndex, const Cell &style) const` | Fills `rect` with `style` and writes the text of the section and its sort indicator. A text that is too long ends in "…". |
+| `void paintSections(ScreenBuffer &buffer, const QRect &rect, int first, const QList<int> &sizes, int spacing, const Cell &style) const` | Paints the sections from `first` in one row. `sizes` has the width of each section, and `spacing` cells separate two sections. A hidden section takes no space. A view calls it to paint its header row. |
 | `void paintEvent(ScreenBuffer &buffer) override` | Paints the labels. The focused section has the focus colors. |
 | `QSize minimumSize() const override` | Horizontal: the sum of the visible section sizes. Vertical: the longest label and the number of visible sections. |
 
