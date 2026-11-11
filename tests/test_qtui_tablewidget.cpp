@@ -20,6 +20,7 @@ class TestQTuiTableWidget : public QObject {
 private slots:
     // Row/column count management (Req 22.1, 22.3)
     void testInitialDimensions();
+    void testSetItemMakesTheColumnWider();
     void testSortingSortsTheRows();
     void testSetRowCount();
     void testSetColumnCount();
@@ -57,6 +58,21 @@ private slots:
     // Resize shrinks and cleans up items
     void testShrinkDeletesItems();
 };
+
+void TestQTuiTableWidget::testSetItemMakesTheColumnWider()
+{
+    QTuiTableWidget table;
+    table.setGeometry(QRect(0, 0, 40, 6));
+    table.setRowCount(2);
+    table.setColumnCount(2);
+    // The table measures its columns while the cells are empty
+    QCOMPARE(table.columnWidth(0), 1);
+    table.setItem(0, 0, new QTuiTableWidgetItem(QStringLiteral("Stockholm")));
+    QCOMPARE(table.columnWidth(0), 9);
+    // A shorter item does not make the column narrower
+    table.setItem(0, 0, new QTuiTableWidgetItem(QStringLiteral("Oslo")));
+    QCOMPARE(table.columnWidth(0), 9);
+}
 
 void TestQTuiTableWidget::testInitialDimensions()
 {

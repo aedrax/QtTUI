@@ -188,7 +188,7 @@ void example(QTuiWidget *parent)
 | `int rowCount() const` | Returns the number of rows. |
 | `void setColumnCount(int columns)` | Sets the number of columns, as `setRowCount()` does for rows. |
 | `int columnCount() const` | Returns the number of columns. |
-| `void setItem(int row, int column, QTuiTableWidgetItem *item)` | Puts the item in the cell. The widget takes ownership and deletes the old item. A cell out of range has no effect. |
+| `void setItem(int row, int column, QTuiTableWidgetItem *item)` | Puts the item in the cell. The widget takes ownership and deletes the old item. A cell out of range has no effect. If the text of the item is wider than the stored natural width of the column, the column becomes wider. |
 | `QTuiTableWidgetItem *item(int row, int column) const` | Returns the item in the cell, or `nullptr`. |
 | `QTuiTableWidgetItem *takeItem(int row, int column)` | Removes the item from the cell and returns it. You own it. |
 | `void setHorizontalHeaderLabels(const QStringList &labels)` | Sets the column headers. Labels after the last column have no effect. |

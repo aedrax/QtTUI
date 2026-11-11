@@ -1,4 +1,5 @@
 #include <QtTUI/QTuiTableWidget.h>
+#include <QtTUI/QtTuiUnicode.h>
 #include <QtTUI/TuiEvents.h>
 #include <algorithm>
 #include <numeric>
@@ -233,6 +234,10 @@ void QTuiTableWidget::setItem(int row, int column, QTuiTableWidgetItem *item)
         item->m_column = column;
     }
     m_internalModel->updateCell(row, column);
+    // The table can measure its columns before the application adds the
+    // items. A new item makes its column wider if necessary, never narrower.
+    if (item)
+        growColumnWidth(column, QtTuiUnicode::stringWidth(item->text()));
 }
 
 QTuiTableWidgetItem *QTuiTableWidget::item(int row, int column) const
