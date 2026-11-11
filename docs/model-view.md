@@ -24,8 +24,8 @@ and the next render pass paints them. See
 | --- | --- |
 | `dataChanged` | The changed rows. `QTuiColumnView` repaints all. |
 | `rowsInserted`, `rowsRemoved` | The rows from the first changed row to the bottom of the view. |
-| `columnsInserted`, `columnsRemoved` | All (`QTuiTableView` only). |
-| `headerDataChanged` | The header row, or all for the vertical header if it shows (`QTuiTableView` only). |
+| `columnsInserted`, `columnsRemoved` | All (`QTuiTableView` and `QTuiTreeView`). |
+| `headerDataChanged` | The header row (`QTuiTableView` and `QTuiTreeView`), or all for the vertical header of a table if it shows. |
 | `layoutChanged`, `modelReset` | All. |
 
 The current item follows its item through inserts, removes, moves and
@@ -401,6 +401,24 @@ Use these functions when you write a view.
 | `int shownRowNear(int row) const` | Returns the row that shows at `row` or after it, or the last row that shows, or -1. |
 | `void clampScrollOffset(int visibleRows)` | Keeps the scroll offset in the rows that show. |
 | `void shiftHiddenRows(int first, int count)` | Moves the hidden rows after the model inserts (`count` > 0) or removes (`count` < 0) rows at `first`. Call it first in the `rowsInserted` and `rowsRemoved` slots. |
+| `QTuiHeaderView *createColumnHeader()` | Makes the header of the columns. Call it in the constructor of a view that has columns. The functions below need it. `QTuiTableView` and `QTuiTreeView` share them. |
+| `int headerHeight() const` | Returns 1 if the header row shows, or 0. |
+| `virtual int columnsLeft() const` | Returns the cells at the left of the first column. The default is 0; the table returns the width of its vertical header. |
+| `int horizontalScrollOffset() const`, `int firstVisibleColumn() const` | Return the first column that shows after the horizontal scroll. |
+| `int columnWidth(int column) const`, `void setColumnWidth(int column, int width)`, `void resizeColumnToContents(int column)`, `void resizeColumnsToContents()`, `bool isColumnHidden(int column) const` | The column functions that the table and the tree make public. |
+| `int movedColumn(int column, int step) const` | Returns the next column that shows in the direction of `step` (1 or -1), or `column`. |
+| `void ensureColumnVisible(int column)` | Scrolls by column until the column shows. |
+| `void invalidateColumnWidths()` | Makes the next paint calculate the widths again. |
+| `virtual void remeasureColumnWidths()` | Discards the stored natural widths. |
+| `void growColumnWidth(int column, int width)` | Makes the stored natural width of the column wider. It does not make it narrower. |
+| `virtual int measureColumn(int column) const` | Returns the natural width of a column. The default measures the header; a view adds the cells that show. |
+| `const QVector<int> &effectiveColumnWidths() const` | Returns the width of each column, from the resize modes and the natural widths. |
+| `QList<ColumnSpan> visibleColumns() const` | Returns the columns that show, with the screen x and the width of each. Painting, hit tests and `visualRect()` use it. |
+| `int columnAt(int x, bool *separator = nullptr, int *columnX = nullptr) const` | Returns the column at a screen x, or -1 at the left of the first column. |
+| `void paintHeaderRow(ScreenBuffer &buffer, const ThemeProperties &theme) const` | Paints the header row with the header view, if it shows. |
+| `bool resizeColumnKeyEvent(const TuiKeyEvent *event, int column)` | Handles Alt+Left and Alt+Right for the column. |
+| `bool headerResizeMouseEvent(const TuiMouseEvent *event)` | Handles a drag on the separator after a header. |
+| `bool horizontalWheelEvent(const TuiMouseEvent *event)` | Handles Shift+wheel. |
 | `void updateEditorGeometry()` | Moves the editor to its item. If the item is not visible, it closes the editor and writes the value. |
 | `bool eventFilter(QObject *watched, QEvent *event) override` | Gives Enter and Escape in the editor to the view. |
 | `bool isSelected(const QModelIndex &index) const` | Returns `true` if the item is selected. |
@@ -452,7 +470,7 @@ The wheel scrolls the view by `wheelScrollLines` rows (3) for each notch
 (`wheelDelta() / 120`). It does not change the current item, as in Qt. The
 limits are the same as for `scrollTo()`. In `QTuiTableView`, Shift+wheel
 scrolls by one column. Some terminals keep Shift+wheel for their own
-scrollback. In `QTuiColumnView`, the wheel scrolls the column under the
+scrollback. `QTuiTreeView` does the same. In `QTuiColumnView`, the wheel scrolls the column under the
 mouse. The next key that moves the current item scrolls back to it.
 
 ## QTuiListView
@@ -720,10 +738,31 @@ int main(int argc, char *argv[])
 
 `#include <QtTUI/QTuiTreeView.h>` · Inherits: `QTuiAbstractItemView`
 
-Shows a tree model. Each level has an indent of 2 cells. An item with
-children has "▶" (collapsed) or "▼" (expanded) before its text. Different
-from Qt: the view shows only column 0 and has no header. The item delegate
-writes the text of each item, after the indent and the indicator.
+Shows a tree model with all its columns. In column 0, each level has an
+indent of 2 cells, and an item with children has "▶" (collapsed) or "▼"
+(expanded) before its text. A space separates the columns. The item
+delegate writes each item; in column 0, after the indent and the indicator.
+
+The view has a header row, which `header()` returns as a `QTuiHeaderView`.
+Different from Qt: the header row is hidden by default, so a tree with one
+column looks like a list with branches. `setHeaderHidden(false)` shows it.
+
+The columns follow the same rules as in [QTuiTableView](#qtuitableview):
+the resize modes of the header, the natural width that the view measures
+one time, Alt+Left and Alt+Right, a drag on the header, hidden columns and
+the scroll by column. Two things are different:
+
+- The last column gets the free width (`stretchLastSection` is `true`), as
+  in Qt. Thus a tree with one column uses the full width.
+- When an item expands, the columns get wider if one page of its children
+  needs more space (the children have an indent). The columns do not get
+  narrower, and a scroll does not change them. A width that the user or
+  `setColumnWidth()` set stays.
+
+The tree has a current column. With the default `SelectItems`, only the
+current cell has the selection colors. Use
+`setSelectionBehavior(QTuiAbstractItemView::SelectRows)` to select the
+full row, which is the default look of `QTreeView`.
 
 ### Example
 
@@ -757,6 +796,17 @@ void example(QTuiWidget *parent, QAbstractItemModel *model)
 | `void scrollTo(const QModelIndex &index, ScrollHint hint = EnsureVisible)` | Expands the parents of the item and scrolls to it. |
 | `QRect visualRect(const QModelIndex &index) const` | Returns the area of the item text, after the indent and the indicator. |
 | `QRect hoverRect() const override` | Returns the row under the mouse, for the hover highlight. |
+| `QTuiHeaderView *header() const` | Returns the header of the columns. It keeps the resize modes, the sizes and the hidden state. |
+| `bool isHeaderHidden() const` | Returns `true` if the header row does not show. The default is `true`. |
+| `void setHeaderHidden(bool hide)` | Hides or shows the header row. |
+| `int columnWidth(int column) const` | Returns the width of the column as the view paints it. |
+| `void setColumnWidth(int column, int width)` | Sets the size of the header section (the minimum is 2). An `Interactive` or a `Fixed` column uses it. |
+| `void resizeColumnToContents(int column)` | Sets the width of the column to the widest of the header and the visible items. |
+| `bool isColumnHidden(int column) const` | Returns `true` if the column is hidden. |
+| `void setColumnHidden(int column, bool hide)` | Hides or shows the column. If the current column becomes hidden, the next column that shows becomes current. Column 0 has the branches: if you hide it, the tree shows no indent. |
+| `void hideColumn(int column)` | Calls `setColumnHidden(column, true)`. |
+| `void showColumn(int column)` | Calls `setColumnHidden(column, false)`. |
+| `int horizontalScrollOffset() const` | Returns the first visible column. |
 | `void expand(const QModelIndex &index)` | Shows the children of the item and emits `expanded()`. |
 | `void collapse(const QModelIndex &index)` | Hides the children of the item and emits `collapsed()`. |
 | `bool isExpanded(const QModelIndex &index) const` | Returns `true` if the item is expanded. |
@@ -777,14 +827,17 @@ void example(QTuiWidget *parent, QAbstractItemModel *model)
 
 | Key | Action |
 | --- | --- |
-| Up, Down | Move the current item. With Shift, select a range. |
-| Right | Expands the item. If it is expanded, moves to its first child. |
-| Left | Collapses the item. If it is collapsed or has no children, moves to its parent. |
+| Up, Down | Move the current item. The column stays. With Shift, select a range. |
+| Right | Expands the item. If it is expanded, moves to its first child. On an item without children, moves to the next column, as in Qt. |
+| Left | Moves to the column before. In the first column: collapses the item, or moves to its parent if it is collapsed or has no children. |
+| Alt+Left, Alt+Right | Make the current column narrower or wider by 1. Only an `Interactive` column. |
 | Enter | Expands or collapses an item with children, and emits `activated()`. |
 
 ### Mouse
 
-- A left click makes the item current, selects it and emits `clicked()`.
+- A left click makes the item and its column current, selects it and emits `clicked()`.
+- A left drag that starts on the separator after a header sets the width of that column. Only an `Interactive` column. A click on a header does nothing else.
+- The wheel scrolls the rows. Shift+wheel scrolls the columns.
 - A left drag selects the range from the pressed item to the item under the mouse.
 - A double click emits `doubleClicked()`. Then it opens the editor (`DoubleClicked`). If no editor opens, it expands or collapses the item and emits `activated()`.
 

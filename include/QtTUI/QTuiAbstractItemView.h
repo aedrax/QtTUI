@@ -16,6 +16,7 @@ namespace QtTUI {
 class TuiKeyEvent;
 class TuiMouseEvent;
 class QTuiItemDelegate;
+class QTuiHeaderView;
 
 // Base class of the model/view widgets, like QAbstractItemView: the
 // model, the current index, the selection, and the activated() and
@@ -293,6 +294,84 @@ protected:
     // and the elide mode of the view. The view fills the rectangle first.
     void paintItem(ScreenBuffer &buffer, const QRect &rect, const QModelIndex &index,
                    const Cell &style) const;
+    // --- Columns: the code that the table view and the tree view share.
+    // A view that has columns calls createColumnHeader() in its
+    // constructor. The other functions of this group need that header.
+
+    // Makes the header of the columns. It keeps the resize modes, the
+    // sizes, the hidden state and the sort indicator. The view paints it.
+    QTuiHeaderView *createColumnHeader();
+    // 1 if the header row shows, or 0
+    int headerHeight() const;
+    // The cells at the left of the first column (the vertical header of a
+    // table). The default is 0.
+    virtual int columnsLeft() const;
+    // The first column that the view shows after the horizontal scroll
+    int horizontalScrollOffset() const;
+    // The same, but 0 if the model no longer has that column
+    int firstVisibleColumn() const;
+    // The width of the column as the view paints it. The resize modes of
+    // the header set the widths. In the default mode (Interactive), a
+    // column starts with its natural width: the widest of the header and
+    // the cells that show when the model has its first rows. The width
+    // then stays the same. A scroll or a change of the data does not
+    // change it. These change it: setColumnWidth(), the two
+    // resizeColumn...ToContents() functions, a model reset, a change of
+    // the column count, and the user (Alt+Left, Alt+Right, or a
+    // left-button drag on the cell after a column header). Columns that do
+    // not fit in the view keep their widths: the view scrolls by column.
+    int columnWidth(int column) const;
+    void setColumnWidth(int column, int width);
+    // Sets the width to the widest of the header and the visible cells
+    void resizeColumnToContents(int column);
+    void resizeColumnsToContents();
+    bool isColumnHidden(int column) const;
+    // The next column that shows in the direction of step (1 or -1), or
+    // column if there is none
+    int movedColumn(int column, int step) const;
+    // Scrolls by column until the column shows
+    void ensureColumnVisible(int column);
+    // Makes the next paint calculate the widths again
+    void invalidateColumnWidths();
+    // Discards the stored natural widths: the next paint measures again
+    virtual void remeasureColumnWidths();
+    // Makes the stored natural width of the column `width`, if that is
+    // wider. It does not make a column narrower.
+    void growColumnWidth(int column, int width);
+    // The natural width of a column: the header and the cells that show.
+    // The default measures the header only.
+    virtual int measureColumn(int column) const;
+    const QVector<int> &effectiveColumnWidths() const;
+    // A column that shows: its screen x and its width, cut at the right
+    // edge of the view. One cell separates two columns.
+    struct ColumnSpan {
+        int column;
+        int x;
+        int width;
+    };
+    // The columns that show now, from left to right. Painting, hit tests
+    // and visualRect() use the same positions.
+    QList<ColumnSpan> visibleColumns() const;
+    // The column at the screen x, or -1 if x is at the left of the first
+    // column. After the last column, it is the last column. *separator is
+    // true if x is the separator cell after the column. *columnX gets the
+    // screen x of the column.
+    int columnAt(int x, bool *separator = nullptr, int *columnX = nullptr) const;
+    // Paints the header row at the top of the view, if it shows
+    void paintHeaderRow(ScreenBuffer &buffer, const ThemeProperties &theme) const;
+    // Alt+Left and Alt+Right make `column` narrower or wider by 1, if its
+    // mode is Interactive. Returns true for these two keys.
+    bool resizeColumnKeyEvent(const TuiKeyEvent *event, int column);
+    // A left drag that starts on the separator after a header sets the
+    // width of that column. Returns true if the event is part of the drag.
+    bool headerResizeMouseEvent(const TuiMouseEvent *event);
+    // Shift+wheel scrolls one column for each notch. Returns true if the
+    // event is such a wheel event.
+    bool horizontalWheelEvent(const TuiMouseEvent *event);
+
+    QTuiHeaderView *m_header = nullptr;
+    int m_horizontalScrollOffset = 0;
+
     // The items from `from` to `to` in the order of the view. The default
     // is the rectangle between the two indexes if they have the same parent.
     virtual QItemSelection selectionRange(const QModelIndex &from, const QModelIndex &to) const;
@@ -313,6 +392,16 @@ private:
     // keeps the numbers, not the items. Use persistent indexes if the
     // hidden rows must follow a sort.
     QList<int> m_hiddenRows;
+    int m_resizingColumn = -1; // column that a header drag resizes
+    int m_resizeColumnX = 0;   // its left edge on the screen
+    // Natural width per column, measured one time. Empty: not measured.
+    mutable QVector<int> m_naturalWidths;
+    // Cached final column widths shared by painting, hit testing and
+    // horizontal scrolling.
+    mutable QVector<int> m_cachedColumnWidths;
+    mutable bool m_columnWidthsStale = true;
+    mutable int m_columnWidthsScrollOffset = -1;
+    mutable QRect m_columnWidthsGeometry;
     QPersistentModelIndex m_rootIndex;
     // True while the root is a valid index, to see that the model removed it
     bool m_hasRootIndex = false;

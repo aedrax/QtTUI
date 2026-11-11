@@ -548,7 +548,7 @@ private slots:
         tree.setGeometry(QRect(0, 0, 20, 6));
         tree.setModel(&model);
         tree.setRootIndex(model.index(0, 0));
-        QCOMPARE(paintedLine(tree, 0).trimmed(), QStringLiteral("A0"));
+        QCOMPARE(paintedLine(tree, 0).trimmed(), QStringLiteral("A0 A0+"));
         QCOMPARE(paintedLine(tree, 4), QString());
         QCOMPARE(tree.currentIndex(), model.index(0, 0, model.index(0, 0)));
 
@@ -588,7 +588,7 @@ private slots:
         tree.setRootIndex(model.index(0, 0));
         model.reset();
         QVERIFY(!tree.rootIndex().isValid());
-        QCOMPARE(paintedLine(tree, 0).trimmed(), QStringLiteral("▶ A"));
+        QCOMPARE(paintedLine(tree, 0).trimmed(), QStringLiteral("▶ A A+"));
 
         // A new model starts at the invalid index
         list.setRootIndex(model.index(0, 0));
@@ -844,9 +844,10 @@ private slots:
         tree.setModel(&model);
         tree.expand(model.index(0, 0));
         tree.setItemDelegateForRow(0, &upper);
-        // Row 0 of each parent: the group "A" and its child "A0"
-        QCOMPARE(paintedLine(tree, 0), QStringLiteral("▼ A"));
-        QCOMPARE(upper.paints, 2);
+        // Row 0 of each parent: the two columns of the group "A" and of
+        // its child "A0"
+        QCOMPARE(paintedLine(tree, 0), QStringLiteral("▼ A    A+"));
+        QCOMPARE(upper.paints, 4);
         // A styled delegate keeps the selection colors
         tree.setItemDelegate(&plain);
         tree.setFocus();
@@ -1176,6 +1177,197 @@ private slots:
         table.setVerticalHeaderLabels({QStringLiteral("the first row")});
         QCOMPARE(table.dirtyRegion(), table.geometry());
         QCOMPARE(paintedLine(table, 1), QStringLiteral("the first row a"));
+    }
+
+    // --- Tree columns and header ---
+
+    void treeShowsAllColumns()
+    {
+        GroupModel model;
+        QTuiTreeView tree;
+        tree.setGeometry(QRect(0, 0, 30, 6));
+        tree.setModel(&model);
+        // The header row is hidden by default
+        QVERIFY(tree.isHeaderHidden());
+        QCOMPARE(tree.header()->focusPolicy(), Qt::NoFocus);
+        QCOMPARE(paintedLine(tree, 0), QStringLiteral("▶ A A+"));
+        QCOMPARE(paintedLine(tree, 2), QStringLiteral("▶ C C+"));
+        // Column 0 has the natural width of the first rows; the last
+        // column gets the free width, as in Qt
+        QCOMPARE(tree.columnWidth(0), 3);
+        QCOMPARE(tree.columnWidth(1), 26);
+        QVERIFY(tree.header()->stretchLastSection());
+
+        // An expand makes the column wider for the children that show
+        tree.clearDirtyRegions();
+        tree.expand(model.index(0, 0));
+        QCOMPARE(tree.dirtyRegion(), tree.geometry());
+        QCOMPARE(tree.columnWidth(0), 6);
+        QCOMPARE(paintedLine(tree, 0), QStringLiteral("▼ A    A+"));
+        QCOMPARE(paintedLine(tree, 1), QStringLiteral("    A0 A0+"));
+        // A collapse and a scroll keep the width
+        tree.collapse(model.index(0, 0));
+        QCOMPARE(tree.columnWidth(0), 6);
+        tree.expand(model.index(0, 0));
+        sendKey(tree, Qt::Key_End);
+        QCOMPARE(tree.columnWidth(0), 6);
+        sendKey(tree, Qt::Key_Home);
+        // A width that the user sets stays
+        tree.setColumnWidth(0, 3);
+        tree.expand(model.index(1, 0));
+        QCOMPARE(tree.columnWidth(0), 3);
+        tree.resizeColumnToContents(0);
+        QCOMPARE(tree.columnWidth(0), 6);
+
+        // visualRect() is the text area of each column
+        const QModelIndex child = model.index(0, 0, model.index(0, 0));
+        QCOMPARE(tree.visualRect(child), QRect(4, 1, 2, 1));
+        QCOMPARE(tree.visualRect(child.siblingAtColumn(1)), QRect(7, 1, 23, 1));
+    }
+
+    void treeHeaderRow()
+    {
+        GroupModel model;
+        QTuiTreeView tree;
+        tree.setGeometry(QRect(0, 0, 30, 4));
+        tree.setModel(&model);
+        tree.clearDirtyRegions();
+        tree.setHeaderHidden(false);
+        QVERIFY(!tree.isHeaderHidden());
+        QCOMPARE(tree.dirtyRegion(), tree.geometry());
+        QCOMPARE(paintedLine(tree, 0), QStringLiteral("H0  H1"));
+        QCOMPARE(paintedLine(tree, 1), QStringLiteral("▶ A A+"));
+        ScreenBuffer buffer(30, 4);
+        tree.paintEvent(buffer);
+        QVERIFY(buffer.backCell(0, 0).bold);
+
+        // The rows use the lines below the header: 3 lines for 3 groups
+        tree.expand(model.index(2, 0));
+        sendKey(tree, Qt::Key_End);
+        QCOMPARE(tree.currentIndex(), model.index(3, 0, model.index(2, 0)));
+        QCOMPARE(paintedLine(tree, 3), QStringLiteral("    C3 C3+"));
+        QCOMPARE(tree.visualRect(tree.currentIndex().siblingAtColumn(1)).y(), 3);
+        // A click on line 1 is the first row that shows
+        click(tree, 8, 1);
+        QCOMPARE(tree.currentIndex(), model.index(1, 1, model.index(2, 0)));
+        // A click on the header does not change the current item
+        click(tree, 1, 0);
+        QCOMPARE(tree.currentIndex(), model.index(1, 1, model.index(2, 0)));
+
+        // A change of one row repaints its line below the header
+        tree.clearDirtyRegions();
+        emit model.dataChanged(model.index(2, 0, model.index(2, 0)), model.index(2, 0, model.index(2, 0)));
+        QCOMPARE(tree.dirtyRegion(), QRect(0, 2, 30, 1));
+    }
+
+    void treeColumnKeys()
+    {
+        GroupModel model;
+        QTuiTreeView tree;
+        tree.setGeometry(QRect(0, 0, 30, 6));
+        tree.setModel(&model);
+        tree.expand(model.index(0, 0));
+        const QModelIndex child = model.index(0, 0, model.index(0, 0));
+        tree.setCurrentIndex(child);
+        // Right on an item without children goes to the next column
+        sendKey(tree, Qt::Key_Right);
+        QCOMPARE(tree.currentIndex(), child.siblingAtColumn(1));
+        QVERIFY(tree.selectionModel()->isSelected(child.siblingAtColumn(1)));
+        // Up and Down keep the column
+        sendKey(tree, Qt::Key_Down);
+        QCOMPARE(tree.currentIndex(), model.index(1, 1, model.index(0, 0)));
+        // Left goes to the column before, and then to the parent
+        sendKey(tree, Qt::Key_Left);
+        QCOMPARE(tree.currentIndex(), model.index(1, 0, model.index(0, 0)));
+        sendKey(tree, Qt::Key_Left);
+        QCOMPARE(tree.currentIndex(), model.index(0, 0));
+        // Right on an item with children expands it or goes to its child
+        sendKey(tree, Qt::Key_Right);
+        QCOMPARE(tree.currentIndex(), child);
+
+        // Alt+Left and Alt+Right resize the current column
+        sendKey(tree, Qt::Key_Right, Qt::AltModifier);
+        QCOMPARE(tree.columnWidth(0), 7);
+        sendKey(tree, Qt::Key_Left, Qt::AltModifier);
+        sendKey(tree, Qt::Key_Left, Qt::AltModifier);
+        QCOMPARE(tree.columnWidth(0), 5);
+        tree.setColumnWidth(0, 10);
+        QCOMPARE(paintedLine(tree, 1), QStringLiteral("    A0     A0+"));
+
+        // The current cell has the focus colors; the other column does not
+        tree.setFocus();
+        ScreenBuffer buffer(30, 6);
+        tree.paintEvent(buffer);
+        const ThemeProperties theme = Theme_Engine::instance()->properties(QStringLiteral("QTuiTreeView"));
+        QCOMPARE(buffer.backCell(4, 1).background, theme.focusBackground);
+        QCOMPARE(buffer.backCell(11, 1).background, theme.background);
+        // With SelectRows, the row is one bar
+        tree.setSelectionBehavior(QTuiAbstractItemView::SelectRows);
+        sendKey(tree, Qt::Key_Down);
+        tree.paintEvent(buffer);
+        QCOMPARE(buffer.backCell(4, 2).background, theme.focusBackground);
+        QCOMPARE(buffer.backCell(10, 2).background, theme.focusBackground);
+        QCOMPARE(buffer.backCell(11, 2).background, theme.focusBackground);
+    }
+
+    void treeHiddenColumnsAndScroll()
+    {
+        GroupModel model;
+        QTuiTreeView tree;
+        tree.setGeometry(QRect(0, 0, 30, 6));
+        tree.setModel(&model);
+        tree.setColumnHidden(1, true);
+        QVERIFY(tree.isColumnHidden(1));
+        QCOMPARE(paintedLine(tree, 0), QStringLiteral("▶ A"));
+        // The one column that shows gets the free width
+        QCOMPARE(tree.columnWidth(0), 30);
+        tree.showColumn(1);
+        QCOMPARE(paintedLine(tree, 0), QStringLiteral("▶ A A+"));
+
+        // If the current column becomes hidden, the next one is current
+        tree.setCurrentIndex(model.index(1, 1));
+        tree.hideColumn(1);
+        QCOMPARE(tree.currentIndex(), model.index(1, 0));
+        tree.showColumn(1);
+
+        // Columns that do not fit: the view scrolls by column
+        tree.header()->setStretchLastSection(false);
+        tree.setColumnWidth(0, 20);
+        tree.setColumnWidth(1, 20);
+        QCOMPARE(tree.horizontalScrollOffset(), 0);
+        tree.setCurrentIndex(model.index(1, 1));
+        QCOMPARE(tree.horizontalScrollOffset(), 1);
+        QCOMPARE(paintedLine(tree, 0), QStringLiteral("A+"));
+        QCOMPARE(tree.columnWidth(0), 20);
+    }
+
+    void treeWidgetShowsColumnsAndHeaderLabels()
+    {
+        QTuiTreeWidget tree;
+        tree.setGeometry(QRect(0, 0, 30, 5));
+        auto *src = new QTuiTreeWidgetItem({QStringLiteral("src"), QStringLiteral("dir")});
+        src->addChild(new QTuiTreeWidgetItem({QStringLiteral("main.cpp"), QStringLiteral("12 kB")}));
+        tree.addTopLevelItem(src);
+        // One column and no header until the tree has more
+        QCOMPARE(paintedLine(tree, 0), QStringLiteral("▶ src"));
+        QVERIFY(tree.isHeaderHidden());
+
+        tree.setHeaderLabels({QStringLiteral("Name"), QStringLiteral("Size")});
+        QCOMPARE(tree.columnCount(), 2);
+        QVERIFY(!tree.isHeaderHidden());
+        tree.expand(tree.model()->index(0, 0));
+        QCOMPARE(paintedLine(tree, 0), QStringLiteral("Name         Size"));
+        QCOMPARE(paintedLine(tree, 1), QStringLiteral("▼ src        dir"));
+        QCOMPARE(paintedLine(tree, 2), QStringLiteral("    main.cpp 12 kB"));
+
+        // The text of a column changes on the screen
+        tree.clearDirtyRegions();
+        src->child(0)->setText(1, QStringLiteral("13 kB"));
+        QCOMPARE(tree.dirtyRegion(), QRect(0, 2, 30, 1));
+        QCOMPARE(paintedLine(tree, 2), QStringLiteral("    main.cpp 13 kB"));
+
+        tree.setHeaderHidden(true);
+        QCOMPARE(paintedLine(tree, 0), QStringLiteral("▼ src        dir"));
     }
 };
 

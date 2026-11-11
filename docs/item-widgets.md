@@ -298,9 +298,11 @@ int selectedCellCount(const QTuiTableWidget *table)
 `#include <QtTUI/QTuiTreeWidget.h>` · Inherits: `QTuiTreeView`
 
 A tree of `QTuiTreeWidgetItem` objects. The widget owns its top-level items
-and deletes them when it is deleted. Different from Qt: the tree shows only
-column 0 and has no header, so the header labels and the other columns are
-stored but not shown. `itemClicked()` comes from a left click on an item, as
+and deletes them when it is deleted. The tree shows the text of each column
+of an item. Different from Qt: the header row is hidden until you call
+`setHeaderLabels()` or `setHeaderHidden(false)`. See
+[QTuiTreeView](model-view.md#qtuitreeview) for the columns and the keys.
+`itemClicked()` comes from a left click on an item, as
 in Qt, and also from Enter on the current item.
 
 ### Example
@@ -350,9 +352,9 @@ int main(int argc, char *argv[])
 | `QTuiTreeWidgetItem *topLevelItem(int index) const` | Returns the top-level item, or `nullptr`. |
 | `int topLevelItemCount() const` | Returns the number of top-level items. |
 | `QTuiTreeWidgetItem *takeTopLevelItem(int index)` | Removes the top-level item and returns it. You own it. Returns `nullptr` if the index is out of range. |
-| `void setHeaderLabels(const QStringList &labels)` | Sets the header labels. The column count grows to the number of labels. It resets the model, so all items collapse. |
+| `void setHeaderLabels(const QStringList &labels)` | Sets the header labels and shows the header row. The column count grows to the number of labels. It resets the model, so all items collapse. |
 | `int columnCount() const` | Returns the number of columns. |
-| `void setColumnCount(int columns)` | Sets the number of columns. The minimum is 1. It resets the model, so all items collapse. |
+| `void setColumnCount(int columns)` | Sets the number of columns that the tree shows. The minimum is 1. It resets the model, so all items collapse. |
 | `QTuiTreeWidgetItem *currentItem() const` | Returns the current item, or `nullptr`. |
 | `void setCurrentItem(QTuiTreeWidgetItem *item)` | Makes the item current. The parents of the item must be expanded. It does not emit `currentItemChanged()`. |
 | `QList<QTuiTreeWidgetItem *> selectedItems() const` | Returns the selected items. |

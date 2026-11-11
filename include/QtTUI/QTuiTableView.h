@@ -24,7 +24,7 @@ public:
     QRect hoverRect() const override;
     void setRootIndex(const QModelIndex &index) override;
 
-    int horizontalScrollOffset() const;
+    using QTuiAbstractItemView::horizontalScrollOffset;
 
     // Sorting, as in QTableView. With sorting enabled, a click on a column
     // header sorts by that column; another click reverses the order. The
@@ -38,25 +38,17 @@ public:
     Qt::SortOrder sortOrder() const;
 
     // Column widths, as in QTableView. The resize modes of
-    // horizontalHeader() set the widths. In the default mode
-    // (Interactive), a column starts with its natural width: the widest of
-    // the header and the cells that show when the model has its first rows.
-    // The width then stays the same. A scroll or a change of the data does
-    // not change it. These change it: setColumnWidth(), the two
-    // resizeColumn...ToContents() functions, a model reset, a change of the
-    // column count, and the user (Alt+Left, Alt+Right, or a left-button drag
-    // on the cell after a column header). Columns that do not fit in the
-    // view keep their widths: the view scrolls by column.
-    int columnWidth(int column) const;
-    void setColumnWidth(int column, int width);
-    // Sets the width to the widest of the header and the visible cells
-    void resizeColumnToContents(int column);
-    void resizeColumnsToContents();
+    // horizontalHeader() set the widths. See the column functions of
+    // QTuiAbstractItemView for the rules.
+    using QTuiAbstractItemView::columnWidth;
+    using QTuiAbstractItemView::setColumnWidth;
+    using QTuiAbstractItemView::resizeColumnToContents;
+    using QTuiAbstractItemView::resizeColumnsToContents;
 
     // Hidden columns, as in QTableView. A hidden column does not show and
     // the Left and Right keys go past it. If the current column becomes
     // hidden, the next column that shows becomes current.
-    bool isColumnHidden(int column) const;
+    using QTuiAbstractItemView::isColumnHidden;
     void setColumnHidden(int column, bool hide);
     void hideColumn(int column) { setColumnHidden(column, true); }
     void showColumn(int column) { setColumnHidden(column, false); }
@@ -102,48 +94,25 @@ private slots:
     void onModelReset();
 
 private:
-    // 1 if the header row shows, or 0
-    int headerHeight() const;
     // The width of the vertical header and its separator, or 0
-    int columnsLeft() const;
+    int columnsLeft() const override;
     // Repaints all if the width of the vertical header is not as painted
     void updateColumnsLeft();
     void disconnectModel();
     void connectModel();
     void ensureCurrentVisible();
-    void ensureColumnVisible(int column);
     void clampCurrentIndex();
-    void invalidateColumnWidths();
-    // Discards the stored natural widths: the next paint measures again
-    void remeasureColumnWidths();
-    int measureColumn(int column) const;
-    // The next column that shows in the direction of step (1 or -1), or
-    // column if there is none
-    int movedColumn(int column, int step) const;
-    const QVector<int> &effectiveColumnWidths() const;
+    void remeasureColumnWidths() override;
+    int measureColumn(int column) const override;
 
     int m_currentRow = 0;
     int m_currentCol = 0;
-    int m_horizontalScrollOffset = 0;
     bool m_sortingEnabled = false;
-    QTuiHeaderView *m_header = nullptr;
     QTuiHeaderView *m_verticalHeader = nullptr;
     // The widest label of the vertical header, measured one time. -1: not
     // measured.
     mutable int m_verticalLabelWidth = -1;
     mutable int m_paintedColumnsLeft = 0;
-    int m_resizingColumn = -1; // column that a header drag resizes
-    int m_resizeColumnX = 0;   // its left edge, relative to the view
-
-    // Natural width per column, measured one time. Empty: not measured.
-    mutable QVector<int> m_naturalWidths;
-
-    // Cached final column widths shared by painting, hit testing and
-    // horizontal scrolling.
-    mutable QVector<int> m_cachedColumnWidths;
-    mutable bool m_columnWidthsStale = true;
-    mutable int m_columnWidthsScrollOffset = -1;
-    mutable QRect m_columnWidthsGeometry;
 };
 
 } // namespace QtTUI
