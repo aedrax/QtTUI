@@ -32,6 +32,7 @@ void QTuiColumnView::setModel(QAbstractItemModel *model)
     m_activeColumn = 0;
     m_firstColumn = 0;
 
+    resetRootIndex();
     if (m_model) {
         connectModel();
         rebuildColumns();
@@ -64,7 +65,7 @@ void QTuiColumnView::setCurrentIndex(const QModelIndex &index)
     // Build the path from root to this index
     QList<QModelIndex> path;
     QModelIndex current = index;
-    while (current.isValid()) {
+    while (current.isValid() && current != rootIndex()) {
         path.prepend(current);
         current = current.parent();
     }
@@ -72,7 +73,7 @@ void QTuiColumnView::setCurrentIndex(const QModelIndex &index)
     // Rebuild columns following the path
     m_columns.clear();
     Column rootCol;
-    rootCol.rootIndex = QModelIndex();
+    rootCol.rootIndex = rootIndex();
     rootCol.currentRow = 0;
     m_columns.append(rootCol);
 
@@ -413,6 +414,13 @@ void QTuiColumnView::onLayoutChanged()
     markDirty();
 }
 
+void QTuiColumnView::setRootIndex(const QModelIndex &index)
+{
+    QTuiAbstractItemView::setRootIndex(index);
+    onModelReset();
+    selectCurrent(Qt::NoModifier, false);
+}
+
 void QTuiColumnView::onModelReset()
 {
     m_columns.clear();
@@ -473,7 +481,7 @@ void QTuiColumnView::rebuildColumns()
     // Preserve columns up to and including the active column, then rebuild children.
     if (m_columns.isEmpty()) {
         Column rootCol;
-        rootCol.rootIndex = QModelIndex();
+        rootCol.rootIndex = rootIndex();
         rootCol.currentRow = 0;
         m_columns.append(rootCol);
         m_activeColumn = 0;

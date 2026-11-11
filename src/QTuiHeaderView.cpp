@@ -28,6 +28,7 @@ void QTuiHeaderView::setModel(QAbstractItemModel *model)
     }
 
     m_model = model;
+    m_rootIndex = QPersistentModelIndex();
 
     if (m_model) {
         connect(m_model, &QAbstractItemModel::headerDataChanged,
@@ -67,6 +68,17 @@ QAbstractItemModel *QTuiHeaderView::model() const
     return m_model;
 }
 
+void QTuiHeaderView::setRootIndex(const QModelIndex &index)
+{
+    m_rootIndex = index;
+    initSections();
+}
+
+QModelIndex QTuiHeaderView::rootIndex() const
+{
+    return m_rootIndex;
+}
+
 Qt::Orientation QTuiHeaderView::orientation() const
 {
     return m_orientation;
@@ -74,14 +86,14 @@ Qt::Orientation QTuiHeaderView::orientation() const
 
 int QTuiHeaderView::sectionSize(int logicalIndex) const
 {
-    if (logicalIndex < 0 || logicalIndex >= m_sectionSizes.size())
+    if (logicalIndex < 0 || logicalIndex >= count())
         return 0;
-    return m_sectionSizes.at(logicalIndex);
+    return m_sectionSizes.value(logicalIndex, DefaultSectionSize);
 }
 
 void QTuiHeaderView::resizeSection(int logicalIndex, int size)
 {
-    if (logicalIndex < 0 || logicalIndex >= m_sectionSizes.size())
+    if (logicalIndex < 0 || logicalIndex >= count())
         return;
     if (size < MinSectionSize)
         size = MinSectionSize;
@@ -90,7 +102,7 @@ void QTuiHeaderView::resizeSection(int logicalIndex, int size)
     // in a table view, if the size stays the same
     const bool wasResized = m_resizedSections.contains(logicalIndex);
     m_resizedSections.insert(logicalIndex);
-    int oldSize = m_sectionSizes.at(logicalIndex);
+    int oldSize = sectionSize(logicalIndex);
     if (oldSize == size) {
         if (!wasResized)
             emit geometriesChanged();
@@ -160,13 +172,77 @@ void QTuiHeaderView::setStretchLastSection(bool stretch)
     emit geometriesChanged();
 }
 
+void QTuiHeaderView::setSortIndicator(int logicalIndex, Qt::SortOrder order)
+{
+    if (m_sortSection == logicalIndex && m_sortOrder == order)
+        return;
+    m_sortSection = logicalIndex;
+    m_sortOrder = order;
+    markDirty();
+}
+
+int QTuiHeaderView::sortIndicatorSection() const
+{
+    return m_sortSection;
+}
+
+Qt::SortOrder QTuiHeaderView::sortIndicatorOrder() const
+{
+    return m_sortOrder;
+}
+
+bool QTuiHeaderView::isSortIndicatorShown() const
+{
+    return m_sortIndicatorShown;
+}
+
+void QTuiHeaderView::setSortIndicatorShown(bool show)
+{
+    if (m_sortIndicatorShown == show)
+        return;
+    m_sortIndicatorShown = show;
+    markDirty();
+}
+
+void QTuiHeaderView::paintSection(ScreenBuffer &buffer, const QRect &rect, int logicalIndex,
+                                  const Cell &style) const
+{
+    fillRect(buffer, rect, style);
+    if (!m_model)
+        return;
+    QString text = m_model->headerData(logicalIndex, m_orientation, Qt::DisplayRole).toString();
+    if (m_sortIndicatorShown && logicalIndex == m_sortSection)
+        text += m_sortOrder == Qt::AscendingOrder ? QStringLiteral(" \u25B2") : QStringLiteral(" \u25BC");
+    renderTextTruncated(buffer, rect.x(), rect.y(), text, rect.width(), style);
+}
+
+void QTuiHeaderView::paintSections(ScreenBuffer &buffer, const QRect &rect, int first,
+                                   const QList<int> &sizes, int spacing, const Cell &style) const
+{
+    const auto theme = themeProperties();
+    int x = rect.x();
+    for (int i = qMax(0, first); i < sizes.size() && x <= rect.right(); ++i) {
+        if (isSectionHidden(i))
+            continue;
+        Cell sectionStyle = style;
+        if (hasFocus() && i == m_focusedSection) {
+            sectionStyle.foreground = theme.focusForeground;
+            sectionStyle.background = theme.focusBackground;
+            sectionStyle.bold = true;
+        }
+        const int width = qMin(sizes.at(i), rect.right() + 1 - x);
+        paintSection(buffer, QRect(x, rect.y(), width, 1), i, sectionStyle);
+        x += width + spacing;
+    }
+}
+
 int QTuiHeaderView::count() const
 {
     if (!m_model)
         return 0;
     return (m_orientation == Qt::Horizontal)
-        ? m_model->columnCount()
-        : m_model->rowCount();
+        ? m_model->columnCount(m_rootIndex)
+        : m_model->rowCount(m_rootIndex);
 }
 
 QSize QTuiHeaderView::minimumSize() const
@@ -206,36 +282,29 @@ void QTuiHeaderView::paintEvent(ScreenBuffer &buffer)
 
     const auto theme = themeProperties();
     const int n = count();
-    // Writes the label of section i in a cell of w columns at (x, y)
-    auto paintSection = [&](int i, Qt::Orientation orientation, int x, int y, int w) {
-        Cell style = cellStyle(theme, theme.foreground, theme.background);
-        if (hasFocus() && i == m_focusedSection) {
-            style.foreground = theme.focusForeground;
-            style.background = theme.focusBackground;
-            style.bold = true;
-        }
-        fillRect(buffer, QRect(x, y, w, 1), style);
-        renderText(buffer, x, y, m_model->headerData(i, orientation, Qt::DisplayRole).toString(), w, style);
-    };
+    const Cell style = cellStyle(theme, theme.foreground, theme.background);
 
     if (m_orientation == Qt::Horizontal) {
-        // Render header labels in a single row
-        int x = geo.x();
-        for (int i = 0; i < n; ++i) {
-            if (isSectionHidden(i))
-                continue;
-            paintSection(i, Qt::Horizontal, x, geo.y(), sectionSize(i));
-            x += sectionSize(i);
-        }
-        // Fill remaining width with background
-        fillRect(buffer, QRect(x, geo.y(), geo.right() + 1 - x, 1), cellStyle(theme.foreground, theme.background));
+        // The labels in one row, and the theme background after them
+        QList<int> sizes(n);
+        for (int i = 0; i < n; ++i)
+            sizes[i] = sectionSize(i);
+        fillRect(buffer, QRect(geo.x(), geo.y(), geo.width(), 1),
+                 cellStyle(theme.foreground, theme.background));
+        paintSections(buffer, QRect(geo.x(), geo.y(), geo.width(), 1), 0, sizes, 0, style);
     } else {
-        // Vertical: render labels in a single column
+        // Vertical: one label on each line
         int row = geo.y();
         for (int i = 0; i < n && row <= geo.bottom(); ++i) {
             if (isSectionHidden(i))
                 continue;
-            paintSection(i, Qt::Vertical, geo.x(), row++, geo.width());
+            Cell sectionStyle = style;
+            if (hasFocus() && i == m_focusedSection) {
+                sectionStyle.foreground = theme.focusForeground;
+                sectionStyle.background = theme.focusBackground;
+                sectionStyle.bold = true;
+            }
+            paintSection(buffer, QRect(geo.x(), row++, geo.width(), 1), i, sectionStyle);
         }
     }
 }
@@ -295,13 +364,11 @@ void QTuiHeaderView::keyPressEvent(TuiKeyEvent *event)
     case Qt::Key_Plus:
     case Qt::Key_Equal:
         // Increase focused section size
-        if (m_focusedSection >= 0 && m_focusedSection < m_sectionSizes.size())
-            resizeSection(m_focusedSection, sectionSize(m_focusedSection) + 1);
+        resizeSection(m_focusedSection, sectionSize(m_focusedSection) + 1);
         break;
     case Qt::Key_Minus:
         // Decrease focused section size
-        if (m_focusedSection >= 0 && m_focusedSection < m_sectionSizes.size())
-            resizeSection(m_focusedSection, sectionSize(m_focusedSection) - 1);
+        resizeSection(m_focusedSection, sectionSize(m_focusedSection) - 1);
         break;
     default:
         QTuiWidget::keyPressEvent(event);
@@ -311,12 +378,12 @@ void QTuiHeaderView::keyPressEvent(TuiKeyEvent *event)
 
 void QTuiHeaderView::initSections()
 {
+    // The cost is the number of sections that have a size or a state, not
+    // the number of sections: a vertical header can have millions
     const int n = count();
-    m_sectionSizes.resize(n);
-    for (int i = 0; i < n; ++i) {
-        if (m_sectionSizes.at(i) <= 0)
-            m_sectionSizes[i] = DefaultSectionSize;
-    }
+    m_sectionSizes.removeIf([n](const std::pair<const int &, int &> &section) {
+        return section.first >= n;
+    });
     // Ensure focused section is valid
     if (m_focusedSection >= n)
         m_focusedSection = qMax(0, n - 1);
@@ -333,7 +400,9 @@ void QTuiHeaderView::initSections()
         else
             ++it;
     }
-    markDirty();
+    // A view that paints the header marks its own regions for the change
+    if (!isPaintedByParent())
+        markDirty();
 }
 
 int QTuiHeaderView::nextVisibleSection(int from, int direction) const

@@ -10,8 +10,10 @@ internal model classes (`QTuiListWidgetModel`, `QTuiTableWidgetModel`,
 `QTuiTreeWidgetModel`) are in the public headers, but they are not part of
 the API. Do not use them.
 
-The widgets show the `Qt::DisplayRole` text of each item. They do not show
-icons or check states.
+The widgets show the `Qt::DisplayRole` text of each item. An item with a
+check state shows a check box before the text, and Space or a click on the
+box toggles it. A list item with an icon shows that string before the text.
+See [check boxes and glyphs](model-view.md#check-boxes-and-glyphs).
 
 ## QTuiListWidget
 
@@ -102,9 +104,10 @@ also work.
 `#include <QtTUI/QTuiListWidgetItem.h>` · Inherits: none
 
 One item of a `QTuiListWidget`. The default flags are
-`Qt::ItemIsSelectable | Qt::ItemIsEnabled`, so an item is not editable. Add
-`Qt::ItemIsEditable` to edit it in place. Different from Qt: the icon is a
-string, and the check state is an `int`.
+`Qt::ItemIsSelectable | Qt::ItemIsUserCheckable | Qt::ItemIsEnabled`, so an
+item is not editable. Add `Qt::ItemIsEditable` to edit it in place. An item
+shows a check box only after `setCheckState()` gives it a state, as in Qt.
+Different from Qt: the icon is a string (a glyph).
 
 ### Example
 
@@ -131,11 +134,11 @@ void example(QTuiListWidget *list)
 | `QString text() const` | Returns the `Qt::DisplayRole` text. |
 | `void setText(const QString &text)` | Sets the text and repaints the item. |
 | `QString icon() const` | Returns the `Qt::DecorationRole` string. |
-| `void setIcon(const QString &icon)` | Sets the `Qt::DecorationRole` string. The view does not show it. |
+| `void setIcon(const QString &icon)` | Sets the `Qt::DecorationRole` string: a glyph that shows before the text. |
 | `Qt::ItemFlags flags() const` | Returns the flags. |
 | `void setFlags(Qt::ItemFlags flags)` | Sets the flags. |
-| `int checkState() const` | Returns the check state (0, 1 or 2). |
-| `void setCheckState(int state)` | Sets the check state. It is not the `Qt::CheckStateRole` data, and the view does not show it. |
+| `Qt::CheckState checkState() const` | Returns the `Qt::CheckStateRole` data. An item without a state returns `Qt::Unchecked`. |
+| `void setCheckState(Qt::CheckState state)` | Sets the `Qt::CheckStateRole` data. The item then shows a check box. |
 | `QVariant data(int role) const` | Returns the data for the role. |
 | `void setData(int role, const QVariant &value)` | Sets the data for the role and repaints the item. |
 | `QTuiListWidget *listWidget() const` | Returns the list that has the item, or `nullptr`. |
@@ -147,8 +150,9 @@ void example(QTuiListWidget *list)
 A table of `QTuiTableWidgetItem` objects. A cell can be empty. The widget
 owns its items and deletes them when it is deleted. `cellClicked()` comes
 from a left click on a cell, as in Qt, and also from Enter on the current
-cell. The vertical header labels are stored, but the table does not show
-them. A sort puts the rows in the order of the text in the sort column.
+cell. Different from Qt: the vertical header is hidden by default. Call
+`verticalHeader()->setVisible(true)` to show the row labels; a row without a
+label shows its number. A sort puts the rows in the order of the text in the sort column.
 Empty cells go last.
 
 ### Example
@@ -188,7 +192,7 @@ void example(QTuiWidget *parent)
 | `QTuiTableWidgetItem *item(int row, int column) const` | Returns the item in the cell, or `nullptr`. |
 | `QTuiTableWidgetItem *takeItem(int row, int column)` | Removes the item from the cell and returns it. You own it. |
 | `void setHorizontalHeaderLabels(const QStringList &labels)` | Sets the column headers. Labels after the last column have no effect. |
-| `void setVerticalHeaderLabels(const QStringList &labels)` | Sets the row headers. The table does not show them. |
+| `void setVerticalHeaderLabels(const QStringList &labels)` | Sets the row headers. They show if the vertical header shows (see [QTuiTableView](model-view.md#qtuitableview)). |
 | `QList<QTuiTableWidgetSelectionRange> selectedRanges() const` | Returns the selected ranges. |
 | `QList<QTuiTableWidgetItem *> selectedItems() const` | Returns the selected cells that have an item. |
 | `void keyPressEvent(TuiKeyEvent *event) override` | Handles the keys of `QTuiTableView` and emits the signals below. |
@@ -218,7 +222,10 @@ The keys of [`QTuiTableView`](model-view.md#qtuitableview) and of
 `#include <QtTUI/QTuiTableWidgetItem.h>` · Inherits: none
 
 One cell of a `QTuiTableWidget`. The default flags are
-`Qt::ItemIsEditable | Qt::ItemIsSelectable | Qt::ItemIsEnabled`, as in Qt.
+`Qt::ItemIsEditable | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable | Qt::ItemIsEnabled`,
+as in Qt. A cell shows a check box only after `setCheckState()` gives it a
+state. Set a string for `Qt::DecorationRole` with `setData()` to show a
+glyph before the text.
 
 ### Example
 
@@ -245,6 +252,8 @@ void example(QTuiTableWidget *table)
 | `void setText(const QString &text)` | Sets the text and repaints the cell. |
 | `Qt::ItemFlags flags() const` | Returns the flags. |
 | `void setFlags(Qt::ItemFlags flags)` | Sets the flags. |
+| `Qt::CheckState checkState() const` | Returns the `Qt::CheckStateRole` data. A cell without a state returns `Qt::Unchecked`. |
+| `void setCheckState(Qt::CheckState state)` | Sets the `Qt::CheckStateRole` data. The cell then shows a check box. |
 | `QVariant data(int role) const` | Returns the data for the role. |
 | `void setData(int role, const QVariant &value)` | Sets the data for the role and repaints the cell. |
 | `QTuiTableWidget *tableWidget() const` | Returns the table that has the item, or `nullptr`. |
@@ -289,9 +298,11 @@ int selectedCellCount(const QTuiTableWidget *table)
 `#include <QtTUI/QTuiTreeWidget.h>` · Inherits: `QTuiTreeView`
 
 A tree of `QTuiTreeWidgetItem` objects. The widget owns its top-level items
-and deletes them when it is deleted. Different from Qt: the tree shows only
-column 0 and has no header, so the header labels and the other columns are
-stored but not shown. `itemClicked()` comes from a left click on an item, as
+and deletes them when it is deleted. The tree shows the text of each column
+of an item. Different from Qt: the header row is hidden until you call
+`setHeaderLabels()` or `setHeaderHidden(false)`. See
+[QTuiTreeView](model-view.md#qtuitreeview) for the columns and the keys.
+`itemClicked()` comes from a left click on an item, as
 in Qt, and also from Enter on the current item.
 
 ### Example
@@ -341,9 +352,9 @@ int main(int argc, char *argv[])
 | `QTuiTreeWidgetItem *topLevelItem(int index) const` | Returns the top-level item, or `nullptr`. |
 | `int topLevelItemCount() const` | Returns the number of top-level items. |
 | `QTuiTreeWidgetItem *takeTopLevelItem(int index)` | Removes the top-level item and returns it. You own it. Returns `nullptr` if the index is out of range. |
-| `void setHeaderLabels(const QStringList &labels)` | Sets the header labels. The column count grows to the number of labels. It resets the model, so all items collapse. |
+| `void setHeaderLabels(const QStringList &labels)` | Sets the header labels and shows the header row. The column count grows to the number of labels. It resets the model, so all items collapse. |
 | `int columnCount() const` | Returns the number of columns. |
-| `void setColumnCount(int columns)` | Sets the number of columns. The minimum is 1. It resets the model, so all items collapse. |
+| `void setColumnCount(int columns)` | Sets the number of columns that the tree shows. The minimum is 1. It resets the model, so all items collapse. |
 | `QTuiTreeWidgetItem *currentItem() const` | Returns the current item, or `nullptr`. |
 | `void setCurrentItem(QTuiTreeWidgetItem *item)` | Makes the item current. The parents of the item must be expanded. It does not emit `currentItemChanged()`. |
 | `QList<QTuiTreeWidgetItem *> selectedItems() const` | Returns the selected items. |
@@ -372,9 +383,9 @@ The keys of [`QTuiTreeView`](model-view.md#qtuitreeview) and of
 
 One item of a `QTuiTreeWidget`, with a text for each column and child
 items. The item owns its children. The default flags are
-`Qt::ItemIsSelectable | Qt::ItemIsEnabled`, so an item is not editable.
-Different from Qt: the check state is an `int`, and the tree does not show
-it.
+`Qt::ItemIsSelectable | Qt::ItemIsUserCheckable | Qt::ItemIsEnabled`, so an
+item is not editable. A column shows a check box only after
+`setCheckState()` gives it a state, as in Qt.
 
 The destructor deletes the children, but it does not remove the item from
 its parent or its tree. Call `takeChild()` or
@@ -415,8 +426,8 @@ void example(QTuiTreeWidget *tree)
 | `QTuiTreeWidget *treeWidget() const` | Returns the tree that has the item, or `nullptr`. |
 | `QString text(int column) const` | Returns the `Qt::DisplayRole` text of the column. |
 | `void setText(int column, const QString &text)` | Sets the text of the column and repaints the item. |
-| `int checkState(int column) const` | Returns the `Qt::CheckStateRole` data of the column as an `int`. |
-| `void setCheckState(int column, int state)` | Sets the `Qt::CheckStateRole` data of the column. |
+| `Qt::CheckState checkState(int column) const` | Returns the `Qt::CheckStateRole` data of the column. A column without a state returns `Qt::Unchecked`. |
+| `void setCheckState(int column, Qt::CheckState state)` | Sets the `Qt::CheckStateRole` data of the column. The column then shows a check box. |
 | `QVariant data(int column, int role) const` | Returns the data of the column for the role. |
 | `void setData(int column, int role, const QVariant &value)` | Sets the data of the column for the role and repaints the item. |
 | `int columnCount() const` | Returns the number of columns that have data. |
@@ -452,7 +463,7 @@ QStringList checkedNames(QTuiTreeWidget *tree)
 
 | Enum | Values |
 | --- | --- |
-| `IteratorFlag` (flags `IteratorFlags`) | `All`: all items (the default). `Checked`: the check state of column 0 is 2. `Unchecked`: the check state of column 0 is 0. `Selected`: the item is selected. `Hidden`: matches no item, because items cannot be hidden. As in Qt, an item must match all the flags. |
+| `IteratorFlag` (flags `IteratorFlags`) | `All`: all items (the default). `Checked`: the check state of column 0 is `Qt::Checked`. `Unchecked`: the check state of column 0 is `Qt::Unchecked`. `Selected`: the item is selected. `Hidden`: matches no item, because items cannot be hidden. As in Qt, an item must match all the flags. |
 
 ### Functions
 

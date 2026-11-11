@@ -4,6 +4,9 @@
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/RenderUtils.h>
 #include <QtTUI/TuiEvents.h>
+#include <QtTUI/AnsiRenderer.h>
+#include <QtTUI/QTuiItemDelegate.h>
+#include <QtTUI/QtTuiUnicode.h>
 #include <QDebug>
 
 namespace QtTUI {
@@ -12,13 +15,24 @@ QTuiTableView::QTuiTableView(QTuiWidget *parent)
     : QTuiAbstractItemView(parent)
 {
     setFocusPolicy(Qt::StrongFocus);
-    m_header = new QTuiHeaderView(Qt::Horizontal, this);
-    m_header->setFocusPolicy(Qt::NoFocus);
-    m_header->setVisible(false);
+    // The table gives the headers their place and paints them, so they are
+    // not focus stops and do not take the mouse. The vertical header is
+    // hidden by default.
+    createColumnHeader();
+    m_verticalHeader = new QTuiHeaderView(Qt::Vertical, this);
+    m_verticalHeader->setFocusPolicy(Qt::NoFocus);
+    m_verticalHeader->setPaintedByParent(true);
+    m_verticalHeader->setVisible(false);
     const auto headerChanged = [this]() {
         invalidateColumnWidths();
+        clampScrollOffset(geometry().height() - headerHeight());
+        ensureCurrentVisible();
+        ensureColumnVisible(m_currentCol);
+        updateEditorGeometry();
         markDirty();
     };
+    connect(m_header, &QTuiWidget::visibilityChanged, this, headerChanged);
+    connect(m_verticalHeader, &QTuiWidget::visibilityChanged, this, headerChanged);
     connect(m_header, &QTuiHeaderView::sectionResized, this, headerChanged);
     connect(m_header, &QTuiHeaderView::geometriesChanged, this, headerChanged);
     // Layouts resize views through setGeometry(); no resize events are
@@ -27,10 +41,7 @@ QTuiTableView::QTuiTableView(QTuiWidget *parent)
     connect(this, &QTuiWidget::geometryChanged, this, [this](const QRect &) {
         if (!m_model)
             return;
-        const int rows = m_model->rowCount();
-        const int visibleDataRows = geometry().height() - m_headerHeight;
-        if (visibleDataRows > 0)
-            m_scrollOffset = qBound(0, m_scrollOffset, qMax(0, rows - visibleDataRows));
+        clampScrollOffset(geometry().height() - headerHeight());
         clampCurrentIndex();
         ensureCurrentVisible();
         ensureColumnVisible(m_currentCol);
@@ -49,27 +60,35 @@ void QTuiTableView::setModel(QAbstractItemModel *model)
     m_currentCol = 0;
     m_scrollOffset = 0;
     m_horizontalScrollOffset = 0;
+    m_spans.clear();
+    resetRootIndex();
     remeasureColumnWidths();
 
     if (m_model)
         connectModel();
     m_header->setModel(m_model);
+    m_verticalHeader->setModel(m_model);
     resetSelectionModel();
 }
 
 QModelIndex QTuiTableView::currentIndex() const
 {
-    if (!m_model || m_model->rowCount() == 0 || m_model->columnCount() == 0)
+    if (shownRows() == 0 || m_model->columnCount(rootIndex()) == 0)
         return QModelIndex();
-    return m_model->index(m_currentRow, m_currentCol);
+    return m_model->index(m_currentRow, m_currentCol, rootIndex());
 }
 
 void QTuiTableView::setCurrentIndex(const QModelIndex &index)
 {
-    if (!m_model)
+    if (shownRows() == 0 || (index.isValid() && index.parent() != rootIndex()))
         return;
-    int row = qBound(0, index.row(), qMax(0, m_model->rowCount() - 1));
-    int col = qBound(0, index.column(), qMax(0, m_model->columnCount() - 1));
+    // A hidden row cannot be current: the next row that shows is
+    int row = shownRowNear(index.row());
+    int col = qBound(0, index.column(), qMax(0, m_model->columnCount(rootIndex()) - 1));
+    if (const Span *span = spanAt(row, col)) {
+        row = span->row;
+        col = span->column;
+    }
     if (row != m_currentRow || col != m_currentCol) {
         m_currentRow = row;
         m_currentCol = col;
@@ -82,37 +101,32 @@ void QTuiTableView::setCurrentIndex(const QModelIndex &index)
 
 void QTuiTableView::scrollTo(const QModelIndex &index, ScrollHint hint)
 {
-    if (!m_model || index.model() != m_model || index.parent().isValid())
+    if (!m_model || index.model() != m_model || index.parent() != rootIndex())
         return;
     ensureColumnVisible(index.column());
-    scrollToRow(index.row(), geometry().height() - m_headerHeight, m_model->rowCount(), hint);
+    if (!isHiddenRow(index.row()))
+        scrollToRow(visualRow(index.row()), geometry().height() - headerHeight(), shownRows(), hint);
 }
 
 QRect QTuiTableView::visualRect(const QModelIndex &index) const
 {
-    if (!m_model || index.model() != m_model || index.parent().isValid())
+    if (!m_model || index.model() != m_model || index.parent() != rootIndex())
         return QRect();
     const QRect geo = geometry();
-    const int line = index.row() - m_scrollOffset;
-    if (line < 0 || line >= geo.height() - m_headerHeight)
+    const int line = visualRow(index.row()) - m_scrollOffset;
+    if (line < 0 || line >= geo.height() - headerHeight() || isHiddenRow(index.row()))
         return QRect();
-    // The same column positions as paintEvent: a separator after each column
-    const QVector<int> colWidths = effectiveColumnWidths();
-    int x = geo.x();
-    for (int c = m_horizontalScrollOffset; c < colWidths.size() && x < geo.right() + 1; ++c) {
-        if (isColumnHidden(c))
-            continue;
-        const int width = qMin(colWidths.at(c), geo.right() + 1 - x);
-        if (c == index.column())
-            return QRect(x, geo.y() + m_headerHeight + line, width, 1);
-        x += width + 1;
+    // The same column positions as paintEvent. The first cell of a span
+    // has the width of the columns of the span that show.
+    const Span *cellSpan = spanAt(index.row(), index.column());
+    const int lastColumn = cellSpan && cellSpan->row == index.row() && cellSpan->column == index.column()
+        ? cellSpan->right() : index.column();
+    QRect rect;
+    for (const ColumnSpan &span : visibleColumns()) {
+        if (span.column >= index.column() && span.column <= lastColumn)
+            rect |= QRect(span.x, geo.y() + headerHeight() + line, span.width, 1);
     }
-    return QRect();
-}
-
-int QTuiTableView::horizontalScrollOffset() const
-{
-    return m_horizontalScrollOffset;
+    return rect;
 }
 
 void QTuiTableView::paintEvent(ScreenBuffer &buffer)
@@ -122,99 +136,95 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
         return;
 
     const auto theme = themeProperties();
-    const int cols = m_model->columnCount();
-    const int rows = m_model->rowCount();
+    const int cols = m_model->columnCount(rootIndex());
+    const int rows = shownRows();
     const int viewWidth = geo.width();
     const int viewHeight = geo.height();
+    // The columns start after the vertical header and its separator
+    const int left = columnsLeft();
+    m_paintedColumnsLeft = left;
 
     if (cols == 0)
         return;
 
-    // Final (post-scaling) column widths, shared with mouse hit testing and
-    // horizontal scrolling.
-    const QVector<int> colWidths = effectiveColumnWidths();
+    // The column positions, shared with mouse hit testing and
+    // horizontal scrolling
+    const QList<ColumnSpan> spans = visibleColumns();
 
-    // --- Determine visible columns based on horizontal scroll offset ---
-    int firstVisibleCol = m_horizontalScrollOffset;
-    if (firstVisibleCol >= cols)
-        firstVisibleCol = 0;
-
-    // --- Render column headers on first row with bold text ---
     // The separators between the columns and the rest of each row use the
-    // plain theme colors.
+    // plain theme colors. The vertical header is bold, as the header row.
     const Cell plain = cellStyle(theme.foreground, theme.background);
-    {
-        Cell headerStyle = plain;
-        headerStyle.bold = true;
-        fillRect(buffer, QRect(geo.x(), geo.y(), viewWidth, 1), plain);
-
-        int xOff = geo.x();
-        for (int c = firstVisibleCol; c < cols; ++c) {
-            if (isColumnHidden(c))
-                continue;
-            if (xOff >= geo.x() + viewWidth)
-                break;
-            int availWidth = qMin(colWidths[c], geo.x() + viewWidth - xOff);
-            fillRect(buffer, QRect(xOff, geo.y(), availWidth, 1), headerStyle);
-            renderTextTruncated(buffer, xOff, geo.y(), headerText(c), availWidth, headerStyle);
-            xOff += availWidth + 1;
-        }
-    }
+    Cell headerStyle = plain;
+    headerStyle.bold = true;
+    paintHeaderRow(buffer, theme);
 
     // --- Handle empty model (0 rows): fill remaining with theme background ---
-    int visibleDataRows = viewHeight - m_headerHeight;
+    int visibleDataRows = viewHeight - headerHeight();
     if (rows == 0) {
-        fillRect(buffer, QRect(geo.x(), geo.y() + m_headerHeight, viewWidth, visibleDataRows), plain);
+        fillRect(buffer, QRect(geo.x(), geo.y() + headerHeight(), viewWidth, visibleDataRows), plain);
         return;
     }
 
     // --- Render visible data rows ---
     for (int vr = 0; vr < visibleDataRows; ++vr) {
-        int modelRow = m_scrollOffset + vr;
-        int screenY = geo.y() + m_headerHeight + vr;
-        fillRect(buffer, QRect(geo.x(), screenY, viewWidth, 1), plain);
+        const bool hasRow = m_scrollOffset + vr < rows;
+        const int modelRow = hasRow ? logicalRow(m_scrollOffset + vr) : -1;
+        int screenY = geo.y() + headerHeight() + vr;
+        // The separators and the rest of an alternate row have its shade
+        Cell rowStyle = plain;
+        if (hasRow && AnsiRenderer::colorMode() != AnsiRenderer::NoColor
+            && isAlternateRow(m_model->index(modelRow, 0, rootIndex())))
+            rowStyle.background = alternateBackground(theme);
+        fillRect(buffer, QRect(geo.x(), screenY, viewWidth, 1), rowStyle);
+        if (left > 0 && hasRow)
+            m_verticalHeader->paintSection(buffer, QRect(geo.x(), screenY, left - 1, 1), modelRow,
+                                           headerStyle);
 
-        int xOff = geo.x();
-        for (int c = firstVisibleCol; c < cols; ++c) {
-            if (isColumnHidden(c))
-                continue;
-            if (xOff >= geo.x() + viewWidth)
-                break;
-            int availWidth = qMin(colWidths[c], geo.x() + viewWidth - xOff);
-
-            QString cellText;
+        for (int i = 0; i < spans.size(); ++i) {
+            ColumnSpan span = spans.at(i);
+            int c = span.column;
             QModelIndex idx;
-            if (modelRow < rows) {
-                idx = m_model->index(modelRow, c);
-                cellText = m_model->data(idx, Qt::DisplayRole).toString();
-            }
+            if (hasRow)
+                idx = m_model->index(modelRow, c, rootIndex());
+            bool isCurrent = (modelRow == m_currentRow && c == m_currentCol);
 
-            bool isCurrent = (modelRow == m_currentRow && c == m_currentCol && modelRow < rows);
+            // A cell in a span: paint the columns of the span that show
+            // as one cell, with the item of the first cell of the span.
+            // Only the first row of the span has the text.
+            const Span *cellSpan = hasRow ? spanAt(modelRow, c) : nullptr;
+            if (cellSpan) {
+                while (i + 1 < spans.size() && spans.at(i + 1).column <= cellSpan->right())
+                    ++i;
+                span.width = spans.at(i).x + spans.at(i).width - span.x;
+                c = spans.at(i).column;
+                idx = m_model->index(cellSpan->row, cellSpan->column, rootIndex());
+                isCurrent = cellSpan->row == m_currentRow && cellSpan->column == m_currentCol;
+            }
             const Cell style = itemStyle(idx, isCurrent, theme);
 
             // The space after the text has the item colors, without bold or inverse
             Cell padStyle = style;
             padStyle.bold = false;
             padStyle.inverse = false;
-            fillRect(buffer, QRect(xOff, screenY, availWidth, 1), padStyle);
-            renderTextTruncated(buffer, xOff, screenY, cellText, availWidth, style);
-            xOff += availWidth;
+            const QRect cell(span.x, screenY, span.width, 1);
+            fillRect(buffer, cell, padStyle);
+            if (!cellSpan || cellSpan->row == modelRow)
+                paintItem(buffer, cell, idx, style);
 
-            // Render separator space between columns. Between two selected
-            // cells it has the selection color, so a selected row is one bar.
+            // The separator between two selected cells has the selection
+            // color, so a selected row is one bar
             const int next = movedColumn(c, 1);
-            if (next != c && xOff < geo.x() + viewWidth) {
-                if (isSelected(idx) && isSelected(m_model->index(modelRow, next)))
-                    fillRect(buffer, QRect(xOff, screenY, 1, 1), cellStyle(theme.foreground, style.background));
-                xOff++;
-            }
+            const int separatorX = span.x + span.width;
+            if (next != c && separatorX < geo.x() + viewWidth && isSelected(idx)
+                && isSelected(m_model->index(modelRow, next, rootIndex())))
+                fillRect(buffer, QRect(separatorX, screenY, 1, 1), cellStyle(theme.foreground, style.background));
         }
     }
 }
 
 void QTuiTableView::keyPressEvent(TuiKeyEvent *event)
 {
-    if (!m_model || m_model->rowCount() == 0 || m_model->columnCount() == 0)
+    if (shownRows() == 0 || m_model->columnCount(rootIndex()) == 0)
         return;
 
     if (editKeyPressEvent(event) || selectionKeyPressEvent(event))
@@ -223,24 +233,14 @@ void QTuiTableView::keyPressEvent(TuiKeyEvent *event)
     // Alt+Left and Alt+Right make the current column narrower or wider,
     // as a drag on the header does. Alt+Up and Alt+Down sort by it, as a
     // header click does.
-    if (event->modifiers() == Qt::AltModifier) {
-        const bool resizable = m_header->sectionResizeMode(m_currentCol) == QTuiHeaderView::Interactive;
-        switch (event->key()) {
-        case Qt::Key_Left:
-        case Qt::Key_Right:
-            if (resizable)
-                setColumnWidth(m_currentCol, columnWidth(m_currentCol)
-                                                 + (event->key() == Qt::Key_Left ? -1 : 1));
-            return;
-        case Qt::Key_Up:
-        case Qt::Key_Down:
-            if (m_sortingEnabled)
-                sortByColumn(m_currentCol, event->key() == Qt::Key_Up ? Qt::AscendingOrder
-                                                                      : Qt::DescendingOrder);
-            return;
-        default:
-            break;
-        }
+    if (resizeColumnKeyEvent(event, m_currentCol))
+        return;
+    if (event->modifiers() == Qt::AltModifier
+        && (event->key() == Qt::Key_Up || event->key() == Qt::Key_Down)) {
+        if (m_sortingEnabled)
+            sortByColumn(m_currentCol, event->key() == Qt::Key_Up ? Qt::AscendingOrder
+                                                                  : Qt::DescendingOrder);
+        return;
     }
 
     const QModelIndex previous = currentIndex();
@@ -249,16 +249,30 @@ void QTuiTableView::keyPressEvent(TuiKeyEvent *event)
     // Home and End (also with Ctrl) go to the first and the last row and
     // keep the column: a cell has no text cursor to move
     if (cursorAction(event, &action, &modifiers)) {
-        if (action == MoveLeft || action == MoveRight) {
-            m_currentCol = movedColumn(m_currentCol, action == MoveLeft ? -1 : 1);
-            ensureColumnVisible(m_currentCol);
+        // A move starts at the edge of the span of the current cell, and a
+        // move into a span goes to its first cell
+        const Span *from = spanAt(m_currentRow, m_currentCol);
+        if (action == MoveLeft) {
+            m_currentCol = movedColumn(m_currentCol, -1);
+        } else if (action == MoveRight) {
+            const int last = from ? from->right() : m_currentCol;
+            const int next = movedColumn(last, 1);
+            if (next != last)
+                m_currentCol = next;
         } else {
-            m_currentRow = movedRow(action, m_currentRow, m_model->rowCount(),
-                                    geometry().height() - m_headerHeight);
-            ensureCurrentVisible();
+            const int start = from && (action == MoveDown || action == MovePageDown
+                                       || action == MoveHalfPageDown) ? from->bottom() : m_currentRow;
+            const int row = logicalRow(movedRow(action, visualRow(start), shownRows(),
+                                                geometry().height() - headerHeight()));
+            // No row after the span: stay
+            if (!from || spanAt(row, m_currentCol) != from)
+                m_currentRow = row;
         }
+        snapCurrentToSpan();
+        ensureCurrentVisible();
+        ensureColumnVisible(m_currentCol);
     } else if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
-        emit activated(m_model->index(m_currentRow, m_currentCol));
+        emit activated(m_model->index(m_currentRow, m_currentCol, rootIndex()));
     }
 
     if (currentIndex() != previous)
@@ -276,6 +290,7 @@ void QTuiTableView::setSortingEnabled(bool enable)
     if (m_sortingEnabled == enable)
         return;
     m_sortingEnabled = enable;
+    m_header->setSortIndicatorShown(enable);
     // The natural widths keep space for the sort indicator
     remeasureColumnWidths();
     markDirty();
@@ -283,8 +298,7 @@ void QTuiTableView::setSortingEnabled(bool enable)
 
 void QTuiTableView::sortByColumn(int column, Qt::SortOrder order)
 {
-    m_sortColumn = column;
-    m_sortOrder = order;
+    m_header->setSortIndicator(column, order);
     if (m_model && column >= 0)
         m_model->sort(column, order); // the model emits layoutChanged()
     invalidateColumnWidths();
@@ -293,27 +307,12 @@ void QTuiTableView::sortByColumn(int column, Qt::SortOrder order)
 
 int QTuiTableView::sortColumn() const
 {
-    return m_sortColumn;
+    return m_header->sortIndicatorSection();
 }
 
 Qt::SortOrder QTuiTableView::sortOrder() const
 {
-    return m_sortOrder;
-}
-
-int QTuiTableView::columnWidth(int column) const
-{
-    return effectiveColumnWidths().value(column);
-}
-
-void QTuiTableView::setColumnWidth(int column, int width)
-{
-    m_header->resizeSection(column, width);
-}
-
-bool QTuiTableView::isColumnHidden(int column) const
-{
-    return m_header->isSectionHidden(column);
+    return m_header->sortIndicatorOrder();
 }
 
 void QTuiTableView::setColumnHidden(int column, bool hide)
@@ -326,7 +325,7 @@ void QTuiTableView::setColumnHidden(int column, bool hide)
         int col = movedColumn(m_currentCol, 1);
         if (col == m_currentCol)
             col = movedColumn(m_currentCol, -1);
-        setCurrentIndex(m_model->index(m_currentRow, col));
+        setCurrentIndex(m_model->index(m_currentRow, col, rootIndex()));
     }
     invalidateColumnWidths();
     ensureColumnVisible(m_currentCol);
@@ -334,14 +333,41 @@ void QTuiTableView::setColumnHidden(int column, bool hide)
     markDirty();
 }
 
-int QTuiTableView::movedColumn(int column, int step) const
+void QTuiTableView::setRootIndex(const QModelIndex &index)
 {
-    const int cols = m_model ? m_model->columnCount() : 0;
-    for (int c = column + step; c >= 0 && c < cols; c += step) {
-        if (!isColumnHidden(c))
-            return c;
-    }
-    return column;
+    QTuiAbstractItemView::setRootIndex(index);
+    m_header->setRootIndex(rootIndex());
+    m_verticalHeader->setRootIndex(rootIndex());
+    m_spans.clear();
+    m_currentRow = 0;
+    m_currentCol = qMax(0, movedColumn(-1, 1));
+    m_horizontalScrollOffset = 0;
+    remeasureColumnWidths();
+    selectCurrent(Qt::NoModifier, false);
+}
+
+bool QTuiTableView::isRowHidden(int row) const
+{
+    return isHiddenRow(row);
+}
+
+void QTuiTableView::setRowHidden(int row, bool hide)
+{
+    if (!m_model || row < 0 || row >= m_model->rowCount(rootIndex()) || !setHiddenRow(row, hide))
+        return;
+    // The current cell must be in a row that shows
+    if (isHiddenRow(m_currentRow) && shownRows() > 0)
+        setCurrentIndex(m_model->index(m_currentRow, m_currentCol, rootIndex()));
+    const int offset = m_scrollOffset;
+    clampScrollOffset(geometry().height() - headerHeight());
+    ensureCurrentVisible();
+    invalidateColumnWidths();
+    updateEditorGeometry();
+    // The lines from the row down change, or all lines if the view scrolls
+    if (m_scrollOffset != offset)
+        markDirty();
+    else
+        markRowsDirty(visualRow(row), INT_MAX, headerHeight());
 }
 
 QTuiHeaderView *QTuiTableView::horizontalHeader() const
@@ -349,28 +375,133 @@ QTuiHeaderView *QTuiTableView::horizontalHeader() const
     return m_header;
 }
 
-QString QTuiTableView::headerText(int column) const
+void QTuiTableView::setSpan(int row, int column, int rowSpan, int columnSpan)
 {
-    QString text = m_model->headerData(column, Qt::Horizontal, Qt::DisplayRole).toString();
-    if (m_sortingEnabled && column == m_sortColumn)
-        text += m_sortOrder == Qt::AscendingOrder ? QStringLiteral(" \u25B2") : QStringLiteral(" \u25BC");
-    return text;
+    if (row < 0 || column < 0 || rowSpan < 1 || columnSpan < 1)
+        return;
+    // A new span replaces the span that starts at the same cell
+    for (int i = 0; i < m_spans.size(); ++i) {
+        if (m_spans.at(i).row == row && m_spans.at(i).column == column) {
+            markSpanDirty(m_spans.at(i));
+            m_spans.removeAt(i);
+            break;
+        }
+    }
+    if (rowSpan > 1 || columnSpan > 1) {
+        m_spans.append({row, column, rowSpan, columnSpan});
+        markSpanDirty(m_spans.last());
+    }
+    // The current cell can now be in the span
+    const QModelIndex previous = currentIndex();
+    snapCurrentToSpan();
+    if (currentIndex() != previous)
+        selectCurrent(Qt::NoModifier, false);
+    invalidateColumnWidths();
+    updateEditorGeometry();
+}
+
+int QTuiTableView::rowSpan(int row, int column) const
+{
+    const Span *span = spanAt(row, column);
+    return span ? span->rowSpan : 1;
+}
+
+int QTuiTableView::columnSpan(int row, int column) const
+{
+    const Span *span = spanAt(row, column);
+    return span ? span->columnSpan : 1;
+}
+
+void QTuiTableView::clearSpans()
+{
+    if (m_spans.isEmpty())
+        return;
+    m_spans.clear();
+    invalidateColumnWidths();
+    updateEditorGeometry();
+    markDirty();
+}
+
+const QTuiTableView::Span *QTuiTableView::spanAt(int row, int column) const
+{
+    for (const Span &span : m_spans) {
+        if (row >= span.row && row <= span.bottom() && column >= span.column && column <= span.right())
+            return &span;
+    }
+    return nullptr;
+}
+
+void QTuiTableView::snapCurrentToSpan()
+{
+    const Span *span = spanAt(m_currentRow, m_currentCol);
+    // A hidden first cell cannot be current
+    if (span && !isHiddenRow(span->row) && !isColumnHidden(span->column)) {
+        m_currentRow = span->row;
+        m_currentCol = span->column;
+    }
+}
+
+void QTuiTableView::shiftSpans(int first, int count)
+{
+    for (int i = m_spans.size() - 1; i >= 0; --i) {
+        Span &span = m_spans[i];
+        const int lastRemoved = first - count - 1;
+        if (count < 0 && span.row <= lastRemoved && span.bottom() >= first) {
+            // Removed rows in the span: its rows above them are again
+            // cells of their own
+            markSpanDirty(span);
+            m_spans.removeAt(i);
+        } else if (span.row >= first)
+            span.row += count;
+    }
+}
+
+void QTuiTableView::markSpanDirty(const Span &span)
+{
+    markRowsDirty(visualRow(span.row), visualRow(span.bottom()), headerHeight());
+}
+
+QTuiHeaderView *QTuiTableView::verticalHeader() const
+{
+    return m_verticalHeader;
+}
+
+int QTuiTableView::columnsLeft() const
+{
+    if (!m_verticalHeader->isVisible() || !m_model)
+        return 0;
+    // The width does not change when the view scrolls: the view measures
+    // the labels of the rows that show one time, and keeps space for the
+    // number of the last row.
+    if (m_verticalLabelWidth < 0 && shownRows() > 0) {
+        static constexpr int FallbackSampleRows = 100;
+        const int visibleRows = geometry().height() - headerHeight();
+        const int end = qMin(shownRows(), m_scrollOffset + (visibleRows > 0 ? visibleRows : FallbackSampleRows));
+        m_verticalLabelWidth = 1;
+        for (int r = m_scrollOffset; r < end; ++r) {
+            const QString label = m_model->headerData(logicalRow(r), Qt::Vertical, Qt::DisplayRole).toString();
+            m_verticalLabelWidth = qMax(m_verticalLabelWidth, QtTuiUnicode::stringWidth(label));
+        }
+    }
+    const int digits = QString::number(m_model->rowCount(rootIndex())).size();
+    // One more cell separates the header from the first column
+    return qMax(m_verticalLabelWidth, digits) + 1;
+}
+
+void QTuiTableView::updateColumnsLeft()
+{
+    if (columnsLeft() != m_paintedColumnsLeft)
+        markDirty();
 }
 
 void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
 {
     // Shift+wheel scrolls one column per notch. Some terminals keep
     // Shift+wheel for their own scrollback.
-    if (m_model && event->mouseType() == TuiMouseEvent::Wheel
-        && (event->modifiers() & Qt::ShiftModifier)) {
-        const int column = m_horizontalScrollOffset - event->wheelDelta() / 120;
-        m_horizontalScrollOffset = qBound(0, column, qMax(0, m_model->columnCount() - 1));
-        updateEditorGeometry();
-        markDirty();
+    if (horizontalWheelEvent(event))
         return;
-    }
-    if (m_model && wheelScroll(event, &m_scrollOffset, geometry().height() - m_headerHeight,
-                               m_model->rowCount()))
+    if (m_model && wheelScroll(event, &m_scrollOffset, geometry().height() - headerHeight(),
+                               shownRows()))
         return;
     // The Press before the DoubleClick already made the item current
     if (event->mouseType() == TuiMouseEvent::DoubleClick) {
@@ -379,81 +510,43 @@ void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
             return;
         emit doubleClicked(index);
         // No editor for a double click on the header
-        const bool onHeader = event->y() - geometry().y() < m_headerHeight;
+        const bool onHeader = event->y() - geometry().y() < headerHeight();
         if (!onHeader && (editTriggers() & DoubleClicked) && edit(index))
             return;
         emit activated(index);
         return;
     }
-    // A header drag resizes the column that it started on
-    if (m_resizingColumn >= 0) {
-        if (event->mouseType() == TuiMouseEvent::Move && event->button() == Qt::LeftButton) {
-            setColumnWidth(m_resizingColumn, event->x() - geometry().x() - m_resizeColumnX);
-            return;
-        }
-        if (event->mouseType() == TuiMouseEvent::Release) {
-            m_resizingColumn = -1;
-            return;
-        }
-    }
+    if (headerResizeMouseEvent(event))
+        return;
     // A left drag selects a range, as Shift+click does (see QTuiListView)
     const bool drag = event->mouseType() == TuiMouseEvent::Move && event->button() == Qt::LeftButton;
     if (event->mouseType() != TuiMouseEvent::Press && !drag)
         return;
-    if (!m_model || m_model->rowCount() == 0 || m_model->columnCount() == 0)
+    if (shownRows() == 0 || m_model->columnCount(rootIndex()) == 0)
         return;
 
     const QRect geo = geometry();
-    const int cols = m_model->columnCount();
-    const int rows = m_model->rowCount();
 
     // Calculate clicked row (subtract 1 for header)
-    const bool onHeader = event->y() - geo.y() < m_headerHeight;
-    int clickedRow = (event->y() - geo.y() - m_headerHeight) + m_scrollOffset;
+    const bool onHeader = event->y() - geo.y() < headerHeight();
+    const int clickedLine = (event->y() - geo.y() - headerHeight()) + m_scrollOffset;
     if (drag && onHeader)
         return;
-    if (!onHeader && (clickedRow < 0 || clickedRow >= rows))
+    if (!onHeader && (clickedLine < 0 || clickedLine >= shownRows()))
         return;
+    const int clickedRow = logicalRow(clickedLine);
 
-    // Same final column widths as paintEvent
-    const QVector<int> colWidths = effectiveColumnWidths();
-
-    // Determine which column was clicked
-    int clickX = event->x() - geo.x();
-    int xOff = 0;
-    int clickedCol = -1;
-    int firstVisibleCol = m_horizontalScrollOffset;
-    if (firstVisibleCol >= cols)
-        firstVisibleCol = 0;
-
-    for (int c = firstVisibleCol; c < cols; ++c) {
-        if (isColumnHidden(c))
-            continue;
-        int colEnd = xOff + colWidths[c];
-        if (clickX >= xOff && clickX < colEnd) {
-            clickedCol = c;
-            break;
-        }
-        // A left press on the separator after a header starts a resize
-        if (onHeader && clickX == colEnd && movedColumn(c, 1) != c && event->button() == Qt::LeftButton
-            && m_header->sectionResizeMode(c) == QTuiHeaderView::Interactive) {
-            m_resizingColumn = c;
-            m_resizeColumnX = xOff;
-            return;
-        }
-        xOff = colEnd + 1; // +1 for separator
-    }
-
-    // A click after the last column goes to the last column that shows
+    // The same column positions as paintEvent. A click after the last
+    // column goes to the last column that shows. A press on the vertical
+    // header does nothing.
+    const int clickedCol = columnAt(event->x());
     if (clickedCol < 0)
-        clickedCol = movedColumn(cols, -1);
-    if (clickedCol >= cols)
         return;
 
     // A header click sorts: a new column ascending, the same column reversed
     if (onHeader) {
         if (m_sortingEnabled) {
-            const Qt::SortOrder order = (clickedCol == m_sortColumn && m_sortOrder == Qt::AscendingOrder)
+            const Qt::SortOrder order = (clickedCol == sortColumn() && sortOrder() == Qt::AscendingOrder)
                 ? Qt::DescendingOrder : Qt::AscendingOrder;
             sortByColumn(clickedCol, order);
         }
@@ -463,51 +556,60 @@ void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
     // Another button keeps a selection that contains the cell
     m_currentRow = clickedRow;
     m_currentCol = clickedCol;
+    snapCurrentToSpan();
     markDirty();
     if (event->button() == Qt::LeftButton)
         selectCurrent(drag ? Qt::ShiftModifier : event->modifiers(), !drag);
     else if (!isSelected(currentIndex()))
         selectCurrent(Qt::NoModifier, true);
-    if (event->button() == Qt::LeftButton && !drag)
-        emit clicked(m_model->index(clickedRow, clickedCol));
+    if (event->button() == Qt::LeftButton && !drag) {
+        checkBoxPressEvent(event, currentIndex());
+        emit clicked(currentIndex());
+    }
 }
 
 void QTuiTableView::onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)
 {
-    if (!m_model)
+    if (!m_model || topLeft.parent() != rootIndex())
         return;
 
     invalidateColumnWidths();
-    const int lastRow = m_model->rowCount() - 1;
-    markRowsDirty(qBound(0, topLeft.row(), lastRow), qBound(0, bottomRight.row(), lastRow),
-                  m_headerHeight);
+    const int lastRow = m_model->rowCount(rootIndex()) - 1;
+    // The first cell of a span gives its colors to all rows of the span
+    int bottom = bottomRight.row();
+    for (const Span &span : std::as_const(m_spans)) {
+        if (span.row >= topLeft.row() && span.row <= bottomRight.row())
+            bottom = qMax(bottom, span.bottom());
+    }
+    markRowsDirty(visualRow(qBound(0, topLeft.row(), lastRow)),
+                  visualRow(qBound(0, bottom, lastRow)), headerHeight());
 }
 
 void QTuiTableView::onRowsInserted(const QModelIndex &parent, int first, int last)
 {
-    Q_UNUSED(parent);
-    Q_UNUSED(last);
-
-    if (!m_model)
+    if (!m_model || parent != rootIndex())
         return;
 
+    shiftHiddenRows(first, last - first + 1);
+    shiftSpans(first, last - first + 1);
     invalidateColumnWidths();
+    updateColumnsLeft();
     // Mark from the insertion point to the bottom of the view
-    markRowsDirty(first, INT_MAX, m_headerHeight);
+    markRowsDirty(visualRow(first), INT_MAX, headerHeight());
     clampCurrentIndex();
 }
 
 void QTuiTableView::onRowsRemoved(const QModelIndex &parent, int first, int last)
 {
-    Q_UNUSED(parent);
-    Q_UNUSED(last);
-
-    if (!m_model)
+    if (!m_model || parent != rootIndex())
         return;
 
+    shiftHiddenRows(first, first - last - 1);
+    shiftSpans(first, first - last - 1);
     invalidateColumnWidths();
+    updateColumnsLeft();
     // Mark from the removal point to the bottom of the view
-    markRowsDirty(first, INT_MAX, m_headerHeight);
+    markRowsDirty(visualRow(first), INT_MAX, headerHeight());
     clampCurrentIndex();
     ensureCurrentVisible();
 }
@@ -518,9 +620,10 @@ void QTuiTableView::onColumnsChanged()
         return;
 
     remeasureColumnWidths();
+    m_spans.clear();
     clampCurrentIndex();
     m_horizontalScrollOffset = qBound(0, m_horizontalScrollOffset,
-                                      qMax(0, m_model->columnCount() - 1));
+                                      qMax(0, m_model->columnCount(rootIndex()) - 1));
     ensureColumnVisible(m_currentCol);
     markDirty();
 }
@@ -530,8 +633,14 @@ void QTuiTableView::onHeaderDataChanged(Qt::Orientation orientation, int first, 
     Q_UNUSED(first);
     Q_UNUSED(last);
 
-    if (orientation != Qt::Horizontal)
+    // The labels of the rows can have a different width
+    if (orientation == Qt::Vertical) {
+        m_verticalLabelWidth = -1;
+        invalidateColumnWidths();
+        if (m_verticalHeader->isVisible())
+            markDirty();
         return;
+    }
 
     // Header text feeds the column width calculation
     invalidateColumnWidths();
@@ -539,7 +648,7 @@ void QTuiTableView::onHeaderDataChanged(Qt::Orientation orientation, int first, 
     const QRect geo = geometry();
     if (geo.width() <= 0 || geo.height() <= 0)
         return;
-    markDirty(QRect(geo.x(), geo.y(), geo.width(), m_headerHeight));
+    markDirty(QRect(geo.x(), geo.y(), geo.width(), headerHeight()));
 }
 
 void QTuiTableView::onLayoutChanged()
@@ -559,6 +668,8 @@ void QTuiTableView::onModelReset()
     m_currentCol = 0;
     m_scrollOffset = 0;
     m_horizontalScrollOffset = 0;
+    m_spans.clear();
+    clearHiddenRows();
     remeasureColumnWidths();
     markDirty();
 }
@@ -620,66 +731,17 @@ void QTuiTableView::ensureCurrentVisible()
     if (!m_model)
         return;
 
-    scrollRowIntoView(m_currentRow, geometry().height() - m_headerHeight);
-}
-
-void QTuiTableView::ensureColumnVisible(int column)
-{
-    if (!m_model)
-        return;
-
-    const int cols = m_model->columnCount();
-    if (cols == 0)
-        return;
-
-    // If the column is before the horizontal scroll offset, scroll left
-    if (column < m_horizontalScrollOffset)
-        m_horizontalScrollOffset = column;
-
-    const int viewWidth = geometry().width();
-    if (viewWidth <= 0)
-        return;
-
-    // Use the same final (post-scaling) widths that paintEvent renders with,
-    // so scrolling and painting always agree on which columns are visible.
-    const QVector<int> colWidths = effectiveColumnWidths();
-    if (colWidths.size() != cols)
-        return;
-
-    // Last fully visible column when rendering starts at firstCol
-    const auto lastVisibleFrom = [&](int firstCol) {
-        int usedWidth = 0;
-        int lastVisibleCol = firstCol;
-        for (int c = firstCol; c < cols; ++c) {
-            if (isColumnHidden(c))
-                continue;
-            int needed = colWidths.at(c) + (usedWidth > 0 ? 1 : 0); // +1 separator
-            if (usedWidth + needed > viewWidth)
-                break;
-            usedWidth += needed;
-            lastVisibleCol = c;
-        }
-        return lastVisibleCol;
-    };
-
-    // Scroll right until the column is visible
-    while (m_horizontalScrollOffset < column
-           && column > lastVisibleFrom(m_horizontalScrollOffset)) {
-        m_horizontalScrollOffset++;
-    }
-}
-
-// Makes the next paint calculate the widths again. This does not discard
-// the stored natural widths.
-void QTuiTableView::invalidateColumnWidths()
-{
-    m_columnWidthsStale = true;
+    // A scroll changes all lines
+    const int offset = m_scrollOffset;
+    scrollRowIntoView(visualRow(m_currentRow), geometry().height() - headerHeight());
+    if (m_scrollOffset != offset)
+        markDirty();
 }
 
 void QTuiTableView::remeasureColumnWidths()
 {
-    m_naturalWidths.clear();
-    invalidateColumnWidths();
+    m_verticalLabelWidth = -1;
+    QTuiAbstractItemView::remeasureColumnWidths();
 }
 
 int QTuiTableView::measureColumn(int column) const
@@ -688,125 +750,33 @@ int QTuiTableView::measureColumn(int column) const
     // geometry has no data rows yet, sample a bounded number of rows from
     // the top of the model.
     static constexpr int FallbackSampleRows = 100;
-    const int rows = m_model->rowCount();
-    const int visibleDataRows = geometry().height() - m_headerHeight;
+    const int rows = shownRows();
+    const int visibleDataRows = geometry().height() - headerHeight();
     const int first = qBound(0, m_scrollOffset, qMax(0, rows - 1));
     const int end = qMin(rows, first + (visibleDataRows > 0 ? visibleDataRows : FallbackSampleRows));
 
     // Keep space for the sort indicator, so a sort does not cut the header
     int width = m_model->headerData(column, Qt::Horizontal, Qt::DisplayRole).toString().length()
                 + (m_sortingEnabled ? 2 : 0);
-    for (int r = first; r < end; ++r)
-        width = qMax(width, int(m_model->data(m_model->index(r, column), Qt::DisplayRole).toString().length()));
-    return qMax(1, width);
-}
-
-void QTuiTableView::resizeColumnToContents(int column)
-{
-    if (m_model && column >= 0 && column < m_model->columnCount())
-        m_header->resizeSection(column, measureColumn(column));
-}
-
-void QTuiTableView::resizeColumnsToContents()
-{
-    if (!m_model)
-        return;
-    for (int c = 0; c < m_model->columnCount(); ++c)
-        resizeColumnToContents(c);
-}
-
-const QVector<int> &QTuiTableView::effectiveColumnWidths() const
-{
-    const QRect geo = geometry();
-
-    // The cache is keyed on the viewport: a ResizeToContents column depends
-    // on the vertical scroll offset, a Stretch column depends on the view
-    // width.
-    if (!m_columnWidthsStale
-        && m_columnWidthsScrollOffset == m_scrollOffset
-        && m_columnWidthsGeometry == geo) {
-        return m_cachedColumnWidths;
-    }
-
-    m_columnWidthsStale = false;
-    m_columnWidthsScrollOffset = m_scrollOffset;
-    m_columnWidthsGeometry = geo;
-    m_cachedColumnWidths.clear();
-
-    if (!m_model)
-        return m_cachedColumnWidths;
-
-    const int cols = m_model->columnCount();
-    if (cols == 0)
-        return m_cachedColumnWidths;
-
-    // The view measures the natural widths one time, when the model has its
-    // first rows. After that, a scroll or a change of the data does not
-    // change them. Before the first rows, each paint measures the headers.
-    const bool measureNow = m_naturalWidths.size() != cols && m_model->rowCount() > 0;
-    if (measureNow)
-        m_naturalWidths.resize(cols);
-
-    // Step 1: The width per column from its resize mode. A Fixed column and
-    // a resized Interactive column have the size of the header section. A
-    // ResizeToContents column follows the visible cells. The other columns
-    // have the stored natural width.
-    QVector<int> colWidths(cols, 0);
-    for (int c = 0; c < cols; ++c) {
-        const QTuiHeaderView::ResizeMode mode = m_header->sectionResizeMode(c);
-        const bool measured = m_naturalWidths.size() == cols && !measureNow;
-        if (mode == QTuiHeaderView::ResizeToContents || !measured) {
-            colWidths[c] = measureColumn(c);
-            if (measureNow)
-                m_naturalWidths[c] = colWidths[c];
-        } else {
-            colWidths[c] = m_naturalWidths.at(c);
-        }
-        if (mode == QTuiHeaderView::Fixed
-            || (mode == QTuiHeaderView::Interactive && m_header->isSectionResized(c)))
-            colWidths[c] = qMax(1, m_header->sectionSize(c));
-    }
-
-    // Step 2: The Stretch columns (and the last column with
-    // stretchLastSection) share the free width. Columns that do not fit
-    // keep their widths: the view scrolls by column.
-    int shown = 0;
-    int totalNatural = 0;
-    for (int c = 0; c < cols; ++c) {
-        if (isColumnHidden(c))
+    for (int r = first; r < end; ++r) {
+        const QModelIndex index = m_model->index(logicalRow(r), column, rootIndex());
+        // A cell in a span has more than one column for its text
+        if (!m_spans.isEmpty() && spanAt(index.row(), column))
             continue;
-        ++shown;
-        totalNatural += colWidths[c];
+        width = qMax(width, itemDelegateForIndex(index)->sizeHint(index).width());
     }
-    const int availableForCols = geo.width() - qMax(0, shown - 1); // a separator between columns
-
-    if (totalNatural < availableForCols) {
-        QVector<int> stretch;
-        for (int c = 0; c < cols; ++c) {
-            if (isColumnHidden(c))
-                continue;
-            if (m_header->sectionResizeMode(c) == QTuiHeaderView::Stretch
-                || (c == movedColumn(cols, -1) && m_header->stretchLastSection()))
-                stretch.append(c);
-        }
-        const int free = availableForCols - totalNatural;
-        for (int i = 0; i < stretch.size(); ++i)
-            colWidths[stretch.at(i)] += free / stretch.size() + (i < free % stretch.size() ? 1 : 0);
-    }
-
-    m_cachedColumnWidths = colWidths;
-    return m_cachedColumnWidths;
+    return qMax(1, width);
 }
 
 void QTuiTableView::clampCurrentIndex()
 {
-    if (!m_model || m_model->rowCount() == 0) {
+    if (shownRows() == 0) {
         m_currentRow = 0;
         m_currentCol = 0;
         return;
     }
-    m_currentRow = qBound(0, m_currentRow, m_model->rowCount() - 1);
-    m_currentCol = qBound(0, m_currentCol, qMax(0, m_model->columnCount() - 1));
+    m_currentRow = shownRowNear(m_currentRow);
+    m_currentCol = qBound(0, m_currentCol, qMax(0, m_model->columnCount(rootIndex()) - 1));
 }
 
 QRect QTuiTableView::hoverRect() const
@@ -814,10 +784,10 @@ QRect QTuiTableView::hoverRect() const
     // The header, or only the row under the mouse if it has an item
     const QRect geo = geometry();
     const int line = hoverPos().y() - geo.y();
-    if (line >= 0 && line < m_headerHeight)
-        return QRect(geo.x(), geo.y(), geo.width(), m_headerHeight);
-    const int row = line - m_headerHeight + m_scrollOffset;
-    if (!m_model || row < 0 || row >= m_model->rowCount())
+    if (line >= 0 && line < headerHeight())
+        return QRect(geo.x(), geo.y(), geo.width(), headerHeight());
+    const int row = line - headerHeight() + m_scrollOffset;
+    if (row < 0 || row >= shownRows())
         return QRect();
     return QRect(geo.x(), hoverPos().y(), geo.width(), 1);
 }

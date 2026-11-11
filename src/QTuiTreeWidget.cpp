@@ -277,6 +277,9 @@ void QTuiTreeWidget::setHeaderLabels(const QStringList &labels)
     for (int i = 0; i < labels.size(); ++i)
         m_internalModel->m_headerData[i] = labels.at(i);
     m_internalModel->endResetModel();
+    // Labels are there to show. Different from QTreeView, the header row
+    // of QTuiTreeView is hidden by default.
+    setHeaderHidden(false);
 }
 
 int QTuiTreeWidget::columnCount() const

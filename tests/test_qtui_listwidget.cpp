@@ -273,10 +273,12 @@ void TestQTuiListWidget::testItemFlags()
 void TestQTuiListWidget::testItemCheckState()
 {
     QTuiListWidgetItem item("Check");
-    QCOMPARE(item.checkState(), 0); // Unchecked
+    QCOMPARE(item.checkState(), Qt::Unchecked);
+    QVERIFY(!item.data(Qt::CheckStateRole).isValid());
 
-    item.setCheckState(2); // Checked
-    QCOMPARE(item.checkState(), 2);
+    item.setCheckState(Qt::Checked);
+    QCOMPARE(item.checkState(), Qt::Checked);
+    QCOMPARE(item.data(Qt::CheckStateRole).toInt(), int(Qt::Checked));
 }
 
 void TestQTuiListWidget::testItemIcon()

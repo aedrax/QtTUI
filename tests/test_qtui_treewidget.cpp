@@ -224,15 +224,15 @@ void TestQTuiTreeWidget::testItemConstructorWithTexts()
 void TestQTuiTreeWidget::testPerColumnCheckState()
 {
     QTuiTreeWidgetItem item;
-    QCOMPARE(item.checkState(0), 0); // default unchecked
+    QCOMPARE(item.checkState(0), Qt::Unchecked);
 
-    item.setCheckState(0, 2); // Checked
-    QCOMPARE(item.checkState(0), 2);
+    item.setCheckState(0, Qt::Checked);
+    QCOMPARE(item.checkState(0), Qt::Checked);
 
-    item.setCheckState(1, 1); // PartiallyChecked
-    QCOMPARE(item.checkState(1), 1);
+    item.setCheckState(1, Qt::PartiallyChecked);
+    QCOMPARE(item.checkState(1), Qt::PartiallyChecked);
     // Column 0 unchanged
-    QCOMPARE(item.checkState(0), 2);
+    QCOMPARE(item.checkState(0), Qt::Checked);
 }
 
 void TestQTuiTreeWidget::testItemData()
@@ -504,9 +504,9 @@ void TestQTuiTreeWidget::testIteratorCheckedFilter()
     auto *a = new QTuiTreeWidgetItem(QStringList{QStringLiteral("A")});
     auto *b = new QTuiTreeWidgetItem(QStringList{QStringLiteral("B")});
     auto *c = new QTuiTreeWidgetItem(QStringList{QStringLiteral("C")});
-    a->setCheckState(0, 2); // Checked
-    b->setCheckState(0, 0); // Unchecked
-    c->setCheckState(0, 2); // Checked
+    a->setCheckState(0, Qt::Checked);
+    b->setCheckState(0, Qt::Unchecked);
+    c->setCheckState(0, Qt::Checked);
     tw.addTopLevelItem(a);
     tw.addTopLevelItem(b);
     tw.addTopLevelItem(c);
@@ -526,8 +526,8 @@ void TestQTuiTreeWidget::testIteratorUncheckedFilter()
     QTuiTreeWidget tw;
     auto *a = new QTuiTreeWidgetItem(QStringList{QStringLiteral("A")});
     auto *b = new QTuiTreeWidgetItem(QStringList{QStringLiteral("B")});
-    a->setCheckState(0, 2); // Checked
-    b->setCheckState(0, 0); // Unchecked
+    a->setCheckState(0, Qt::Checked);
+    b->setCheckState(0, Qt::Unchecked);
     tw.addTopLevelItem(a);
     tw.addTopLevelItem(b);
 

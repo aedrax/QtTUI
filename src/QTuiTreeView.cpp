@@ -5,6 +5,7 @@
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/RenderUtils.h>
 #include <QtTUI/TuiEvents.h>
+#include <QtTUI/AnsiRenderer.h>
 
 namespace QtTUI {
 
@@ -12,20 +13,34 @@ QTuiTreeView::QTuiTreeView(QTuiWidget *parent)
     : QTuiAbstractItemView(parent)
 {
     setFocusPolicy(Qt::StrongFocus);
+    // Different from Qt: the header row is hidden by default. As in Qt,
+    // the last column gets the free width, so a tree with one column uses
+    // the full width.
+    createColumnHeader();
+    m_header->setVisible(false);
+    m_header->setStretchLastSection(true);
     // Layouts resize views through setGeometry(); no resize events are
     // delivered to child widgets. Re-clamp scrolling whenever our geometry
     // changes so the current row stays visible after a shrink or grow.
-    connect(this, &QTuiWidget::geometryChanged, this, [this](const QRect &) {
+    const auto clampScroll = [this]() {
         if (!m_model)
             return;
-        const int visibleRows = geometry().height();
-        if (visibleRows > 0) {
-            m_scrollOffset = qBound(0, m_scrollOffset,
-                                    qMax(0, int(m_flatList.size()) - visibleRows));
-        }
+        if (viewRows() > 0)
+            m_scrollOffset = qBound(0, m_scrollOffset, qMax(0, int(m_flatList.size()) - viewRows()));
         scrollToVisible();
+        ensureColumnVisible(m_currentCol);
         markDirty();
-    });
+    };
+    connect(this, &QTuiWidget::geometryChanged, this, clampScroll);
+    const auto headerChanged = [this, clampScroll]() {
+        invalidateColumnWidths();
+        clampScroll();
+        updateEditorGeometry();
+        markDirty();
+    };
+    connect(m_header, &QTuiWidget::visibilityChanged, this, headerChanged);
+    connect(m_header, &QTuiHeaderView::sectionResized, this, headerChanged);
+    connect(m_header, &QTuiHeaderView::geometriesChanged, this, headerChanged);
 }
 
 void QTuiTreeView::setModel(QAbstractItemModel *model)
@@ -36,15 +51,21 @@ void QTuiTreeView::setModel(QAbstractItemModel *model)
     disconnectModel();
     m_model = model;
     m_currentRow = 0;
+    m_currentCol = 0;
     m_scrollOffset = 0;
+    m_horizontalScrollOffset = 0;
+    remeasureColumnWidths();
     m_pendingRemovalFlatRow = -1;
     m_expandedItems.clear();
+    m_hiddenItems.clear();
     m_flatList.clear();
+    resetRootIndex();
 
     if (m_model) {
         connectModel();
         rebuildFlatList();
     }
+    m_header->setModel(m_model);
     resetSelectionModel();
 }
 
@@ -52,7 +73,7 @@ QModelIndex QTuiTreeView::currentIndex() const
 {
     if (m_flatList.isEmpty() || m_currentRow < 0 || m_currentRow >= m_flatList.size())
         return QModelIndex();
-    return m_flatList.at(m_currentRow).index;
+    return m_flatList.at(m_currentRow).index.siblingAtColumn(m_currentCol);
 }
 
 void QTuiTreeView::setCurrentIndex(const QModelIndex &index)
@@ -60,16 +81,22 @@ void QTuiTreeView::setCurrentIndex(const QModelIndex &index)
     int row = flatRowForIndex(index);
     if (row < 0)
         return;
-    if (row != m_currentRow) {
+    // A hidden column cannot be current
+    const int col = isColumnHidden(index.column()) ? m_currentCol : index.column();
+    if (row != m_currentRow || col != m_currentCol) {
         m_currentRow = row;
+        m_currentCol = col;
         scrollToVisible();
+        ensureColumnVisible(m_currentCol);
         markDirty();
     }
     selectCurrent(Qt::NoModifier, false);
 }
 
-void QTuiTreeView::expand(const QModelIndex &index)
+void QTuiTreeView::expand(const QModelIndex &anyColumn)
 {
+    // The items of column 0 have the children
+    const QModelIndex index = anyColumn.siblingAtColumn(0);
     if (!m_model || !index.isValid())
         return;
 
@@ -84,23 +111,33 @@ void QTuiTreeView::expand(const QModelIndex &index)
 
     // Find the flat row of the toggled node before rebuild
     int toggledRow = flatRowForIndex(index);
+    const QModelIndex current = currentIndex();
 
     rebuildFlatList();
 
-    // Restore current row to point to the same index after rebuild
-    int row = flatRowForIndex(index);
-    if (row >= 0)
-        m_currentRow = row;
+    // The current item stays current: find its row after the rebuild
+    const int currentRow = flatRowForIndex(current);
+    if (currentRow >= 0)
+        m_currentRow = currentRow;
+    const int row = flatRowForIndex(index);
     scrollToVisible();
 
     // Mark from toggled row to bottom of visible area as dirty
-    markRowsDirty(toggledRow >= 0 ? toggledRow : 0, INT_MAX);
+    markRowsDirty(toggledRow >= 0 ? toggledRow : 0, INT_MAX, headerHeight());
+    // The children have an indent and can be wider than the rows that the
+    // view measured: the columns get wider for one page of them, never
+    // narrower. A scroll does not change the widths.
+    for (int c = 0; row >= 0 && c < m_model->columnCount(rootIndex()); ++c) {
+        if (!isColumnHidden(c))
+            growColumnWidth(c, measureRows(c, row + 1, viewRows()));
+    }
 
     emit expanded(index);
 }
 
-void QTuiTreeView::collapse(const QModelIndex &index)
+void QTuiTreeView::collapse(const QModelIndex &anyColumn)
 {
+    const QModelIndex index = anyColumn.siblingAtColumn(0);
     if (!m_model || !index.isValid())
         return;
 
@@ -110,10 +147,15 @@ void QTuiTreeView::collapse(const QModelIndex &index)
 
     // Find the flat row of the toggled node before rebuild
     int toggledRow = flatRowForIndex(index);
+    const QModelIndex current = currentIndex();
 
     m_expandedItems.remove(persistent);
     rebuildFlatList();
-    int row = flatRowForIndex(index);
+    // The current item stays current. If it was below the collapsed item,
+    // that item becomes current, as in Qt.
+    int row = flatRowForIndex(current);
+    if (row < 0)
+        row = flatRowForIndex(index);
     if (row >= 0)
         m_currentRow = row;
     // Clamp current row if it's now beyond the list
@@ -122,14 +164,59 @@ void QTuiTreeView::collapse(const QModelIndex &index)
     scrollToVisible();
 
     // Mark from toggled row to bottom of visible area as dirty
-    markRowsDirty(toggledRow >= 0 ? toggledRow : 0, INT_MAX);
+    markRowsDirty(toggledRow >= 0 ? toggledRow : 0, INT_MAX, headerHeight());
+    if (currentIndex() != current) {
+        selectCurrent(Qt::NoModifier, false);
+        markDirty();
+    }
 
     emit collapsed(index);
 }
 
+void QTuiTreeView::setRootIndex(const QModelIndex &index)
+{
+    QTuiAbstractItemView::setRootIndex(index);
+    m_header->setRootIndex(rootIndex());
+    m_currentRow = 0;
+    m_currentCol = 0;
+    m_horizontalScrollOffset = 0;
+    remeasureColumnWidths();
+    rebuildFlatList();
+    selectCurrent(Qt::NoModifier, false);
+}
+
+bool QTuiTreeView::isRowHidden(int row, const QModelIndex &parent) const
+{
+    return m_model && m_hiddenItems.contains(QPersistentModelIndex(m_model->index(row, 0, parent)));
+}
+
+void QTuiTreeView::setRowHidden(int row, const QModelIndex &parent, bool hide)
+{
+    const QModelIndex index = m_model ? m_model->index(row, 0, parent) : QModelIndex();
+    if (!index.isValid() || hide == isRowHidden(row, parent))
+        return;
+    if (hide)
+        m_hiddenItems.insert(QPersistentModelIndex(index));
+    else
+        m_hiddenItems.remove(QPersistentModelIndex(index));
+
+    // Keep the current item. If it is now hidden, the item at its row
+    // becomes current.
+    const QModelIndex current = currentIndex();
+    rebuildFlatList();
+    const int currentRow = flatRowForIndex(current);
+    m_currentRow = currentRow >= 0 ? currentRow
+                                   : qBound(0, m_currentRow, qMax(0, int(m_flatList.size()) - 1));
+    m_scrollOffset = qBound(0, m_scrollOffset, qMax(0, int(m_flatList.size()) - viewRows()));
+    scrollToVisible();
+    if (currentRow < 0)
+        selectCurrent(Qt::NoModifier, false);
+    markDirty();
+}
+
 bool QTuiTreeView::isExpanded(const QModelIndex &index) const
 {
-    return m_expandedItems.contains(QPersistentModelIndex(index));
+    return m_expandedItems.contains(QPersistentModelIndex(index.siblingAtColumn(0)));
 }
 
 void QTuiTreeView::scrollTo(const QModelIndex &index, ScrollHint hint)
@@ -138,11 +225,12 @@ void QTuiTreeView::scrollTo(const QModelIndex &index, ScrollHint hint)
         return;
     // Expand the parents, so that the item has a row
     QList<QModelIndex> parents;
-    for (QModelIndex p = index.parent(); p.isValid(); p = p.parent())
+    for (QModelIndex p = index.parent(); p.isValid() && p != rootIndex(); p = p.parent())
         parents.prepend(p);
     for (const QModelIndex &p : parents)
         expand(p);
-    scrollToRow(flatRowForIndex(index), geometry().height(), m_flatList.size(), hint);
+    ensureColumnVisible(index.column());
+    scrollToRow(flatRowForIndex(index), viewRows(), m_flatList.size(), hint);
 }
 
 QRect QTuiTreeView::visualRect(const QModelIndex &index) const
@@ -150,13 +238,19 @@ QRect QTuiTreeView::visualRect(const QModelIndex &index) const
     const int row = flatRowForIndex(index);
     const QRect geo = geometry();
     const int line = row - m_scrollOffset;
-    if (row < 0 || line < 0 || line >= geo.height())
+    if (row < 0 || line < 0 || line >= viewRows())
         return QRect();
-    // The text starts after the indentation and the 2 cells of the indicator
-    const int x = m_flatList.at(row).depth * m_indentWidth + 2;
-    if (x >= geo.width())
-        return QRect();
-    return QRect(geo.x() + x, geo.y() + line, geo.width() - x, 1);
+    for (const ColumnSpan &span : visibleColumns()) {
+        if (span.column != index.column())
+            continue;
+        // In column 0, the text starts after the indentation and the 2
+        // cells of the indicator
+        const int x = span.column == 0 ? m_flatList.at(row).depth * m_indentWidth + 2 : 0;
+        if (x >= span.width)
+            return QRect();
+        return QRect(span.x + x, geo.y() + headerHeight() + line, span.width - x, 1);
+    }
+    return QRect();
 }
 
 void QTuiTreeView::paintEvent(ScreenBuffer &buffer)
@@ -172,56 +266,63 @@ void QTuiTreeView::paintEvent(ScreenBuffer &buffer)
         return;
 
     const auto theme = themeProperties();
-    const int viewWidth = geo.width();
-    const int viewHeight = geo.height();
+    paintHeaderRow(buffer, theme);
+    // The column positions, shared with the mouse hit test
+    const QList<ColumnSpan> spans = visibleColumns();
+    const int viewRight = geo.right() + 1;
+    const int rows = viewRows();
 
-    for (int vr = 0; vr < viewHeight; ++vr) {
+    for (int vr = 0; vr < rows; ++vr) {
         int flatRow = m_scrollOffset + vr;
-        int screenY = geo.y() + vr;
+        int screenY = geo.y() + headerHeight() + vr;
 
         if (flatRow >= m_flatList.size())
             break;
 
         const FlattenedItem &item = m_flatList.at(flatRow);
-        bool isCurrent = (flatRow == m_currentRow);
-        bool hasChildren = m_model->hasChildren(item.index);
+        // The separators and the rest of an alternate row have its shade
+        if (AnsiRenderer::colorMode() != AnsiRenderer::NoColor && isAlternateRow(item.index))
+            fillRect(buffer, QRect(geo.x(), screenY, geo.width(), 1),
+                     cellStyle(theme.foreground, alternateBackground(theme)));
 
-        const Cell style = itemStyle(item.index, isCurrent, theme);
+        for (const ColumnSpan &span : spans) {
+            const QModelIndex index = item.index.siblingAtColumn(span.column);
+            const bool isCurrent = flatRow == m_currentRow && span.column == m_currentCol;
+            const Cell style = itemStyle(index, isCurrent, theme);
+            QRect cell(span.x, screenY, span.width, 1);
 
-        // Fill the entire row with the item style first (for highlighting)
-        if (style.background != theme.background || style.underline)
-            fillRect(buffer, QRect(geo.x(), screenY, viewWidth, 1), style);
+            // Fill the cell with the item style first (for highlighting)
+            if (style.background != theme.background || style.underline)
+                fillRect(buffer, cell, style);
 
-        // The indentation and the expand/collapse indicator use the item
-        // colors without bold or inverse. The indicator is ▶ (collapsed) or
-        // ▼ (expanded) and a space; a leaf gets two spaces for alignment.
-        Cell plain = style;
-        plain.bold = false;
-        plain.inverse = false;
-        const int indentOffset = item.depth * m_indentWidth;
-        const int indicatorOffset = indentOffset + 2;
-        fillRect(buffer, QRect(geo.x(), screenY, qMin(indicatorOffset, viewWidth), 1), plain);
-        if (hasChildren)
-            renderText(buffer, geo.x() + indentOffset, screenY,
-                       item.expanded ? QStringLiteral("▼") : QStringLiteral("▶"),
-                       viewWidth - indentOffset, plain);
-
-        // Render item text with truncation
-        if (m_delegate) {
-            // Let delegate paint into the remaining area
-            int remainingWidth = viewWidth - indicatorOffset;
-            if (remainingWidth > 0) {
-                QRect delegateRect(geo.x() + indicatorOffset, screenY,
-                                   remainingWidth, 1);
-                m_delegate->paint(buffer, delegateRect, item.index);
+            if (span.column == 0) {
+                // The indentation and the expand/collapse indicator use the
+                // item colors without bold or inverse. The indicator is ▶
+                // (collapsed) or ▼ (expanded) and a space; a leaf gets two
+                // spaces for alignment.
+                Cell plain = style;
+                plain.bold = false;
+                plain.inverse = false;
+                const int indentOffset = item.depth * m_indentWidth;
+                const int indicatorOffset = indentOffset + 2;
+                fillRect(buffer, QRect(span.x, screenY, qMin(indicatorOffset, span.width), 1), plain);
+                if (m_model->hasChildren(item.index))
+                    renderText(buffer, span.x + indentOffset, screenY,
+                               item.expanded ? QStringLiteral("▼") : QStringLiteral("▶"),
+                               span.width - indentOffset, plain);
+                cell.setLeft(span.x + indicatorOffset);
             }
-        } else {
-            QString text = m_model->data(item.index, Qt::DisplayRole).toString();
-            int remainingWidth = viewWidth - indicatorOffset;
-            if (remainingWidth > 0) {
-                renderTextTruncated(buffer, geo.x() + indicatorOffset, screenY,
-                                    text, remainingWidth, style);
-            }
+
+            // The delegate writes the item in the remaining area
+            paintItem(buffer, cell, index, style);
+
+            // The separator between two selected cells has the selection
+            // color, so a selected row is one bar
+            const int next = movedColumn(span.column, 1);
+            const int separatorX = span.x + span.width;
+            if (next != span.column && separatorX < viewRight && isSelected(index)
+                && isSelected(item.index.siblingAtColumn(next)))
+                fillRect(buffer, QRect(separatorX, screenY, 1, 1), cellStyle(theme.foreground, style.background));
         }
     }
 }
@@ -232,7 +333,10 @@ void QTuiTreeView::keyPressEvent(TuiKeyEvent *event)
         return;
     if (editKeyPressEvent(event) || selectionKeyPressEvent(event))
         return;
-    const int previousRow = m_currentRow;
+    // Alt+Left and Alt+Right make the current column narrower or wider
+    if (resizeColumnKeyEvent(event, m_currentCol))
+        return;
+    const QModelIndex previous = currentIndex();
     CursorAction action;
     Qt::KeyboardModifiers modifiers = event->modifiers();
     int key = event->key();
@@ -240,7 +344,7 @@ void QTuiTreeView::keyPressEvent(TuiKeyEvent *event)
         if (action == MoveLeft || action == MoveRight) {
             key = action == MoveLeft ? Qt::Key_Left : Qt::Key_Right;
         } else {
-            m_currentRow = movedRow(action, m_currentRow, m_flatList.size(), geometry().height());
+            m_currentRow = movedRow(action, m_currentRow, m_flatList.size(), viewRows());
             scrollToVisible();
             markDirty();
             key = 0;
@@ -259,13 +363,24 @@ void QTuiTreeView::keyPressEvent(TuiKeyEvent *event)
                 scrollToVisible();
                 markDirty();
             }
+        } else {
+            // An item without children: move to the next column, as in Qt
+            m_currentCol = movedColumn(m_currentCol, 1);
+            ensureColumnVisible(m_currentCol);
+            markDirty();
         }
         break;
     }
 
     case Qt::Key_Left: {
         const FlattenedItem &item = m_flatList.at(m_currentRow);
-        if (item.expanded && m_model->hasChildren(item.index)) {
+        const int column = movedColumn(m_currentCol, -1);
+        if (column != m_currentCol) {
+            // Not in the first column: move to the column before
+            m_currentCol = column;
+            ensureColumnVisible(m_currentCol);
+            markDirty();
+        } else if (item.expanded && m_model->hasChildren(item.index)) {
             collapse(item.index);
         } else if (item.depth > 0) {
             // Move to parent
@@ -298,48 +413,75 @@ void QTuiTreeView::keyPressEvent(TuiKeyEvent *event)
         break;
     }
 
-    if (m_currentRow != previousRow)
+    if (currentIndex() != previous)
         selectCurrent(modifiers, false);
 }
 
 void QTuiTreeView::mousePressEvent(TuiMouseEvent *event)
 {
-    if (wheelScroll(event, &m_scrollOffset, geometry().height(), m_flatList.size()))
+    // Shift+wheel scrolls one column per notch
+    if (horizontalWheelEvent(event))
         return;
+    if (wheelScroll(event, &m_scrollOffset, viewRows(), m_flatList.size()))
+        return;
+    const bool onHeader = event->y() - geometry().y() < headerHeight();
     // The Press before the DoubleClick already made the item current
     if (event->mouseType() == TuiMouseEvent::DoubleClick) {
         const QModelIndex index = currentIndex();
-        if (!index.isValid())
+        if (!index.isValid() || onHeader)
             return;
         emit doubleClicked(index);
         if ((editTriggers() & DoubleClicked) && edit(index))
             return;
         // A double click on an item with children expands or collapses it
-        if (m_model && m_model->hasChildren(index))
+        if (m_model && m_model->hasChildren(index.siblingAtColumn(0)))
             isExpanded(index) ? collapse(index) : expand(index);
         emit activated(index);
         return;
     }
+    // A left drag on the separator after a header resizes that column
+    if (headerResizeMouseEvent(event))
+        return;
     // A left drag selects a range, as Shift+click does (see QTuiListView)
     const bool drag = event->mouseType() == TuiMouseEvent::Move && event->button() == Qt::LeftButton;
     if (event->mouseType() != TuiMouseEvent::Press && !drag)
         return;
-    if (!m_model || m_flatList.isEmpty())
+    if (!m_model || m_flatList.isEmpty() || onHeader)
         return;
 
     const QRect geo = geometry();
-    int clickedRow = (event->y() - geo.y()) + m_scrollOffset;
-    if (clickedRow >= 0 && clickedRow < m_flatList.size()) {
+    int clickedRow = (event->y() - geo.y() - headerHeight()) + m_scrollOffset;
+    const int clickedCol = columnAt(event->x());
+    if (clickedRow >= 0 && clickedRow < m_flatList.size() && clickedCol >= 0) {
         // Another button keeps a selection that contains the item
         m_currentRow = clickedRow;
+        m_currentCol = clickedCol;
         markDirty();
         if (event->button() == Qt::LeftButton)
             selectCurrent(drag ? Qt::ShiftModifier : event->modifiers(), !drag);
         else if (!isSelected(currentIndex()))
             selectCurrent(Qt::NoModifier, true);
-        if (event->button() == Qt::LeftButton && !drag)
-            emit clicked(m_flatList.at(clickedRow).index);
+        if (event->button() == Qt::LeftButton && !drag) {
+            checkBoxPressEvent(event, currentIndex());
+            emit clicked(currentIndex());
+        }
     }
+}
+
+bool QTuiTreeView::isAlternateRow(const QModelIndex &index) const
+{
+    if (!alternatingRowColors())
+        return false;
+    // ponytail: a search in the rows that show for each item, so a paint
+    // costs the square of the view height. Give the row to itemStyle() if
+    // a view is high enough to see it.
+    const QModelIndex first = index.siblingAtColumn(0);
+    const int end = qMin(int(m_flatList.size()), m_scrollOffset + viewRows());
+    for (int row = qMax(0, m_scrollOffset); row < end; ++row) {
+        if (m_flatList.at(row).index == first)
+            return row & 1;
+    }
+    return false;
 }
 
 QItemSelection QTuiTreeView::selectionRange(const QModelIndex &from, const QModelIndex &to) const
@@ -349,10 +491,12 @@ QItemSelection QTuiTreeView::selectionRange(const QModelIndex &from, const QMode
     const int b = flatRowForIndex(to);
     if (a < 0 || b < 0)
         return QItemSelection(to, to);
+    const int left = qMin(from.column(), to.column());
+    const int right = qMax(from.column(), to.column());
     QItemSelection range;
     for (int row = qMin(a, b); row <= qMax(a, b); ++row) {
         const QModelIndex index = m_flatList.at(row).index;
-        range.select(index, index);
+        range.select(index.siblingAtColumn(left), index.siblingAtColumn(right));
     }
     return range;
 }
@@ -361,7 +505,9 @@ void QTuiTreeView::selectAll()
 {
     if (!selectionModel() || m_flatList.isEmpty() || selectionMode() < MultiSelection)
         return;
-    selectionModel()->select(selectionRange(m_flatList.first().index, m_flatList.last().index),
+    const int lastColumn = qMax(0, m_model->columnCount(rootIndex()) - 1);
+    selectionModel()->select(selectionRange(m_flatList.first().index,
+                                            m_flatList.last().index.siblingAtColumn(lastColumn)),
                              QItemSelectionModel::ClearAndSelect);
 }
 
@@ -373,7 +519,8 @@ void QTuiTreeView::onDataChanged(const QModelIndex &topLeft, const QModelIndex &
         return;
 
     // Find the visible flat rows of the changed indexes
-    const int lastVisibleRow = qMin(int(m_flatList.size()), m_scrollOffset + geometry().height()) - 1;
+    invalidateColumnWidths();
+    const int lastVisibleRow = qMin(int(m_flatList.size()), m_scrollOffset + viewRows()) - 1;
     int dirtyTop = -1;
     int dirtyBottom = -1;
     for (int i = m_scrollOffset; i <= lastVisibleRow; ++i) {
@@ -386,7 +533,7 @@ void QTuiTreeView::onDataChanged(const QModelIndex &topLeft, const QModelIndex &
         }
     }
     if (dirtyTop >= 0)
-        markRowsDirty(dirtyTop, dirtyBottom);
+        markRowsDirty(dirtyTop, dirtyBottom, headerHeight());
 }
 
 void QTuiTreeView::onRowsInserted(const QModelIndex &parent, int first, int last)
@@ -421,7 +568,7 @@ void QTuiTreeView::onRowsInserted(const QModelIndex &parent, int first, int last
     scrollToVisible();
 
     // Mark from the affected row to the bottom of the view
-    markRowsDirty(qMax(0, affectedFlatRow), INT_MAX);
+    markRowsDirty(qMax(0, affectedFlatRow), INT_MAX, headerHeight());
 }
 
 void QTuiTreeView::onRowsAboutToBeRemoved(const QModelIndex &parent, int first, int last)
@@ -460,7 +607,31 @@ void QTuiTreeView::onRowsRemoved(const QModelIndex &parent, int first, int last)
     scrollToVisible();
 
     // Mark from the affected row to the bottom of the view
-    markRowsDirty(qMax(0, affectedFlatRow), INT_MAX);
+    markRowsDirty(qMax(0, affectedFlatRow), INT_MAX, headerHeight());
+}
+
+void QTuiTreeView::onColumnsChanged()
+{
+    if (!m_model)
+        return;
+    remeasureColumnWidths();
+    const int lastColumn = qMax(0, m_model->columnCount(rootIndex()) - 1);
+    m_currentCol = qBound(0, m_currentCol, lastColumn);
+    m_horizontalScrollOffset = qBound(0, m_horizontalScrollOffset, lastColumn);
+    ensureColumnVisible(m_currentCol);
+    markDirty();
+}
+
+void QTuiTreeView::onHeaderDataChanged(Qt::Orientation orientation, int first, int last)
+{
+    Q_UNUSED(first);
+    Q_UNUSED(last);
+    if (orientation != Qt::Horizontal)
+        return;
+    invalidateColumnWidths();
+    const QRect geo = geometry();
+    if (headerHeight() > 0 && !geo.isEmpty())
+        markDirty(QRect(geo.x(), geo.y(), geo.width(), headerHeight()));
 }
 
 void QTuiTreeView::onLayoutChanged()
@@ -473,6 +644,7 @@ void QTuiTreeView::onLayoutChanged()
         currentIdx = m_flatList.at(m_currentRow).index;
 
     rebuildFlatList();
+    invalidateColumnWidths();
 
     int row = flatRowForIndex(currentIdx);
     if (row >= 0)
@@ -486,8 +658,12 @@ void QTuiTreeView::onLayoutChanged()
 void QTuiTreeView::onModelReset()
 {
     m_currentRow = 0;
+    m_currentCol = 0;
     m_scrollOffset = 0;
+    m_horizontalScrollOffset = 0;
+    remeasureColumnWidths();
     m_expandedItems.clear();
+    m_hiddenItems.clear();
     m_flatList.clear();
     rebuildFlatList();
     markDirty();
@@ -508,6 +684,12 @@ void QTuiTreeView::disconnectModel()
                this, &QTuiTreeView::onRowsAboutToBeRemoved);
     disconnect(m_model, &QAbstractItemModel::rowsRemoved,
                this, &QTuiTreeView::onRowsRemoved);
+    disconnect(m_model, &QAbstractItemModel::columnsInserted,
+               this, &QTuiTreeView::onColumnsChanged);
+    disconnect(m_model, &QAbstractItemModel::columnsRemoved,
+               this, &QTuiTreeView::onColumnsChanged);
+    disconnect(m_model, &QAbstractItemModel::headerDataChanged,
+               this, &QTuiTreeView::onHeaderDataChanged);
     disconnect(m_model, &QAbstractItemModel::layoutChanged,
                this, &QTuiTreeView::onLayoutChanged);
     disconnect(m_model, &QAbstractItemModel::modelReset,
@@ -528,6 +710,12 @@ void QTuiTreeView::connectModel()
             this, &QTuiTreeView::onRowsAboutToBeRemoved);
     connect(m_model, &QAbstractItemModel::rowsRemoved,
             this, &QTuiTreeView::onRowsRemoved);
+    connect(m_model, &QAbstractItemModel::columnsInserted,
+            this, &QTuiTreeView::onColumnsChanged);
+    connect(m_model, &QAbstractItemModel::columnsRemoved,
+            this, &QTuiTreeView::onColumnsChanged);
+    connect(m_model, &QAbstractItemModel::headerDataChanged,
+            this, &QTuiTreeView::onHeaderDataChanged);
     connect(m_model, &QAbstractItemModel::layoutChanged,
             this, &QTuiTreeView::onLayoutChanged);
     connect(m_model, &QAbstractItemModel::modelReset,
@@ -544,7 +732,7 @@ void QTuiTreeView::rebuildFlatList()
     m_flatList.clear();
     if (!m_model)
         return;
-    buildFlatListRecursive(QModelIndex(), 0);
+    buildFlatListRecursive(rootIndex(), 0);
     updateEditorGeometry();
 }
 
@@ -553,6 +741,8 @@ void QTuiTreeView::buildFlatListRecursive(const QModelIndex &parent, int depth)
     const int rowCount = m_model->rowCount(parent);
     for (int r = 0; r < rowCount; ++r) {
         QModelIndex idx = m_model->index(r, 0, parent);
+        if (!m_hiddenItems.isEmpty() && m_hiddenItems.contains(QPersistentModelIndex(idx)))
+            continue;
         bool isExpanded = m_expandedItems.contains(QPersistentModelIndex(idx));
 
         FlattenedItem item;
@@ -568,13 +758,79 @@ void QTuiTreeView::buildFlatListRecursive(const QModelIndex &parent, int depth)
 
 void QTuiTreeView::scrollToVisible()
 {
-    scrollRowIntoView(m_currentRow, geometry().height());
+    // A scroll changes all lines
+    const int offset = m_scrollOffset;
+    scrollRowIntoView(m_currentRow, viewRows());
+    if (m_scrollOffset != offset)
+        markDirty();
+}
+
+int QTuiTreeView::viewRows() const
+{
+    return geometry().height() - headerHeight();
+}
+
+QTuiHeaderView *QTuiTreeView::header() const
+{
+    return m_header;
+}
+
+bool QTuiTreeView::isHeaderHidden() const
+{
+    return !m_header->isVisible();
+}
+
+void QTuiTreeView::setHeaderHidden(bool hide)
+{
+    m_header->setVisible(!hide);
+}
+
+void QTuiTreeView::setColumnHidden(int column, bool hide)
+{
+    if (!m_model || hide == isColumnHidden(column))
+        return;
+    m_header->setSectionHidden(column, hide);
+    // The current item must be in a column that shows
+    if (isColumnHidden(m_currentCol)) {
+        int col = movedColumn(m_currentCol, 1);
+        if (col == m_currentCol)
+            col = movedColumn(m_currentCol, -1);
+        setCurrentIndex(currentIndex().siblingAtColumn(col));
+    }
+    invalidateColumnWidths();
+    ensureColumnVisible(m_currentCol);
+    updateEditorGeometry();
+    markDirty();
+}
+
+int QTuiTreeView::measureColumn(int column) const
+{
+    // The header and the items that show
+    return qMax(QTuiAbstractItemView::measureColumn(column),
+                measureRows(column, m_scrollOffset, viewRows()));
+}
+
+int QTuiTreeView::measureRows(int column, int first, int count) const
+{
+    // If the geometry has no rows yet, a bounded number of items
+    static constexpr int FallbackSampleRows = 100;
+    first = qMax(0, first);
+    const int end = qMin(int(m_flatList.size()), first + (count > 0 ? count : FallbackSampleRows));
+    int width = 1;
+    for (int r = first; r < end; ++r) {
+        const FlattenedItem &item = m_flatList.at(r);
+        const QModelIndex index = item.index.siblingAtColumn(column);
+        const int indent = column == 0 ? item.depth * m_indentWidth + 2 : 0;
+        width = qMax(width, indent + itemDelegateForIndex(index)->sizeHint(index).width());
+    }
+    return width;
 }
 
 int QTuiTreeView::flatRowForIndex(const QModelIndex &index) const
 {
+    const QModelIndex first = index.siblingAtColumn(0);
     for (int i = 0; i < m_flatList.size(); ++i) {
-        if (m_flatList.at(i).index == index)
+        if (m_flatList.at(i).index == first)
             return i;
     }
     return -1;
@@ -582,9 +838,12 @@ int QTuiTreeView::flatRowForIndex(const QModelIndex &index) const
 
 QRect QTuiTreeView::hoverRect() const
 {
-    // Only the row under the mouse, if it has an item
+    // The header, or only the row under the mouse if it has an item
     const QRect geo = geometry();
-    const int row = hoverPos().y() - geo.y() + m_scrollOffset;
+    const int line = hoverPos().y() - geo.y() - headerHeight();
+    if (line < 0)
+        return QRect(geo.x(), geo.y(), geo.width(), headerHeight());
+    const int row = line + m_scrollOffset;
     if (row < 0 || row >= m_flatList.size())
         return QRect();
     return QRect(geo.x(), hoverPos().y(), geo.width(), 1);

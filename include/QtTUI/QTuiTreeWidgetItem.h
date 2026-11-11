@@ -31,9 +31,10 @@ public:
     QString text(int column) const;
     void setText(int column, const QString &text);
 
-    // Per-column check state
-    int checkState(int column) const;
-    void setCheckState(int column, int state);
+    // The Qt::CheckStateRole data of a column, as in Qt. A column shows a
+    // check box after setCheckState() (or setData()) gives it a state.
+    Qt::CheckState checkState(int column) const;
+    void setCheckState(int column, Qt::CheckState state);
 
     // Generic data access
     QVariant data(int column, int role) const;
@@ -53,7 +54,7 @@ private:
     QTuiTreeWidgetItem *m_parent = nullptr;
     QTuiTreeWidget *m_treeWidget = nullptr;
     QList<QHash<int, QVariant>> m_columnData;
-    Qt::ItemFlags m_flags = Qt::ItemIsSelectable | Qt::ItemIsEnabled;
+    Qt::ItemFlags m_flags = Qt::ItemIsSelectable | Qt::ItemIsUserCheckable | Qt::ItemIsEnabled;
 };
 
 } // namespace QtTUI

@@ -24,8 +24,11 @@ public:
     Qt::ItemFlags flags() const;
     void setFlags(Qt::ItemFlags flags);
 
-    int checkState() const;
-    void setCheckState(int state);
+    // The Qt::CheckStateRole data, as in Qt. An item shows a check box
+    // after setCheckState() (or setData()) gives it a state. checkState()
+    // of an item without a state is Qt::Unchecked.
+    Qt::CheckState checkState() const;
+    void setCheckState(Qt::CheckState state);
 
     QVariant data(int role) const;
     void setData(int role, const QVariant &value);
@@ -35,8 +38,7 @@ public:
 private:
     friend class QTuiListWidget;
     QHash<int, QVariant> m_data;
-    Qt::ItemFlags m_flags = Qt::ItemIsSelectable | Qt::ItemIsEnabled;
-    int m_checkState = 0;
+    Qt::ItemFlags m_flags = Qt::ItemIsSelectable | Qt::ItemIsUserCheckable | Qt::ItemIsEnabled;
     QTuiListWidget *m_listWidget = nullptr;
 };
 

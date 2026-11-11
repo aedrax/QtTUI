@@ -31,6 +31,16 @@ void QTuiTableWidgetItem::setFlags(Qt::ItemFlags flags)
     m_flags = flags;
 }
 
+Qt::CheckState QTuiTableWidgetItem::checkState() const
+{
+    return Qt::CheckState(m_data.value(Qt::CheckStateRole).toInt());
+}
+
+void QTuiTableWidgetItem::setCheckState(Qt::CheckState state)
+{
+    setData(Qt::CheckStateRole, int(state));
+}
+
 QVariant QTuiTableWidgetItem::data(int role) const
 {
     return m_data.value(role);

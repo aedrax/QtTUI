@@ -47,16 +47,14 @@ void QTuiListWidgetItem::setFlags(Qt::ItemFlags flags)
     m_flags = flags;
 }
 
-int QTuiListWidgetItem::checkState() const
+Qt::CheckState QTuiListWidgetItem::checkState() const
 {
-    return m_checkState;
+    return Qt::CheckState(m_data.value(Qt::CheckStateRole).toInt());
 }
 
-void QTuiListWidgetItem::setCheckState(int state)
+void QTuiListWidgetItem::setCheckState(Qt::CheckState state)
 {
-    m_checkState = state;
-    if (m_listWidget)
-        m_listWidget->syncItemToModel(this);
+    setData(Qt::CheckStateRole, int(state));
 }
 
 QVariant QTuiListWidgetItem::data(int role) const

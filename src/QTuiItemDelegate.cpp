@@ -1,6 +1,8 @@
 #include <QtTUI/QTuiItemDelegate.h>
 #include <QtTUI/QTuiWidget.h>
 #include <QtTUI/ScreenBuffer.h>
+#include <QtTUI/RenderUtils.h>
+#include <QtTUI/QtTuiUnicode.h>
 
 namespace QtTUI {
 
@@ -9,24 +11,35 @@ QTuiItemDelegate::QTuiItemDelegate(QObject *parent)
 {
 }
 
-void QTuiItemDelegate::paint(ScreenBuffer &buffer, const QRect &rect,
+void QTuiItemDelegate::paint(ScreenBuffer &buffer, const QTuiStyleOptionViewItem &option,
                              const QModelIndex &index) const
 {
-    if (!index.isValid() || rect.isEmpty())
+    if (!index.isValid() || option.rect.isEmpty())
         return;
+    // The check box and the decoration do not get an ellipsis
+    const int used = renderText(buffer, option.rect.x(), option.rect.y(), decorationText(index),
+                                option.rect.width(), option.style);
+    renderTextTruncated(buffer, option.rect.x() + used, option.rect.y(),
+                        index.data(Qt::DisplayRole).toString(), option.rect.width() - used,
+                        option.style, option.textElideMode);
+}
 
-    QString text = index.data(Qt::DisplayRole).toString();
-
-    int y = rect.y();
-    int x = rect.x();
-    int maxWidth = rect.width();
-
-    for (int i = 0; i < text.length() && i < maxWidth; ++i) {
-        if (x + i >= 0 && x + i < buffer.width() && y >= 0 && y < buffer.height()) {
-            Cell &cell = buffer.backCell(x + i, y);
-            cell.setChar(text.at(i).unicode());
+QString QTuiItemDelegate::decorationText(const QModelIndex &index)
+{
+    QString text;
+    const QVariant check = index.data(Qt::CheckStateRole);
+    if (check.isValid()) {
+        switch (check.toInt()) {
+        case Qt::Checked:          text = QStringLiteral("[x] "); break;
+        case Qt::PartiallyChecked: text = QStringLiteral("[-] "); break;
+        default:                   text = QStringLiteral("[ ] "); break;
         }
     }
+    // QIcon is in Qt GUI: only a string (a glyph) shows
+    const QVariant decoration = index.data(Qt::DecorationRole);
+    if (decoration.userType() == QMetaType::QString && !decoration.toString().isEmpty())
+        text += decoration.toString() + QLatin1Char(' ');
+    return text;
 }
 
 QTuiWidget *QTuiItemDelegate::createEditor(QTuiWidget * /*parent*/,
@@ -54,7 +67,7 @@ QSize QTuiItemDelegate::sizeHint(const QModelIndex &index) const
         return QSize(0, 1);
 
     QString text = index.data(Qt::DisplayRole).toString();
-    return QSize(text.length(), 1);
+    return QSize(QtTuiUnicode::stringWidth(decorationText(index)) + text.length(), 1);
 }
 
 } // namespace QtTUI

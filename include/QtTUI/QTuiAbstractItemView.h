@@ -7,6 +7,7 @@
 #include <QItemSelectionModel>
 #include <QPersistentModelIndex>
 #include <QPointer>
+#include <QHash>
 #include <QtTUI/ScreenBuffer.h>
 #include <QtTUI/Theme_Engine.h>
 
@@ -15,6 +16,7 @@ namespace QtTUI {
 class TuiKeyEvent;
 class TuiMouseEvent;
 class QTuiItemDelegate;
+class QTuiHeaderView;
 
 // Base class of the model/view widgets, like QAbstractItemView: the
 // model, the current index, the selection, and the activated() and
@@ -46,6 +48,8 @@ class QTuiAbstractItemView : public QTuiAbstractScrollArea {
     Q_PROPERTY(SelectionBehavior selectionBehavior READ selectionBehavior WRITE setSelectionBehavior)
     Q_PROPERTY(EditTriggers editTriggers READ editTriggers WRITE setEditTriggers)
     Q_PROPERTY(int wheelScrollLines READ wheelScrollLines WRITE setWheelScrollLines)
+    Q_PROPERTY(bool alternatingRowColors READ alternatingRowColors WRITE setAlternatingRowColors)
+    Q_PROPERTY(Qt::TextElideMode textElideMode READ textElideMode WRITE setTextElideMode)
 public:
     enum SelectionMode {
         NoSelection,
@@ -92,6 +96,15 @@ public:
     virtual QModelIndex currentIndex() const = 0;
     virtual void setCurrentIndex(const QModelIndex &index) = 0;
 
+    // The parent of the rows that the view shows, as in Qt. The default is
+    // the invalid index: the view shows the top-level rows. A new root
+    // makes its first row current, clears the selection anchor and shows
+    // the hidden rows again. An index of a different model has no effect.
+    // If the model removes the root or resets, the root is again the
+    // invalid index. setModel() also resets it.
+    virtual void setRootIndex(const QModelIndex &index);
+    QModelIndex rootIndex() const;
+
     QItemSelectionModel *selectionModel() const;
     // The view does not take ownership of the selection model
     void setSelectionModel(QItemSelectionModel *selectionModel);
@@ -109,10 +122,22 @@ public:
     // The default is DoubleClicked | EditKeyPressed, as in Qt
     EditTriggers editTriggers() const;
     void setEditTriggers(EditTriggers triggers);
-    // The delegate that makes the editors. The view does not take
-    // ownership. Without a delegate, the view uses a QTuiStyledItemDelegate.
+    // The delegate that paints the items and makes the editors. The view
+    // does not take ownership. Without a delegate, the view uses a
+    // QTuiStyledItemDelegate. itemDelegate() returns the delegate that
+    // setItemDelegate() set, or nullptr.
     void setItemDelegate(QTuiItemDelegate *delegate);
     QTuiItemDelegate *itemDelegate() const;
+    // A delegate for the items of one row or one column, as in Qt. nullptr
+    // removes it. The row and the column are numbers of the model.
+    void setItemDelegateForRow(int row, QTuiItemDelegate *delegate);
+    QTuiItemDelegate *itemDelegateForRow(int row) const;
+    void setItemDelegateForColumn(int column, QTuiItemDelegate *delegate);
+    QTuiItemDelegate *itemDelegateForColumn(int column) const;
+    // The delegate that the view uses for the item: the delegate of its
+    // row, then of its column, then itemDelegate(), then the default
+    // QTuiStyledItemDelegate. It never returns nullptr.
+    virtual QTuiItemDelegate *itemDelegateForIndex(const QModelIndex &index) const;
 
     // Opens an editor on the item. Returns false if the item is not
     // editable or the delegate makes no editor.
@@ -128,6 +153,19 @@ public:
     // current item, as in Qt.
     int wheelScrollLines() const;
     void setWheelScrollLines(int lines);
+
+    // With alternatingRowColors, each second row that shows has a different
+    // shade of the background, as in Qt. The default is false. A
+    // Qt::BackgroundRole color of the model and the selection colors come
+    // before the shade. The NoColor mode shows no shade.
+    bool alternatingRowColors() const;
+    void setAlternatingRowColors(bool enable);
+
+    // Where the "…" goes in a text that is too long for its item, as in
+    // Qt: Qt::ElideRight (the default), Qt::ElideLeft, Qt::ElideMiddle, or
+    // Qt::ElideNone (no "…"). The column view always cuts the text.
+    Qt::TextElideMode textElideMode() const;
+    void setTextElideMode(Qt::TextElideMode mode);
 
     // Scrolls the view so that the item is visible. A tree view also
     // expands the parents of the item.
@@ -149,12 +187,27 @@ protected:
     // the model signals. The base then connects to the row signals after
     // the view, so the view updates its rows first.
     void resetSelectionModel();
+    // Each view calls this in setModel(), after it sets m_model and before
+    // it reads the new model: the root is the invalid index and all rows
+    // show.
+    void resetRootIndex();
     // Each view calls this after a key or a click makes a different item
     // current. It updates the selection for the mode and the modifiers.
     void selectCurrent(Qt::KeyboardModifiers modifiers, bool click);
     // Space, Ctrl+Space and Ctrl+A. Returns true if the key changed the
-    // selection.
+    // selection or the check state. As in Qt, Space on a current item with
+    // a check box toggles the check box and does not change the selection;
+    // Ctrl+Space then toggles the selection in the multiple modes.
     bool selectionKeyPressEvent(TuiKeyEvent *event);
+    // Toggles the check state of the item with setData(), as in Qt. A
+    // Qt::ItemIsUserTristate item goes through the three states. Returns
+    // false if the item is not enabled, does not have
+    // Qt::ItemIsUserCheckable, or has no Qt::CheckStateRole value.
+    bool toggleCheckState(const QModelIndex &index);
+    // A left press on the check box of the item toggles it. A view calls
+    // this after the press made the item current. Returns true if the
+    // check state changed.
+    bool checkBoxPressEvent(const TuiMouseEvent *event, const QModelIndex &index);
     // F2 and typed characters (the key edit triggers). Returns true if the
     // key opened an editor.
     bool editKeyPressEvent(TuiKeyEvent *event);
@@ -180,6 +233,32 @@ protected:
     // Marks the visible rows from `first` to `last` as dirty. The first row
     // of the view is `top` lines below the top of the widget.
     void markRowsDirty(int first, int last, int top = 0);
+    // The hidden rows of the list and the table view. A view row is the
+    // position of a row among the rows that show. movedRow(), wheelScroll(),
+    // scrollToRow(), markRowsDirty() and m_scrollOffset use view rows; the
+    // current row of a view is a model row. Each function costs a search in
+    // the hidden rows, not a loop on the rows of the model.
+    bool isHiddenRow(int row) const;
+    // Returns false if the row already has that state
+    bool setHiddenRow(int row, bool hide);
+    void clearHiddenRows();
+    // The number of rows that show
+    int shownRows() const;
+    // The view row of a model row. For a hidden row, this is the view row
+    // of the next row that shows.
+    int visualRow(int row) const;
+    // The model row of a view row
+    int logicalRow(int visualRow) const;
+    // The row that shows at `row` or after it, or the last row that shows.
+    // Returns -1 if no row shows.
+    int shownRowNear(int row) const;
+    // Keeps m_scrollOffset in the rows that show, for a view of
+    // visibleRows lines
+    void clampScrollOffset(int visibleRows);
+    // Moves the hidden rows after the model inserts (count > 0) or removes
+    // (count < 0) rows at `first`. A view calls it first in its
+    // rowsInserted and rowsRemoved slots.
+    void shiftHiddenRows(int first, int count);
     // Moves the editor to the item after the rows of the view change, or
     // closes it (with commit) if the item is no longer visible
     void updateEditorGeometry();
@@ -204,6 +283,95 @@ protected:
     // Override this function to use a different rule.
     virtual Cell itemStyle(const QModelIndex &index, bool isCurrent,
                            const ThemeProperties &theme) const;
+    // True if alternatingRowColors is on and the item is on a second row.
+    // The default counts the rows that show before the row of the item. A
+    // view where the rows are not the rows of one parent overrides it.
+    virtual bool isAlternateRow(const QModelIndex &index) const;
+    // The background of the alternate rows: the theme background with a
+    // part of the theme foreground
+    static Color alternateBackground(const ThemeProperties &theme);
+    // Calls paint() of the delegate of the item for `rect`, with `style`
+    // and the elide mode of the view. The view fills the rectangle first.
+    void paintItem(ScreenBuffer &buffer, const QRect &rect, const QModelIndex &index,
+                   const Cell &style) const;
+    // --- Columns: the code that the table view and the tree view share.
+    // A view that has columns calls createColumnHeader() in its
+    // constructor. The other functions of this group need that header.
+
+    // Makes the header of the columns. It keeps the resize modes, the
+    // sizes, the hidden state and the sort indicator. The view paints it.
+    QTuiHeaderView *createColumnHeader();
+    // 1 if the header row shows, or 0
+    int headerHeight() const;
+    // The cells at the left of the first column (the vertical header of a
+    // table). The default is 0.
+    virtual int columnsLeft() const;
+    // The first column that the view shows after the horizontal scroll
+    int horizontalScrollOffset() const;
+    // The same, but 0 if the model no longer has that column
+    int firstVisibleColumn() const;
+    // The width of the column as the view paints it. The resize modes of
+    // the header set the widths. In the default mode (Interactive), a
+    // column starts with its natural width: the widest of the header and
+    // the cells that show when the model has its first rows. The width
+    // then stays the same. A scroll or a change of the data does not
+    // change it. These change it: setColumnWidth(), the two
+    // resizeColumn...ToContents() functions, a model reset, a change of
+    // the column count, and the user (Alt+Left, Alt+Right, or a
+    // left-button drag on the cell after a column header). Columns that do
+    // not fit in the view keep their widths: the view scrolls by column.
+    int columnWidth(int column) const;
+    void setColumnWidth(int column, int width);
+    // Sets the width to the widest of the header and the visible cells
+    void resizeColumnToContents(int column);
+    void resizeColumnsToContents();
+    bool isColumnHidden(int column) const;
+    // The next column that shows in the direction of step (1 or -1), or
+    // column if there is none
+    int movedColumn(int column, int step) const;
+    // Scrolls by column until the column shows
+    void ensureColumnVisible(int column);
+    // Makes the next paint calculate the widths again
+    void invalidateColumnWidths();
+    // Discards the stored natural widths: the next paint measures again
+    virtual void remeasureColumnWidths();
+    // Makes the stored natural width of the column `width`, if that is
+    // wider. It does not make a column narrower.
+    void growColumnWidth(int column, int width);
+    // The natural width of a column: the header and the cells that show.
+    // The default measures the header only.
+    virtual int measureColumn(int column) const;
+    const QVector<int> &effectiveColumnWidths() const;
+    // A column that shows: its screen x and its width, cut at the right
+    // edge of the view. One cell separates two columns.
+    struct ColumnSpan {
+        int column;
+        int x;
+        int width;
+    };
+    // The columns that show now, from left to right. Painting, hit tests
+    // and visualRect() use the same positions.
+    QList<ColumnSpan> visibleColumns() const;
+    // The column at the screen x, or -1 if x is at the left of the first
+    // column. After the last column, it is the last column. *separator is
+    // true if x is the separator cell after the column. *columnX gets the
+    // screen x of the column.
+    int columnAt(int x, bool *separator = nullptr, int *columnX = nullptr) const;
+    // Paints the header row at the top of the view, if it shows
+    void paintHeaderRow(ScreenBuffer &buffer, const ThemeProperties &theme) const;
+    // Alt+Left and Alt+Right make `column` narrower or wider by 1, if its
+    // mode is Interactive. Returns true for these two keys.
+    bool resizeColumnKeyEvent(const TuiKeyEvent *event, int column);
+    // A left drag that starts on the separator after a header sets the
+    // width of that column. Returns true if the event is part of the drag.
+    bool headerResizeMouseEvent(const TuiMouseEvent *event);
+    // Shift+wheel scrolls one column for each notch. Returns true if the
+    // event is such a wheel event.
+    bool horizontalWheelEvent(const TuiMouseEvent *event);
+
+    QTuiHeaderView *m_header = nullptr;
+    int m_horizontalScrollOffset = 0;
+
     // The items from `from` to `to` in the order of the view. The default
     // is the rectangle between the two indexes if they have the same parent.
     virtual QItemSelection selectionRange(const QModelIndex &from, const QModelIndex &to) const;
@@ -212,7 +380,6 @@ protected:
     QPointer<QTuiItemDelegate> m_delegate;
 
 private:
-    QTuiItemDelegate *editingDelegate();
     void watchEditorFocus(QTuiWidget *widget);
     QItemSelectionModel::SelectionFlags behaviorFlags() const;
     void onSelectionCurrentChanged(const QModelIndex &current);
@@ -221,6 +388,23 @@ private:
     // inserts, removes and sorts
     void followSelectionModel();
 
+    // ponytail: the hidden rows are row numbers, sorted. A sort of the model
+    // keeps the numbers, not the items. Use persistent indexes if the
+    // hidden rows must follow a sort.
+    QList<int> m_hiddenRows;
+    int m_resizingColumn = -1; // column that a header drag resizes
+    int m_resizeColumnX = 0;   // its left edge on the screen
+    // Natural width per column, measured one time. Empty: not measured.
+    mutable QVector<int> m_naturalWidths;
+    // Cached final column widths shared by painting, hit testing and
+    // horizontal scrolling.
+    mutable QVector<int> m_cachedColumnWidths;
+    mutable bool m_columnWidthsStale = true;
+    mutable int m_columnWidthsScrollOffset = -1;
+    mutable QRect m_columnWidthsGeometry;
+    QPersistentModelIndex m_rootIndex;
+    // True while the root is a valid index, to see that the model removed it
+    bool m_hasRootIndex = false;
     QItemSelectionModel *m_selectionModel = nullptr;
     SelectionMode m_selectionMode = SingleSelection;
     SelectionBehavior m_selectionBehavior = SelectItems;
@@ -232,7 +416,11 @@ private:
     QList<QPointer<QTuiWidget>> m_watchedEditorWidgets;
     EditTriggers m_editTriggers = EditTriggers(DoubleClicked | EditKeyPressed);
     int m_wheelScrollLines = 3;
+    bool m_alternatingRowColors = false;
+    Qt::TextElideMode m_textElideMode = Qt::ElideRight;
     QTuiItemDelegate *m_defaultDelegate = nullptr;
+    QHash<int, QPointer<QTuiItemDelegate>> m_rowDelegates;
+    QHash<int, QPointer<QTuiItemDelegate>> m_columnDelegates;
     // True while the view follows a current index set on the selection
     // model, so that selectCurrent() does not change the selection
     bool m_followingSelectionModel = false;

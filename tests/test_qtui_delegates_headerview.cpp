@@ -147,8 +147,9 @@ private slots:
         TestModel model(1, 1);
         model.setDisplayData(0, 0, QStringLiteral("Hello"));
 
-        QRect rect(2, 1, 10, 1);
-        delegate.paint(buffer, rect, model.index(0, 0));
+        QTuiStyleOptionViewItem option;
+        option.rect = QRect(2, 1, 10, 1);
+        delegate.paint(buffer, option, model.index(0, 0));
 
         QCOMPARE(buffer.backCell(2, 1).ch, U'H');
         QCOMPARE(buffer.backCell(3, 1).ch, U'e');
@@ -161,8 +162,9 @@ private slots:
     {
         QTuiItemDelegate delegate;
         ScreenBuffer buffer(10, 5);
-        QRect rect(0, 0, 5, 1);
-        delegate.paint(buffer, rect, QModelIndex());
+        QTuiStyleOptionViewItem option;
+        option.rect = QRect(0, 0, 5, 1);
+        delegate.paint(buffer, option, QModelIndex());
         QCOMPARE(buffer.backCell(0, 0).ch, U' ');
     }
 
@@ -233,33 +235,36 @@ private slots:
     // QTuiStyledItemDelegate tests
     // ---------------------------------------------------------------
 
-    void styledDelegate_paintUsesThemeColors()
+    // The delegate writes the text with the style that the view gives. It
+    // does not fill the area: the view does that.
+    void styledDelegate_paintUsesTheOptionStyle()
     {
         QTuiStyledItemDelegate delegate;
         ScreenBuffer buffer(20, 5);
         TestModel model(1, 1);
-        model.setDisplayData(0, 0, QStringLiteral("Styled"));
+        model.setDisplayData(0, 0, QStringLiteral("Styled text"));
 
-        ThemeProperties props = Theme_Engine::instance()->properties(
-            QStringLiteral("QTuiStyledItemDelegate"));
+        QTuiStyleOptionViewItem option;
+        option.rect = QRect(0, 0, 8, 1);
+        option.style.foreground = Color(1, 2, 3);
+        option.style.background = Color(4, 5, 6);
+        option.style.bold = true;
+        delegate.paint(buffer, option, model.index(0, 0));
 
-        QRect rect(0, 0, 10, 1);
-        delegate.paint(buffer, rect, model.index(0, 0));
-
-        // Verify themed colors on text cell
         const Cell &cell = buffer.backCell(0, 0);
         QCOMPARE(cell.ch, U'S');
-        QCOMPARE(cell.foreground, props.foreground);
-        QCOMPARE(cell.background, props.background);
-        QCOMPARE(cell.bold, props.bold);
-        QCOMPARE(cell.italic, props.italic);
-        QCOMPARE(cell.underline, props.underline);
+        QCOMPARE(cell.foreground, Color(1, 2, 3));
+        QCOMPARE(cell.background, Color(4, 5, 6));
+        QVERIFY(cell.bold);
+        // The text ends in the ellipsis of the elide mode
+        QCOMPARE(buffer.backCell(7, 0).ch, U'…');
+        QCOMPARE(buffer.backCell(8, 0).ch, U' ');
+        QVERIFY(buffer.backCell(8, 0).background != Color(4, 5, 6));
 
-        // Verify background fill beyond text
-        const Cell &bgCell = buffer.backCell(7, 0);
-        QCOMPARE(bgCell.ch, U' ');
-        QCOMPARE(bgCell.foreground, props.foreground);
-        QCOMPARE(bgCell.background, props.background);
+        option.textElideMode = Qt::ElideLeft;
+        delegate.paint(buffer, option, model.index(0, 0));
+        QCOMPARE(buffer.backCell(0, 0).ch, U'…');
+        QCOMPARE(buffer.backCell(7, 0).ch, U't');
     }
 
     void styledDelegate_createEditorLineEditForString()

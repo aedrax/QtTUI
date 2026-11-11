@@ -318,3 +318,6 @@ qttui_add_test(test_close_event test_close_event.cpp)
 
 # Item view colors, paging and vim keys, wheel, column resize modes
 qttui_add_test(test_item_view_features test_item_view_features.cpp)
+
+# Item view hidden rows, root index, delegates, check states, headers, spans
+qttui_add_test(test_item_view_structure test_item_view_structure.cpp)

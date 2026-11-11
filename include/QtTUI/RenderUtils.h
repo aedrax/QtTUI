@@ -86,12 +86,19 @@ int renderText(ScreenBuffer &buffer, int x, int y, const QString &text,
  *
  * Each character is written using the provided style Cell's attributes
  * (foreground, background, bold, italic, etc.) with the appropriate character.
+ *
+ * mode tells where the ellipsis goes, as in Qt. Qt::ElideRight is the rule
+ * above. Qt::ElideLeft writes the ellipsis and then the end of the text.
+ * Qt::ElideMiddle writes the start of the text, the ellipsis and the end of
+ * the text. Qt::ElideNone cuts the text without an ellipsis, as renderText()
+ * does.
  */
 void renderTextTruncated(ScreenBuffer &buffer,
                          int x, int y,
                          const QString &text,
                          int maxWidth,
-                         const Cell &style);
+                         const Cell &style,
+                         Qt::TextElideMode mode = Qt::ElideRight);
 
 } // namespace QtTUI
 
