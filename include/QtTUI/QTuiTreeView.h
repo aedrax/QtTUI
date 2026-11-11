@@ -45,9 +45,9 @@ public:
     using QTuiAbstractItemView::setColumnWidth;
     using QTuiAbstractItemView::resizeColumnToContents;
     using QTuiAbstractItemView::isColumnHidden;
-    void setColumnHidden(int column, bool hide);
-    void hideColumn(int column) { setColumnHidden(column, true); }
-    void showColumn(int column) { setColumnHidden(column, false); }
+    using QTuiAbstractItemView::setColumnHidden;
+    using QTuiAbstractItemView::hideColumn;
+    using QTuiAbstractItemView::showColumn;
 
     void expand(const QModelIndex &index);
     void collapse(const QModelIndex &index);

@@ -147,19 +147,6 @@ QString QTuiLabel::displayText() const
     return parsedText().shown;
 }
 
-bool QTuiLabel::terminalHyperlinks() const
-{
-    return m_terminalHyperlinks;
-}
-
-void QTuiLabel::setTerminalHyperlinks(bool on)
-{
-    if (m_terminalHyperlinks == on)
-        return;
-    m_terminalHyperlinks = on;
-    markDirty();
-}
-
 // Only the schemes that a terminal can open go to the terminal. A scheme
 // of the application (for example "app:settings") stays in the application.
 static bool isTerminalScheme(const QString &scheme)
@@ -711,7 +698,7 @@ void QTuiLabel::render(ScreenBuffer &buffer, const QPoint &offset, const QRect &
             if (link != idLink) {
                 idLink = link;
                 const QString url = m_links.value(link - 1);
-                id = m_terminalHyperlinks && isTerminalScheme(linkScheme(url)) ? buffer.linkId(url) : 0;
+                id = isTerminalScheme(linkScheme(url)) ? buffer.linkId(url) : 0;
             }
             styled.link = id;
         }

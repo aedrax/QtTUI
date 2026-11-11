@@ -313,7 +313,6 @@ private slots:
             QVERIFY2(QTuiLabel::linkScheme(QString::fromLatin1(internal)).isEmpty(), internal);
 
         QTuiLabel label;
-        QVERIFY(label.terminalHyperlinks());
         label.setTextFormat(Qt::MarkdownText);
         // "web mail top"
         label.setText(QStringLiteral("[web](https://x.example/a) [mail](mailto:a@x.example) [top](#top)"));
@@ -329,15 +328,6 @@ private slots:
         for (int x : {3, 8, 9, 10, 11, 12})
             QCOMPARE(buffer.backCell(x, 0).link, quint16(0));
         QVERIFY(buffer.backCell(9, 0).underline); // "#top" is still a link of the label
-
-        // The property turns the terminal hyperlinks off
-        label.clearDirtyRegions();
-        label.setTerminalHyperlinks(false);
-        QVERIFY(label.isDirty());
-        label.paintEvent(buffer);
-        for (int x = 0; x < 20; ++x)
-            QCOMPARE(buffer.backCell(x, 0).link, quint16(0));
-        QVERIFY(buffer.backCell(0, 0).underline);
     }
 
     void hyperlinkStaysCorrectInAScrollArea()

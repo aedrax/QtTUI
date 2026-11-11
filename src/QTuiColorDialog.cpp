@@ -29,11 +29,6 @@ constexpr quint32 kPalette[] = {
 constexpr int kCount = int(sizeof(kPalette) / sizeof(kPalette[0]));
 constexpr int kRows = kCount / kColumns;
 
-Color fromRgb(quint32 rgb)
-{
-    return Color(uint8_t(rgb >> 16), uint8_t(rgb >> 8), uint8_t(rgb));
-}
-
 QString hexText(const Color &c)
 {
     return QStringLiteral("#%1").arg((c.r << 16) | (c.g << 8) | c.b, 6, 16, QLatin1Char('0')).toUpper();
@@ -65,7 +60,7 @@ public:
         clearBackground(buffer, geo);
         const int current = cursor();
         for (int i = 0; i < kCount; ++i) {
-            const Color color = fromRgb(kPalette[i]);
+            const Color color = Color::fromRgb(kPalette[i]);
             const int x = geo.x() + (i % kColumns) * kCellWidth;
             const int y = geo.y() + i / kColumns;
             Cell style = cellStyle(contrastColor(color), color);
@@ -120,7 +115,7 @@ private:
     {
         const Color current = m_dialog->currentColor();
         for (int i = 0; i < kCount; ++i) {
-            if (fromRgb(kPalette[i]) == current)
+            if (Color::fromRgb(kPalette[i]) == current)
                 return i;
         }
         return m_last;
@@ -129,7 +124,7 @@ private:
     void select(int index)
     {
         m_last = index;
-        m_dialog->setCurrentColor(fromRgb(kPalette[index]));
+        m_dialog->setCurrentColor(Color::fromRgb(kPalette[index]));
         markDirty();
     }
 
@@ -203,39 +198,33 @@ QTuiColorDialog::QTuiColorDialog(const Color &initial, QTuiWidget *parent)
     auto *column = new QTuiBoxLayout(QTuiBoxLayout::TopToBottom);
 
     // Top row: the grid on the left; the preview and the hex text on the right
-    auto *top = new QTuiWidget(this);
     auto *topRow = new QTuiBoxLayout(QTuiBoxLayout::LeftToRight);
     topRow->setSpacing(2);
-    m_grid = new ColorGrid(this, top);
+    m_grid = new ColorGrid(this, this);
     topRow->addWidget(m_grid);
-    auto *side = new QTuiWidget(top);
     auto *sideColumn = new QTuiBoxLayout(QTuiBoxLayout::TopToBottom);
-    m_swatch = new ColorSwatch(this, side);
+    m_swatch = new ColorSwatch(this, this);
     sideColumn->addWidget(m_swatch, 1);
     sideColumn->addSpacing(1);
-    m_hexEdit = new QTuiLineEdit(side);
+    m_hexEdit = new QTuiLineEdit(this);
     m_hexEdit->setValidator(new QTuiRegularExpressionValidator(
         QRegularExpression(QStringLiteral("#[0-9A-Fa-f]{6}")), m_hexEdit));
     sideColumn->addWidget(m_hexEdit);
-    side->setLayout(sideColumn);
-    topRow->addWidget(side);
-    top->setLayout(topRow);
-    column->addWidget(top);
+    topRow->addLayout(sideColumn, 1);
+    column->addLayout(topRow);
     column->addSpacing(1);
 
     // One row for each of red, green and blue: "R <slider> 255"
     const QString names[3] = { tr("R"), tr("G"), tr("B") };
     for (int i = 0; i < 3; ++i) {
-        auto *channel = new QTuiWidget(this);
         auto *row = new QTuiBoxLayout(QTuiBoxLayout::LeftToRight);
         row->setSpacing(1);
-        row->addWidget(new QTuiLabel(names[i], channel));
-        m_sliders[i] = new ChannelSlider(this, channel);
+        row->addWidget(new QTuiLabel(names[i], this));
+        m_sliders[i] = new ChannelSlider(this, this);
         row->addWidget(m_sliders[i], 1);
-        m_valueLabels[i] = new QTuiLabel(QString(), channel);
+        m_valueLabels[i] = new QTuiLabel(QString(), this);
         row->addWidget(m_valueLabels[i]);
-        channel->setLayout(row);
-        column->addWidget(channel);
+        column->addLayout(row);
         connect(m_sliders[i], &QTuiSlider::valueChanged, this, [this]() {
             setCurrentColor(Color(uint8_t(m_sliders[0]->value()), uint8_t(m_sliders[1]->value()),
                                   uint8_t(m_sliders[2]->value())));
@@ -243,22 +232,20 @@ QTuiColorDialog::QTuiColorDialog(const Color &initial, QTuiWidget *parent)
     }
     column->addSpacing(1);
 
-    auto *buttons = new QTuiWidget(this);
     auto *buttonRow = new QTuiBoxLayout(QTuiBoxLayout::LeftToRight);
     buttonRow->setSpacing(1);
     buttonRow->addStretch();
-    auto *ok = new QTuiPushButton(tr("OK"), buttons);
-    auto *cancel = new QTuiPushButton(tr("Cancel"), buttons);
+    auto *ok = new QTuiPushButton(tr("OK"), this);
+    auto *cancel = new QTuiPushButton(tr("Cancel"), this);
     buttonRow->addWidget(ok);
     buttonRow->addWidget(cancel);
-    buttons->setLayout(buttonRow);
-    column->addWidget(buttons);
+    column->addLayout(buttonRow);
     setLayout(column);
 
     // A complete "#RRGGBB" text sets the color; other text waits
     connect(m_hexEdit, &QTuiLineEdit::textChanged, this, [this](const QString &text) {
         if (m_hexEdit->hasAcceptableInput())
-            setCurrentColor(fromRgb(text.mid(1).toUInt(nullptr, 16)));
+            setCurrentColor(Color::fromRgb(text.mid(1).toUInt(nullptr, 16)));
     });
     connect(m_hexEdit, &QTuiLineEdit::returnPressed, this, &QTuiDialog::accept);
     connect(ok, &QTuiPushButton::clicked, this, &QTuiDialog::accept);

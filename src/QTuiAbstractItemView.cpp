@@ -268,7 +268,7 @@ static bool colorFromRole(const QVariant &value, Color *color)
     if (type == QMetaType::Int || type == QMetaType::UInt
         || type == QMetaType::LongLong || type == QMetaType::ULongLong) {
         const qulonglong rgb = value.toULongLong();
-        *color = Color(uint8_t(rgb >> 16), uint8_t(rgb >> 8), uint8_t(rgb));
+        *color = Color::fromRgb(uint32_t(rgb));
         return true;
     }
     // A QColor converts to "#rrggbb" if QtGui is in the application
@@ -278,7 +278,7 @@ static bool colorFromRole(const QVariant &value, Color *color)
         const uint rgb = text.mid(1).toUInt(&ok, 16);
         if (text.size() != 7 || !text.startsWith(QLatin1Char('#')) || !ok)
             return false;
-        *color = Color(uint8_t(rgb >> 16), uint8_t(rgb >> 8), uint8_t(rgb));
+        *color = Color::fromRgb(uint32_t(rgb));
         return true;
     }
     return false;
@@ -1000,6 +1000,26 @@ void QTuiAbstractItemView::setColumnWidth(int column, int width)
 bool QTuiAbstractItemView::isColumnHidden(int column) const
 {
     return m_header->isSectionHidden(column);
+}
+
+void QTuiAbstractItemView::setColumnHidden(int column, bool hide)
+{
+    if (!m_model || hide == isColumnHidden(column))
+        return;
+    m_header->setSectionHidden(column, hide);
+    // The current item must be in a column that shows
+    const QModelIndex current = currentIndex();
+    if (current.isValid() && isColumnHidden(current.column())) {
+        int col = movedColumn(current.column(), 1);
+        if (col == current.column())
+            col = movedColumn(current.column(), -1);
+        setCurrentIndex(current.siblingAtColumn(col));
+    }
+    invalidateColumnWidths();
+    if (currentIndex().isValid())
+        ensureColumnVisible(currentIndex().column());
+    updateEditorGeometry();
+    markDirty();
 }
 
 int QTuiAbstractItemView::movedColumn(int column, int step) const

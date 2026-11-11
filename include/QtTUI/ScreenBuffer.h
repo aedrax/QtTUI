@@ -22,6 +22,11 @@ struct Color {
 
     constexpr Color() = default;
     constexpr Color(uint8_t r, uint8_t g, uint8_t b) : r(r), g(g), b(b) {}
+    // From 0xRRGGBB
+    static constexpr Color fromRgb(uint32_t rgb)
+    {
+        return Color(uint8_t(rgb >> 16), uint8_t(rgb >> 8), uint8_t(rgb));
+    }
 
     bool operator==(const Color &other) const
     {

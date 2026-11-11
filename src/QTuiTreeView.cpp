@@ -785,24 +785,6 @@ void QTuiTreeView::setHeaderHidden(bool hide)
     m_header->setVisible(!hide);
 }
 
-void QTuiTreeView::setColumnHidden(int column, bool hide)
-{
-    if (!m_model || hide == isColumnHidden(column))
-        return;
-    m_header->setSectionHidden(column, hide);
-    // The current item must be in a column that shows
-    if (isColumnHidden(m_currentCol)) {
-        int col = movedColumn(m_currentCol, 1);
-        if (col == m_currentCol)
-            col = movedColumn(m_currentCol, -1);
-        setCurrentIndex(currentIndex().siblingAtColumn(col));
-    }
-    invalidateColumnWidths();
-    ensureColumnVisible(m_currentCol);
-    updateEditorGeometry();
-    markDirty();
-}
-
 int QTuiTreeView::measureColumn(int column) const
 {
     // The header and the items that show

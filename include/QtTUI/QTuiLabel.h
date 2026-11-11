@@ -19,7 +19,6 @@ class QTuiLabel : public QTuiFrame {
     Q_PROPERTY(Qt::Alignment alignment READ alignment WRITE setAlignment)
     Q_PROPERTY(bool wordWrap READ wordWrap WRITE setWordWrap)
     Q_PROPERTY(Qt::TextFormat textFormat READ textFormat WRITE setTextFormat)
-    Q_PROPERTY(bool terminalHyperlinks READ terminalHyperlinks WRITE setTerminalHyperlinks)
 public:
     explicit QTuiLabel(const QString &text = QString(), QTuiWidget *parent = nullptr);
 
@@ -49,14 +48,11 @@ public:
     // The text as it shows, without markup
     QString displayText() const;
 
-    // Terminal hyperlinks (OSC 8). If on (the default), a link whose target
-    // has a URL scheme (https:, file:, mailto:, ...) is also a hyperlink of
-    // the terminal, so the terminal can open it. A target without a scheme
-    // ("#section", "settings", "page.md") is never a terminal hyperlink.
-    // Set it to false if the text is not trusted, or if the application
-    // uses its own schemes ("action:quit") as link targets.
-    bool terminalHyperlinks() const;
-    void setTerminalHyperlinks(bool on);
+    // Terminal hyperlinks (OSC 8): a link whose target has the scheme http,
+    // https, file, mailto or ftp is also a hyperlink of the terminal, so
+    // the terminal can open it. A target with another scheme
+    // ("action:quit") or without a scheme ("#section", "page.md") stays in
+    // the application.
     // The scheme of a link target in lower case ("https"), or an empty
     // string if the target has no scheme. A scheme has two or more
     // characters, so the drive of "C:\dir" is not a scheme.
@@ -136,7 +132,6 @@ private:
     // The row in contentsRect() of the first line, from the alignment
     int firstTextRow(const TextLayout &l) const;
     mutable TextLayout m_layout;
-    bool m_terminalHyperlinks = true;
     // Reads the links again after a change of the text or the format
     void updateLinks();
 

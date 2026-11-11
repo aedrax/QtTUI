@@ -53,17 +53,13 @@ target_link_libraries(test_terminal_backend PRIVATE
 )
 add_test(NAME test_terminal_backend COMMAND test_terminal_backend)
 
-# Tests that give a mock backend to a QTuiApplication and read its output
-function(qttui_add_backend_test TEST_NAME TEST_SOURCE)
-    qttui_add_test(${TEST_NAME} ${TEST_SOURCE})
-    target_link_libraries(${TEST_NAME} PRIVATE mock_terminal_backend)
-endfunction()
-
 # Terminal window title (OSC 2 and the title stack)
-qttui_add_backend_test(test_terminal_title test_terminal_title.cpp)
+qttui_add_test(test_terminal_title test_terminal_title.cpp)
+target_link_libraries(test_terminal_title PRIVATE mock_terminal_backend)
 
 # Synchronized output (mode 2026) around a render pass
-qttui_add_backend_test(test_synchronized_output test_synchronized_output.cpp)
+qttui_add_test(test_synchronized_output test_synchronized_output.cpp)
+target_link_libraries(test_synchronized_output PRIVATE mock_terminal_backend)
 
 # OSC 8 hyperlinks (link table, diff, renderer output)
 qttui_add_test(test_hyperlinks test_hyperlinks.cpp)

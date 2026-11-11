@@ -64,7 +64,7 @@ struct Parts {
     explicit Parts(QTuiColorDialog &dialog)
         : hex(dialog.findChild<QTuiLineEdit *>())
         , sliders(dialog.findChildren<QTuiSlider *>())
-        , grid(hex->parentWidget()->parentWidget()->childWidgets().first())
+        , grid(dialog.childWidgets().first())
     {
     }
     QTuiLineEdit *hex;

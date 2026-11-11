@@ -315,24 +315,6 @@ Qt::SortOrder QTuiTableView::sortOrder() const
     return m_header->sortIndicatorOrder();
 }
 
-void QTuiTableView::setColumnHidden(int column, bool hide)
-{
-    if (!m_model || hide == isColumnHidden(column))
-        return;
-    m_header->setSectionHidden(column, hide);
-    // The current cell must be in a column that shows
-    if (isColumnHidden(m_currentCol)) {
-        int col = movedColumn(m_currentCol, 1);
-        if (col == m_currentCol)
-            col = movedColumn(m_currentCol, -1);
-        setCurrentIndex(m_model->index(m_currentRow, col, rootIndex()));
-    }
-    invalidateColumnWidths();
-    ensureColumnVisible(m_currentCol);
-    updateEditorGeometry();
-    markDirty();
-}
-
 void QTuiTableView::setRootIndex(const QModelIndex &index)
 {
     QTuiAbstractItemView::setRootIndex(index);

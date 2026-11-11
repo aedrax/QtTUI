@@ -49,9 +49,9 @@ public:
     // the Left and Right keys go past it. If the current column becomes
     // hidden, the next column that shows becomes current.
     using QTuiAbstractItemView::isColumnHidden;
-    void setColumnHidden(int column, bool hide);
-    void hideColumn(int column) { setColumnHidden(column, true); }
-    void showColumn(int column) { setColumnHidden(column, false); }
+    using QTuiAbstractItemView::setColumnHidden;
+    using QTuiAbstractItemView::hideColumn;
+    using QTuiAbstractItemView::showColumn;
 
     // Hidden rows, as in QTableView. A hidden row does not show, the keys
     // go past it, and a range that Shift selects does not contain it. If

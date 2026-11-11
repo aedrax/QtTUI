@@ -326,6 +326,11 @@ protected:
     void resizeColumnToContents(int column);
     void resizeColumnsToContents();
     bool isColumnHidden(int column) const;
+    // If the current column becomes hidden, the next column that shows
+    // becomes current
+    void setColumnHidden(int column, bool hide);
+    void hideColumn(int column) { setColumnHidden(column, true); }
+    void showColumn(int column) { setColumnHidden(column, false); }
     // The next column that shows in the direction of step (1 or -1), or
     // column if there is none
     int movedColumn(int column, int step) const;
