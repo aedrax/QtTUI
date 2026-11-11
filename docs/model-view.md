@@ -592,6 +592,25 @@ header->setSectionResizeMode(1, QTuiHeaderView::ResizeToContents);
 header->setStretchLastSection(true);
 ```
 
+`setSpan(row, column, rowSpan, columnSpan)` makes one cell cover more rows
+and columns, as in `QTableView`. The cell has the width of its columns and
+their separators. Its text shows on the first row of the span; the other
+rows of the span are empty, in the colors of the cell. The keys and a click
+in a span go to its first cell: Down and Right go to the cell after the
+span. `setSpan(row, column, 1, 1)` removes a span.
+
+```cpp
+table->setSpan(0, 0, 1, 3); // a title over three columns
+table->setSpan(1, 0, 4, 1); // one label for four rows
+```
+
+The view keeps the spans as row and column numbers. Rows that the model
+inserts or removes before a span move it, and removed rows in a span remove
+it. A model reset, `setModel()`, `setRootIndex()` and a change of the column
+count remove all spans. Do not make spans that overlap, and do not hide the
+first row of a span: its text is on that row. Each cell of a paint searches
+the list of spans, so use tens of spans, not thousands.
+
 Sorting works as in `QTableView`. The view calls
 `QAbstractItemModel::sort()`, so the model (or a `QSortFilterProxyModel` in
 front of it) must implement `sort()`. The header of the sort column shows
@@ -709,7 +728,11 @@ int main(int argc, char *argv[])
 | `void setRowHidden(int row, bool hide)` | Hides or shows the row. See [hidden rows](#hidden-rows). |
 | `void hideRow(int row)` | Calls `setRowHidden(row, true)`. |
 | `void showRow(int row)` | Calls `setRowHidden(row, false)`. |
-| `void resizeColumnToContents(int column)` | Sets the width of the column to the widest of the header and the visible cells, as `setColumnWidth()` does. |
+| `void setSpan(int row, int column, int rowSpan, int columnSpan)` | Makes the cell cover `rowSpan` rows and `columnSpan` columns. A span of 1, 1 removes the span of the cell. |
+| `int rowSpan(int row, int column) const` | Returns the row count of the span that has the cell, or 1. |
+| `int columnSpan(int row, int column) const` | Returns the column count of the span that has the cell, or 1. |
+| `void clearSpans()` | Removes all spans. |
+| `void resizeColumnToContents(int column)` | Sets the width of the column to the widest of the header and the visible cells, as `setColumnWidth()` does. A cell in a span does not count. |
 | `void resizeColumnsToContents()` | Calls `resizeColumnToContents()` for each column. |
 | `QTuiHeaderView *horizontalHeader() const` | Returns the header of the columns. It keeps the resize modes, the sizes and the sort indicator. Hide it to hide the header row. |
 | `QTuiHeaderView *verticalHeader() const` | Returns the header of the rows. It is hidden by default; show it to see the row numbers or the row labels of the model. |
@@ -719,7 +742,7 @@ int main(int argc, char *argv[])
 
 | Key | Action |
 | --- | --- |
-| Up, Down, Left, Right | Move the current cell. With Shift, select a range. With Ctrl, move without a change to the selection (`ExtendedSelection`). |
+| Up, Down, Left, Right | Move the current cell. A move into a span goes to its first cell, and a move from a span starts at its edge. With Shift, select a range. With Ctrl, move without a change to the selection (`ExtendedSelection`). |
 | Home, End, Ctrl+Home, Ctrl+End | Go to the first or the last row. The column does not change, because a cell has no text cursor. |
 | Alt+Left, Alt+Right | Make the current column narrower or wider by 1. Only an `Interactive` column. |
 | Alt+Up, Alt+Down | Sort by the current column, ascending or descending. Only if sorting is enabled. |
@@ -727,7 +750,7 @@ int main(int argc, char *argv[])
 
 ### Mouse
 
-- A left click on a cell makes it current, selects it and emits `clicked()`. A single click does not emit `activated()`.
+- A left click on a cell makes it current, selects it and emits `clicked()`. A click in a span does this for the first cell of the span. A click on the separator after a column goes to that column. A single click does not emit `activated()`.
 - A left drag selects the range from the pressed cell to the cell under the mouse.
 - A click on a header sorts by that column, if sorting is enabled. A second click reverses the order.
 - A left drag that starts on the separator after a header sets the width of that column. Only an `Interactive` column.

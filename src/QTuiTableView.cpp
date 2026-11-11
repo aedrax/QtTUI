@@ -60,6 +60,7 @@ void QTuiTableView::setModel(QAbstractItemModel *model)
     m_currentCol = 0;
     m_scrollOffset = 0;
     m_horizontalScrollOffset = 0;
+    m_spans.clear();
     resetRootIndex();
     remeasureColumnWidths();
 
@@ -82,8 +83,12 @@ void QTuiTableView::setCurrentIndex(const QModelIndex &index)
     if (shownRows() == 0 || (index.isValid() && index.parent() != rootIndex()))
         return;
     // A hidden row cannot be current: the next row that shows is
-    const int row = shownRowNear(index.row());
+    int row = shownRowNear(index.row());
     int col = qBound(0, index.column(), qMax(0, m_model->columnCount(rootIndex()) - 1));
+    if (const Span *span = spanAt(row, col)) {
+        row = span->row;
+        col = span->column;
+    }
     if (row != m_currentRow || col != m_currentCol) {
         m_currentRow = row;
         m_currentCol = col;
@@ -111,12 +116,17 @@ QRect QTuiTableView::visualRect(const QModelIndex &index) const
     const int line = visualRow(index.row()) - m_scrollOffset;
     if (line < 0 || line >= geo.height() - headerHeight() || isHiddenRow(index.row()))
         return QRect();
-    // The same column positions as paintEvent
+    // The same column positions as paintEvent. The first cell of a span
+    // has the width of the columns of the span that show.
+    const Span *cellSpan = spanAt(index.row(), index.column());
+    const int lastColumn = cellSpan && cellSpan->row == index.row() && cellSpan->column == index.column()
+        ? cellSpan->right() : index.column();
+    QRect rect;
     for (const ColumnSpan &span : visibleColumns()) {
-        if (span.column == index.column())
-            return QRect(span.x, geo.y() + headerHeight() + line, span.width, 1);
+        if (span.column >= index.column() && span.column <= lastColumn)
+            rect |= QRect(span.x, geo.y() + headerHeight() + line, span.width, 1);
     }
-    return QRect();
+    return rect;
 }
 
 void QTuiTableView::paintEvent(ScreenBuffer &buffer)
@@ -170,13 +180,26 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
             m_verticalHeader->paintSection(buffer, QRect(geo.x(), screenY, left - 1, 1), modelRow,
                                            headerStyle);
 
-        for (const ColumnSpan &span : spans) {
-            const int c = span.column;
+        for (int i = 0; i < spans.size(); ++i) {
+            ColumnSpan span = spans.at(i);
+            int c = span.column;
             QModelIndex idx;
             if (hasRow)
                 idx = m_model->index(modelRow, c, rootIndex());
-
             bool isCurrent = (modelRow == m_currentRow && c == m_currentCol);
+
+            // A cell in a span: paint the columns of the span that show
+            // as one cell, with the item of the first cell of the span.
+            // Only the first row of the span has the text.
+            const Span *cellSpan = hasRow ? spanAt(modelRow, c) : nullptr;
+            if (cellSpan) {
+                while (i + 1 < spans.size() && spans.at(i + 1).column <= cellSpan->right())
+                    ++i;
+                span.width = spans.at(i).x + spans.at(i).width - span.x;
+                c = spans.at(i).column;
+                idx = m_model->index(cellSpan->row, cellSpan->column, rootIndex());
+                isCurrent = cellSpan->row == m_currentRow && cellSpan->column == m_currentCol;
+            }
             const Cell style = itemStyle(idx, isCurrent, theme);
 
             // The space after the text has the item colors, without bold or inverse
@@ -185,7 +208,8 @@ void QTuiTableView::paintEvent(ScreenBuffer &buffer)
             padStyle.inverse = false;
             const QRect cell(span.x, screenY, span.width, 1);
             fillRect(buffer, cell, padStyle);
-            paintItem(buffer, cell, idx, style);
+            if (!cellSpan || cellSpan->row == modelRow)
+                paintItem(buffer, cell, idx, style);
 
             // The separator between two selected cells has the selection
             // color, so a selected row is one bar
@@ -225,14 +249,28 @@ void QTuiTableView::keyPressEvent(TuiKeyEvent *event)
     // Home and End (also with Ctrl) go to the first and the last row and
     // keep the column: a cell has no text cursor to move
     if (cursorAction(event, &action, &modifiers)) {
-        if (action == MoveLeft || action == MoveRight) {
-            m_currentCol = movedColumn(m_currentCol, action == MoveLeft ? -1 : 1);
-            ensureColumnVisible(m_currentCol);
+        // A move starts at the edge of the span of the current cell, and a
+        // move into a span goes to its first cell
+        const Span *from = spanAt(m_currentRow, m_currentCol);
+        if (action == MoveLeft) {
+            m_currentCol = movedColumn(m_currentCol, -1);
+        } else if (action == MoveRight) {
+            const int last = from ? from->right() : m_currentCol;
+            const int next = movedColumn(last, 1);
+            if (next != last)
+                m_currentCol = next;
         } else {
-            m_currentRow = logicalRow(movedRow(action, visualRow(m_currentRow), shownRows(),
-                                               geometry().height() - headerHeight()));
-            ensureCurrentVisible();
+            const int start = from && (action == MoveDown || action == MovePageDown
+                                       || action == MoveHalfPageDown) ? from->bottom() : m_currentRow;
+            const int row = logicalRow(movedRow(action, visualRow(start), shownRows(),
+                                                geometry().height() - headerHeight()));
+            // No row after the span: stay
+            if (!from || spanAt(row, m_currentCol) != from)
+                m_currentRow = row;
         }
+        snapCurrentToSpan();
+        ensureCurrentVisible();
+        ensureColumnVisible(m_currentCol);
     } else if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
         emit activated(m_model->index(m_currentRow, m_currentCol, rootIndex()));
     }
@@ -300,6 +338,7 @@ void QTuiTableView::setRootIndex(const QModelIndex &index)
     QTuiAbstractItemView::setRootIndex(index);
     m_header->setRootIndex(rootIndex());
     m_verticalHeader->setRootIndex(rootIndex());
+    m_spans.clear();
     m_currentRow = 0;
     m_currentCol = qMax(0, movedColumn(-1, 1));
     m_horizontalScrollOffset = 0;
@@ -329,6 +368,89 @@ void QTuiTableView::setRowHidden(int row, bool hide)
 QTuiHeaderView *QTuiTableView::horizontalHeader() const
 {
     return m_header;
+}
+
+void QTuiTableView::setSpan(int row, int column, int rowSpan, int columnSpan)
+{
+    if (row < 0 || column < 0 || rowSpan < 1 || columnSpan < 1)
+        return;
+    // A new span replaces the span that starts at the same cell
+    for (int i = 0; i < m_spans.size(); ++i) {
+        if (m_spans.at(i).row == row && m_spans.at(i).column == column) {
+            markSpanDirty(m_spans.at(i));
+            m_spans.removeAt(i);
+            break;
+        }
+    }
+    if (rowSpan > 1 || columnSpan > 1) {
+        m_spans.append({row, column, rowSpan, columnSpan});
+        markSpanDirty(m_spans.last());
+    }
+    // The current cell can now be in the span
+    const QModelIndex previous = currentIndex();
+    snapCurrentToSpan();
+    if (currentIndex() != previous)
+        selectCurrent(Qt::NoModifier, false);
+    invalidateColumnWidths();
+    updateEditorGeometry();
+}
+
+int QTuiTableView::rowSpan(int row, int column) const
+{
+    const Span *span = spanAt(row, column);
+    return span ? span->rowSpan : 1;
+}
+
+int QTuiTableView::columnSpan(int row, int column) const
+{
+    const Span *span = spanAt(row, column);
+    return span ? span->columnSpan : 1;
+}
+
+void QTuiTableView::clearSpans()
+{
+    if (m_spans.isEmpty())
+        return;
+    m_spans.clear();
+    invalidateColumnWidths();
+    updateEditorGeometry();
+    markDirty();
+}
+
+const QTuiTableView::Span *QTuiTableView::spanAt(int row, int column) const
+{
+    for (const Span &span : m_spans) {
+        if (row >= span.row && row <= span.bottom() && column >= span.column && column <= span.right())
+            return &span;
+    }
+    return nullptr;
+}
+
+void QTuiTableView::snapCurrentToSpan()
+{
+    const Span *span = spanAt(m_currentRow, m_currentCol);
+    // A hidden first cell cannot be current
+    if (span && !isHiddenRow(span->row) && !isColumnHidden(span->column)) {
+        m_currentRow = span->row;
+        m_currentCol = span->column;
+    }
+}
+
+void QTuiTableView::shiftSpans(int first, int count)
+{
+    for (int i = m_spans.size() - 1; i >= 0; --i) {
+        Span &span = m_spans[i];
+        const int lastRemoved = first - count - 1;
+        if (count < 0 && span.row <= lastRemoved && span.bottom() >= first)
+            m_spans.removeAt(i); // removed rows in the span
+        else if (span.row >= first)
+            span.row += count;
+    }
+}
+
+void QTuiTableView::markSpanDirty(const Span &span)
+{
+    markRowsDirty(visualRow(span.row), visualRow(span.bottom()), headerHeight());
 }
 
 QTuiHeaderView *QTuiTableView::verticalHeader() const
@@ -426,6 +548,7 @@ void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
     // Another button keeps a selection that contains the cell
     m_currentRow = clickedRow;
     m_currentCol = clickedCol;
+    snapCurrentToSpan();
     markDirty();
     if (event->button() == Qt::LeftButton)
         selectCurrent(drag ? Qt::ShiftModifier : event->modifiers(), !drag);
@@ -433,7 +556,7 @@ void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
         selectCurrent(Qt::NoModifier, true);
     if (event->button() == Qt::LeftButton && !drag) {
         checkBoxPressEvent(event, currentIndex());
-        emit clicked(m_model->index(clickedRow, clickedCol, rootIndex()));
+        emit clicked(currentIndex());
     }
 }
 
@@ -444,8 +567,14 @@ void QTuiTableView::onDataChanged(const QModelIndex &topLeft, const QModelIndex 
 
     invalidateColumnWidths();
     const int lastRow = m_model->rowCount(rootIndex()) - 1;
+    // The first cell of a span gives its colors to all rows of the span
+    int bottom = bottomRight.row();
+    for (const Span &span : std::as_const(m_spans)) {
+        if (span.row >= topLeft.row() && span.row <= bottomRight.row())
+            bottom = qMax(bottom, span.bottom());
+    }
     markRowsDirty(visualRow(qBound(0, topLeft.row(), lastRow)),
-                  visualRow(qBound(0, bottomRight.row(), lastRow)), headerHeight());
+                  visualRow(qBound(0, bottom, lastRow)), headerHeight());
 }
 
 void QTuiTableView::onRowsInserted(const QModelIndex &parent, int first, int last)
@@ -454,6 +583,7 @@ void QTuiTableView::onRowsInserted(const QModelIndex &parent, int first, int las
         return;
 
     shiftHiddenRows(first, last - first + 1);
+    shiftSpans(first, last - first + 1);
     invalidateColumnWidths();
     updateColumnsLeft();
     // Mark from the insertion point to the bottom of the view
@@ -467,6 +597,7 @@ void QTuiTableView::onRowsRemoved(const QModelIndex &parent, int first, int last
         return;
 
     shiftHiddenRows(first, first - last - 1);
+    shiftSpans(first, first - last - 1);
     invalidateColumnWidths();
     updateColumnsLeft();
     // Mark from the removal point to the bottom of the view
@@ -481,6 +612,7 @@ void QTuiTableView::onColumnsChanged()
         return;
 
     remeasureColumnWidths();
+    m_spans.clear();
     clampCurrentIndex();
     m_horizontalScrollOffset = qBound(0, m_horizontalScrollOffset,
                                       qMax(0, m_model->columnCount(rootIndex()) - 1));
@@ -528,6 +660,7 @@ void QTuiTableView::onModelReset()
     m_currentCol = 0;
     m_scrollOffset = 0;
     m_horizontalScrollOffset = 0;
+    m_spans.clear();
     clearHiddenRows();
     remeasureColumnWidths();
     markDirty();
@@ -615,6 +748,9 @@ int QTuiTableView::measureColumn(int column) const
                 + (m_sortingEnabled ? 2 : 0);
     for (int r = first; r < end; ++r) {
         const QModelIndex index = m_model->index(logicalRow(r), column, rootIndex());
+        // A cell in a span has more than one column for its text
+        if (!m_spans.isEmpty() && spanAt(index.row(), column))
+            continue;
         width = qMax(width, itemDelegateForIndex(index)->sizeHint(index).width());
     }
     return qMax(1, width);

@@ -8,6 +8,7 @@
 #include <QStringListModel>
 #include <QAbstractTableModel>
 #include <QAbstractListModel>
+#include <QSignalSpy>
 
 using namespace QtTUI;
 
@@ -1368,6 +1369,182 @@ private slots:
 
         tree.setHeaderHidden(true);
         QCOMPARE(paintedLine(tree, 0), QStringLiteral("▼ src        dir"));
+    }
+
+    // --- Spans ---
+
+    void columnSpanPaintsOneCell()
+    {
+        GridModel model;
+        QTuiTableView table;
+        table.setGeometry(QRect(0, 0, 30, 6));
+        table.setModel(&model);
+        QCOMPARE(table.rowSpan(1, 0), 1);
+        table.clearDirtyRegions();
+        table.setSpan(1, 0, 1, 2);
+        // Only the row of the span repaints (row 1 is on line 2)
+        QCOMPARE(table.dirtyRegion(), QRect(0, 2, 30, 1));
+        QCOMPARE(table.columnSpan(1, 0), 2);
+        QCOMPARE(table.columnSpan(1, 1), 2);
+        QCOMPARE(table.columnSpan(1, 2), 1);
+        QCOMPARE(table.rowSpan(1, 0), 1);
+        // The text of column 1 does not show: the first cell covers it
+        QCOMPARE(paintedLine(table, 1), QStringLiteral("r0c0 r0c1 r0c2"));
+        QCOMPARE(paintedLine(table, 2), QStringLiteral("r1c0      r1c2"));
+        // The cell has the width of two columns and the separator
+        QCOMPARE(table.visualRect(model.index(1, 0)), QRect(0, 2, 9, 1));
+
+        // The current cell colors cover the full span
+        table.setFocus();
+        table.setCurrentIndex(model.index(1, 0));
+        ScreenBuffer buffer(30, 6);
+        table.paintEvent(buffer);
+        const ThemeProperties theme = Theme_Engine::instance()->properties(QStringLiteral("QTuiTableView"));
+        for (int x = 0; x < 9; ++x)
+            QCOMPARE(buffer.backCell(x, 2).background, theme.focusBackground);
+        QCOMPARE(buffer.backCell(9, 2).background, theme.background);
+        QCOMPARE(buffer.backCell(5, 1).background, theme.background);
+
+        // A long text uses the space of the span
+        table.setSpan(2, 0, 1, 3);
+        QCOMPARE(paintedLine(table, 3), QStringLiteral("r2c0"));
+        // A span of 1, 1 removes the span
+        table.setSpan(1, 0, 1, 1);
+        QCOMPARE(table.columnSpan(1, 1), 1);
+        QCOMPARE(paintedLine(table, 2), QStringLiteral("r1c0 r1c1 r1c2"));
+        table.clearSpans();
+        QCOMPARE(paintedLine(table, 3), QStringLiteral("r2c0 r2c1 r2c2"));
+    }
+
+    void rowSpanRepeatsNothing()
+    {
+        GridModel model;
+        QTuiTableView table;
+        table.setGeometry(QRect(0, 0, 30, 6));
+        table.setModel(&model);
+        table.clearDirtyRegions();
+        table.setSpan(1, 1, 3, 1);
+        QCOMPARE(table.dirtyRegion(), QRect(0, 2, 30, 3));
+        QCOMPARE(table.rowSpan(3, 1), 3);
+        QCOMPARE(paintedLine(table, 2), QStringLiteral("r1c0 r1c1 r1c2"));
+        QCOMPARE(paintedLine(table, 3), QStringLiteral("r2c0      r2c2"));
+        QCOMPARE(paintedLine(table, 4), QStringLiteral("r3c0      r3c2"));
+        QCOMPARE(paintedLine(table, 5), QStringLiteral("r4c0 r4c1 r4c2"));
+
+        // The rows of the span have the colors of its first cell
+        table.setFocus();
+        table.setCurrentIndex(model.index(2, 1));
+        QCOMPARE(table.currentIndex(), model.index(1, 1));
+        ScreenBuffer buffer(30, 6);
+        table.paintEvent(buffer);
+        const ThemeProperties theme = Theme_Engine::instance()->properties(QStringLiteral("QTuiTableView"));
+        QCOMPARE(buffer.backCell(5, 2).background, theme.focusBackground);
+        QCOMPARE(buffer.backCell(5, 4).background, theme.focusBackground);
+        QCOMPARE(buffer.backCell(5, 5).background, theme.background);
+
+        // The first row of the span is above the view: the rest shows empty
+        table.scrollTo(model.index(2, 0), QTuiAbstractItemView::PositionAtTop);
+        QCOMPARE(paintedLine(table, 1), QStringLiteral("r2c0      r2c2"));
+        QCOMPARE(paintedLine(table, 2), QStringLiteral("r3c0      r3c2"));
+        QCOMPARE(paintedLine(table, 3), QStringLiteral("r4c0 r4c1 r4c2"));
+        table.paintEvent(buffer);
+        QCOMPARE(buffer.backCell(5, 1).background, theme.focusBackground);
+
+        // A change of the first cell repaints all rows of the span that show
+        table.clearDirtyRegions();
+        emit model.dataChanged(model.index(1, 1), model.index(1, 1));
+        QCOMPARE(table.dirtyRegion(), QRect(0, 1, 30, 2));
+    }
+
+    void keysGoToTheFirstCellOfASpan()
+    {
+        GridModel model;
+        QTuiTableView table;
+        table.setGeometry(QRect(0, 0, 30, 10));
+        table.setModel(&model);
+        table.setSpan(1, 0, 2, 2); // rows 1 to 2, columns 0 to 1
+        table.setCurrentIndex(model.index(0, 1));
+        // Down into the span goes to its first cell
+        sendKey(table, Qt::Key_Down);
+        QCOMPARE(table.currentIndex(), model.index(1, 0));
+        QVERIFY(table.selectionModel()->isSelected(model.index(1, 0)));
+        // Down goes to the row after the span
+        sendKey(table, Qt::Key_Down);
+        QCOMPARE(table.currentIndex(), model.index(3, 0));
+        // Up into the span goes to its first cell
+        sendKey(table, Qt::Key_Up);
+        QCOMPARE(table.currentIndex(), model.index(1, 0));
+        // Right goes to the column after the span
+        sendKey(table, Qt::Key_Right);
+        QCOMPARE(table.currentIndex(), model.index(1, 2));
+        sendKey(table, Qt::Key_Down);
+        QCOMPARE(table.currentIndex(), model.index(2, 2));
+        // Left into the span goes to its first cell
+        sendKey(table, Qt::Key_Left);
+        QCOMPARE(table.currentIndex(), model.index(1, 0));
+        sendKey(table, Qt::Key_Up);
+        QCOMPARE(table.currentIndex(), model.index(0, 0));
+
+        // A span at the last rows: Down stays
+        table.setSpan(48, 0, 2, 1);
+        sendKey(table, Qt::Key_End);
+        QCOMPARE(table.currentIndex(), model.index(48, 0));
+        sendKey(table, Qt::Key_Down);
+        QCOMPARE(table.currentIndex(), model.index(48, 0));
+        sendKey(table, Qt::Key_PageUp);
+        QCOMPARE(table.currentIndex().row(), 40);
+
+        // A new span takes the current cell that it covers
+        table.setCurrentIndex(model.index(41, 1));
+        table.setSpan(40, 0, 2, 2);
+        QCOMPARE(table.currentIndex(), model.index(40, 0));
+    }
+
+    void clicksInASpanSelectIt()
+    {
+        GridModel model;
+        QTuiTableView table;
+        table.setGeometry(QRect(0, 0, 30, 10));
+        table.setModel(&model);
+        table.setSpan(1, 0, 2, 2);
+        QSignalSpy clicked(&table, &QTuiAbstractItemView::clicked);
+        // Line 3 is row 2, x 6 is column 1: a cell that the span covers
+        click(table, 6, 3);
+        QCOMPARE(table.currentIndex(), model.index(1, 0));
+        QVERIFY(table.selectionModel()->isSelected(model.index(1, 0)));
+        QCOMPARE(clicked.count(), 1);
+        QCOMPARE(clicked.at(0).at(0).toModelIndex(), model.index(1, 0));
+        click(table, 11, 3);
+        QCOMPARE(table.currentIndex(), model.index(2, 2));
+    }
+
+    void spansFollowRows()
+    {
+        GridModel model;
+        QTuiTableView table;
+        table.setGeometry(QRect(0, 0, 30, 10));
+        table.setModel(&model);
+        table.setSpan(5, 0, 2, 2);
+        model.insertAt(0, 3);
+        QCOMPARE(table.rowSpan(8, 1), 2);
+        QCOMPARE(table.rowSpan(5, 0), 1);
+        model.removeAt(0, 1);
+        QCOMPARE(table.rowSpan(7, 0), 2);
+        // Rows after the span do not move it
+        model.insertAt(20, 1);
+        QCOMPARE(table.rowSpan(8, 0), 2);
+        // Removed rows in the span remove it
+        model.removeAt(8, 1);
+        QCOMPARE(table.rowSpan(7, 0), 1);
+
+        // A hidden column in a span takes no space
+        table.setSpan(0, 0, 1, 3);
+        table.hideColumn(1);
+        QCOMPARE(table.visualRect(model.index(0, 0)), QRect(0, 1, 9, 1));
+        table.showColumn(1);
+        // A reset removes the spans
+        model.reset();
+        QCOMPARE(table.columnSpan(0, 0), 1);
     }
 };
 

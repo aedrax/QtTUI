@@ -63,6 +63,20 @@ public:
     void hideRow(int row) { setRowHidden(row, true); }
     void showRow(int row) { setRowHidden(row, false); }
 
+    // Spans, as in QTableView. The cell at (row, column) covers rowSpan
+    // rows and columnSpan columns: its width is the sum of the columns
+    // and their separators. The text shows on the first row of the span;
+    // the other rows of the span are empty in its colors. The keys and a
+    // click in the span go to its first cell. A span of 1, 1 removes the
+    // span. A model reset, setModel(), setRootIndex() and a change of the
+    // column count remove all spans. Rows that the model inserts or
+    // removes before a span move it; removed rows in a span remove it.
+    // Do not make spans that overlap.
+    void setSpan(int row, int column, int rowSpan, int columnSpan);
+    int rowSpan(int row, int column) const;
+    int columnSpan(int row, int column) const;
+    void clearSpans();
+
     // The header of the columns, as in QTableView. It keeps the resize
     // modes, the sizes and the sort indicator, and paints the header row.
     // horizontalHeader()->setVisible(false) hides the header row.
@@ -102,6 +116,22 @@ private:
     void connectModel();
     void ensureCurrentVisible();
     void clampCurrentIndex();
+    struct Span {
+        int row;
+        int column;
+        int rowSpan;
+        int columnSpan;
+        int bottom() const { return row + rowSpan - 1; }
+        int right() const { return column + columnSpan - 1; }
+    };
+    // The span that has the cell, or nullptr
+    const Span *spanAt(int row, int column) const;
+    // If the current cell is in a span, the first cell of the span is current
+    void snapCurrentToSpan();
+    // Moves the spans after the model inserts (count > 0) or removes
+    // (count < 0) rows at `first`
+    void shiftSpans(int first, int count);
+    void markSpanDirty(const Span &span);
     void remeasureColumnWidths() override;
     int measureColumn(int column) const override;
 
@@ -109,6 +139,9 @@ private:
     int m_currentCol = 0;
     bool m_sortingEnabled = false;
     QTuiHeaderView *m_verticalHeader = nullptr;
+    // ponytail: a list, and each cell of a paint searches it. That is
+    // good for tens of spans. Use an index by row if a table has thousands.
+    QList<Span> m_spans;
     // The widest label of the vertical header, measured one time. -1: not
     // measured.
     mutable int m_verticalLabelWidth = -1;
