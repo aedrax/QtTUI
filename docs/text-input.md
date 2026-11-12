@@ -176,9 +176,7 @@ The label takes keys only while it has links and focus.
 | Left, Up | Goes to the previous link. |
 | Enter, Return | Emits `linkActivated()` for the current link. |
 
-Tab and Shift+Tab also go to the next and the previous link if the label gets
-them. In a `QTuiMainWindow`, the window uses Tab to go to the next widget, so
-use the arrow keys there.
+Tab and Shift+Tab go to the next and the previous widget, not to a link.
 
 ### Mouse
 

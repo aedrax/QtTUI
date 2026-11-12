@@ -509,12 +509,10 @@ void QTuiLabel::keyPressEvent(TuiKeyEvent *event)
     switch (event->key()) {
     case Qt::Key_Right:
     case Qt::Key_Down:
-    case Qt::Key_Tab:
-        link += (event->modifiers() & Qt::ShiftModifier) ? -1 : 1;
+        ++link;
         break;
     case Qt::Key_Left:
     case Qt::Key_Up:
-    case Qt::Key_Backtab:
         --link;
         break;
     case Qt::Key_Return:

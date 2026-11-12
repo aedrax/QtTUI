@@ -142,14 +142,6 @@ private slots:
         sendKey(label, Qt::Key_Left);
         QCOMPARE(current(), QStringLiteral("1"));
 
-        // Tab and Shift+Tab, if they reach the label
-        sendKey(label, Qt::Key_Tab);
-        QCOMPARE(current(), QStringLiteral("2"));
-        sendKey(label, Qt::Key_Tab);
-        sendKey(label, Qt::Key_Backtab, Qt::ShiftModifier);
-        sendKey(label, Qt::Key_Tab, Qt::ShiftModifier);
-        QCOMPARE(current(), QStringLiteral("1"));
-
         // A new text starts at the first link
         sendKey(label, Qt::Key_Right);
         label.setText(QStringLiteral("[x](7) [y](8)"));

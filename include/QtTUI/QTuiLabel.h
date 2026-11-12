@@ -41,8 +41,8 @@ public:
     //
     // Links: [text](url) in Markdown and <a href="url">text</a> in rich
     // text. A link shows underlined in the accent color. A label with
-    // links takes the focus: Left, Right, Up, Down and Tab move between
-    // the links, and Enter or a left click emits linkActivated().
+    // links takes the focus: Left, Right, Up and Down move between the
+    // links, and Enter or a left click emits linkActivated().
     Qt::TextFormat textFormat() const;
     void setTextFormat(Qt::TextFormat format);
     // The text as it shows, without markup
