@@ -313,6 +313,7 @@ A 24-bit RGB color, with the fields `r`, `g` and `b` (`uint8_t`). The default is
 | --- | --- |
 | `constexpr Color()` | Makes black. |
 | `constexpr Color(uint8_t r, uint8_t g, uint8_t b)` | Makes the color. |
+| `static constexpr Color fromRgb(uint32_t rgb)` | Makes the color from `0xRRGGBB`. |
 | `bool operator==(const Color &other) const` | Returns true if the components are equal. |
 | `bool operator!=(const Color &other) const` | Returns true if a component is different. |
 

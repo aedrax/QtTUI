@@ -12,20 +12,27 @@ changes.
 
 ## Contents
 
-- Widgets: buttons, check boxes, radio buttons, line edits, text edits, spin
-  boxes, sliders, combo boxes, progress bars, a calendar, list, table, tree
-  and column views, tabs, splitters, scroll areas, group boxes, MDI windows,
-  dock widgets, menus, tool bars, status bars, tooltips and context menus.
+- Widgets: buttons, check boxes, radio buttons, labels with links, line
+  edits, key sequence edits, text edits with word wrap and a syntax
+  highlighter, a text browser for Markdown, spin boxes, sliders, combo boxes,
+  progress bars, a calendar, list, table, tree and column views, tabs,
+  splitters, scroll areas, group boxes, MDI windows, dock widgets, menus,
+  tool bars, status bars, tooltips and context menus.
 - Dialogs: `QTuiDialog` with `exec()`, `QTuiMessageBox`, `QTuiInputDialog`,
-  `QTuiProgressDialog`, `QTuiFileDialog` and `QTuiWizard`.
+  `QTuiProgressDialog`, `QTuiFileDialog`, `QTuiColorDialog` and `QTuiWizard`.
+- Focus: `setTabOrder()`, `focusNextPrevChild()`, label mnemonics and
+  `QTuiShortcut`.
 - Layouts: box, grid, form and stacked layouts, with size policies and
   right-to-left direction.
 - Terminal: 24-bit color, with 256-color, 16-color and no-color modes. Mouse
   clicks, drags, the wheel and the hover highlight. Bracketed paste, copy
-  with OSC 52, the kitty keyboard protocol, Ctrl+Z and resize.
+  with OSC 52, the kitty keyboard protocol, Ctrl+Z and resize. The window
+  title, hyperlinks (OSC 8), synchronized output, emoji sequences and
+  right-to-left text.
 - Themes: a dark theme, a light theme, or your own theme through
   `Theme_Engine`.
-- `UI_Loader` makes a widget tree from a JSON description.
+- `UI_Loader` makes a widget tree from a JSON description, with layouts and
+  container pages.
 
 QtTUI is tested on Linux only. The Windows backend is not compiled or tested.
 
@@ -109,6 +116,7 @@ Each mouse action also has a key.
 | h, j, k, l | Do the same as the arrow keys in a widget that does not type text: menus, tool bars, tabs, sliders, the calendar and more |
 | Shift+arrows, Shift+Page Up, Shift+Page Down, J, K, Space, Ctrl+A | Select items in a view |
 | F2 | Edit the current item |
+| Alt+Left, Alt+Right | Make the current column of a table or a tree narrower or wider |
 | Ctrl+W, Ctrl+U | Remove the word or the text before the cursor in a line edit |
 
 Some terminals, for example Konsole, keep Shift+click for their own text

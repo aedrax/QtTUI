@@ -386,6 +386,7 @@ Use these functions when you write a view.
 | `bool selectionKeyPressEvent(TuiKeyEvent *event)` | Handles Space, Ctrl+Space and Ctrl+A. Returns `true` if the key changed the selection or the check state. |
 | `bool toggleCheckState(const QModelIndex &index)` | Toggles the check state of the item with `setData()`. Returns `false` if the item is not user-checkable or has no check state. |
 | `bool checkBoxPressEvent(const TuiMouseEvent *event, const QModelIndex &index)` | Toggles the check state if the event is a left press on the check box of the item (the first 3 cells of `visualRect()`). |
+| `void clickCurrent(const TuiMouseEvent *event, bool drag)` | A view calls it after a press or a drag made an item current. It marks the view dirty and updates the selection. A left press also calls `checkBoxPressEvent()` and emits `clicked()`. |
 | `bool editKeyPressEvent(TuiKeyEvent *event)` | Handles F2 and typed characters. Returns `true` if the key opened an editor. |
 | `bool cursorAction(const TuiKeyEvent *event, CursorAction *action, Qt::KeyboardModifiers *modifiers) const` | Reads the move of a navigation key (see [keys](#keys)). Returns `false` for other keys. `*modifiers` gets the modifiers to give to `selectCurrent()`. |
 | `static int movedRow(CursorAction action, int row, int rowCount, int visibleRows)` | Returns the view row after a vertical move. A page is `visibleRows - 1` rows. |
