@@ -422,6 +422,52 @@ private slots:
         QVERIFY(!buf.backCell(14, 0).italic);
     }
 
+    void markdownHeadingsListsAndCodeBlocks()
+    {
+        const QChar nbsp(0x00A0);
+        QTuiLabel label(QStringLiteral("# Title\n"
+                                       "## Part *one*\n"
+                                       "- first\n"
+                                       "  * nested\n"
+                                       "1. one\n"
+                                       "  2. two\n"
+                                       "```cpp\n"
+                                       "if (a) {\n"
+                                       "    b(); // **not bold**\n"
+                                       "```\n"
+                                       "#no heading and a-b - c"));
+        label.setTextFormat(Qt::MarkdownText);
+        QStringList lines = label.displayText().split(QLatin1Char('\n'));
+        for (QString &line : lines)
+            line.replace(nbsp, QLatin1Char(' '));
+        QCOMPARE(lines, QStringList({QStringLiteral("Title"), QStringLiteral("Part one"),
+                                     QStringLiteral("\u2022 first"), QStringLiteral("  \u2022 nested"),
+                                     QStringLiteral("1. one"), QStringLiteral("  2. two"),
+                                     QStringLiteral("if (a) {"),
+                                     QStringLiteral("    b(); // **not bold**"),
+                                     QStringLiteral("#no heading and a-b - c")}));
+
+        label.setGeometry(QRect(0, 0, 30, 9));
+        label.setAlignment(Qt::AlignLeft | Qt::AlignTop);
+        label.setWordWrap(true);
+        ScreenBuffer buf(30, 9);
+        label.paintEvent(buf);
+        // Heading 1: bold with an underline. Heading 2: bold only.
+        QVERIFY(buf.backCell(0, 0).bold && buf.backCell(0, 0).underline);
+        QVERIFY(buf.backCell(0, 1).bold && !buf.backCell(0, 1).underline);
+        QVERIFY(buf.backCell(5, 1).italic);
+        // The next line has no heading style
+        QVERIFY(!buf.backCell(2, 2).bold);
+        // The indent of a nested item and of a code line stays with word wrap
+        QCOMPARE(buf.backCell(2, 3).ch, U'\u2022');
+        QCOMPARE(buf.backCell(2, 5).ch, U'2');
+        QCOMPARE(buf.backCell(4, 7).ch, U'b');
+        // A code block has the code style and no other markup
+        QVERIFY(buf.backCell(0, 6).inverse);
+        QVERIFY(buf.backCell(12, 7).inverse && !buf.backCell(12, 7).bold);
+        QVERIFY(!buf.backCell(0, 8).inverse);
+    }
+
     void htmlStylesAndWrapping()
     {
         QTuiLabel label(QStringLiteral("<b>one two</b> <i>three</i> &lt;4&gt;"));

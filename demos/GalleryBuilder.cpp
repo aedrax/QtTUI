@@ -517,7 +517,16 @@ static QTuiWidget *createBrowserTab(QTuiWidget *parent, QTuiStatusBar *statusBar
     page->addWidget(sectionLabel("QTuiTextBrowser", page));
     auto *browser = new QTuiTextBrowser(page);
     QString text = QStringLiteral(
-        "**QTuiTextBrowser** shows long rich text. It is read-only.\n\n"
+        "# QTuiTextBrowser\n"
+        "The browser shows long rich text. It is **read-only**.\n\n"
+        "## Keys\n"
+        "- Scroll: Up, Down, Page Up, Page Down, Home and End\n"
+        "- Links: Tab and Shift+Tab, then Enter\n"
+        "  - Left and Right also go to the next and the previous link\n\n"
+        "```\n"
+        "auto *browser = new QTuiTextBrowser(parent);\n"
+        "browser->setSource(\"help/index.md\");\n"
+        "```\n\n"
         "Up, Down, Page Up, Page Down, Home and End scroll. The vim keys `j`, `k`, `g`, `G`, "
         "`Ctrl+F` and `Ctrl+B` scroll too.\n\n"
         "Tab, Shift+Tab, Left and Right go to the next and the previous link. Enter follows "

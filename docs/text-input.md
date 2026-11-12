@@ -28,7 +28,20 @@ inside it. The label takes keys and the mouse only if the text has links. See
   `~~strikethrough~~` and `` `code` ``. A marker counts only if the same marker
   closes it later on the same line. Otherwise the label shows the marker. A
   backslash shows the next character as it is. Markup in code shows as text.
-  `[text](url)` is a link. The label does not read headings or lists.
+  `[text](url)` is a link. These rules apply to a full line:
+  - `# ` to `###### ` at the start make the line a heading. A heading is
+    bold, and a level 1 heading also has an underline.
+  - `- `, `* ` or `+ ` at the start make a list item, which shows with `•`.
+    The indent of a nested item stays. A numbered item (`1. `) shows as it
+    is.
+  - A line that starts with ```` ``` ```` starts or ends a code block. The
+    marker line does not show. The lines between show in the code style,
+    with their indent and without other markup.
+
+  The label does not read tables, quotes or rules. The wrapped lines of a
+  list item have no indent, and a long code line wraps at the edge. The
+  label writes an indent as no-break spaces (U+00A0), so `displayText()`
+  has them.
 - `Qt::RichText`: the tags `<b>`, `<strong>`, `<i>`, `<em>`, `<u>`, `<s>`,
   `<del>` and `<code>`. `<a href="url">` is a link. `<br>` and `</p>` start a
   new line. The label removes
@@ -232,9 +245,10 @@ the source or the history.
 
 ### Limits
 
-- The text formats are the small subsets of `QTuiLabel`. Markdown has no
-  headings, lists or tables: these show as their source text. A line break in
-  the source is a line break on the screen. In an HTML file, the browser
+- The text formats are the small subsets of `QTuiLabel`. Markdown has
+  headings, lists and code blocks, but no tables, quotes or rules: these
+  show as their source text. A line break in the source is a line break on
+  the screen. In an HTML file, the browser
   removes unknown tags but shows their content.
 - The browser shows at most 16 MiB of a file.
 - New text always starts at the top. The history does not keep the scroll

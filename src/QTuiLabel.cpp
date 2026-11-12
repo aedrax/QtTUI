@@ -201,18 +201,30 @@ int QTuiLabel::heightForWidth(int width) const
     return qMax(1, int(textLayout(width - frame).lines.size())) + frame;
 }
 
-// Reads Markdown (a small subset) into text, styles and link targets
+// Reads Markdown (a small subset) into text, styles and link targets.
+// Line rules: "# " to "###### " start a heading (bold; level 1 also has an
+// underline), "- ", "* " and "+ " start a list item (shown with a bullet),
+// and a line that starts with ``` starts or ends a code block. A numbered
+// list item ("1. ") shows as it is.
+// ponytail: the wrapped lines of a list item have no indent, and a long
+// code line wraps at the edge. No tables, quotes or rules. Add them to
+// this function if a document needs them.
 static void parseMarkdown(const QString &in, QString *out, QVector<quint32> *styles,
                           QStringList *links)
 {
     quint8 current = 0;
+    quint8 lineBits = 0; // the style of a heading line or a code block
+    bool fence = false;  // inside a code block
     int linkCount = 0;
     int link = 0;     // number of the open link (from 1), or 0
     int linkEnd = -1; // index of the "]" that closes its text
+    // The word wrap drops normal spaces at the start of a line and breaks
+    // lines at them. A no-break space keeps an indent.
+    const QChar indentSpace(0x00A0);
     auto put = [&](QChar ch) {
         out->append(ch);
         if (styles)
-            styles->append(quint32(current) | (quint32(link) << 8));
+            styles->append(quint32(current | lineBits) | (quint32(link) << 8));
     };
     // A marker counts only if the same marker closes it later in the paragraph
     auto closes = [&](int from, const QString &marker) {
@@ -222,6 +234,52 @@ static void parseMarkdown(const QString &in, QString *out, QVector<quint32> *sty
     };
     for (int i = 0; i < in.length(); ++i) {
         const QChar ch = in.at(i);
+        if (link == 0 && (i == 0 || in.at(i - 1) == QLatin1Char('\n'))) {
+            int eol = in.indexOf(QLatin1Char('\n'), i);
+            if (eol < 0)
+                eol = in.length();
+            int k = i; // the first character after the indent
+            while (k < eol && in.at(k) == QLatin1Char(' '))
+                ++k;
+            if (QStringView(in).mid(k, eol - k).startsWith(QLatin1String("```"))) {
+                // The line of the marker does not show
+                fence = !fence;
+                current = 0;
+                lineBits = fence ? 16 : 0;
+                i = eol;
+                continue;
+            }
+            if (!fence) {
+                lineBits = 0;
+                int level = 0;
+                while (i + level < eol && in.at(i + level) == QLatin1Char('#'))
+                    ++level;
+                if (level >= 1 && level <= 6 && i + level < eol && in.at(i + level) == QLatin1Char(' ')) {
+                    lineBits = level == 1 ? 1 | 4 : 1;
+                    i += level; // the loop goes over the space
+                    continue;
+                }
+                int digits = k;
+                while (digits < eol && in.at(digits).isDigit())
+                    ++digits;
+                const bool bullet = k + 1 < eol && QStringLiteral("-*+").contains(in.at(k))
+                    && in.at(k + 1) == QLatin1Char(' ');
+                const bool numbered = digits > k && digits + 1 < eol && in.at(digits) == QLatin1Char('.')
+                    && in.at(digits + 1) == QLatin1Char(' ');
+                if (bullet || (numbered && k > i)) {
+                    for (int j = i; j < k; ++j)
+                        put(indentSpace);
+                    if (bullet)
+                        put(QChar(0x2022)); // the loop continues at the space
+                    i = bullet ? k : k - 1;
+                    continue;
+                }
+            }
+        }
+        if (fence) { // no markup in a code block
+            put(ch == QLatin1Char(' ') ? indentSpace : ch);
+            continue;
+        }
         if (i == linkEnd) {
             // The end of the link text: go over "](url)". The url is not
             // text, so its * and _ are not markup.
