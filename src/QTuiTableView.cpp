@@ -465,7 +465,9 @@ int QTuiTableView::columnsLeft() const
             m_verticalLabelWidth = qMax(m_verticalLabelWidth, QtTuiUnicode::stringWidth(label));
         }
     }
-    const int digits = QString::number(m_model->rowCount(rootIndex())).size();
+    // Space for 7 digits from the start: the width then stays the same
+    // while a model (for example a live log) grows to 9,999,999 rows
+    const int digits = qMax(7, int(QString::number(m_model->rowCount(rootIndex())).size()));
     // One more cell separates the header from the first column
     return qMax(m_verticalLabelWidth, digits) + 1;
 }

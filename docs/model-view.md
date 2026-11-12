@@ -554,8 +554,8 @@ below).
 
 The width of the vertical header does not change when the view scrolls. It
 has space for the labels of the rows that show at the first paint, and for
-the number of the last row. It becomes wider when the row count gets one
-more digit, and the view measures the labels again when the model emits
+a row number of 7 digits. Thus it also does not change while a model grows,
+up to 9,999,999 rows. The view measures the labels again when the model emits
 `headerDataChanged` for the rows. A click on the vertical header does
 nothing. `verticalHeader()->setSectionHidden()` has no effect on the table:
 use `setRowHidden()`.
