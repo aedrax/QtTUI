@@ -895,15 +895,11 @@ void QTuiTextEdit::paintEvent(ScreenBuffer &buffer)
         if (py >= buffer.height())
             break;
         if (row > 0 && lineIdx < m_lines.size()) {
-            // Go to the next visual row
-            if (sub + 1 < starts.size()) {
-                ++sub;
-            } else {
-                ++lineIdx;
-                sub = 0;
-                if (lineIdx < m_lines.size())
-                    starts = rowStarts(lineIdx);
-            }
+            // Go to the next visual row, or past the end of the text
+            if (stepRow(lineIdx, sub, 1))
+                starts = rowStarts(lineIdx);
+            else
+                lineIdx = m_lines.size();
         }
 
         const QString line = (lineIdx < m_lines.size()) ? m_lines.at(lineIdx)
