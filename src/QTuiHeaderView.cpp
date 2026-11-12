@@ -216,6 +216,19 @@ void QTuiHeaderView::paintSection(ScreenBuffer &buffer, const QRect &rect, int l
     renderTextTruncated(buffer, rect.x(), rect.y(), text, rect.width(), style);
 }
 
+// The style of a section: the focused section of a focused header has the
+// focus colors
+Cell QTuiHeaderView::sectionStyle(int logicalIndex, Cell style) const
+{
+    if (hasFocus() && logicalIndex == m_focusedSection) {
+        const auto theme = themeProperties();
+        style.foreground = theme.focusForeground;
+        style.background = theme.focusBackground;
+        style.bold = true;
+    }
+    return style;
+}
+
 void QTuiHeaderView::paintSections(ScreenBuffer &buffer, const QRect &rect, int first,
                                    const QList<int> &sizes, int spacing, const Cell &style) const
 {
@@ -224,14 +237,8 @@ void QTuiHeaderView::paintSections(ScreenBuffer &buffer, const QRect &rect, int 
     for (int i = qMax(0, first); i < sizes.size() && x <= rect.right(); ++i) {
         if (isSectionHidden(i))
             continue;
-        Cell sectionStyle = style;
-        if (hasFocus() && i == m_focusedSection) {
-            sectionStyle.foreground = theme.focusForeground;
-            sectionStyle.background = theme.focusBackground;
-            sectionStyle.bold = true;
-        }
         const int width = qMin(sizes.at(i), rect.right() + 1 - x);
-        paintSection(buffer, QRect(x, rect.y(), width, 1), i, sectionStyle);
+        paintSection(buffer, QRect(x, rect.y(), width, 1), i, sectionStyle(i, style));
         x += width + spacing;
     }
 }
@@ -298,13 +305,7 @@ void QTuiHeaderView::paintEvent(ScreenBuffer &buffer)
         for (int i = 0; i < n && row <= geo.bottom(); ++i) {
             if (isSectionHidden(i))
                 continue;
-            Cell sectionStyle = style;
-            if (hasFocus() && i == m_focusedSection) {
-                sectionStyle.foreground = theme.focusForeground;
-                sectionStyle.background = theme.focusBackground;
-                sectionStyle.bold = true;
-            }
-            paintSection(buffer, QRect(geo.x(), row++, geo.width(), 1), i, sectionStyle);
+            paintSection(buffer, QRect(geo.x(), row++, geo.width(), 1), i, sectionStyle(i, style));
         }
     }
 }

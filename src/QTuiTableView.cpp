@@ -537,19 +537,10 @@ void QTuiTableView::mousePressEvent(TuiMouseEvent *event)
         return;
     }
 
-    // Another button keeps a selection that contains the cell
     m_currentRow = clickedRow;
     m_currentCol = clickedCol;
     snapCurrentToSpan();
-    markDirty();
-    if (event->button() == Qt::LeftButton)
-        selectCurrent(drag ? Qt::ShiftModifier : event->modifiers(), !drag);
-    else if (!isSelected(currentIndex()))
-        selectCurrent(Qt::NoModifier, true);
-    if (event->button() == Qt::LeftButton && !drag) {
-        checkBoxPressEvent(event, currentIndex());
-        emit clicked(currentIndex());
-    }
+    clickCurrent(event, drag);
 }
 
 void QTuiTableView::onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)

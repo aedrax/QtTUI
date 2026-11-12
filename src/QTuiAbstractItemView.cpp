@@ -215,6 +215,20 @@ bool QTuiAbstractItemView::toggleCheckState(const QModelIndex &index)
     return m_model->setData(index, state, Qt::CheckStateRole);
 }
 
+void QTuiAbstractItemView::clickCurrent(const TuiMouseEvent *event, bool drag)
+{
+    markDirty();
+    // Another button keeps a selection that contains the item
+    if (event->button() == Qt::LeftButton)
+        selectCurrent(drag ? Qt::ShiftModifier : event->modifiers(), !drag);
+    else if (!isSelected(currentIndex()))
+        selectCurrent(Qt::NoModifier, true);
+    if (event->button() == Qt::LeftButton && !drag) {
+        checkBoxPressEvent(event, currentIndex());
+        emit clicked(currentIndex());
+    }
+}
+
 bool QTuiAbstractItemView::checkBoxPressEvent(const TuiMouseEvent *event, const QModelIndex &index)
 {
     if (event->mouseType() != TuiMouseEvent::Press || event->button() != Qt::LeftButton)

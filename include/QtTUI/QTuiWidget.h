@@ -267,6 +267,7 @@ protected:
 
 private:
     friend class QTuiMainWindow;
+    void applySizeLimits();
     void setUnderMouse(bool under);
     void setHoverPos(const QPoint &pos);
 

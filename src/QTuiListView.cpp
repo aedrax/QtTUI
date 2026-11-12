@@ -173,18 +173,10 @@ void QTuiListView::mousePressEvent(TuiMouseEvent *event)
         const int clickedRow = logicalRow(clickedLine);
         // Any button selects the row (a context menu then acts on it);
         // only the left button activates it
-        // Another button keeps a selection that contains the row
         m_currentRow = clickedRow;
-        markDirty();
-        if (event->button() == Qt::LeftButton)
-            selectCurrent(drag ? Qt::ShiftModifier : event->modifiers(), !drag);
-        else if (!isSelected(currentIndex()))
-            selectCurrent(Qt::NoModifier, true);
-        if (event->button() == Qt::LeftButton && !drag) {
-            checkBoxPressEvent(event, currentIndex());
-            emit clicked(m_model->index(m_currentRow, 0, rootIndex()));
-            emit activated(m_model->index(m_currentRow, 0, rootIndex()));
-        }
+        clickCurrent(event, drag);
+        if (event->button() == Qt::LeftButton && !drag)
+            emit activated(currentIndex());
     }
 }
 

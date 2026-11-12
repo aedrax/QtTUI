@@ -208,6 +208,10 @@ protected:
     // this after the press made the item current. Returns true if the
     // check state changed.
     bool checkBoxPressEvent(const TuiMouseEvent *event, const QModelIndex &index);
+    // Each view calls this after a press or a drag made an item current.
+    // It updates the selection. A left press also toggles a check box
+    // under the mouse and emits clicked().
+    void clickCurrent(const TuiMouseEvent *event, bool drag);
     // F2 and typed characters (the key edit triggers). Returns true if the
     // key opened an editor.
     bool editKeyPressEvent(TuiKeyEvent *event);

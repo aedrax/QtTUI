@@ -488,9 +488,13 @@ void QTuiWidget::setMinimumSize(const QSize &size)
     if (m_minimumSize == minimum)
         return;
     m_minimumSize = minimum;
+    applySizeLimits();
+}
 
-    // As in QWidget, bring the current size inside the limits. setGeometry()
-    // marks the old and the new area dirty.
+// As in QWidget, brings the current size inside the limits. setGeometry()
+// marks the old and the new area dirty.
+void QTuiWidget::applySizeLimits()
+{
     const QSize bounded = m_geometry.size().expandedTo(m_minimumSize).boundedTo(m_maximumSize);
     if (bounded != m_geometry.size())
         setGeometry(QRect(m_geometry.topLeft(), bounded));
@@ -504,12 +508,7 @@ void QTuiWidget::setMaximumSize(const QSize &size)
     if (m_maximumSize == maximum)
         return;
     m_maximumSize = maximum;
-
-    const QSize bounded = m_geometry.size().expandedTo(m_minimumSize).boundedTo(m_maximumSize);
-    if (bounded != m_geometry.size())
-        setGeometry(QRect(m_geometry.topLeft(), bounded));
-    if (auto *parent = parentWidget(); parent && parent->layout())
-        parent->layout()->invalidate();
+    applySizeLimits();
 }
 
 void QTuiWidget::setMinimumWidth(int width)

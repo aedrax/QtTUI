@@ -107,6 +107,7 @@ protected:
     void keyPressEvent(TuiKeyEvent *event) override;
 
 private:
+    Cell sectionStyle(int logicalIndex, Cell style) const;
     void initSections();
     int nextVisibleSection(int from, int direction) const;
 

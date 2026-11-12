@@ -453,18 +453,9 @@ void QTuiTreeView::mousePressEvent(TuiMouseEvent *event)
     int clickedRow = (event->y() - geo.y() - headerHeight()) + m_scrollOffset;
     const int clickedCol = columnAt(event->x());
     if (clickedRow >= 0 && clickedRow < m_flatList.size() && clickedCol >= 0) {
-        // Another button keeps a selection that contains the item
         m_currentRow = clickedRow;
         m_currentCol = clickedCol;
-        markDirty();
-        if (event->button() == Qt::LeftButton)
-            selectCurrent(drag ? Qt::ShiftModifier : event->modifiers(), !drag);
-        else if (!isSelected(currentIndex()))
-            selectCurrent(Qt::NoModifier, true);
-        if (event->button() == Qt::LeftButton && !drag) {
-            checkBoxPressEvent(event, currentIndex());
-            emit clicked(currentIndex());
-        }
+        clickCurrent(event, drag);
     }
 }
 
