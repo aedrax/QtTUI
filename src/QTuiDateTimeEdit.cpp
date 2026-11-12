@@ -209,43 +209,19 @@ void QTuiDateTimeEdit::typeDigit(QChar digit)
     // Sets the section to value. Returns false if the section cannot have
     // this value.
     auto apply = [this, sec](int value) {
-        QDate d = m_dateTime.date();
-        QTime t = m_dateTime.time();
-        switch (sec) {
-        case Year:
-            if (value < 1)
-                return false;
-            d = QDate(value, d.month(), qMin(d.day(), QDate(value, d.month(), 1).daysInMonth()));
-            break;
-        case Month:
-            if (value < 1 || value > 12)
-                return false;
-            d = QDate(d.year(), value, qMin(d.day(), QDate(d.year(), value, 1).daysInMonth()));
-            break;
-        case Day:
-            if (value < 1 || value > d.daysInMonth())
-                return false;
-            d = QDate(d.year(), d.month(), value);
-            break;
-        case Hour:
-            if (value > 23)
-                return false;
-            t = QTime(value, t.minute(), t.second());
-            break;
-        case Minute:
-            if (value > 59)
-                return false;
-            t = QTime(t.hour(), value, t.second());
-            break;
-        case Second:
-            if (value > 59)
-                return false;
-            t = QTime(t.hour(), t.minute(), value);
-            break;
-        }
-        if (!d.isValid() || !t.isValid())
+        const QDate d = m_dateTime.date();
+        const QTime t = m_dateTime.time();
+        // In the order of Section
+        int f[6] = {d.year(), d.month(), d.day(), t.hour(), t.minute(), t.second()};
+        f[sec] = value;
+        // A new year or month keeps the day inside the month
+        if (sec == Year || sec == Month)
+            f[Day] = qMin(f[Day], QDate(f[Year], f[Month], 1).daysInMonth());
+        const QDate date(f[Year], f[Month], f[Day]);
+        const QTime time(f[Hour], f[Minute], f[Second]);
+        if (!date.isValid() || !time.isValid())
             return false;
-        setDateTime(QDateTime(d, t));
+        setDateTime(QDateTime(date, time));
         return true;
     };
 

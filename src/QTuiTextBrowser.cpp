@@ -241,16 +241,14 @@ void QTuiTextBrowser::keyPressEvent(TuiKeyEvent *event)
     else if (ctrl && key == Qt::Key_B)
         scrollKey = Qt::Key_PageUp;
 
-    if (alt && key == Qt::Key_Left) {
+    // Tab and Shift+Tab come through focusNextPrevChild()
+    if ((alt && key == Qt::Key_Left) || key == Qt::Key_Backspace) {
         backward();
     } else if (alt && key == Qt::Key_Right) {
         forward();
-    } else if (key == Qt::Key_Backspace) {
-        backward();
-    } else if (key == Qt::Key_Left || key == Qt::Key_Backtab
-               || (key == Qt::Key_Tab && (event->modifiers() & Qt::ShiftModifier))) {
+    } else if (key == Qt::Key_Left) {
         moveLink(false);
-    } else if (key == Qt::Key_Right || key == Qt::Key_Tab) {
+    } else if (key == Qt::Key_Right) {
         moveLink(true);
     } else if (key == Qt::Key_Return || key == Qt::Key_Enter) {
         // The label emits linkActivated() for its current link

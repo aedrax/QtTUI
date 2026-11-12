@@ -139,6 +139,8 @@ private:
     int maskInsert(QString &buffer, int pos, const QString &text) const;
     // The buffer without the blanks
     QString stripMask(const QString &buffer) const;
+    // The first position from pos that takes a character
+    int skipSeparators(int pos) const;
 
     QString m_text;          // with a mask: one character per mask position
     int m_cursorPos = 0;     // code-unit index into m_text (cluster boundary)

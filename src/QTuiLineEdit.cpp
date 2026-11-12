@@ -30,9 +30,7 @@ QTuiLineEdit::QTuiLineEdit(QTuiWidget *parent)
     connect(this, &QTuiWidget::focusGained, this, [this]() {
         if (m_mask.isEmpty())
             return;
-        m_cursorPos = 0;
-        while (m_cursorPos < m_mask.size() && m_mask.at(m_cursorPos).separator)
-            ++m_cursorPos;
+        m_cursorPos = skipSeparators(0);
         m_selAnchor = -1;
         adjustScrollToCursor();
         markDirty();
@@ -84,9 +82,7 @@ void QTuiLineEdit::setInputMask(const QString &inputMask)
     m_redoStack.clear();
     m_typingEnd = -1;
     setText(oldText);
-    m_cursorPos = 0;
-    while (m_cursorPos < m_mask.size() && m_mask.at(m_cursorPos).separator)
-        ++m_cursorPos;
+    m_cursorPos = skipSeparators(0);
     if (m_mask.isEmpty())
         m_cursorPos = m_text.length();
     m_selAnchor = -1;
@@ -170,9 +166,14 @@ int QTuiLineEdit::maskInsert(QString &buffer, int pos, const QString &text) cons
     if (!changed)
         return -1;
     // The cursor waits at the next position for a character
-    while (i < size && m_mask.at(i).separator)
-        ++i;
-    return i;
+    return skipSeparators(i);
+}
+
+int QTuiLineEdit::skipSeparators(int pos) const
+{
+    while (pos < m_mask.size() && m_mask.at(pos).separator)
+        ++pos;
+    return pos;
 }
 
 QString QTuiLineEdit::stripMask(const QString &buffer) const

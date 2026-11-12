@@ -238,7 +238,7 @@ private slots:
         QCOMPARE(browser.scrollOffset(), 0);
 
         // The third link is not in view: the browser scrolls to it
-        sendKey(browser, Qt::Key_Tab);
+        sendKey(browser, Qt::Key_Right);
         QCOMPARE(browser.scrollOffset(), 26);
         browser.paintEvent(buffer);
         QCOMPARE(rowText(buffer, 4, 0, 19), QStringLiteral("to the third"));
@@ -252,7 +252,7 @@ private slots:
 
         sendKey(browser, Qt::Key_Left);
         QCOMPARE(browser.scrollOffset(), 1);
-        sendKey(browser, Qt::Key_Backtab, Qt::ShiftModifier);
+        sendKey(browser, Qt::Key_Left);
         QCOMPARE(browser.scrollOffset(), 0);
         sendKey(browser, Qt::Key_Return);
         QCOMPARE(spy.last().at(0).toString(), QStringLiteral("one"));
